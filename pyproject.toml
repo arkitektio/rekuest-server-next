@@ -1,0 +1,30 @@
+[tool.poetry]
+name = "rekuest-server"
+version = "0.1.0"
+description = ""
+authors = ["jhnnsrs <jhnnsrs@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+django = "^4.2.4"
+strawberry-graphql = "^0.199.2"
+strawberry-graphql-django = "^0.16.0"
+channels = "^4.0.0"
+kante = "0.1.6"
+omegaconf = "^2.3.0"
+psycopg = ">=3"
+daphne = "^4.0.0"
+channels-redis = "^4.1.0"
+django-choices-field = "^2.2.2"
+authentikate = "0.1.6"
+namegenerator = "^1.0.6"
+
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.7.0"
+django-stubs = "^4.2.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

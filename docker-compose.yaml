@@ -1,0 +1,27 @@
+version: '3.7'
+
+
+services:
+  db:
+    environment:
+      POSTGRES_MULTIPLE_DATABASES: rekuest_db
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: fostgres
+    image: jhnnsrs/daten-next:prod
+    labels:
+      - "arkitekt.default.service=db"
+  rekuest-next:
+    build: .
+    ports:
+    - 8233:80
+    labels:
+      - "arkitekt.default.service=kreature"
+      - "traefik.enable=true"
+      - "traefik.http.routers.mikro.entrypoints=mikrosecure"
+      - "traefik.http.routers.mikro.rule=Host(`jhnnsrs-server.hyena-sole.ts.net`)"
+      - "traefik.http.services.mikro.loadbalancer.server.port=8080"
+      - "traefik.http.routers.mikro.tls.certresolver=myresolver"
+  redis:
+    image: redis:latest
+    labels:
+      - "arkitekt.default.service=redis"

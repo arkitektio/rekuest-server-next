@@ -1,0 +1,160 @@
+from enum import Enum
+import strawberry
+from django.db.models import TextChoices
+
+
+class RunEventKindChoices(TextChoices):
+    """Event Type for the Event Operator"""
+
+    NEXT = "NEXT", "NEXT (Value represent Item)"
+    ERROR = "ERROR", "Error (Value represent Exception)"
+    COMPLETE = "COMPLETE", "COMPLETE (Value is none)"
+    UNKNOWN = "UNKNOWN", "UNKNOWN (Should never be used)"
+
+
+class ReactiveKindChoices(TextChoices):
+    # Combination
+    ZIP = "ZIP", "ZIP (Zip the data)"
+    COMBINELATEST = (
+        "COMBINELATEST",
+        "COMBINELATEST (Combine values with latest value from each stream)",
+    )
+    WITHLATEST = (
+        "WITHLATEST",
+        "WITHLATEST (Combine a leading value with the latest value)",
+    )
+    BUFFER_COMPLETE = (
+        "BUFFER_COMPLETE",
+        "BUFFER_COMPLETE (Buffer values until complete is retrieved)",
+    )
+    BUFFER_UNTIL = (
+        "BUFFER_UNTIL",
+        "BUFFER_UNTIL (Buffer values until signal is send)",
+    )
+
+    # Delay
+    DELAY = "DELAY", "DELAY (Delay the data)"
+    DELAY_UNTIL = "DELAY_UNTIL", "DELAY_UNTIL (Delay the data until signal is send)"
+
+    # Transformation
+    CHUNK = "CHUNK", "CHUNK (Chunk the data)"
+    SPLIT = "SPLIT", "SPLIT (Split the data)"
+    OMIT = "OMIT", "OMIT (Omit the data)"
+    ENSURE = "ENSURE", "ENSURE (Ensure the data (discards None in the stream))"
+
+    # Basic Operations
+    ADD = "ADD", "ADD (Add a number to the data)"
+    SUBTRACT = "SUBTRACT", "SUBTRACT (Subtract a number from the data)"
+    MULTIPLY = "MULTIPLY", "MULTIPLY (Multiply the data with a number)"
+    DIVIDE = "DIVIDE", "DIVIDE (Divide the data with a number)"
+    MODULO = "MODULO", "MODULO (Modulo the data with a number)"
+    POWER = "POWER", "POWER (Power the data with a number)"
+
+    # String Operations
+    PREFIX = "PREFIX", "PREFIX (Prefix the data with a string)"
+    SUFFIX = "SUFFIX", "SUFFIX (Suffix the data with a string)"
+
+    # Filter operations
+    FILTER = "FILTER", "FILTER (Filter the data of a union)"
+
+    GATE = "GATE", "GATE (Gate the data, first value is gated, second is gate)"
+
+    TO_LIST = "TO_LIST", "TO_LIST (Convert to list)"
+
+    FOREACH = "FOREACH", "FOREACH (Foreach element in list)"
+
+    IF = "IF", "IF (If condition is met)"
+    AND = "AND", "AND (AND condition)"
+    ALL = "ALL", "ALL (establish if all values are Trueish)"
+
+
+@strawberry.enum
+class RunEventKind(Enum):
+    """Event Type for the Event Operator"""
+
+    NEXT = "NEXT"
+    ERROR = "ERROR"
+    COMPLETE = "COMPLETE"
+    UNKNOWN = "UNKNOWN"
+
+
+@strawberry.enum
+class GraphNodeKind(Enum):
+    """Event Type for the Event Operator"""
+
+    ARKITEKT = "ARKITEKT"
+    REACTIVE = "REACTIVE"
+    ARGS = "ARGS"
+    RETURNS = "RETURNS"
+
+
+@strawberry.enum
+class ReactiveImplementation(Enum):
+    """Reactive Node Kind"""
+
+    # Combination
+    ZIP = "ZIP"
+    COMBINELATEST = "COMBINELATEST"
+    WITHLATEST = "WITHLATEST"
+    BUFFER_COMPLETE = "BUFFER_COMPLETE"
+    BUFFER_UNTIL = "BUFFER_UNTILs"
+
+    # Delay
+    DELAY = "DELAY"
+    DELAY_UNTIL = "DELAY_UNTIL"
+
+    # Transformation
+    CHUNK = "CHUNK"
+    SPLIT = "SPLIT"
+    OMIT = "OMIT"
+    ENSURE = "ENSURE"
+
+    # Basic Operations
+    ADD = "ADD"
+    SUBTRACT = "SUBTRACT"
+    MULTIPLY = "MULTIPLY"
+    DIVIDE = "DIVIDE"
+    MODULO = "MODULO"
+    POWER = "POWER"
+
+    # String Operations
+    PREFIX = "PREFIX"
+    SUFFIX = "SUFFIX"
+
+    # Filter operations
+    FILTER = "FILTER"
+
+    GATE = "GATE"
+
+    TO_LIST = "TO_LIST"
+
+    FOREACH = "FOREACH"
+
+    IF = "IF"
+    AND = "AND"
+    ALL = "ALL"
+
+
+@strawberry.enum
+class MapStrategy(Enum):
+    """Map Strategy for Arkitekt"""
+
+    MAP = "MAP"
+    MAP_TO = "MAP_TO"
+    MAP_FROM = "MAP_FROM"
+
+
+@strawberry.enum
+class ContractStatus(Enum):
+    """Scope of the Posrts"""
+
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
+
+
+@strawberry.enum
+class GraphEdgeKind(Enum):
+    """Scope of the Posrt"""
+
+    VANILLA = "VANILLA"
+    LOGGING = "LOGGING"
