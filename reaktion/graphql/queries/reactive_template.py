@@ -10,5 +10,5 @@ from kante.types import Info
 from reaktion import enums, inputs, models, scalars, types
 
 
-def workspace(info: Info, id: strawberry.ID) -> types.Workspace:
-    return models.Workspace.objects.get(id=id)
+def reactive_template(info: Info, id: strawberry.ID) -> types.ReactiveTemplate:
+    return models.ReactiveTemplate.objects.get(id=id)

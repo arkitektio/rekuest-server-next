@@ -146,7 +146,7 @@ class Migration(migrations.Migration):
                             ("AND", "AND (AND condition)"),
                             ("ALL", "ALL (establish if all values are Trueish)"),
                         ],
-                        choices_enum=reaktion.enums.ReactiveKindChoices,
+                        choices_enum=reaktion.enums.ReactiveImplementationChoices,
                         default="ZIP",
                         help_text="Check async Programming Textbook",
                         max_length=1000,

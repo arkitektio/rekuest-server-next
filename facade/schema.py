@@ -28,7 +28,15 @@ class Query:
     provisions: list[types.Provision] = strawberry_django.field()
     node = strawberry_django.field(resolver=queries.node)
     flow = strawberry_django.field(resolver=reaktion_queries.flow)
+    flows: list[reaktion_types.Flow] = strawberry_django.field()
+    workspaces: list[reaktion_types.Workspace] = strawberry_django.field()
     workspace = strawberry_django.field(resolver=reaktion_queries.workspace)
+    reactive_templates: list[
+        reaktion_types.ReactiveTemplate
+    ] = strawberry_django.field()
+    reactive_template = strawberry_django.field(
+        resolver=reaktion_queries.reactive_template
+    )
 
     @strawberry_django.field()
     def agent(self, info: Info, id: strawberry.ID) -> types.Agent:

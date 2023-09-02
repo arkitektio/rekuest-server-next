@@ -213,8 +213,8 @@ class ChildPort:
     child: Optional[
         LazyType["ChildPort", __name__]
     ] = None  # this took me a while to figure out should be more obvious
-    variants: list[
-        LazyType["ChildPort", __name__]
+    variants: Optional[
+        list[LazyType["ChildPort", __name__]]
     ] = None  # this took me a while to figure out should be more obvious
     assign_widget: AssignWidget | None
     return_widget: ReturnWidget | None

@@ -12,7 +12,7 @@ class RunEventKindChoices(TextChoices):
     UNKNOWN = "UNKNOWN", "UNKNOWN (Should never be used)"
 
 
-class ReactiveKindChoices(TextChoices):
+class ReactiveImplementationChoices(TextChoices):
     # Combination
     ZIP = "ZIP", "ZIP (Zip the data)"
     COMBINELATEST = (
@@ -69,7 +69,7 @@ class ReactiveKindChoices(TextChoices):
 
 
 @strawberry.enum
-class RunEventKind(Enum):
+class RunEventKind(str, Enum):
     """Event Type for the Event Operator"""
 
     NEXT = "NEXT"
@@ -79,7 +79,7 @@ class RunEventKind(Enum):
 
 
 @strawberry.enum
-class GraphNodeKind(Enum):
+class GraphNodeKind(str, Enum):
     """Event Type for the Event Operator"""
 
     ARKITEKT = "ARKITEKT"
@@ -89,7 +89,7 @@ class GraphNodeKind(Enum):
 
 
 @strawberry.enum
-class ReactiveImplementation(Enum):
+class ReactiveImplementation(str, Enum):
     """Reactive Node Kind"""
 
     # Combination
@@ -136,7 +136,7 @@ class ReactiveImplementation(Enum):
 
 
 @strawberry.enum
-class MapStrategy(Enum):
+class MapStrategy(str, Enum):
     """Map Strategy for Arkitekt"""
 
     MAP = "MAP"
@@ -145,7 +145,7 @@ class MapStrategy(Enum):
 
 
 @strawberry.enum
-class ContractStatus(Enum):
+class ContractStatus(str, Enum):
     """Scope of the Posrts"""
 
     ACTIVE = "ACTIVE"
@@ -153,7 +153,7 @@ class ContractStatus(Enum):
 
 
 @strawberry.enum
-class GraphEdgeKind(Enum):
+class GraphEdgeKind(str, Enum):
     """Scope of the Posrt"""
 
     VANILLA = "VANILLA"

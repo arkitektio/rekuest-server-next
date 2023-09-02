@@ -33,6 +33,7 @@ class GraphNodeInputModel(BaseModel):
     title: str | None = None
     retries: int | None = None
     retry_delay: int | None = None
+    node_kind: facade_enums.NodeKind | None = None
     next_timeout: int | None = None
     hash: str | None = None
     map_strategy: enums.MapStrategy | None = None
@@ -55,6 +56,7 @@ class GraphNodeInput:
     title: str | None = None
     retries: int | None = None
     retry_delay: int | None = None
+    node_kind: facade_enums.NodeKind | None = None
     next_timeout: int | None = None
     hash: str | None = None
     map_strategy: enums.MapStrategy | None = None
@@ -116,4 +118,21 @@ class GraphInputModel(BaseModel):
 
 @pydantic.input(GraphInputModel, all_fields=True)
 class GraphInput:
+    pass
+
+
+class ReactiveTemplateInputModel(BaseModel):
+    title: str
+    description: str
+    ins: list[list[facade_inputs.PortInputModel]]  # A set of streams
+    outs: list[list[facade_inputs.PortInputModel]]
+    constants: list[facade_inputs.PortInputModel]
+    implementation: enums.ReactiveImplementation
+
+    class Config:
+        use_enum_values = True
+
+
+@pydantic.input(ReactiveTemplateInputModel, all_fields=True)
+class ReactiveTemplateInput:
     pass

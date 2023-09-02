@@ -30,7 +30,7 @@ class Workspace(models.Model):
     )
 
     def __str__(self):
-        return f"{self.name}"
+        return f"{self.title}"
 
 
 class Flow(models.Model):
@@ -75,18 +75,25 @@ class Flow(models.Model):
 
 
 class ReactiveTemplate(models.Model):
-    name = models.CharField(max_length=100, null=True, blank=True)
+    title = models.CharField(max_length=100, null=True, blank=True)
     description = models.CharField(max_length=1000, null=True, blank=True)
-    kind = TextChoicesField(
+    implementation = TextChoicesField(
         max_length=1000,
-        choices_enum=enums.ReactiveKindChoices,
-        default=enums.ReactiveKindChoices.ZIP.value,
+        choices_enum=enums.ReactiveImplementationChoices,
+        default=enums.ReactiveImplementationChoices.ZIP.value,
         help_text="Check async Programming Textbook",
     )
-    instream = models.JSONField(null=True, blank=True, default=list)
-    outstream = models.JSONField(null=True, blank=True, default=list)
-    constream = models.JSONField(null=True, blank=True, default=list)
-    defaults = models.JSONField(null=True, blank=True)
+    ins = models.JSONField(null=True, blank=True, default=list)
+    outs = models.JSONField(null=True, blank=True, default=list)
+    constants = models.JSONField(null=True, blank=True, default=list)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["title", "description"],
+                name="Only one Reactive Template with this title and description",
+            )
+        ]
 
 
 # Montoring Classes

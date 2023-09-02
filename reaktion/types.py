@@ -244,6 +244,21 @@ class Workspace:
 )
 class ReactiveTemplate:
     id: strawberry.ID
+    implementation: enums.ReactiveImplementation
+    title: str
+    description: str | None = None
+
+    @strawberry_django.field()
+    def ins(self, info) -> list[list[facade_types.Port]]:
+        return [[facade_types.PortModel(**i) for i in stream] for stream in self.ins]
+
+    @strawberry_django.field()
+    def outs(self, info) -> list[list[facade_types.Port]]:
+        return [[facade_types.PortModel(**i) for i in stream] for stream in self.outs]
+
+    @strawberry_django.field()
+    def constants(self, info) -> list[list[facade_types.Port]]:
+        return [facade_types.PortModel(**i) for i in self.constants]
 
 
 @strawberry_django.type(models.Run, pagination=True)
