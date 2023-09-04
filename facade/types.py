@@ -320,7 +320,8 @@ class Node:
 )
 class Template:
     id: strawberry.ID
-    name: str
+    name: str | None
+    interface: str
     agent: "Agent"
     node: "Node"
     params: scalars.AnyDefault
@@ -375,6 +376,7 @@ class Reservation:
     updated_at: datetime.datetime
     reference: str
     provisions: list["Provision"]
+    binds: Binds
 
 
 @strawberry_django.type(

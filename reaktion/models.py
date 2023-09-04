@@ -9,6 +9,7 @@ import uuid
 # Create your models here.
 from django_choices_field import TextChoicesField
 from . import enums
+from facade.models import Provision, Assignation
 
 
 class Workspace(models.Model):
@@ -85,6 +86,7 @@ class ReactiveTemplate(models.Model):
     )
     ins = models.JSONField(null=True, blank=True, default=list)
     outs = models.JSONField(null=True, blank=True, default=list)
+    voids = models.JSONField(null=True, blank=True, default=list)
     constants = models.JSONField(null=True, blank=True, default=list)
 
     class Meta:
@@ -101,7 +103,13 @@ class Run(models.Model):
     flow = models.ForeignKey(
         Flow, on_delete=models.CASCADE, null=True, blank=True, related_name="runs"
     )
-    assignation = models.CharField(max_length=100, null=True, blank=True)
+    assignation = models.OneToOneField(
+        Assignation,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="run",
+    )
     status = models.CharField(max_length=100, null=True, blank=True)
     snapshot_interval = models.IntegerField(null=True, blank=True)
     pinned_by = models.ManyToManyField(
@@ -148,9 +156,15 @@ class RunEvent(models.Model):
 
 class Trace(models.Model):
     flow = models.ForeignKey(
-        Flow, on_delete=models.CASCADE, null=True, blank=True, related_name="conditions"
+        Flow, on_delete=models.CASCADE, null=True, blank=True, related_name="traces"
     )
-    provision = models.CharField(max_length=100, null=True, blank=True)
+    provision = models.OneToOneField(
+        Provision,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="trace",
+    )
     snapshot_interval = models.IntegerField(null=True, blank=True)
     pinned_by = models.ManyToManyField(
         get_user_model(),

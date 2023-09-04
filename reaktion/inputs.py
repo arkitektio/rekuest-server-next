@@ -39,6 +39,7 @@ class GraphNodeInputModel(BaseModel):
     map_strategy: enums.MapStrategy | None = None
     allow_local_execution: bool | None = None
     binds: facade_inputs.BindsInputModel | None = None
+    implementation: enums.ReactiveImplementation | None = None
 
 
 @pydantic.input(GraphNodeInputModel)
@@ -63,6 +64,7 @@ class GraphNodeInput:
     allow_local_execution: bool | None = None
     binds: facade_inputs.BindsInput | None = None
     parent_node: str | None = None
+    implementation: enums.ReactiveImplementation | None = None
 
 
 class StreamItemInputModel(BaseModel):

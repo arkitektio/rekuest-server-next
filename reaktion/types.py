@@ -47,9 +47,9 @@ class GraphNode:
     kind: enums.GraphNodeKind
     position: Position
     parent_node: str | None = None
-    ins: list[list[facade_types.Port]]  # A set of streams
-    outs: list[list[facade_types.Port]]
-    constants: list[facade_types.Port]
+    ins: list[list[facade_types.Port]]  # Itmes that are streamed in
+    outs: list[list[facade_types.Port]]  # Items that are streamed out
+    constants: list[facade_types.Port]  # Items that are constants
     constants_map: scalars.ValueMap
     globals_map: scalars.ValueMap
     description: str = "No description"
@@ -257,7 +257,7 @@ class ReactiveTemplate:
         return [[facade_types.PortModel(**i) for i in stream] for stream in self.outs]
 
     @strawberry_django.field()
-    def constants(self, info) -> list[list[facade_types.Port]]:
+    def constants(self, info) -> list[facade_types.Port]:
         return [facade_types.PortModel(**i) for i in self.constants]
 
 

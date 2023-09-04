@@ -21,6 +21,7 @@ class Command(BaseCommand):
                 ins=create_n_empty_streams(2),
                 outs=create_n_empty_streams(1),
                 constants=[],
+                voids=[],
                 implementation=enums.ReactiveImplementation.ZIP,
             )
         ]
@@ -35,5 +36,6 @@ class Command(BaseCommand):
                     constants=serialized["constants"],
                     implementation=node.implementation,
                     ins=serialized["ins"],
+                    voids=[],
                 ),
             )
