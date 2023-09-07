@@ -208,7 +208,7 @@ class Waiter(models.Model):
         ]
 
     def __str__(self):
-        return f"Waiter {self.registry} on {self.identifier}"
+        return f"Waiter {self.registry} on {self.instance_id}"
 
     @property
     def queue(self):
@@ -274,6 +274,12 @@ class Provision(models.Model):
     according to its policy if it wants to wait for reconnect (if connection was Lost), raise an error, or choose another Topic.
 
     """
+    agent = models.ForeignKey(
+        Agent,
+        on_delete=models.CASCADE,
+        help_text="The associated agent for this Provision",
+        related_name="provisions",
+    )
 
     unique = models.UUIDField(
         max_length=1000,
@@ -579,8 +585,6 @@ class TestResult(models.Model):
     result = models.JSONField(default=dict, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
-
-import facade.signals
 
 
 import facade.signals

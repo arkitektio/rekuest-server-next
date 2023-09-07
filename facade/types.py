@@ -194,12 +194,17 @@ class ChildPortModel(BaseModel):
 
 
 class BindsModel(BaseModel):
-    templates: list[str]
+    templates: Optional[list[str]] = None
+    clients: Optional[list[str]] = None
+    desired_instances: int = 1
+    minimum_instances: int = 1
 
 
 @pydantic.type(BindsModel)
 class Binds:
     templates: list[strawberry.ID]
+    clients: list[strawberry.ID]
+    desired_instances: int
 
 
 @pydantic.type(ChildPortModel)
@@ -376,7 +381,7 @@ class Reservation:
     updated_at: datetime.datetime
     reference: str
     provisions: list["Provision"]
-    binds: Binds
+    binds: Binds | None
 
 
 @strawberry_django.type(

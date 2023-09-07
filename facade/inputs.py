@@ -8,12 +8,17 @@ from strawberry import LazyType
 
 
 class BindsInputModel(BaseModel):
-    templates: list[str]
+    templates: Optional[list[str]]
+    clients: Optional[list[str]]
+    desired_instances: int = 1
+
 
 
 @pydantic.input(BindsInputModel)
 class BindsInput:
-    templates: list[strawberry.ID]
+    templates: list[strawberry.ID] | None
+    clients: list[strawberry.ID] | None
+    desired_instances: int | None
 
 
 class EffectDependencyInputModel(BaseModel):

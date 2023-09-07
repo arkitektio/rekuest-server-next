@@ -25,6 +25,7 @@ class Query:
     test_results: list[types.TestResult] = strawberry_django.field()
     test_cases: list[types.TestCase] = strawberry_django.field()
     reservations: list[types.Reservation] = strawberry_django.field()
+    myreservations: list[types.Reservation] = strawberry_django.field(resolver=queries.myreservations)
     provisions: list[types.Provision] = strawberry_django.field()
     node = strawberry_django.field(resolver=queries.node)
     flow = strawberry_django.field(resolver=reaktion_queries.flow)

@@ -7,13 +7,13 @@ import json
 import logging
 from facade.protocol import infer_protocols
 from facade.utils import hash_input
-
+from facade.logic import schedule_reservation
 logger = logging.getLogger(__name__)
 
 
 @strawberry.input
 class ReserveInput:
-    instanceId: scalars.InstanceID
+    instance_id: scalars.InstanceID
     node: strawberry.ID | None = None
     template: strawberry.ID | None = None
     title: str | None = None
@@ -28,9 +28,26 @@ def reserve(info: Info, input: ReserveInput) -> types.Reservation:
         input.binds or inputs.BindsInput(templates=[])
     )
 
-    models.Reservation.objects.get_or_create(
-        reference=reference,
+    registry, _ = models.Registry.objects.get_or_create(
+        app=info.context.request.app, user=info.context.request.user
     )
+        
+
+    waiter, _ = models.Waiter.objects.get_or_create(registry=registry, instance_id=input.instance_id , defaults=dict(name="default"))
+
+    res, _ = models.Reservation.objects.update_or_create(
+        reference=reference,
+        node_id = input.node,
+        waiter=waiter,
+        defaults=dict(
+            title=input.title,
+            binds=strawberry.asdict(input.binds) if input.binds else None,
+        ),
+    )
+
+    schedule_reservation(res)
+
+    return res
 
 
 @strawberry.input

@@ -16,7 +16,7 @@ from django.urls import re_path
 from django.core.asgi import get_asgi_application
 from kante.consumers import KanteHTTPConsumer, KanteWsConsumer
 from kante.cors import CorsMiddleware
-
+from facade.consumers.async_consumer import AgentConsumer
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "rekuest.settings")
 # Initialize Django ASGI application early to ensure the AppRegistry
@@ -35,6 +35,7 @@ gql_ws_consumer = KanteWsConsumer.as_asgi(schema=schema)
 
 websocket_urlpatterns = [
     re_path(r"graphql", gql_ws_consumer),
+    re_path(r"agi", AgentConsumer.as_asgi() )
 ]
 
 application = ProtocolTypeRouter(

@@ -92,6 +92,16 @@ CHANNEL_LAYERS = {
     },
 }
 
+BROKER_URL = f"amqp://{conf.rabbitmq.username}:{conf.rabbitmq.password}@{conf.rabbitmq.host}:{conf.rabbitmq.port}/{conf.rabbitmq.v_host}"
+
+
+BROKER_USERNAME = conf.rabbitmq.username
+BROKER_PASSWORD = conf.rabbitmq.password
+BROKER_HOST = conf.rabbitmq.host
+BROKER_PORT = conf.rabbitmq.port
+BROKER_VHOST = conf.rabbitmq.v_host
+
+
 CORS_ALLOW_ALL_ORIGINS = True
 
 

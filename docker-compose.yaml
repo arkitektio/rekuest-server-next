@@ -13,7 +13,7 @@ services:
   rekuest-next:
     build: .
     ports:
-    - 8233:80
+    - 8234:80
     labels:
       - "arkitekt.default.service=kreature"
       - "traefik.enable=true"
@@ -25,3 +25,8 @@ services:
     image: redis:latest
     labels:
       - "arkitekt.default.service=redis"
+  rabbitmq:
+    command: rabbitmq-server
+    image: jhnnsrs/mister:fancy
+    labels:
+      - "arkitekt.default.service=rabbitmq"
