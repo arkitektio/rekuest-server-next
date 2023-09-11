@@ -6,6 +6,16 @@ from strawberry_django.filters import FilterLookup
 import strawberry_django
 
 
+@strawberry.input
+class SearchFilter:
+    search: Optional[str] | None
+
+    def filter_search(self, queryset, info):
+        if self.search is None:
+            return queryset
+        return queryset.filter(name__icontains=self.search)
+
+
 @strawberry_django.filter(models.TestCase)
 class TestCaseFilter:
     name: Optional[FilterLookup[str]]
@@ -148,7 +158,7 @@ class NodeOrder:
 
 
 @strawberry_django.filter(models.Node)
-class NodeFilter:
+class NodeFilter(SearchFilter):
     name: Optional[FilterLookup[str]]
     ids: list[strawberry.ID] | None
 

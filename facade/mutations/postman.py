@@ -9,7 +9,8 @@ from facade.protocol import infer_protocols
 from facade.utils import hash_input
 from facade.logic import schedule_reservation
 logger = logging.getLogger(__name__)
-
+from facade.connection import redis_pool
+import redis 
 
 @strawberry.input
 class ReserveInput:
@@ -68,13 +69,9 @@ class AssignInput:
 
 
 def assign(info: Info, input: AssignInput) -> types.Assignation:
-    reference = input.reference or hash_input(
-        input.binds or inputs.BindsInput(templates=[])
-    )
+    r = redis.StrictRedis(connection_pool=redis_pool)
+    r.lpush('my_queue', "task_data")
 
-    models.Reservation.objects.get_or_create(
-        reference=reference,
-    )
 
 
 @strawberry.input

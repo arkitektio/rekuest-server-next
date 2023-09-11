@@ -6,6 +6,11 @@ from facade import models, enums
 from authentikate import models as auth_models
 from asgiref.sync import sync_to_async
 from authentikate.utils import authenticate_token_or_none
+
+import redis
+import asyncio
+import redis.asyncio as redis
+
 logger = logging.getLogger(__name__)
 
 class ErrorMessages(BaseModel):
@@ -101,6 +106,20 @@ class AgentConsumer(AsyncWebsocketConsumer):
             provisions=[ProvisionModel.from_provision(p) for p in self.provisions]
         ).json()
         )
+        print("SENT CONNECTED MESSAGE")
+        self.__task = asyncio.create_task(self.listen_for_tasks())
+        self.__task.add_done_callback(lambda x: print("DONE", x))
+
+    async def listen_for_tasks(self):
+
+        connection = redis.Redis(host="redis", auto_close_connection_pool=False)
+        while True:
+            task = await connection.brpoplpush('my_queue', 'processing_queue')
+            if task:
+                await self.send(text_data=json.dumps({
+                    'task': task.decode('utf-8')
+                }))
+                await connection.lrem('processing_queue', 0, task)
         
         
 
