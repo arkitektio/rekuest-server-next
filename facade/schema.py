@@ -127,6 +127,7 @@ schema = strawberry.Schema(
         types.CustomEffect,
         types.MessageEffect,
         reaktion_types.ArkitektGraphNode,
+        reaktion_types.ArkitektFilterGraphNode,
         reaktion_types.RetriableNode,
         reaktion_types.ArgNode,
         reaktion_types.ReturnNode,

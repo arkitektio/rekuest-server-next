@@ -27,6 +27,7 @@ class GraphNodeInputModel(BaseModel):
     ins: list[list[facade_inputs.PortInputModel]]  # A set of streams
     outs: list[list[facade_inputs.PortInputModel]]
     constants: list[facade_inputs.PortInputModel]
+    voids: list[facade_inputs.PortInputModel]
     constants_map: Dict[str, Any]
     globals_map: Dict[str, Any]
     description: str | None = None
@@ -51,6 +52,7 @@ class GraphNodeInput:
     ins: list[list[facade_inputs.PortInput]]  # A set of streams
     outs: list[list[facade_inputs.PortInput]]
     constants: list[facade_inputs.PortInput]
+    voids: list[facade_inputs.PortInput]
     constants_map: scalars.ValueMap
     globals_map: scalars.ValueMap
     description: str | None = None

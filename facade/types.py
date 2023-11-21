@@ -317,7 +317,7 @@ class Node:
 
     @strawberry_django.field()
     def returns(self) -> list[Port]:
-        return [PortModel(**i) for i in self.args]
+        return [PortModel(**i) for i in self.returns]
 
 
 @strawberry_django.type(

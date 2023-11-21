@@ -215,6 +215,40 @@ class Waiter(models.Model):
         return f"waiter_{self.unique}"
 
 
+class Dependency(models.Model):
+    template = models.ForeignKey(
+        "Template",
+        on_delete=models.CASCADE,
+        help_text="The Template that has this dependency",
+        related_name="dependencies",
+    )
+    node = models.ForeignKey(
+        Node,
+        on_delete=models.CASCADE,
+        help_text="The node this dependency is for",
+        related_name="dependencies",
+    )
+    reference = models.CharField(
+        max_length=1000,
+        help_text="A reference for this dependency",
+        null=True,
+        blank=True,
+    )
+    optional = models.BooleanField(
+        default=False,
+        help_text="Is this dependency optional (e.g. can we still use the template if this dependency is not met)",
+    )
+    binds = models.JSONField(
+        max_length=2000,
+        default=dict,
+        help_text="The binds for this dependency (Determines which templates can be used for this dependency)",
+    )
+    viable_instances = models.IntegerField(
+        default=1,
+        help_text="How many instances of this dependency do we need to be viable",
+    )
+
+
 class Template(models.Model):
     """A Template is a conceptual implementation of A Node. It represents its implementation as well as its performance"""
 
@@ -274,6 +308,7 @@ class Provision(models.Model):
     according to its policy if it wants to wait for reconnect (if connection was Lost), raise an error, or choose another Topic.
 
     """
+
     agent = models.ForeignKey(
         Agent,
         on_delete=models.CASCADE,
@@ -293,16 +328,17 @@ class Provision(models.Model):
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        help_text="Reservation that created this provision (if we were auto created)",
+        help_text="Reservation that created this provision",
         related_name="created_provisions",
     )
 
     # Provisions are bound to templates, and through that to an agent
-    template = models.ForeignKey(
+    # A TEMPLATE CAN ONLY BE BOUND TO ONE PROVISION
+    template = models.OneToOneField(
         Template,
         on_delete=models.CASCADE,
         help_text="The Template for this Provision",
-        related_name="provisions",
+        related_name="provision",
         null=True,
         blank=True,
     )
@@ -584,7 +620,6 @@ class TestResult(models.Model):
     passed = models.BooleanField(default=False)
     result = models.JSONField(default=dict, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-
 
 
 import facade.signals

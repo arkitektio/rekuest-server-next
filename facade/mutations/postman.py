@@ -8,23 +8,13 @@ import logging
 from facade.protocol import infer_protocols
 from facade.utils import hash_input
 from facade.logic import schedule_reservation
+
 logger = logging.getLogger(__name__)
 from facade.connection import redis_pool
-import redis 
-
-@strawberry.input
-class ReserveInput:
-    instance_id: scalars.InstanceID
-    node: strawberry.ID | None = None
-    template: strawberry.ID | None = None
-    title: str | None = None
-    hash: scalars.NodeHash | None = None
-    provision: strawberry.ID | None = None
-    reference: str | None = None
-    binds: inputs.BindsInput | None = None
+import redis
 
 
-def reserve(info: Info, input: ReserveInput) -> types.Reservation:
+def reserve(info: Info, input: inputs.ReserveInput) -> types.Reservation:
     reference = input.reference or hash_input(
         input.binds or inputs.BindsInput(templates=[])
     )
@@ -32,13 +22,14 @@ def reserve(info: Info, input: ReserveInput) -> types.Reservation:
     registry, _ = models.Registry.objects.get_or_create(
         app=info.context.request.app, user=info.context.request.user
     )
-        
 
-    waiter, _ = models.Waiter.objects.get_or_create(registry=registry, instance_id=input.instance_id , defaults=dict(name="default"))
+    waiter, _ = models.Waiter.objects.get_or_create(
+        registry=registry, instance_id=input.instance_id, defaults=dict(name="default")
+    )
 
     res, _ = models.Reservation.objects.update_or_create(
         reference=reference,
-        node_id = input.node,
+        node_id=input.node,
         waiter=waiter,
         defaults=dict(
             title=input.title,
@@ -70,8 +61,7 @@ class AssignInput:
 
 def assign(info: Info, input: AssignInput) -> types.Assignation:
     r = redis.StrictRedis(connection_pool=redis_pool)
-    r.lpush('my_queue', "task_data")
-
+    r.lpush("my_queue", "task_data")
 
 
 @strawberry.input

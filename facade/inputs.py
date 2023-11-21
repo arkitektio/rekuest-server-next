@@ -13,7 +13,6 @@ class BindsInputModel(BaseModel):
     desired_instances: int = 1
 
 
-
 @pydantic.input(BindsInputModel)
 class BindsInput:
     templates: list[strawberry.ID] | None
@@ -197,3 +196,27 @@ class DefinitionInput:
     kind: enums.NodeKind
     is_test_for: list[str] | None = strawberry.field(default_factory=list)
     interfaces: list[str] | None = strawberry.field(default_factory=list)
+
+
+@strawberry.input
+class DependencyInput:
+    """A dependency for a template. By defining dependencies, you can
+    create a dependency graph for your templates and nodes"""
+
+    node: strawberry.ID | None = None
+    hash: scalars.NodeHash | None = None
+    reference: str | None = None  # How to reference this dependency (e.g. if it corresponds to a node_id in a flow)
+    binds: BindsInput | None = None
+    optional: bool = False
+    viable_instances: int | None = None
+
+
+@strawberry.input
+class ReserveInput:
+    instance_id: scalars.InstanceID
+    node: strawberry.ID | None = None
+    template: strawberry.ID | None = None
+    title: str | None = None
+    hash: scalars.NodeHash | None = None
+    reference: str | None = None
+    binds: BindsInput | None = None

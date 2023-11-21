@@ -44,6 +44,7 @@ def infer_node_scope(definition: inputs.DefinitionInput):
 @strawberry.input
 class CreateTemplateInput:
     definition: inputs.DefinitionInput
+    dependencies: inputs.DependencyInput | None = None
     interface: str
     params: scalars.AnyDefault | None = None
     instance_id: scalars.InstanceID | None = None
@@ -88,7 +89,6 @@ def create_template(info: Info, input: CreateTemplateInput) -> types.Template:
         )
 
         protocols = infer_protocols(definition)
-        print(protocols)
         node.protocols.add(*protocols)
 
         if definition.is_test_for:
@@ -103,11 +103,12 @@ def create_template(info: Info, input: CreateTemplateInput) -> types.Template:
         logger.info(f"Created {node}")
 
     try:
-        template = models.Template.objects.get(interface=input.interface, agent=agent)
+        template = models.Template.objects.get(
+            interface=input.interface,
+            agent=agent,
+        )
 
-        if template.node.hash == hash:
-            return template
-        else:
+        if template.node.hash != hash:
             if template.node.templates.count() == 1:
                 logger.info("Deleting Node because it has no more templates")
                 template.node.delete()
@@ -115,7 +116,7 @@ def create_template(info: Info, input: CreateTemplateInput) -> types.Template:
         template.node = node
         template.save()
 
-    except:
+    except models.Template.DoesNotExist:
         template = models.Template.objects.create(
             interface=input.interface,
             node=node,
@@ -124,4 +125,3 @@ def create_template(info: Info, input: CreateTemplateInput) -> types.Template:
 
     return template
 
-    raise NotImplementedError("Mutation create_template is not implemented")

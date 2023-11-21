@@ -86,6 +86,7 @@ class GraphNodeKind(str, Enum):
     REACTIVE = "REACTIVE"
     ARGS = "ARGS"
     RETURNS = "RETURNS"
+    ARKITEKT_FILTER = "ARKITEKT_FILTER"
 
 
 @strawberry.enum

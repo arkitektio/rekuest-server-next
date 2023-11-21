@@ -35,6 +35,7 @@ class GraphNodeModel(BaseModel):
     ins: list[list[facade_types.PortModel]]  # A set of streams
     outs: list[list[facade_types.PortModel]]
     constants: list[facade_types.PortModel]
+    voids: list[facade_types.PortModel]
     constants_map: Dict[str, Any]
     globals_map: Dict[str, Any]
     description: str
@@ -50,6 +51,7 @@ class GraphNode:
     ins: list[list[facade_types.Port]]  # Itmes that are streamed in
     outs: list[list[facade_types.Port]]  # Items that are streamed out
     constants: list[facade_types.Port]  # Items that are constants
+    voids: list[facade_types.Port]  # Items that are voids
     constants_map: scalars.ValueMap
     globals_map: scalars.ValueMap
     description: str = "No description"
@@ -84,9 +86,27 @@ class ArkitektGraphNodeModel(GraphNodeModel, RetriableNodeModel, AssignableNodeM
     binds: facade_types.BindsModel
     node_kind: facade_enums.NodeKind
 
+class ArkitektFilterGraphNodeModel(GraphNodeModel, RetriableNodeModel, AssignableNodeModel):
+    kind: Literal["ARKITEKT_FILTER"]
+    hash: str
+    map_strategy: str
+    allow_local_execution: bool
+    binds: facade_types.BindsModel
+    node_kind: facade_enums.NodeKind
+
+
 
 @pydantic.type(ArkitektGraphNodeModel)
 class ArkitektGraphNode(GraphNode, RetriableNode, AssignableNode):
+    hash: str
+    map_strategy: enums.MapStrategy
+    allow_local_execution: bool
+    binds: facade_types.Binds
+    node_kind: facade_enums.NodeKind
+
+
+@pydantic.type(ArkitektFilterGraphNodeModel)
+class ArkitektFilterGraphNode(GraphNode, RetriableNode, AssignableNode):
     hash: str
     map_strategy: enums.MapStrategy
     allow_local_execution: bool
@@ -115,6 +135,9 @@ class ReactiveNode(GraphNode):
     implementation: enums.ReactiveImplementation
 
 
+
+
+
 class ReturnNodeModel(GraphNodeModel):
     kind: Literal["RETURNS"]
     return_stuff: str | None = None
@@ -126,7 +149,7 @@ class ReturnNode(GraphNode):
 
 
 GraphNodeModelUnion = Union[
-    ArkitektGraphNodeModel, ReactiveNodeModel, ArgNodeModel, ReturnNodeModel
+    ArkitektGraphNodeModel, ReactiveNodeModel, ArgNodeModel, ReturnNodeModel, ArkitektFilterGraphNodeModel
 ]
 
 
@@ -259,6 +282,10 @@ class ReactiveTemplate:
     @strawberry_django.field()
     def constants(self, info) -> list[facade_types.Port]:
         return [facade_types.PortModel(**i) for i in self.constants]
+    
+    @strawberry_django.field()
+    def voids(self, info) -> list[facade_types.Port]:
+        return []
 
 
 @strawberry_django.type(models.Run, pagination=True)
