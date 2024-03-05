@@ -245,6 +245,7 @@ class PortModel(BaseModel):
     identifier: str | None = None
     nullable: bool
     effects: list[EffectModelUnion] | None
+    validators: list[str] | None
     default: str | None
     variants: list[ChildPortModel] | None
     assign_widget: AssignWidgetModelUnion | None
@@ -262,6 +263,7 @@ class Port:
     key: str
     nullable: bool
     label: str | None
+    validators: list[scalars.Validator] | None
     description: str | None
     effects: list[Effect] | None
     child: Optional[ChildPort] = None
@@ -302,7 +304,6 @@ class Node:
     name: str
     kind: enums.NodeKind
     description: str | None
-    port_groups: list[PortGroup]
     collections: list["Collection"]
     templates: list["Template"]
     scope: enums.NodeScope
@@ -318,6 +319,10 @@ class Node:
     @strawberry_django.field()
     def returns(self) -> list[Port]:
         return [PortModel(**i) for i in self.returns]
+    
+    @strawberry_django.field()
+    def port_groups(self) -> list[PortGroup]:
+        return [PortGroupModel(**i) for i in self.port_groups]
 
 
 @strawberry_django.type(

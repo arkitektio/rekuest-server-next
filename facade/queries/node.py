@@ -30,4 +30,7 @@ def node(
 
     if hash:
         return models.Node.objects.get(hash=hash)
+    
+
+    print("ID: ", id)
     return models.Node.objects.get(id=id)

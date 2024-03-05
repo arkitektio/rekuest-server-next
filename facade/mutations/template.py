@@ -6,39 +6,11 @@ import hashlib
 import json
 import logging
 from facade.protocol import infer_protocols
-
+from facade.unique import infer_node_scope
 
 logger = logging.getLogger(__name__)
 
 
-def traverse_scope(port: inputs.ChildPortInput, scope=enums.PortScope.LOCAL):
-    if port.kind == enums.PortKind.STRUCTURE:
-        if port.scope == scope:
-            return True
-    if port.child:
-        return traverse_scope(port.child, scope)
-    return False
-
-
-def has_locals(ports: list[inputs.ChildPortInput]):
-    for port in ports:
-        if traverse_scope(port, enums.PortScope.LOCAL):
-            return True
-    return False
-
-
-def infer_node_scope(definition: inputs.DefinitionInput):
-    has_local_argports = has_locals(definition.args)
-    has_local_returnports = has_locals(definition.returns)
-
-    if has_local_argports and has_local_returnports:
-        return enums.NodeScope.LOCAL
-    if not has_local_argports and not has_local_returnports:
-        return enums.NodeScope.GLOBAL
-    if not has_local_argports and has_local_returnports:
-        return enums.NodeScope.BRIDGE_GLOBAL_TO_LOCAL
-    if has_local_argports and not has_local_returnports:
-        return enums.NodeScope.BRIDGE_LOCAL_TO_GLOBAL
 
 
 @strawberry.input

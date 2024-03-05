@@ -7,7 +7,7 @@ services:
       POSTGRES_MULTIPLE_DATABASES: rekuest_db
       POSTGRES_PASSWORD: postgres
       POSTGRES_USER: fostgres
-    image: jhnnsrs/daten-next:prod
+    image: jhnnsrs/daten:next
     labels:
       - "arkitekt.default.service=db"
   rekuest-next:

@@ -149,6 +149,7 @@ class PortInputModel(BaseModel):
     identifier: str | None = None
     nullable: bool
     effects: list[EffectInputModel] | None
+    validators: list[str]  = []
     default: Any | None = None
     child: ChildPortInputModel | None = None
     variants: list["ChildPortInputModel"] | None
@@ -166,6 +167,7 @@ class PortInput:
     description: str | None = None
     identifier: str | None = None
     nullable: bool
+    validators: list[scalars.Validator] | None = strawberry.field(default_factory=list)
     effects: list[EffectInput] | None = strawberry.field(default_factory=list)
     default: scalars.AnyDefault | None = None
     child: Optional[LazyType["ChildPortInput", __name__]] = None
@@ -176,14 +178,30 @@ class PortInput:
     return_widget: Optional["ReturnWidgetInput"] = None
     groups: list[str] | None = strawberry.field(default_factory=list)
 
+class PortGroupInputModel(BaseModel):
+    key: str
+    hidden: bool
 
-@strawberry.input()
+
+@pydantic.input(PortGroupInputModel)
 class PortGroupInput:
     key: str
     hidden: bool
 
 
-@strawberry.input()
+class DefinitionInputModel(BaseModel):
+    description: str | None
+    collections: list[str] = []
+    name: str
+    port_groups: list[PortGroupInputModel] = []
+    args: list[PortInputModel]
+    returns: list[PortInputModel]
+    kind: enums.NodeKind
+    is_test_for: list[str] = []
+    interfaces: list[str] = []
+
+
+@pydantic.input(DefinitionInputModel)
 class DefinitionInput:
     """A definition for a template"""
 
