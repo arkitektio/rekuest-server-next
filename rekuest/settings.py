@@ -47,7 +47,6 @@ INSTALLED_APPS = [
     "koherent",
     "kante",
     "facade",
-    "reaktion",
 ]
 
 # Authentikate section

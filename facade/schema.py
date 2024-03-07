@@ -10,9 +10,6 @@ from typing import Any, Type
 from facade import types, models, mutations, subscriptions, scalars, queries
 from strawberry.field_extensions import InputMutationExtension
 import strawberry_django
-from reaktion.graphql import queries as reaktion_queries
-from reaktion.graphql import mutations as reaktion_mutations
-from reaktion import types as reaktion_types
 from koherent.strawberry.extension import KoherentExtension
 from authentikate.strawberry.permissions import IsAuthenticated
 
@@ -28,16 +25,6 @@ class Query:
     myreservations: list[types.Reservation] = strawberry_django.field(resolver=queries.myreservations)
     provisions: list[types.Provision] = strawberry_django.field()
     node = strawberry_django.field(resolver=queries.node)
-    flow = strawberry_django.field(resolver=reaktion_queries.flow)
-    flows: list[reaktion_types.Flow] = strawberry_django.field()
-    workspaces: list[reaktion_types.Workspace] = strawberry_django.field()
-    workspace = strawberry_django.field(resolver=reaktion_queries.workspace)
-    reactive_templates: list[
-        reaktion_types.ReactiveTemplate
-    ] = strawberry_django.field()
-    reactive_template = strawberry_django.field(
-        resolver=reaktion_queries.reactive_template
-    )
 
     @strawberry_django.field()
     def agent(self, info: Info, id: strawberry.ID) -> types.Agent:
@@ -90,14 +77,6 @@ class Mutation:
     create_test_result: types.TestResult = strawberry_django.mutation(
         resolver=mutations.create_test_result
     )
-    update_workspace = strawberry_django.mutation(
-        resolver=reaktion_mutations.update_workspace
-    )
-    create_workspace = strawberry_django.mutation(
-        permission_classes=[IsAuthenticated],
-        resolver=reaktion_mutations.create_workspace,
-    )
-
 
 @strawberry.type
 class Subscription:
@@ -126,14 +105,6 @@ schema = strawberry.Schema(
         types.CustomAssignWidget,
         types.CustomEffect,
         types.MessageEffect,
-        reaktion_types.ArkitektGraphNode,
-        reaktion_types.ArkitektFilterGraphNode,
-        reaktion_types.RetriableNode,
-        reaktion_types.ArgNode,
-        reaktion_types.ReturnNode,
-        reaktion_types.VanillaEdge,
-        reaktion_types.LoggingEdge,
-        reaktion_types.ReactiveNode,
     ]  # We really need to register
     # all the types here, otherwise the schema will not be able to resolve them
     # and will throw a cryptic error
