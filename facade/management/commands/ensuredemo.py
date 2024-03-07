@@ -36,6 +36,15 @@ definitions = [
         returns=[inputs.PortInputModel(key="difference", scope="GLOBAL", kind="FLOAT", nullable=False, effects=[])],
         port_groups=[inputs.PortGroupInputModel(key="default", hidden=False)]
     ),
+    inputs.DefinitionInputModel(
+        name="Intense Validator",
+        kind="FUNCTION",
+        description="Subtracts two numbers",
+        args=[inputs.PortInputModel(
+            key="a", scope="GLOBAL", kind="INT", nullable=False, effects=[], validators=["(value, otherValues) =>  value > 4 || 'Fuck you' "]), inputs.PortInputModel(key="b", scope="GLOBAL", kind="FLOAT", nullable=False, effects=[], validators=["(value, otherValues) => { if (value < 0) return 'Value must be positive'; }"])],
+        returns=[inputs.PortInputModel(key="difference", scope="GLOBAL", kind="FLOAT", nullable=False, effects=[])],
+        port_groups=[inputs.PortGroupInputModel(key="default", hidden=False)]
+    ),
 ]
 
 
