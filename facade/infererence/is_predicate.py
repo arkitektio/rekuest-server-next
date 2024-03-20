@@ -1,8 +1,8 @@
-from facade.inputs import DefinitionInput
+from rekuest_core.inputs.models import DefinitionInputModel
 from facade.models import Protocol
-from facade.enums import PortKind
+from rekuest_core.enums import PortKind
 
-def is_predicate(definition: DefinitionInput) -> Protocol:
+def is_predicate(definition: DefinitionInputModel) -> Protocol:
     print(definition)
 
     if not definition.returns:

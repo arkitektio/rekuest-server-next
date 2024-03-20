@@ -205,11 +205,6 @@ class LogLevel(str, Enum):
     CRITICAL = "CRITICAL"
 
 
-@strawberry.enum
-class NodeKind(str, Enum):
-    FUNCTION = "FUNCTION"
-    GENERATOR = "GENERATOR"
-
 
 @strawberry.enum
 class AgentStatus(str, Enum):
@@ -217,54 +212,6 @@ class AgentStatus(str, Enum):
     KICKED = "KICKED"
     DISCONNECTED = "DISCONNECTED"
     VANILLA = "VANILLA"
-
-
-@strawberry.enum
-class PortKind(str, Enum):
-    INT = "INT"
-    STRING = "STRING"
-    STRUCTURE = "STRUCTURE"
-    LIST = "LIST"
-    BOOL = "BOOL"
-    DICT = "DICT"
-    FLOAT = "FLOAT"
-    DATE = "DATE"
-    UNION = "UNION"
-
-
-@strawberry.enum
-class AssignWidgetKind(str, Enum):
-    SEARCH = "SEARCH"
-    CHOICE = "CHOICE"
-    SLIDER = "SLIDER"
-    CUSTOM = "CUSTOM"
-    STRING = "STRING"
-
-
-@strawberry.enum
-class ReturnWidgetKind(str, Enum):
-    CHOICE = "CHOICE"
-    CUSTOM = "CUSTOM"
-
-
-@strawberry.enum
-class EffectKind(str, Enum):
-    MESSAGE = "MESSAGE"
-    CUSTOM = "CUSTOM"
-
-
-@strawberry.enum
-class LogicalCondition(str, Enum):
-    IS = "IS"
-    IS_NOT = "IS_NOT"
-    IN = "IN"
-
-
-@strawberry.enum
-class PortScope(str, Enum):
-    GLOBAL = "GLOBAL"
-    LOCAL = "LOCAL"
-
 
 @strawberry.enum
 class NodeScope(str, Enum):

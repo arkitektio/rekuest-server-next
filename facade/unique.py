@@ -1,15 +1,16 @@
 import hashlib
-from facade import inputs, scalars, enums
+from rekuest_core.inputs import models 
+from rekuest_core import enums, scalars
 import json
 
-def calculate_node_hash(definition: inputs.DefinitionInputModel) -> scalars.NodeHash:
+def calculate_node_hash(definition: models.DefinitionInputModel) -> scalars.NodeHash:
     """Calculates the hash for a node."""
     return hashlib.sha256(
         json.dumps(definition.dict(), sort_keys=True).encode("utf-8")
     ).hexdigest()
 
 
-def traverse_scope(port: inputs.ChildPortInput, scope=enums.PortScope.LOCAL):
+def traverse_scope(port: models.ChildPortInputModel, scope=enums.PortScope.LOCAL):
     if port.kind == enums.PortKind.STRUCTURE:
         if port.scope == scope:
             return True
@@ -18,14 +19,14 @@ def traverse_scope(port: inputs.ChildPortInput, scope=enums.PortScope.LOCAL):
     return False
 
 
-def has_locals(ports: list[inputs.ChildPortInput]):
+def has_locals(ports: list[models.ChildPortInputModel]):
     for port in ports:
         if traverse_scope(port, enums.PortScope.LOCAL):
             return True
     return False
 
 
-def infer_node_scope(definition: inputs.DefinitionInput):
+def infer_node_scope(definition: models.DefinitionInputModel):
     has_local_argports = has_locals(definition.args)
     has_local_returnports = has_locals(definition.returns)
 

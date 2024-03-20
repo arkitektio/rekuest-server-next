@@ -11,267 +11,10 @@ from strawberry import LazyType
 from typing import Literal, Union
 from authentikate.strawberry.types import App, User
 import datetime
-
-
-class ChoiceModel(BaseModel):
-    label: str
-    value: str
-    description: str | None
-
-
-@pydantic.type(ChoiceModel, fields=["label", "value", "description"])
-class Choice:
-    pass
-
-
-class AssignWidgetModel(BaseModel):
-    kind: str
-
-
-class SliderAssignWidgetModel(AssignWidgetModel):
-    kind: Literal["SLIDER"]
-    min: int | None
-    max: int | None
-
-
-class ChoiceAssignWidgetModel(AssignWidgetModel):
-    kind: Literal["CHOICE"]
-    choices: list[ChoiceModel] | None
-
-
-class CustomAssignWidgetModel(AssignWidgetModel):
-    kind: Literal["CUSTOM"]
-    hook: str
-    ward: str
-
-
-class SearchAssignWidgetModel(AssignWidgetModel):
-    kind: Literal["SEARCH"]
-    query: str  # TODO: Validators
-    ward: str
-
-
-class StringWidgetModel(AssignWidgetModel):
-    kind: Literal["STRING"]
-    placeholder: str
-    as_paragraph: bool
-
-
-AssignWidgetModelUnion = Union[
-    SliderAssignWidgetModel, ChoiceAssignWidgetModel, SearchAssignWidgetModel
-]
-
-
-class ReturnWidgetModel(BaseModel):
-    kind: str
-
-
-class CustomReturnWidgetModel(ReturnWidgetModel):
-    hook: str
-    ward: str
-
-
-class ChoiceReturnWidgetModel(ReturnWidgetModel):
-    kind: Literal["CHOICE"]
-    choices: list[ChoiceModel] | None
-
-
-ReturnWidgetModelUnion = Union[CustomReturnWidgetModel, ChoiceReturnWidgetModel]
-
-
-@pydantic.interface(AssignWidgetModel)
-class AssignWidget:
-    kind: enums.AssignWidgetKind
-
-
-@pydantic.type(SliderAssignWidgetModel)
-class SliderAssignWidget(AssignWidget):
-    min: int | None
-    max: int | None
-
-
-@pydantic.type(ChoiceAssignWidgetModel)
-class ChoiceAssignWidget(AssignWidget):
-    choices: strawberry.auto
-
-
-@pydantic.type(CustomAssignWidgetModel)
-class CustomAssignWidget(AssignWidget):
-    hook: str
-    ward: str
-
-
-@pydantic.type(SearchAssignWidgetModel)
-class SearchAssignWidget(AssignWidget):
-    query: str
-    ward: str
-
-
-@pydantic.type(StringWidgetModel)
-class StringAssignWidget(AssignWidget):
-    placeholder: str
-    as_paragraph: bool
-
-
-@pydantic.interface(ReturnWidgetModel)
-class ReturnWidget:
-    kind: enums.ReturnWidgetKind
-
-
-@pydantic.type(CustomReturnWidgetModel)
-class CustomReturnWidget(ReturnWidget):
-    hook: str
-    ward: str
-
-
-@pydantic.type(ChoiceReturnWidgetModel)
-class ChoiceReturnWidget(ReturnWidget):
-    choices: strawberry.auto
-
-
-class EffectDependencyModel(BaseModel):
-    condition: str
-    key: str
-    value: str
-
-
-@pydantic.type(EffectDependencyModel)
-class EffectDependency:
-    condition: enums.LogicalCondition
-    key: str
-    value: str
-
-
-class EffectModel(BaseModel):
-    dependencies: list[EffectDependencyModel]
-    kind: str
-
-
-class MessageEffectModel(EffectModel):
-    kind: Literal["MESSAGE"]
-    message: str
-
-
-class CustomEffectModel(EffectModel):
-    kind: Literal["CUSTOM"]
-    hook: str
-    ward: str
-
-
-@pydantic.interface(EffectModel)
-class Effect:
-    kind: str
-    dependencies: list[EffectDependency]
-    pass
-
-
-@pydantic.type(MessageEffectModel)
-class MessageEffect(Effect):
-    message: str
-
-
-@pydantic.type(CustomEffectModel)
-class CustomEffect(Effect):
-    ward: str
-    hook: str
-
-
-EffectModelUnion = Union[MessageEffectModel, CustomEffectModel]
-
-
-class ChildPortModel(BaseModel):
-    label: str | None
-    scope: str
-    kind: str
-    child: Optional["ChildPortModel"] = None
-    description: str | None
-    identifier: str | None
-    nullable: bool
-    default: str | None
-    variants: list["ChildPortModel"] | None
-    assign_widget: AssignWidgetModelUnion | None
-    return_widget: ReturnWidgetModelUnion | None
-
-
-class BindsModel(BaseModel):
-    templates: Optional[list[str]] = None
-    clients: Optional[list[str]] = None
-    desired_instances: int = 1
-    minimum_instances: int = 1
-
-
-@pydantic.type(BindsModel)
-class Binds:
-    templates: list[strawberry.ID]
-    clients: list[strawberry.ID]
-    desired_instances: int
-
-
-@pydantic.type(ChildPortModel)
-class ChildPort:
-    label: strawberry.auto
-    identifier: scalars.Identifier | None
-    default: scalars.AnyDefault | None
-    scope: enums.PortScope
-    kind: enums.PortKind
-    nullable: bool
-    child: Optional[
-        LazyType["ChildPort", __name__]
-    ] = None  # this took me a while to figure out should be more obvious
-    variants: Optional[
-        list[LazyType["ChildPort", __name__]]
-    ] = None  # this took me a while to figure out should be more obvious
-    assign_widget: AssignWidget | None
-    return_widget: ReturnWidget | None
-
-
-class PortGroupModel(BaseModel):
-    key: str
-    hidden: bool
-
-
-@pydantic.type(PortGroupModel)
-class PortGroup:
-    key: str
-    hidden: bool
-
-
-class PortModel(BaseModel):
-    key: str
-    scope: str
-    label: str | None = None
-    kind: str
-    description: str | None = None
-    identifier: str | None = None
-    nullable: bool
-    effects: list[EffectModelUnion] | None
-    validators: list[str] | None
-    default: str | None
-    variants: list[ChildPortModel] | None
-    assign_widget: AssignWidgetModelUnion | None
-    return_widget: ReturnWidgetModelUnion | None
-    child: Optional[ChildPortModel] = None
-    groups: list[str] | None
-
-
-@pydantic.type(PortModel)
-class Port:
-    identifier: scalars.Identifier | None
-    default: scalars.AnyDefault | None
-    scope: enums.PortScope
-    kind: enums.PortKind
-    key: str
-    nullable: bool
-    label: str | None
-    validators: list[scalars.Validator] | None
-    description: str | None
-    effects: list[Effect] | None
-    child: Optional[ChildPort] = None
-    variants: list[ChildPort] | None = None
-    assign_widget: AssignWidget | None
-    return_widget: ReturnWidget | None
-    groups: list[str] | None
-
+from rekuest_core.objects import models as rmodels
+from rekuest_core.objects import types as rtypes
+from rekuest_core import scalars as rscalars
+from rekuest_core import enums as renums
 
 @strawberry_django.type(models.Registry)
 class Registry:
@@ -302,7 +45,7 @@ class Node:
     id: strawberry.ID
     hash: scalars.NodeHash
     name: str
-    kind: enums.NodeKind
+    kind: renums.NodeKind
     description: str | None
     collections: list["Collection"]
     templates: list["Template"]
@@ -313,16 +56,16 @@ class Node:
     defined_at: datetime.datetime
 
     @strawberry_django.field()
-    def args(self) -> list[Port]:
-        return [PortModel(**i) for i in self.args]
+    def args(self) -> list[rtypes.Port]:
+        return [rmodels.PortModel(**i) for i in self.args]
 
     @strawberry_django.field()
-    def returns(self) -> list[Port]:
-        return [PortModel(**i) for i in self.returns]
+    def returns(self) -> list[rtypes.Port]:
+        return [rmodels.PortModel(**i) for i in self.returns]
     
     @strawberry_django.field()
-    def port_groups(self) -> list[PortGroup]:
-        return [PortGroupModel(**i) for i in self.port_groups]
+    def port_groups(self) -> list[rtypes.PortGroup]:
+        return [rmodels.PortGroupModel(**i) for i in self.port_groups]
 
 
 @strawberry_django.type(
@@ -334,7 +77,7 @@ class Template:
     interface: str
     agent: "Agent"
     node: "Node"
-    params: scalars.AnyDefault
+    params: rscalars.AnyDefault
 
 
 @strawberry_django.type(models.Agent, filters=filters.AgentFilter, pagination=True)
@@ -386,7 +129,7 @@ class Reservation:
     updated_at: datetime.datetime
     reference: str
     provisions: list["Provision"]
-    binds: Binds | None
+    binds: rtypes.Binds | None
 
 
 @strawberry_django.type(
@@ -407,7 +150,7 @@ class Assignation:
     id: strawberry.ID
     name: str
     reference: str | None
-    args: scalars.AnyDefault
+    args: rscalars.AnyDefault
     parent: "Assignation"
     status: enums.AssignationStatus
     status_message: str | None
@@ -424,7 +167,7 @@ class Assignation:
 class AssignationEvent:
     id: strawberry.ID
     name: str
-    returns: scalars.AnyDefault
+    returns: rscalars.AnyDefault
     assignation: "Assignation"
     kind: enums.AssignationEventKind
     level: enums.LogLevel

@@ -13,16 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 
-@strawberry.input
-class CreateTemplateInput:
-    definition: inputs.DefinitionInput
-    dependencies: inputs.DependencyInput | None = None
-    interface: str
-    params: scalars.AnyDefault | None = None
-    instance_id: scalars.InstanceID | None = None
 
 
-def create_template(info: Info, input: CreateTemplateInput) -> types.Template:
+def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Template:
     print(info.context.request.headers)
 
     registry, _ = models.Registry.objects.update_or_create(

@@ -12,6 +12,7 @@ from strawberry.field_extensions import InputMutationExtension
 import strawberry_django
 from koherent.strawberry.extension import KoherentExtension
 from authentikate.strawberry.permissions import IsAuthenticated
+from rekuest_core.constants import interface_types
 
 
 @strawberry.type
@@ -95,17 +96,8 @@ schema = strawberry.Schema(
         DjangoOptimizerExtension,
         KoherentExtension,
     ],
-    types=[
-        types.SliderAssignWidget,
-        types.ChoiceAssignWidget,
-        types.SearchAssignWidget,
-        types.CustomReturnWidget,
-        types.ChoiceReturnWidget,
-        types.StringAssignWidget,
-        types.CustomAssignWidget,
-        types.CustomEffect,
-        types.MessageEffect,
-    ]  # We really need to register
+    types=interface_types
+    # We really need to register
     # all the types here, otherwise the schema will not be able to resolve them
     # and will throw a cryptic error
 )

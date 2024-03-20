@@ -9,6 +9,14 @@ Identifier = strawberry.scalar(
     parse_value=lambda v: v,
 )
 
+AnyDefault = strawberry.scalar(
+    NewType("AnyDefault", object),
+    description="The `ArrayLike` scalar type represents a reference to a store "
+    "previously created by the user n a datalayer",
+    serialize=lambda v: v,
+    parse_value=lambda v: v,
+)
+
 Arg = strawberry.scalar(
     NewType("Arg", object),
     description="The `Arg` scalar type represents a an Argument in a Node assignment",
@@ -40,9 +48,8 @@ NodeHash = strawberry.scalar(
     parse_value=lambda v: v,
 )
 
-
-Validator = strawberry.scalar(
-    NewType("Validator", object),
+ValidatorFunction = strawberry.scalar(
+    NewType("ValidatorFunction", object),
     description="""
     The `Validator` scalar represents a javascript function that should execute on the client side (inside a shadow realm)
       to validate a value (or a set of values) before it is sent to the server.  The function has two parameters (value, otherValues) and should return a string if the value is invalid and undefined if the value is valid.

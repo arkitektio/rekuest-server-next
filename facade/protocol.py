@@ -1,4 +1,4 @@
-from .inputs import DefinitionInput
+from rekuest_core.inputs.models import DefinitionInputModel
 from typing import List
 from .models import Protocol
 from facade.infererence.is_predicate import is_predicate
@@ -8,7 +8,7 @@ functions = [
 ]
 
 
-def infer_protocols(definition: DefinitionInput) -> List[Protocol]:
+def infer_protocols(definition: DefinitionInputModel) -> List[Protocol]:
     """Infer the protocols of a definition"""
 
     protocols = []
