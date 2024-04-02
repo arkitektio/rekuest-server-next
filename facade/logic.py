@@ -1,7 +1,9 @@
+import json
 from facade import models, types, enums, inputs
 from django.db.models import Q
 from guardian.shortcuts import get_objects_for_user
-
+from rekuest_core.inputs import types as ritypes
+import hashlib
 
 class UnresolvableDependencyError(Exception):
     pass
@@ -231,3 +233,7 @@ def schedule_reservation(reservation: models.Reservation):
     reservation.save()
 
     return reservation
+
+
+
+
