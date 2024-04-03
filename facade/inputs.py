@@ -6,6 +6,7 @@ from strawberry.experimental import pydantic
 from typing import Any
 from strawberry import LazyType
 from rekuest_core.inputs import types as ritypes
+from rekuest_core import enums as renums
 from rekuest_core import scalars as rscalars    
 
 
@@ -40,3 +41,22 @@ class CreateTemplateInput:
     interface: str
     params: rscalars.AnyDefault | None = None
     instance_id: scalars.InstanceID | None = None
+
+@strawberry.input
+class PortMatchInput:
+    at: int | None = None
+    key: str | None  = None
+    kind: renums.PortKind | None  = None
+    identifier: str | None  = None
+    nullable: bool | None  = None
+    variants: Optional[list[LazyType["PortDemandInput", __name__]]]  = None
+    child: Optional[LazyType["PortDemandInput", __name__]]  = None
+ 
+
+
+@strawberry.input
+class PortDemandInput:
+    kind: enums.DemandKind
+    matches: list[PortMatchInput] | None = None
+    force_length: int | None = None
+    force_non_nullable_length: int | None = None

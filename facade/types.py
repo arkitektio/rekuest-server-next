@@ -31,7 +31,7 @@ class Collection:
     nodes: list["Node"]
 
 
-@strawberry_django.type(models.Protocol)
+@strawberry_django.type(models.Protocol, filters=filters.ProtocolFilter, pagination=True, order=filters.ProtocolOrder)
 class Protocol:
     id: strawberry.ID
     name: str

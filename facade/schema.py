@@ -18,6 +18,7 @@ from rekuest_core.constants import interface_types
 @strawberry.type
 class Query:
     nodes: list[types.Node] = strawberry_django.field()
+    protocols: list[types.Protocol] = strawberry_django.field()
     templates: list[types.Template] = strawberry_django.field()
     assignations: list[types.Assignation] = strawberry_django.field()
     test_results: list[types.TestResult] = strawberry_django.field()

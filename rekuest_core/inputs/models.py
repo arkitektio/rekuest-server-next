@@ -77,7 +77,7 @@ class PortInputModel(BaseModel):
     kind: enums.PortKind
     description: str | None = None
     identifier: str | None = None
-    nullable: bool
+    nullable: bool = False
     effects: list[EffectInputModel] | None
     default: Any | None = None
     child: ChildPortInputModel | None = None

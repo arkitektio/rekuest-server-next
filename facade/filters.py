@@ -1,9 +1,10 @@
 import strawberry
-from facade import models, scalars, enums
+from facade import models, scalars, enums, inputs, managers
 from strawberry import auto
 from typing import Optional
 from strawberry_django.filters import FilterLookup
 import strawberry_django
+
 
 
 @strawberry.input
@@ -157,10 +158,43 @@ class NodeOrder:
     defined_at: auto
 
 
+@strawberry_django.order(models.Protocol)
+class ProtocolOrder:
+    name: auto
+
+@strawberry_django.filter(models.Protocol)
+class ProtocolFilter(SearchFilter):
+    name: Optional[FilterLookup[str]]
+    ids: list[strawberry.ID] | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+
+
 @strawberry_django.filter(models.Node)
 class NodeFilter(SearchFilter):
     name: Optional[FilterLookup[str]]
     ids: list[strawberry.ID] | None
+    demands: list[inputs.PortDemandInput] | None
+    protocols: list[strawberry.ID] | None
+
+    def filter_demands(self, queryset, info):
+        if self.demands is None:
+            return queryset
+        
+        for ports_demand in self.demands:
+            queryset = managers.filter_nodes_by_demands(queryset, ports_demand.matches, type=ports_demand.kind, force_length=ports_demand.force_length, force_non_nullable_length=ports_demand.force_non_nullable_length)
+        
+        
+        return queryset
+    
+    def filter_protocols(self, queryset, info):
+        if self.protocols is None:
+            return queryset
+        return queryset.filter(protocols__id__in=self.protocols)
+
 
     def filter_ids(self, queryset, info):
         if self.ids is None:

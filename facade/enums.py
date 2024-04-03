@@ -219,3 +219,8 @@ class NodeScope(str, Enum):
     LOCAL = "LOCAL"
     BRIDGE_GLOBAL_TO_LOCAL = "BRIDGE_GLOBAL_TO_LOCAL"
     BRIDGE_LOCAL_TO_GLOBAL = "BRIDGE_LOCAL_TO_GLOBAL"
+
+@strawberry.enum
+class DemandKind(str, Enum):
+    ARGS = "args"
+    RETURNS = "returns"
