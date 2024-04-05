@@ -9,12 +9,21 @@ from typing import Any
 from typing import ForwardRef
 from strawberry import LazyType
 from typing import Literal, Union
-from authentikate.strawberry.types import App, User
+from authentikate.models import App
+from authentikate.strawberry.types import User
 import datetime
 from rekuest_core.objects import models as rmodels
 from rekuest_core.objects import types as rtypes
 from rekuest_core import scalars as rscalars
 from rekuest_core import enums as renums
+
+
+@strawberry_django.type(App,  filters=filters.AppFilter, pagination=True, order=filters.AppOrder)
+class App:
+    id: strawberry.ID
+    name: str
+    client_id: str
+
 
 @strawberry_django.type(models.Registry)
 class Registry:

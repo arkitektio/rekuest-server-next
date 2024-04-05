@@ -4,7 +4,8 @@ from strawberry import auto
 from typing import Optional
 from strawberry_django.filters import FilterLookup
 import strawberry_django
-
+from rekuest_core import enums as renums
+from authentikate.models import User, App
 
 
 @strawberry.input
@@ -151,6 +152,37 @@ class TemplateFilter:
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
+    
+
+
+@strawberry_django.order(App)
+class AppOrder:
+    defined_at: auto
+
+
+
+@strawberry_django.filter(App)
+class AppFilter:
+    interface: Optional[FilterLookup[str]]
+    ids: list[strawberry.ID] | None
+    has_templates_for: list[scalars.NodeHash] | None
+    mine: bool | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+    
+    def filter_has_templates_for(self, queryset, info):
+        if self.has_templates_for is None:
+            return queryset
+        return queryset.filter(registry__agents__templates__node__hash__in=self.has_templates_for).distinct()
+    
+    def filter_mine(self, queryset, info):
+        if self.mine is None:
+            return queryset
+        return queryset.filter(user_id=info.context.user.id)
+
 
 
 @strawberry_django.order(models.Node)
@@ -179,6 +211,7 @@ class NodeFilter(SearchFilter):
     ids: list[strawberry.ID] | None
     demands: list[inputs.PortDemandInput] | None
     protocols: list[strawberry.ID] | None
+    kind: Optional[renums.NodeKind] | None
 
     def filter_demands(self, queryset, info):
         if self.demands is None:
@@ -189,6 +222,11 @@ class NodeFilter(SearchFilter):
         
         
         return queryset
+    
+    def filter_kind(self, queryset, info):
+        if self.kind is None:
+            return queryset
+        return queryset.filter(kind=self.kind)
     
     def filter_protocols(self, queryset, info):
         if self.protocols is None:

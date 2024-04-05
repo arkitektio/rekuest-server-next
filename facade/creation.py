@@ -1,13 +1,44 @@
 import hashlib
 import json
 from rekuest_core.inputs import types as ritypes
-from facade import models
+from facade import models, inputs
 from facade.protocol import infer_protocols
 from facade.unique import infer_node_scope
 
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+
+def create_template_from_definition(input: inputs.CreateTemplateInput, agent: models.Agent) -> models.Template:
+
+    node = create_node_from_definition(input.definition)
+
+    try:
+        template = models.Template.objects.get(
+            interface=input.interface,
+            agent=agent,
+        )
+
+        if template.node.hash != hash:
+            if template.node.templates.count() == 1:
+                logger.info("Deleting Node because it has no more templates")
+                template.node.delete()
+
+        template.node = node
+        template.save()
+
+    except models.Template.DoesNotExist:
+        template = models.Template.objects.create(
+            interface=input.interface,
+            node=node,
+            agent=agent,
+        )
+
+    return template
+
+
 
 
 def create_node_from_definition(definition: ritypes.DefinitionInput) -> models.Node:
@@ -47,3 +78,5 @@ def create_node_from_definition(definition: ritypes.DefinitionInput) -> models.N
                 node.collections.add(c)
 
         logger.info(f"Created {node}")
+
+    return node

@@ -17,6 +17,7 @@ from rekuest_core.constants import interface_types
 
 @strawberry.type
 class Query:
+    clients: list[types.App] = strawberry_django.field()
     nodes: list[types.Node] = strawberry_django.field()
     protocols: list[types.Protocol] = strawberry_django.field()
     templates: list[types.Template] = strawberry_django.field()

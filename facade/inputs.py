@@ -1,17 +1,25 @@
 from facade import enums, scalars
 import strawberry
-from typing import Optional
+from typing import Optional, Any
 from pydantic import BaseModel
 from strawberry.experimental import pydantic
 from typing import Any
 from strawberry import LazyType
 from rekuest_core.inputs import types as ritypes
+from rekuest_core.inputs import models as rimodels
 from rekuest_core import enums as renums
 from rekuest_core import scalars as rscalars    
 
+class DependencyInputModel(BaseModel):
+    node: str
+    hash: str
+    reference: str  | None
+    binds: rimodels.BindsInputModel | None
+    optional: bool = False
+    viable_instances: int | None
 
 
-@strawberry.input
+@pydantic.input(DependencyInputModel)
 class DependencyInput:
     """A dependency for a template. By defining dependencies, you can
     create a dependency graph for your templates and nodes"""
@@ -34,7 +42,16 @@ class ReserveInput:
     reference: str | None = None
     binds: ritypes.BindsInput | None = None
 
-@strawberry.input
+
+class CreateTemplateInputModel(BaseModel):
+    definition: rimodels.DefinitionInputModel
+    dependencies: DependencyInputModel | None = None
+    interface: str
+    params: dict[str, Any] | None = None
+    instance_id: str | None = None
+
+
+@pydantic.input(CreateTemplateInputModel)
 class CreateTemplateInput:
     definition: ritypes.DefinitionInput
     dependencies: DependencyInput | None = None
