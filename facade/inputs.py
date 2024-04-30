@@ -23,8 +23,6 @@ class DependencyInputModel(BaseModel):
 class DependencyInput:
     """A dependency for a template. By defining dependencies, you can
     create a dependency graph for your templates and nodes"""
-
-    node: strawberry.ID | None = None
     hash: scalars.NodeHash | None = None
     reference: str | None = None  # How to reference this dependency (e.g. if it corresponds to a node_id in a flow)
     binds: ritypes.BindsInput | None = None
@@ -32,7 +30,19 @@ class DependencyInput:
     viable_instances: int | None = None
 
 
-@strawberry.input
+class ReserveInputModel(BaseModel):
+    instance_id: str
+    node: str | None = None
+    template: str | None = None
+    title: str | None = None
+    hash: str | None = None
+    reference: str | None = None
+    binds: rimodels.BindsInputModel | None = None
+
+    
+
+
+@pydantic.input(ReserveInputModel)
 class ReserveInput:
     instance_id: scalars.InstanceID
     node: strawberry.ID | None = None
@@ -54,7 +64,7 @@ class CreateTemplateInputModel(BaseModel):
 @pydantic.input(CreateTemplateInputModel)
 class CreateTemplateInput:
     definition: ritypes.DefinitionInput
-    dependencies: DependencyInput | None = None
+    dependencies: list[DependencyInput] | None = None
     interface: str
     params: rscalars.AnyDefault | None = None
     instance_id: scalars.InstanceID | None = None

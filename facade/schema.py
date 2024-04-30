@@ -18,6 +18,8 @@ from rekuest_core.constants import interface_types
 @strawberry.type
 class Query:
     clients: list[types.App] = strawberry_django.field()
+    
+    agents: list[types.Agent] = strawberry_django.field()
     nodes: list[types.Node] = strawberry_django.field()
     protocols: list[types.Protocol] = strawberry_django.field()
     templates: list[types.Template] = strawberry_django.field()
@@ -33,6 +35,11 @@ class Query:
     def agent(self, info: Info, id: strawberry.ID) -> types.Agent:
         print("hallo")
         return models.Agent.objects.get(id=id)
+    
+    @strawberry_django.field()
+    def dependency(self, info: Info, id: strawberry.ID) -> types.Dependency:
+        print("hallo")
+        return models.Dependency.objects.get(id=id)
 
     @strawberry_django.field()
     def test_case(self, info: Info, id: strawberry.ID) -> types.TestCase:
@@ -79,6 +86,14 @@ class Mutation:
 
     create_test_result: types.TestResult = strawberry_django.mutation(
         resolver=mutations.create_test_result
+    )
+
+    activate: types.Provision = strawberry_django.mutation(
+        resolver=mutations.activate
+    )
+
+    deactivate: types.Provision = strawberry_django.mutation(
+        resolver=mutations.deactivate
     )
 
 @strawberry.type

@@ -68,10 +68,41 @@ def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Temp
         logger.info(f"Created {node}")
 
     try:
+
         template = models.Template.objects.get(
             interface=input.interface,
             agent=agent,
         )
+
+
+        new_deps = []
+
+        if input.dependencies:
+
+
+            for i in input.dependencies:
+
+                try:
+                    depending_node = models.Node.objects.get(hash=i.hash)
+                except models.Node.DoesNotExist:
+                    depending_node = None
+
+                dep, _ = models.Dependency.objects.update_or_create(
+                    template=template,
+                    reference=i.reference,
+                    defaults=dict(
+                        node=depending_node,
+                        initial_hash=i.hash,
+                        optional=i.optional,
+                        binds=i.binds.dict() if i.binds else None,
+                    )
+                )
+                new_deps.append(dep)
+
+        for dep in template.dependencies.all():
+            if dep not in new_deps:
+                dep.delete()
+
 
         if template.node.hash != hash:
             if template.node.templates.count() == 1:

@@ -2,7 +2,7 @@ import json
 from facade import models, types, enums, inputs
 from django.db.models import Q
 from guardian.shortcuts import get_objects_for_user
-from rekuest_core.inputs import types as ritypes
+from rekuest_core.inputs import models as rimodels
 import hashlib
 
 class UnresolvableDependencyError(Exception):
@@ -10,7 +10,7 @@ class UnresolvableDependencyError(Exception):
 
 
 def unlink(provision: models.Provision, reservation: models.Reservation):
-    provision.reservations.remove(provision)
+    provision.reservations.remove(reservation)
     provision.save()
 
 
@@ -162,9 +162,9 @@ def schedule_reservation(reservation: models.Reservation):
     linked_provisions = []
 
     binds = (
-        types.BindsModel(**reservation.binds)
+        rimodels.BindsInputModel(**reservation.binds)
         if reservation.binds
-        else types.BindsModel()
+        else rimodels.BindsInputModel()
     )
 
     for provision in reservation.provisions.all():
@@ -209,6 +209,33 @@ def schedule_reservation(reservation: models.Reservation):
                     agent=template.agent,
                     causing_reservation=reservation,
                 )
+
+                print("Created new provision", prov)
+
+                for dependency in template.dependencies.all():
+
+                    print("Scheduling dependencies")
+
+                    waiter, _ = models.Waiter.objects.get_or_create(
+                        registry=template.agent.registry, instance_id=template.agent.instance_id, defaults=dict(name="default")
+                    )
+
+                    res, _ = models.Reservation.objects.update_or_create(
+                            reference=dependency.reference,
+                            node=models.Node.objects.get(hash=dependency.initial_hash) if dependency.initial_hash else None,
+                            waiter=waiter,
+                            defaults=dict(
+                                title=dependency.reference,
+                                binds=dependency.binds,
+                                causing_provision=prov,
+                                causing_dependency=dependency,
+                            ),
+                    )
+
+                    schedule_reservation(res)
+
+
+
 
                 link(prov, reservation)
                 linked_provisions.append(prov)

@@ -63,6 +63,9 @@ class Node:
     tests: list["Node"]
     protocols: list["Protocol"]
     defined_at: datetime.datetime
+    reservations: list[LazyType["Reservation", __name__]] | None
+
+
 
     @strawberry_django.field()
     def args(self) -> list[rtypes.Port]:
@@ -78,6 +81,26 @@ class Node:
 
 
 @strawberry_django.type(
+    models.Dependency, filters=filters.DependencyFilter, pagination=True
+)
+class Dependency:
+    id: strawberry.ID
+    template: "Template"
+    node: Node | None
+    hash: scalars.NodeHash
+    initial_hash: scalars.NodeHash  
+    reference: str | None
+    optional: bool = False
+
+    def binds(self) -> rtypes.Binds | None:
+        return rmodels.BindsModel(**self.binds) if self.binds else None
+
+
+
+
+
+
+@strawberry_django.type(
     models.Template, filters=filters.TemplateFilter, pagination=True
 )
 class Template:
@@ -87,13 +110,16 @@ class Template:
     agent: "Agent"
     node: "Node"
     params: rscalars.AnyDefault
+    dependencies: list["Dependency"]
 
 
-@strawberry_django.type(models.Agent, filters=filters.AgentFilter, pagination=True)
+
+@strawberry_django.type(models.Agent, filters=filters.AgentFilter, order=filters.AgentOrder, pagination=True)
 class Agent:
     id: strawberry.ID
     instance_id: scalars.InstanceID
     registry: "Registry"
+    status: enums.AgentStatus
 
 
 @strawberry_django.type(models.Waiter, filters=filters.WaiterFilter, pagination=True)
@@ -112,6 +138,7 @@ class Provision:
     agent: "Agent"
     template: "Template"
     status: enums.ProvisionStatus
+    caused_reservations: list["Reservation"]
 
 
 @strawberry_django.type(
@@ -139,6 +166,9 @@ class Reservation:
     reference: str
     provisions: list["Provision"]
     binds: rtypes.Binds | None
+    events: list["ReservationEvent"]
+    causing_dependency: Dependency | None
+    causing_provision: Provision | None
 
 
 @strawberry_django.type(

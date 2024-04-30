@@ -226,7 +226,15 @@ class Dependency(models.Model):
         Node,
         on_delete=models.CASCADE,
         help_text="The node this dependency is for",
-        related_name="dependencies",
+        related_name="dependees",
+        null=True,
+        blank=True,
+    )
+    initial_hash = models.CharField(
+        max_length=1000,
+        help_text="The initial hash of the Node",
+        null=True,
+        blank=True,
     )
     reference = models.CharField(
         max_length=1000,
@@ -242,10 +250,8 @@ class Dependency(models.Model):
         max_length=2000,
         default=dict,
         help_text="The binds for this dependency (Determines which templates can be used for this dependency)",
-    )
-    viable_instances = models.IntegerField(
-        default=1,
-        help_text="How many instances of this dependency do we need to be viable",
+        null=True,
+        blank=True,
     )
 
 
@@ -281,7 +287,6 @@ class Template(models.Model):
     policy = models.JSONField(
         max_length=2000, default=dict, help_text="The attached policy for this template"
     )
-
     params = models.JSONField(default=dict, help_text="Params for this Template")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -396,6 +401,15 @@ class Reservation(models.Model):
         null=True,
         blank=True,
         help_text="Was this Reservation caused by a Provision?",
+        related_name="caused_reservations",
+    )
+
+    causing_dependency = models.ForeignKey(
+        "Dependency",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        help_text="Was this Reservation caused by a Dependency?",
         related_name="caused_reservations",
     )
 

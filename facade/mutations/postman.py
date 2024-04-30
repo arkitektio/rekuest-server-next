@@ -2,6 +2,7 @@ from kante.types import Info
 import strawberry_django
 import strawberry
 from facade import types, models, inputs, enums, scalars
+from rekuest_core.inputs import models as rimodels
 import hashlib
 import json
 import logging
@@ -15,8 +16,15 @@ import redis
 
 
 def reserve(info: Info, input: inputs.ReserveInput) -> types.Reservation:
+    if (input.node is None and input.template is None):
+        raise ValueError("Either node or template must be provided")
+
+    node = models.Node.objects.get(hash=input.node) if input.node else None
+    template = models.Template.objects.get(id=input.template) if input.template else None
+
+
     reference = input.reference or hash_input(
-        input.binds or inputs.BindsInput(templates=[])
+        input.binds or rimodels.BindsInputModel(templates=[])
     )
 
     registry, _ = models.Registry.objects.get_or_create(
@@ -27,13 +35,16 @@ def reserve(info: Info, input: inputs.ReserveInput) -> types.Reservation:
         registry=registry, instance_id=input.instance_id, defaults=dict(name="default")
     )
 
+
+
     res, _ = models.Reservation.objects.update_or_create(
         reference=reference,
-        node_id=input.node,
+        node=node,
+        template=template,
         waiter=waiter,
         defaults=dict(
             title=input.title,
-            binds=strawberry.asdict(input.binds) if input.binds else None,
+            binds=input.binds.dict() if input.binds else None,
         ),
     )
 
