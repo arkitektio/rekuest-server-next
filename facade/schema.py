@@ -76,7 +76,11 @@ class Mutation:
     unassign: types.Assignation = strawberry_django.mutation(
         resolver=mutations.unassign
     )
+    provide: types.Provision = strawberry_django.mutation(resolver=mutations.provide)
+    unprovide = strawberry_django.mutation(resolver=mutations.unprovide)
     reserve: types.Reservation = strawberry_django.mutation(resolver=mutations.reserve)
+    link: types.Provision = strawberry_django.mutation(resolver=mutations.link)
+    unlink: types.Provision = strawberry_django.mutation(resolver=mutations.unlink)
     unreserve: types.Reservation = strawberry_django.mutation(
         resolver=mutations.unreserve
     )

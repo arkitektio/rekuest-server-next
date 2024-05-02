@@ -16,7 +16,8 @@ from rekuest_core.objects import models as rmodels
 from rekuest_core.objects import types as rtypes
 from rekuest_core import scalars as rscalars
 from rekuest_core import enums as renums
-
+from dep_graph.types import DependencyGraph
+from dep_graph.functions import build_template_graph, build_node_graph, build_reservation_graph
 
 @strawberry_django.type(App,  filters=filters.AppFilter, pagination=True, order=filters.AppOrder)
 class App:
@@ -66,6 +67,11 @@ class Node:
     reservations: list[LazyType["Reservation", __name__]] | None
 
 
+    @strawberry_django.field()
+    def dependency_graph(self) -> DependencyGraph:
+        return build_node_graph(self)
+
+
 
     @strawberry_django.field()
     def args(self) -> list[rtypes.Port]:
@@ -111,6 +117,10 @@ class Template:
     node: "Node"
     params: rscalars.AnyDefault
     dependencies: list["Dependency"]
+
+    @strawberry_django.field()
+    def dependency_graph(self) -> DependencyGraph:
+        return build_template_graph(self)
 
 
 
@@ -169,6 +179,10 @@ class Reservation:
     events: list["ReservationEvent"]
     causing_dependency: Dependency | None
     causing_provision: Provision | None
+
+    @strawberry_django.field()
+    def dependency_graph(self) -> DependencyGraph:
+        return build_reservation_graph(self)
 
 
 @strawberry_django.type(

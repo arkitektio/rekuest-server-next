@@ -45,6 +45,11 @@ class ReservationStatusChoices(TextChoices):
 
     # End States
     ENDED = "ENDED", "ENDED (Reservation is lacking and accepts assignments"
+    # unhappy path
+    UNHAPPY = "UNHAPPY"
+    HAPPY = "HAPPY"
+    
+
 
 
 class ProvisionStatusChoices(TextChoices):
@@ -134,6 +139,11 @@ class ReservationStatus(str, Enum):
     # LifeCycle States
     ACTIVE = "ACTIVE"
     INACTIVE = "INACTIVE"
+
+    # unhappy path
+    UNHAPPY = "UNHAPPY"
+    HAPPY = "HAPPY"
+    
 
     # Error States
     UNCONNECTED = "UNCONNECTED"

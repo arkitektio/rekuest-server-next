@@ -8,7 +8,7 @@ import json
 import logging
 from facade.protocol import infer_protocols
 from facade.utils import hash_input
-from facade.logic import schedule_reservation
+from facade.logic import schedule_reservation, schedule_provision, link as link_provision_to_reservation, unlink as unlink_provision_from_reservation, check_viability
 
 logger = logging.getLogger(__name__)
 from facade.connection import redis_pool
@@ -91,3 +91,72 @@ class UnassignInput:
 
 def unassign(info: Info, input: UnassignInput) -> types.Assignation:
     return models.Assignation.objects.get(id=input.id)
+
+
+
+@strawberry.input
+class ProvideInput:
+    template: strawberry.ID
+
+
+def provide(info: Info, input: ProvideInput) -> types.Provision:
+
+    template = models.Template.objects.get(id=input.template)
+
+
+    provision, _ = models.Provision.objects.update_or_create(
+        template=template,
+        agent=template.agent
+    )
+
+    schedule_provision(provision)
+
+    return provision
+
+
+@strawberry.input
+class UnProvideInput:
+    provision: strawberry.ID
+
+
+def unprovide(info: Info, input: UnProvideInput) -> strawberry.ID:
+
+
+
+    provision = models.Provision.objects.get(id=input.provision)
+
+    res = provision.reservations.all()
+    provision.delete()
+    for reservation in res:
+        check_viability(reservation)
+
+    return input.provision
+
+
+@strawberry.input
+class LinkInput:
+    provision: strawberry.ID
+    reservation: strawberry.ID
+
+
+def link(info: Info, input: LinkInput) -> types.Provision:
+    provision = models.Provision.objects.get(id=input.provision)
+    reservation = models.Reservation.objects.get(id=input.reservation)
+
+    link_provision_to_reservation(provision, reservation)
+
+    return provision
+
+
+@strawberry.input
+class UnlinkInput:
+    provision: strawberry.ID
+    reservation: strawberry.ID
+
+def unlink(info: Info, input: UnlinkInput) -> types.Provision:
+    provision = models.Provision.objects.get(id=input.provision)
+    reservation = models.Reservation.objects.get(id=input.reservation)
+
+    unlink_provision_from_reservation(provision, reservation)
+
+    return provision
