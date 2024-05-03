@@ -53,10 +53,48 @@ class ReserveInput:
     binds: ritypes.BindsInput | None = None
 
 
+class AssignInputModel(BaseModel):
+    reservation: str
+    args: list[Any]
+    reference: str | None = None
+    parent: str | None = None
+    cached: bool = False
+    log: bool = False
+
+
+
+class CancelInputModel(BaseModel):
+    assignation: str
+
+@pydantic.input(CancelInputModel)
+class CancelInput:
+    assignation: strawberry.ID
+
+
+class InterruptInputModel(BaseModel):
+    assignation: str
+
+@pydantic.input(InterruptInputModel)
+class InterruptInput:
+    assignation: strawberry.ID
+
+
+
+@pydantic.input(AssignInputModel)
+class AssignInput:
+    reservation: strawberry.ID
+    args: list[scalars.Arg]
+    reference: str | None = None
+    parent: strawberry.ID | None = None
+    cached: bool = False
+    log: bool = False
+
+
 class CreateTemplateInputModel(BaseModel):
     definition: rimodels.DefinitionInputModel
     dependencies: DependencyInputModel | None = None
     interface: str
+    extension: str
     params: dict[str, Any] | None = None
     instance_id: str | None = None
 
@@ -66,6 +104,7 @@ class CreateTemplateInput:
     definition: ritypes.DefinitionInput
     dependencies: list[DependencyInput] | None = None
     interface: str
+    extension: str
     params: rscalars.AnyDefault | None = None
     instance_id: scalars.InstanceID | None = None
 

@@ -75,13 +75,9 @@ def build_reservation_graph_recursive(reservation: models.Reservation, edges: li
     for temp in reservation.node.templates.all():
 
         linked = reservation.provisions.filter(template=temp).exists() 
+        provision = temp.provision
 
-        try:
-            provision = temp.provision
-        except Exception as e:
-            provision = None
-
-        template_node = TemplateNodeModel(id=temp.id, template_id=temp.id, interface=temp.interface, provision_id=provision.id if provision else None, client_id=temp.agent.registry.app.client_id, linked=linked, reservation_id=reservation.id, status=provision.status if provision else None)
+        template_node = TemplateNodeModel(id=temp.id, template_id=temp.id, interface=temp.interface, provision_id=provision.id, client_id=temp.agent.registry.app.client_id, linked=linked, reservation_id=reservation.id, status=provision.status, active=provision.active)
         nodes.append(template_node)
         edges.append(ImplementationEdgeModel(source=node_node.id, target=template_node.id, optional=False, linked=linked))
         

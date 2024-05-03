@@ -74,6 +74,14 @@ def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Temp
             agent=agent,
         )
 
+        provision = models.Provision.objects.get_or_create(
+            template=template,
+            agent=agent,
+            defaults=dict(
+                status=enums.ProvisionStatus.INACTIVE,
+            )
+        )
+
 
         new_deps = []
 
@@ -110,6 +118,7 @@ def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Temp
                 template.node.delete()
 
         template.node = node
+        template.extension = input.extension
         template.save()
 
     except models.Template.DoesNotExist:
@@ -117,6 +126,15 @@ def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Temp
             interface=input.interface,
             node=node,
             agent=agent,
+            extension=input.extension,
+        )
+
+        provision = models.Provision.objects.get_or_create(
+            template=template,
+            agent=agent,
+            defaults=dict(
+                status=enums.ProvisionStatus.INACTIVE,
+            )
         )
 
         if input.dependencies:

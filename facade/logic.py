@@ -4,7 +4,7 @@ from django.db.models import Q
 from guardian.shortcuts import get_objects_for_user
 from rekuest_core.inputs import models as rimodels
 import hashlib
-
+from facade.backend import controll_backend
 class UnresolvableDependencyError(Exception):
     pass
 
@@ -142,9 +142,14 @@ def activate_provision(provision: models.Provision):
     """This should recursively active the reservations that are linked to this provision"""
     provision.active = True
     provision.save()
+    controll_backend.provide(provision)
 
     for connecting_reservation in provision.reservations.all():
         check_viability(connecting_reservation) # We need to check if the reservation is viable, and happy.
+
+
+
+
 
 
 
@@ -206,6 +211,7 @@ def schedule_provision(provision: models.Provision):
 
     for dependency in provision.template.dependencies.all():
         if dependency.node:
+            # We are creating all of the reservations for the dependencies.
             waiter, _ = models.Waiter.objects.get_or_create(
                 registry=provision.agent.registry, instance_id=provision.agent.instance_id, defaults=dict(name="default")
             )
@@ -228,6 +234,8 @@ def schedule_provision(provision: models.Provision):
             raise NotImplementedError(
                 "No node specified. Template reservation not implemented yet."
             )
+        
+    activate_provision(provision)
         
             
 

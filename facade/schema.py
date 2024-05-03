@@ -73,10 +73,13 @@ class Mutation:
     )
     ack: types.Assignation = strawberry_django.mutation(resolver=mutations.ack)
     assign: types.Assignation = strawberry_django.mutation(resolver=mutations.assign)
-    unassign: types.Assignation = strawberry_django.mutation(
-        resolver=mutations.unassign
+    cancel: types.Assignation = strawberry_django.mutation(
+        resolver=mutations.cancel
     )
-    provide: types.Provision = strawberry_django.mutation(resolver=mutations.provide)
+    interrupt: types.Assignation = strawberry_django.mutation(
+        resolver=mutations.interrupt
+    )
+    provide: types.Provision = strawberry_django.mutation(resolver=mutations.provide, description="Provide a provision")
     unprovide = strawberry_django.mutation(resolver=mutations.unprovide)
     reserve: types.Reservation = strawberry_django.mutation(resolver=mutations.reserve)
     link: types.Provision = strawberry_django.mutation(resolver=mutations.link)

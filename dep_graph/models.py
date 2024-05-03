@@ -26,6 +26,7 @@ class TemplateNodeModel(BaseModel):
     provision_id: str | None
     reservation_id: str | None
     linked: bool = False
+    active: bool = False
 
 
 

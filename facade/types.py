@@ -113,6 +113,7 @@ class Template:
     id: strawberry.ID
     name: str | None
     interface: str
+    extension: str
     agent: "Agent"
     node: "Node"
     params: rscalars.AnyDefault
@@ -147,7 +148,7 @@ class Provision:
     name: str
     agent: "Agent"
     template: "Template"
-    status: enums.ProvisionStatus
+    status: enums.ProvisionEventKind
     caused_reservations: list["Reservation"]
 
 
@@ -179,6 +180,7 @@ class Reservation:
     events: list["ReservationEvent"]
     causing_dependency: Dependency | None
     causing_provision: Provision | None
+    strategy: enums.ReservationStrategy
 
     @strawberry_django.field()
     def dependency_graph(self) -> DependencyGraph:
@@ -205,7 +207,7 @@ class Assignation:
     reference: str | None
     args: rscalars.AnyDefault
     parent: "Assignation"
-    status: enums.AssignationStatus
+    status: enums.AssignationEventKind
     status_message: str | None
     waiter: "Waiter"
     node: "Node"
@@ -220,11 +222,15 @@ class Assignation:
 class AssignationEvent:
     id: strawberry.ID
     name: str
-    returns: rscalars.AnyDefault
+    returns: rscalars.AnyDefault | None
     assignation: "Assignation"
     kind: enums.AssignationEventKind
-    level: enums.LogLevel
+    
     created_at: strawberry.auto
+
+    @strawberry_django.field()
+    def level(self) -> enums.LogLevel:
+        return enums.LogLevel.INFO
 
 
 @strawberry_django.type(

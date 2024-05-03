@@ -9,6 +9,7 @@ from facade.enums import (
     AssignationEventChoices,
     AssignationStatusChoices,
     ProvisionEventChoices,
+    ReservationStrategyChoices,
     ReservationEventChoices,
 )
 from authentikate.models import User, App
@@ -283,6 +284,7 @@ class Template(models.Model):
         default=list,
         help_text="The attached extensions for this Template",
     )
+    extension = models.CharField(verbose_name="Extension", max_length=1000, default="global")
 
     policy = models.JSONField(
         max_length=2000, default=dict, help_text="The attached policy for this template"
@@ -348,11 +350,16 @@ class Provision(models.Model):
         blank=True,
     )
 
+    active = models.BooleanField(
+        default=False,
+        help_text="Is this provision active (e.g. should the agent provide the associated template)"
+    )
+
     # Status Field
     status = TextChoicesField(
         max_length=1000,
-        choices_enum=ProvisionStatusChoices,
-        default=ProvisionStatusChoices.INACTIVE,
+        choices_enum=ProvisionEventChoices,
+        default=ProvisionEventChoices.INACTIVE,
         help_text="The Status of this Provision",
     )
 
@@ -393,6 +400,13 @@ class Reservation(models.Model):
         unique=True,
         default=uuid.uuid4,
         help_text="A Unique identifier for this Topic",
+    )
+
+    strategy = TextChoicesField(
+        max_length=1000,
+        choices_enum=ReservationStrategyChoices,
+        default=ReservationStrategyChoices.RANDOM,
+        help_text="The Strategy of this Reservation",
     )
 
     causing_provision = models.ForeignKey(
@@ -535,7 +549,7 @@ class Assignation(models.Model):
     status = TextChoicesField(
         max_length=1000,
         choices_enum=AssignationEventChoices,
-        help_text="The Status of this Provision (transitioned by events)",
+        help_text="The latest Status of this Provision (transitioned by events)",
     )
     statusmessage = models.CharField(
         max_length=1000,
@@ -568,6 +582,8 @@ class AssignationEvent(models.Model):
     )
     progress = models.IntegerField(
         help_text="The progress of the assignation",
+        null=True,
+        blank=True,
     )
     message = models.CharField(max_length=2000, null=True, blank=True)
     # Status Field

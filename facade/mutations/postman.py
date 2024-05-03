@@ -13,6 +13,7 @@ from facade.logic import schedule_reservation, schedule_provision, link as link_
 logger = logging.getLogger(__name__)
 from facade.connection import redis_pool
 import redis
+from facade.backend import controll_backend
 
 
 def reserve(info: Info, input: inputs.ReserveInput) -> types.Reservation:
@@ -71,8 +72,8 @@ class AssignInput:
 
 
 def assign(info: Info, input: AssignInput) -> types.Assignation:
-    r = redis.StrictRedis(connection_pool=redis_pool)
-    r.lpush("my_queue", "task_data")
+    return controll_backend.assign(input)
+
 
 
 @strawberry.input
@@ -84,30 +85,25 @@ def ack(info: Info, input: AckInput) -> types.Assignation:
     return models.Assignation.objects.get(id=input.id)
 
 
-@strawberry.input
-class UnassignInput:
-    assignation: strawberry.ID
 
 
-def unassign(info: Info, input: UnassignInput) -> types.Assignation:
-    return models.Assignation.objects.get(id=input.id)
+def cancel(info: Info, input: inputs.CancelInput) -> types.Assignation:
+    return controll_backend.cancel(input)
+
+
+def interrupt(info: Info, input: inputs.InterruptInput) -> types.Assignation:
+    return controll_backend.interrupt(input)
 
 
 
 @strawberry.input
 class ProvideInput:
-    template: strawberry.ID
+    provision: strawberry.ID
 
 
 def provide(info: Info, input: ProvideInput) -> types.Provision:
 
-    template = models.Template.objects.get(id=input.template)
-
-
-    provision, _ = models.Provision.objects.update_or_create(
-        template=template,
-        agent=template.agent
-    )
+    provision = models.Provision.objects.get(id=input.provision)
 
     schedule_provision(provision)
 
@@ -124,11 +120,15 @@ def unprovide(info: Info, input: UnProvideInput) -> strawberry.ID:
 
 
     provision = models.Provision.objects.get(id=input.provision)
+    provision.active = False
+    provision.save()
 
     res = provision.reservations.all()
-    provision.delete()
     for reservation in res:
         check_viability(reservation)
+
+
+    controll_backend.unprovide(provision)
 
     return input.provision
 
