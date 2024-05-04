@@ -266,11 +266,47 @@ decided_app = DemoApp(
     }
 )
 
+reorder_needed_app = DemoApp(
+    name ="Reorder Needed App",
+    definitions= {
+        "other_stuff" : models.DefinitionInputModel(
+            name="Passes out weird",
+            kind="FUNCTION",
+            description="Checks if there are more than {{threshold}} labels of type {{label_to_test}} in the image",
+            args=[models.PortInputModel(
+                key="image", scope="GLOBAL", kind="STRUCTURE", identifier="@mikro/image", effects=[], description="The labeled image to inspect",),
+                models.PortInputModel(
+                key="house", scope="GLOBAL", kind="INT", effects=[],description="The threshold of labels that the image needs")
+        ],
+            returns=[models.PortInputModel(
+                key="image", scope="GLOBAL", kind="STRUCTURE", identifier="@mikro/image", effects=[], description="The labeled image to inspect",),
+                models.PortInputModel(
+                key="house", scope="GLOBAL", kind="INT", effects=[],description="The threshold of labels that the image needs")],
+            port_groups=[models.PortGroupInputModel(key="default", hidden=False)]
+        ),
+        "labels_exceed" : models.DefinitionInputModel(
+            name="Needs Reorder",
+            kind="FUNCTION",
+            description="Checks if there are more than {{threshold}} labels of type {{label_to_test}} in the image",
+            args=[
+                models.PortInputModel(
+                key="house", scope="GLOBAL", kind="INT", effects=[],description="The threshold of labels that the image needs"),
+                models.PortInputModel(
+                key="image", scope="GLOBAL", kind="STRUCTURE", identifier="@mikro/image", effects=[], description="The labeled image to inspect",),
+                
+        ],
+            returns=[models.PortInputModel(key="is_bigger", description="If the amount is exceeded", scope="GLOBAL", kind="BOOL", nullable=False, effects=[])],
+            port_groups=[models.PortGroupInputModel(key="default", hidden=False)]
+        ),
+        
+    }
+)
 
 
 
 
-apps = [app_one, mikro_app, numpy_app, image_j_app,decided_app]
+
+apps = [app_one, mikro_app, numpy_app, image_j_app,decided_app, reorder_needed_app]
 
 
 class Command(BaseCommand):
