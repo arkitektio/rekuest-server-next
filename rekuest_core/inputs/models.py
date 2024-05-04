@@ -7,6 +7,7 @@ class BindsInputModel(BaseModel):
     templates: Optional[list[str]]
     clients: Optional[list[str]]
     desired_instances: int = 1
+    minimum_instances: int = 1
 
 
 class EffectDependencyInputModel(BaseModel):

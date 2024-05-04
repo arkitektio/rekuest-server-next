@@ -68,10 +68,49 @@ def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Temp
         logger.info(f"Created {node}")
 
     try:
+
         template = models.Template.objects.get(
             interface=input.interface,
             agent=agent,
         )
+
+        provision = models.Provision.objects.get_or_create(
+            template=template,
+            agent=agent,
+            defaults=dict(
+                status=enums.ProvisionStatus.INACTIVE,
+            )
+        )
+
+
+        new_deps = []
+
+        if input.dependencies:
+
+
+            for i in input.dependencies:
+
+                try:
+                    depending_node = models.Node.objects.get(hash=i.hash)
+                except models.Node.DoesNotExist:
+                    depending_node = None
+
+                dep, _ = models.Dependency.objects.update_or_create(
+                    template=template,
+                    reference=i.reference,
+                    defaults=dict(
+                        node=depending_node,
+                        initial_hash=i.hash,
+                        optional=i.optional,
+                        binds=i.binds.dict() if i.binds else None,
+                    )
+                )
+                new_deps.append(dep)
+
+        for dep in template.dependencies.all():
+            if dep not in new_deps:
+                dep.delete()
+
 
         if template.node.hash != hash:
             if template.node.templates.count() == 1:
@@ -79,6 +118,7 @@ def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Temp
                 template.node.delete()
 
         template.node = node
+        template.extension = input.extension
         template.save()
 
     except models.Template.DoesNotExist:
@@ -86,7 +126,38 @@ def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Temp
             interface=input.interface,
             node=node,
             agent=agent,
+            extension=input.extension,
         )
+
+        provision = models.Provision.objects.get_or_create(
+            template=template,
+            agent=agent,
+            defaults=dict(
+                status=enums.ProvisionStatus.INACTIVE,
+            )
+        )
+
+        if input.dependencies:
+
+
+            for i in input.dependencies:
+
+                try:
+                    depending_node = models.Node.objects.get(hash=i.hash)
+                except models.Node.DoesNotExist:
+                    depending_node = None
+
+                dep, _ = models.Dependency.objects.update_or_create(
+                    template=template,
+                    reference=i.reference,
+                    defaults=dict(
+                        node=depending_node,
+                        initial_hash=i.hash,
+                        optional=i.optional,
+                        binds=i.binds.dict() if i.binds else None,
+                    )
+                )
+                new_deps.append(dep)
 
     return template
 

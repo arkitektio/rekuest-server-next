@@ -18,6 +18,8 @@ from rekuest_core.constants import interface_types
 @strawberry.type
 class Query:
     clients: list[types.App] = strawberry_django.field()
+    
+    agents: list[types.Agent] = strawberry_django.field()
     nodes: list[types.Node] = strawberry_django.field()
     protocols: list[types.Protocol] = strawberry_django.field()
     templates: list[types.Template] = strawberry_django.field()
@@ -33,6 +35,11 @@ class Query:
     def agent(self, info: Info, id: strawberry.ID) -> types.Agent:
         print("hallo")
         return models.Agent.objects.get(id=id)
+    
+    @strawberry_django.field()
+    def dependency(self, info: Info, id: strawberry.ID) -> types.Dependency:
+        print("hallo")
+        return models.Dependency.objects.get(id=id)
 
     @strawberry_django.field()
     def test_case(self, info: Info, id: strawberry.ID) -> types.TestCase:
@@ -66,10 +73,17 @@ class Mutation:
     )
     ack: types.Assignation = strawberry_django.mutation(resolver=mutations.ack)
     assign: types.Assignation = strawberry_django.mutation(resolver=mutations.assign)
-    unassign: types.Assignation = strawberry_django.mutation(
-        resolver=mutations.unassign
+    cancel: types.Assignation = strawberry_django.mutation(
+        resolver=mutations.cancel
     )
+    interrupt: types.Assignation = strawberry_django.mutation(
+        resolver=mutations.interrupt
+    )
+    provide: types.Provision = strawberry_django.mutation(resolver=mutations.provide, description="Provide a provision")
+    unprovide = strawberry_django.mutation(resolver=mutations.unprovide)
     reserve: types.Reservation = strawberry_django.mutation(resolver=mutations.reserve)
+    link: types.Provision = strawberry_django.mutation(resolver=mutations.link)
+    unlink: types.Provision = strawberry_django.mutation(resolver=mutations.unlink)
     unreserve: types.Reservation = strawberry_django.mutation(
         resolver=mutations.unreserve
     )
@@ -79,6 +93,14 @@ class Mutation:
 
     create_test_result: types.TestResult = strawberry_django.mutation(
         resolver=mutations.create_test_result
+    )
+
+    activate: types.Provision = strawberry_django.mutation(
+        resolver=mutations.activate
+    )
+
+    deactivate: types.Provision = strawberry_django.mutation(
+        resolver=mutations.deactivate
     )
 
 @strawberry.type

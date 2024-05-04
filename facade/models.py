@@ -9,6 +9,7 @@ from facade.enums import (
     AssignationEventChoices,
     AssignationStatusChoices,
     ProvisionEventChoices,
+    ReservationStrategyChoices,
     ReservationEventChoices,
 )
 from authentikate.models import User, App
@@ -226,7 +227,15 @@ class Dependency(models.Model):
         Node,
         on_delete=models.CASCADE,
         help_text="The node this dependency is for",
-        related_name="dependencies",
+        related_name="dependees",
+        null=True,
+        blank=True,
+    )
+    initial_hash = models.CharField(
+        max_length=1000,
+        help_text="The initial hash of the Node",
+        null=True,
+        blank=True,
     )
     reference = models.CharField(
         max_length=1000,
@@ -242,10 +251,8 @@ class Dependency(models.Model):
         max_length=2000,
         default=dict,
         help_text="The binds for this dependency (Determines which templates can be used for this dependency)",
-    )
-    viable_instances = models.IntegerField(
-        default=1,
-        help_text="How many instances of this dependency do we need to be viable",
+        null=True,
+        blank=True,
     )
 
 
@@ -277,11 +284,11 @@ class Template(models.Model):
         default=list,
         help_text="The attached extensions for this Template",
     )
+    extension = models.CharField(verbose_name="Extension", max_length=1000, default="global")
 
     policy = models.JSONField(
         max_length=2000, default=dict, help_text="The attached policy for this template"
     )
-
     params = models.JSONField(default=dict, help_text="Params for this Template")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -343,11 +350,16 @@ class Provision(models.Model):
         blank=True,
     )
 
+    active = models.BooleanField(
+        default=False,
+        help_text="Is this provision active (e.g. should the agent provide the associated template)"
+    )
+
     # Status Field
     status = TextChoicesField(
         max_length=1000,
-        choices_enum=ProvisionStatusChoices,
-        default=ProvisionStatusChoices.INACTIVE,
+        choices_enum=ProvisionEventChoices,
+        default=ProvisionEventChoices.INACTIVE,
         help_text="The Status of this Provision",
     )
 
@@ -390,12 +402,28 @@ class Reservation(models.Model):
         help_text="A Unique identifier for this Topic",
     )
 
+    strategy = TextChoicesField(
+        max_length=1000,
+        choices_enum=ReservationStrategyChoices,
+        default=ReservationStrategyChoices.RANDOM,
+        help_text="The Strategy of this Reservation",
+    )
+
     causing_provision = models.ForeignKey(
         "Provision",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
         help_text="Was this Reservation caused by a Provision?",
+        related_name="caused_reservations",
+    )
+
+    causing_dependency = models.ForeignKey(
+        "Dependency",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        help_text="Was this Reservation caused by a Dependency?",
         related_name="caused_reservations",
     )
 
@@ -521,7 +549,7 @@ class Assignation(models.Model):
     status = TextChoicesField(
         max_length=1000,
         choices_enum=AssignationEventChoices,
-        help_text="The Status of this Provision (transitioned by events)",
+        help_text="The latest Status of this Provision (transitioned by events)",
     )
     statusmessage = models.CharField(
         max_length=1000,
@@ -554,6 +582,8 @@ class AssignationEvent(models.Model):
     )
     progress = models.IntegerField(
         help_text="The progress of the assignation",
+        null=True,
+        blank=True,
     )
     message = models.CharField(max_length=2000, null=True, blank=True)
     # Status Field

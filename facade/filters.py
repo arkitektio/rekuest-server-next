@@ -154,6 +154,16 @@ class TemplateFilter:
         return queryset.filter(id__in=self.ids)
     
 
+@strawberry_django.filter(models.Dependency)
+class DependencyFilter:
+    ids: list[strawberry.ID] | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+    
+
 
 @strawberry_django.order(App)
 class AppOrder:
@@ -183,6 +193,12 @@ class AppFilter:
             return queryset
         return queryset.filter(user_id=info.context.user.id)
 
+
+
+
+@strawberry_django.order(models.Agent)
+class AgentOrder:
+    installed_at: auto
 
 
 @strawberry_django.order(models.Node)

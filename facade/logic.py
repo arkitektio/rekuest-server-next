@@ -2,21 +2,27 @@ import json
 from facade import models, types, enums, inputs
 from django.db.models import Q
 from guardian.shortcuts import get_objects_for_user
-from rekuest_core.inputs import types as ritypes
+from rekuest_core.inputs import models as rimodels
 import hashlib
-
+from facade.backend import controll_backend
 class UnresolvableDependencyError(Exception):
     pass
 
 
 def unlink(provision: models.Provision, reservation: models.Reservation):
-    provision.reservations.remove(provision)
+    provision.reservations.remove(reservation)
     provision.save()
+
+    check_viability(reservation) # We need to check if the reservation is viable, and happy.
 
 
 def link(provision: models.Provision, reservation: models.Reservation):
     provision.reservations.add(reservation)
     provision.save()
+
+    check_viability(reservation) # We need to check if the reservation is viable, and happy.
+
+
 
 
 def get_desired_templates_for_dependency(dependency: inputs.DependencyInput):
@@ -92,23 +98,59 @@ def on_agent_connected(agent: models.Agent):
             activate_provision(provision)
 
 
+def check_viability(reservation: models.Reservation):
+
+    binds = (
+        rimodels.BindsInputModel(**reservation.binds)
+        if reservation.binds
+        else rimodels.BindsInputModel()
+    )
+
+    if len(reservation.provisions.all()) == 0:
+        reservation.viable = False
+        reservation.happy = False
+        reservation.status = enums.ReservationStatus.INACTIVE
+        reservation.save()
+        return reservation
+    
+    if len(reservation.provisions.all()) < binds.minimum_instances:
+        reservation.viable = False
+        reservation.happy = False
+        reservation.status = enums.ReservationStatus.UNHAPPY
+        reservation.save()
+        return reservation
+
+    if len(reservation.provisions.all()) >= binds.desired_instances:
+        reservation.viable = False
+        reservation.happy = False
+        reservation.status = enums.ReservationStatus.HAPPY
+        reservation.save()
+        return reservation
+    
+
+    reservation.viable = False
+    reservation.happy = False
+    reservation.status = enums.ReservationStatus.UNCONNECTED
+    reservation.save()
+    return reservation
+
+
+
+
+
 def activate_provision(provision: models.Provision):
     """This should recursively active the reservations that are linked to this provision"""
     provision.active = True
     provision.save()
+    controll_backend.provide(provision)
 
-    for relier in provision.reliances.all():
-        if (
-            relier.active
-        ):  # If the relier is already active, we don't need to do anything.
-            continue
+    for connecting_reservation in provision.reservations.all():
+        check_viability(connecting_reservation) # We need to check if the reservation is viable, and happy.
 
-        # Lets check if the relier has enough active dependencies to be active.
-        if relier.dependencies.filter(active=True).count() >= relier.minimal_dependency:
-            relier.active = True
-            relier.save()
 
-    provision.save()
+
+
+
 
 
 def link_or_linkcreate_provisions_for_dependency(
@@ -157,14 +199,55 @@ def create_reservation_for_dependency(
     link_or_linkcreate_provisions_for_dependency(dependency, reservation)
 
 
+
+
+
+def schedule_provision(provision: models.Provision):
+    """This should schedule a provision, and all of its dependencies"""
+
+    if provision.template.dependencies.count() == 0:
+        activate_provision(provision)
+        return
+
+    for dependency in provision.template.dependencies.all():
+        if dependency.node:
+            # We are creating all of the reservations for the dependencies.
+            waiter, _ = models.Waiter.objects.get_or_create(
+                registry=provision.agent.registry, instance_id=provision.agent.instance_id, defaults=dict(name="default")
+            )
+
+            res, _ = models.Reservation.objects.update_or_create(
+                reference=dependency.reference,
+                node=dependency.node,
+                waiter=waiter,
+                defaults=dict(
+                    title=dependency.reference,
+                    binds=dependency.binds,
+                    causing_provision=provision,
+                    causing_dependency=dependency,
+                ),
+            )
+
+            schedule_reservation(res)
+
+        else:
+            raise NotImplementedError(
+                "No node specified. Template reservation not implemented yet."
+            )
+        
+    activate_provision(provision)
+        
+            
+
+
 def schedule_reservation(reservation: models.Reservation):
     forwards = []
     linked_provisions = []
 
     binds = (
-        types.BindsModel(**reservation.binds)
+        rimodels.BindsInputModel(**reservation.binds)
         if reservation.binds
-        else types.BindsModel()
+        else rimodels.BindsInputModel()
     )
 
     for provision in reservation.provisions.all():
@@ -209,6 +292,33 @@ def schedule_reservation(reservation: models.Reservation):
                     agent=template.agent,
                     causing_reservation=reservation,
                 )
+
+                print("Created new provision", prov)
+
+                for dependency in template.dependencies.all():
+
+                    print("Scheduling dependencies")
+
+                    waiter, _ = models.Waiter.objects.get_or_create(
+                        registry=template.agent.registry, instance_id=template.agent.instance_id, defaults=dict(name="default")
+                    )
+
+                    res, _ = models.Reservation.objects.update_or_create(
+                            reference=dependency.reference,
+                            node=models.Node.objects.get(hash=dependency.initial_hash) if dependency.initial_hash else None,
+                            waiter=waiter,
+                            defaults=dict(
+                                title=dependency.reference,
+                                binds=dependency.binds,
+                                causing_provision=prov,
+                                causing_dependency=dependency,
+                            ),
+                    )
+
+                    schedule_reservation(res)
+
+
+
 
                 link(prov, reservation)
                 linked_provisions.append(prov)
