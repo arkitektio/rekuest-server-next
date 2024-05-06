@@ -63,15 +63,8 @@ def unreserve(info: Info, input: UnreserveInput) -> types.Reservation:
     return models.Reservation.objects.get(id=input.reservation)
 
 
-@strawberry.input
-class AssignInput:
-    reservation: strawberry.ID
-    args: list[scalars.Arg]
-    reference: str | None = None
-    parent: strawberry.ID | None = None
 
-
-def assign(info: Info, input: AssignInput) -> types.Assignation:
+def assign(info: Info, input: inputs.AssignInput) -> types.Assignation:
     return controll_backend.assign(input)
 
 

@@ -137,6 +137,8 @@ def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Temp
             )
         )
 
+        new_deps = []
+
         if input.dependencies:
 
 

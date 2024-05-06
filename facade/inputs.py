@@ -55,7 +55,7 @@ class ReserveInput:
 
 class AssignInputModel(BaseModel):
     reservation: str
-    args: list[Any]
+    args: list[Any | None]
     reference: str | None = None
     parent: str | None = None
     cached: bool = False
@@ -83,7 +83,7 @@ class InterruptInput:
 @pydantic.input(AssignInputModel)
 class AssignInput:
     reservation: strawberry.ID
-    args: list[scalars.Arg]
+    args: list[scalars.Arg | None]
     reference: str | None = None
     parent: strawberry.ID | None = None
     cached: bool = False
