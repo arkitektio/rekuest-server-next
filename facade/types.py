@@ -122,6 +122,18 @@ class Template:
     @strawberry_django.field()
     def dependency_graph(self) -> DependencyGraph:
         return build_template_graph(self)
+    
+
+@strawberry_django.type(models.HardwareRecord, filters=filters.HardwareRecordFilter, pagination=True)
+class HardwareRecord:
+    id: strawberry.ID
+    cpu_count: int
+    cpu_vendor_name: str
+    cpu_frequency: float
+    created_at: datetime.datetime
+    agent: "Agent"
+
+
 
 
 
@@ -131,7 +143,12 @@ class Agent:
     instance_id: scalars.InstanceID
     registry: "Registry"
     status: enums.AgentStatus
+    hardware_records: list[HardwareRecord]
+    templates: list["Template"]
 
+    @strawberry_django.field()
+    def latest_hardware_record(self) -> HardwareRecord | None:
+        return self.hardware_records.order_by("-created_at").first()
 
 @strawberry_django.type(models.Waiter, filters=filters.WaiterFilter, pagination=True)
 class Waiter:
@@ -150,6 +167,12 @@ class Provision:
     template: "Template"
     status: enums.ProvisionEventKind
     caused_reservations: list["Reservation"]
+    provided: bool
+    active: bool
+
+    @strawberry_django.field()
+    def dependencies_met(self) -> bool:
+        return self.dependencies_met
 
 
 @strawberry_django.type(
@@ -159,7 +182,7 @@ class ProvisionEvent:
     id: strawberry.ID
     provision: "Provision"
     kind: enums.ProvisionEventKind
-    level: enums.LogLevel
+    level: enums.LogLevel | None
     created_at: strawberry.auto
 
 
@@ -172,19 +195,24 @@ class Reservation:
     waiter: "Waiter"
     title: str | None
     node: "Node"
-    status: enums.ReservationStatus
+    status: enums.ReservationEventKind
     updated_at: datetime.datetime
     reference: str
     provisions: list["Provision"]
     binds: rtypes.Binds | None
-    events: list["ReservationEvent"]
     causing_dependency: Dependency | None
     causing_provision: Provision | None
     strategy: enums.ReservationStrategy
+    viable: bool
+    happy: bool
 
     @strawberry_django.field()
     def dependency_graph(self) -> DependencyGraph:
         return build_reservation_graph(self)
+    
+    @strawberry_django.field()
+    def events(self) -> list["ReservationEvent"]:
+        return self.events.order_by("created_at")[:10]
 
 
 @strawberry_django.type(
@@ -194,7 +222,7 @@ class ReservationEvent:
     id: strawberry.ID
     reservation: "Reservation"
     kind: enums.ReservationEventKind
-    level: enums.LogLevel
+    level: enums.LogLevel | None
     created_at: strawberry.auto
 
 
@@ -207,13 +235,17 @@ class Assignation:
     reference: str | None
     args: rscalars.AnyDefault
     parent: "Assignation"
+    reservation: "Reservation"
     status: enums.AssignationEventKind
     status_message: str | None
     waiter: "Waiter"
     node: "Node"
-    events: list["AssignationEvent"]
     created_at: datetime.datetime
     updated_at: datetime.datetime
+
+    @strawberry_django.field()
+    def events(self) -> list["AssignationEvent"]:
+        return self.events.order_by("created_at")[:10]
 
 
 @strawberry_django.type(
@@ -225,6 +257,8 @@ class AssignationEvent:
     returns: rscalars.AnyDefault | None
     assignation: "Assignation"
     kind: enums.AssignationEventKind
+    message: str | None
+    level: enums.LogLevel | None
     
     created_at: strawberry.auto
 

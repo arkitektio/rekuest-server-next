@@ -56,3 +56,7 @@ EdgeModel = DependencyEdgeModel | ImplementationEdgeModel
 class DependencyGraphModel(BaseModel):
     nodes: list[NodeModel]
     edges: list[EdgeModel]
+
+
+
+

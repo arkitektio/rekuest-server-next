@@ -110,6 +110,7 @@ class AssignationFilter:
     reservation: ReservationFilter | None
     ids: list[strawberry.ID] | None
     status: list[enums.AssignationStatus] | None
+    instance_id: scalars.InstanceID | None
 
     def filter_ids(self, queryset, info):
         if self.ids is None:
@@ -120,11 +121,17 @@ class AssignationFilter:
         if self.status is None:
             return queryset
         return queryset.filter(status__in=self.status)
+    
+    def filter_instance_id(self, queryset, info):
+        if self.instance_id is None:
+            return queryset
+        return queryset.filter(reservation__waiter__instance_id=self.instance_id)
 
 
 @strawberry_django.filter(models.AssignationEvent)
 class AssignationEventFilter:
     kind: list[enums.AssignationEventKind] | None
+    
 
     def filter_kind(self, queryset, info):
         if self.kind is None:
@@ -219,6 +226,31 @@ class ProtocolFilter(SearchFilter):
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
+    
+
+
+
+@strawberry_django.filter(models.HardwareRecord)
+class HardwareRecordFilter:
+    ids: list[strawberry.ID] | None
+    cpu_vendor_name: str | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+    
+    def filter_cpu_vendor_name(self, queryset, info):
+        if self.cpu_vendor_name is None:
+            return queryset
+        
+        return queryset.filter(cpu_vendor_name__contains=self.cpu_vendor_name)
+
+    
+
+
+
+
 
 
 @strawberry_django.filter(models.Node)

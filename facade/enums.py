@@ -137,8 +137,23 @@ class AssignationEventChoices(TextChoices):
 
 
 class ReservationEventChoices(TextChoices):
-    CHANGE = "CHANGE", "Change (Reservation changed its status)"
-    LOG = "LOG", "Log (Reservation logged a message)"
+    PENDING = "PENDING", "Pending (Reservation is pending)"
+    CREATE = "CREATE"
+    RESCHEDULE = "RESCHEDULE"
+    DELETED = "DELETED"
+    CHANGE = "CHANGE"
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
+    # Error States
+    UNCONNECTED ="UNCONNECTED"
+
+    # End States
+    ENDED = "ENDED"
+    # unhappy path
+    UNHAPPY = "UNHAPPY"
+    HAPPY = "HAPPY"
+    # Log Events
+    LOG = "LOG"
 
 
 class ProvisionEventChoices(TextChoices):
@@ -303,10 +318,31 @@ class ProvisionEventKind(str, Enum):
 
 @strawberry.enum
 class ReservationEventKind(str, Enum):
+    PENDING = "PENDING"
+    CREATE = "CREATE"
+    RESCHEDULE = "RESCHEDULE"
+    DELETED = "DELETED"
     CHANGE = "CHANGE"
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
+    # Error States
+    UNCONNECTED ="UNCONNECTED"
 
+    # End States
+    ENDED = "ENDED"
+    # unhappy path
+    UNHAPPY = "UNHAPPY"
+    HAPPY = "HAPPY"
     # Log Events
     LOG = "LOG"
+
+
+class LogLevelChoices(TextChoices):
+    DEBUG = "DEBUG", "DEBUG Level"
+    INFO = "INFO", "INFO Level"
+    ERROR = "ERROR", "ERROR Level"
+    WARN = "WARN", "WARN Level"
+    CRITICAL = "CRITICAL", "CRITICAL Level"
 
 
 @strawberry.enum

@@ -6,7 +6,7 @@ from typing import AsyncGenerator
 from facade.channels import node_created_listen
 
 
-async def provisions(
+async def provision_events(
     self,
     info: Info,
     instance_id: scalars.InstanceID,

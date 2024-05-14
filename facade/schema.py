@@ -18,18 +18,24 @@ from rekuest_core.constants import interface_types
 @strawberry.type
 class Query:
     clients: list[types.App] = strawberry_django.field()
-    
+    hardware_records: list[types.HardwareRecord] = strawberry_django.field()
     agents: list[types.Agent] = strawberry_django.field()
     nodes: list[types.Node] = strawberry_django.field()
     protocols: list[types.Protocol] = strawberry_django.field()
     templates: list[types.Template] = strawberry_django.field()
-    assignations: list[types.Assignation] = strawberry_django.field()
     test_results: list[types.TestResult] = strawberry_django.field()
     test_cases: list[types.TestCase] = strawberry_django.field()
     reservations: list[types.Reservation] = strawberry_django.field()
+    reservations: list[types.Reservation] = strawberry_django.field(resolver=queries.reservations)
     myreservations: list[types.Reservation] = strawberry_django.field(resolver=queries.myreservations)
     provisions: list[types.Provision] = strawberry_django.field()
     node = strawberry_django.field(resolver=queries.node)
+    assignations = strawberry_django.field(resolver=queries.assignations)
+
+
+    @strawberry_django.field()
+    def hardware_record(self, info: Info, id: strawberry.ID) -> types.HardwareRecord:
+        return models.HardwareRecord.objects.get(id=id)
 
     @strawberry_django.field()
     def agent(self, info: Info, id: strawberry.ID) -> types.Agent:
@@ -103,12 +109,18 @@ class Mutation:
         resolver=mutations.deactivate
     )
 
+    create_hardware_record: types.HardwareRecord = strawberry_django.mutation(
+        resolver=mutations.create_hardware_record
+    )
+
 @strawberry.type
 class Subscription:
     new_nodes = strawberry.subscription(resolver=subscriptions.new_nodes)
     assignations = strawberry.subscription(resolver=subscriptions.assignations)
     reservations = strawberry.subscription(resolver=subscriptions.reservations)
-    provisions = strawberry.subscription(resolver=subscriptions.provisions)
+    assignation_events = strawberry.subscription(resolver=subscriptions.assignation_events)
+    reservation_events = strawberry.subscription(resolver=subscriptions.reservation_events)
+    provision_events = strawberry.subscription(resolver=subscriptions.provision_events)
 
 
 schema = strawberry.Schema(

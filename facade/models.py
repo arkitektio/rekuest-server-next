@@ -11,6 +11,7 @@ from facade.enums import (
     ProvisionEventChoices,
     ReservationStrategyChoices,
     ReservationEventChoices,
+    LogLevelChoices,
 )
 from authentikate.models import User, App
 import uuid
@@ -175,6 +176,20 @@ class Agent(models.Model):
     @property
     def queue(self):
         return f"agent_{self.unique}"
+    
+
+class HardwareRecord(models.Model):
+    agent = models.ForeignKey(
+        Agent,
+        on_delete=models.CASCADE,
+        help_text="The associated agent for this HardwareRecord",
+        related_name="hardware_records",
+    )
+ 
+    created_at = models.DateTimeField(auto_now_add=True)
+    cpu_count = models.IntegerField(default=0)
+    cpu_vendor_name = models.CharField(max_length=1000, default="Unknown")
+    cpu_frequency = models.FloatField(default=0)
 
 
 class Waiter(models.Model):
@@ -355,6 +370,16 @@ class Provision(models.Model):
         help_text="Is this provision active (e.g. should the agent provide the associated template)"
     )
 
+    provided = models.BooleanField(
+        default=False,
+        help_text="Is the provision provided (e.g. is the template available on the agent). This does NOT mean that the provision is assignable. Only if all the dependencies are met, the provision is assignable"
+    )
+
+    dependencies_met = models.BooleanField(
+        default=False,
+        help_text="Are all dependencies met for this provision. Should change to True if all dependencies are met (potential sync error)"
+    )
+
     # Status Field
     status = TextChoicesField(
         max_length=1000,
@@ -378,6 +403,10 @@ class Provision(models.Model):
     @property
     def queue(self):
         return f"provision_{self.unique}"
+    
+    @property
+    def is_viable(self):
+        return self.active and self.provided and self.dependencies_met
 
 
 class Reservation(models.Model):
@@ -447,6 +476,18 @@ class Reservation(models.Model):
         blank=True,
     )
 
+
+    happy = models.BooleanField(
+        default=False,
+        help_text="Is this reservation happily connected. E.g does it have enough links according to its policy"
+    )
+
+    viable = models.BooleanField(
+        default=False,
+        help_text="Is this reservation viable. E.g. does it have a viable amount of connections"
+    )
+
+
     # 1 Inputs to the the Reservation (it can be either already a template to provision or just a node)
     node = models.ForeignKey(
         Node,
@@ -488,13 +529,13 @@ class Reservation(models.Model):
     # Status Field
     status = TextChoicesField(
         max_length=1000,
-        choices_enum=ReservationStatusChoices,
-        default=ReservationStatusChoices.INACTIVE,
+        choices_enum=ReservationEventChoices,
+        default=ReservationEventChoices.PENDING,
         help_text="The Status of this Provision",
     )
     statusmessage = models.CharField(
         max_length=1000,
-        help_text="Clear Text status of the Provision as for now",
+        help_text="Clear Text status of the ssssssProvision as for now",
         blank=True,
     )
 
@@ -592,6 +633,13 @@ class AssignationEvent(models.Model):
         choices_enum=AssignationEventChoices,
         help_text="The event kind",
     )
+    level = TextChoicesField(
+        max_length=1000,
+        choices_enum=LogLevelChoices,
+        help_text="The event level",
+        null=True,
+        blank=True,
+    )
 
 
 class ReservationEvent(models.Model):
@@ -609,6 +657,13 @@ class ReservationEvent(models.Model):
         choices_enum=ReservationEventChoices,
         help_text="The event kind",
     )
+    level = TextChoicesField(
+        max_length=1000,
+        choices_enum=LogLevelChoices,
+        help_text="The event level",
+        null=True,
+        blank=True,
+    )
 
 
 class ProvisionEvent(models.Model):
@@ -625,6 +680,13 @@ class ProvisionEvent(models.Model):
         max_length=1000,
         choices_enum=ProvisionEventChoices,
         help_text="The event kind",
+    )
+    level = TextChoicesField(
+        max_length=1000,
+        choices_enum=LogLevelChoices,
+        help_text="The event level",
+        null=True,
+        blank=True,
     )
 
 

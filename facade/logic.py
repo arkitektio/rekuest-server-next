@@ -4,7 +4,6 @@ from django.db.models import Q
 from guardian.shortcuts import get_objects_for_user
 from rekuest_core.inputs import models as rimodels
 import hashlib
-from facade.backend import controll_backend
 class UnresolvableDependencyError(Exception):
     pass
 
@@ -13,14 +12,12 @@ def unlink(provision: models.Provision, reservation: models.Reservation):
     provision.reservations.remove(reservation)
     provision.save()
 
-    check_viability(reservation) # We need to check if the reservation is viable, and happy.
 
 
 def link(provision: models.Provision, reservation: models.Reservation):
     provision.reservations.add(reservation)
     provision.save()
 
-    check_viability(reservation) # We need to check if the reservation is viable, and happy.
 
 
 
@@ -106,47 +103,174 @@ def check_viability(reservation: models.Reservation):
         else rimodels.BindsInputModel()
     )
 
+    old_status = reservation.status
+
     if len(reservation.provisions.all()) == 0:
-        reservation.viable = False
-        reservation.happy = False
-        reservation.status = enums.ReservationStatus.INACTIVE
-        reservation.save()
-        return reservation
+        new_status =  enums.ReservationEventKind.INACTIVE
     
     if len(reservation.provisions.all()) < binds.minimum_instances:
-        reservation.viable = False
-        reservation.happy = False
-        reservation.status = enums.ReservationStatus.UNHAPPY
-        reservation.save()
-        return reservation
+        new_status = enums.ReservationEventKind.UNHAPPY
 
     if len(reservation.provisions.all()) >= binds.desired_instances:
-        reservation.viable = False
-        reservation.happy = False
-        reservation.status = enums.ReservationStatus.HAPPY
-        reservation.save()
-        return reservation
+        new_status = enums.ReservationEventKind.HAPPY
     
 
-    reservation.viable = False
-    reservation.happy = False
-    reservation.status = enums.ReservationStatus.UNCONNECTED
-    reservation.save()
+    if old_status != new_status:
+        reservation.status = new_status
+        reservation.save()
+
+        x = models.ReservationEvent.objects.create(
+            reservation=reservation,
+            kind=new_status,
+            level=enums.LogLevel.INFO,
+            message=f"Reservation transitioned to {new_status}",
+        )
+
     return reservation
 
 
 
 
 
-def activate_provision(provision: models.Provision):
+def activate_provision(provision: models.Provision) -> models.Provision:
     """This should recursively active the reservations that are linked to this provision"""
     provision.active = True
     provision.save()
-    controll_backend.provide(provision)
 
     for connecting_reservation in provision.reservations.all():
         check_viability(connecting_reservation) # We need to check if the reservation is viable, and happy.
 
+    return provision
+
+
+
+
+
+async def apropagate_reservation_change(reservation: models.Reservation):
+    """ This should propagate the change to a reservation which
+    links where potentially updated.
+
+    """
+
+    binds = (
+        rimodels.BindsInputModel(**reservation.binds)
+        if reservation.binds
+        else rimodels.BindsInputModel()
+    )
+
+    old_viable = reservation.viable
+
+
+    active_provisions = []
+
+    async for provision in reservation.provisions.all():
+        if provision.is_viable:
+            active_provisions.append(provision)
+
+
+    print("Active provisions", active_provisions)
+        
+
+    if len(active_provisions) >= binds.minimum_instances:
+        reservation.viable = True
+    else:
+        reservation.viable = False
+
+    if len(active_provisions) >= binds.desired_instances:
+        reservation.happy = True
+    else:
+        reservation.happy = False
+
+    
+    await reservation.asave()
+
+    
+    if old_viable != reservation.viable:
+        print("We changed state. So we need to propagate. Create a new event.")
+        x = await models.ReservationEvent.objects.acreate(
+            reservation=reservation,
+            kind=enums.ReservationEventKind.CHANGE,
+            message=f"Reservation transitioned to {enums.ReservationEventKind.CHANGE}",
+        )
+
+        if reservation.causing_provision:
+            print("This reservation was caused by a provision. So we need to propagate.")
+            await apropagate_provision_change(reservation.causing_provision)
+
+    else:
+        print("We didn't change state. So no need to propagate.")
+        await reservation.asave()
+
+
+
+
+async def apropagate_provision_change(provision: models.Provision):
+
+    unactive_reservations = []
+
+    async for reservation in provision.caused_reservations.all():
+        if reservation.viable:
+            continue
+        else:
+            unactive_reservations.append(reservation)
+
+
+    if len(unactive_reservations) == 0:
+        provision.dependencies_met = True
+
+    else:
+        provision.dependencies_met = False
+
+    await provision.asave()
+
+    if provision.is_viable:
+        print("The provision is now active, and the dependencies are met. We can active potential reservations.")
+        async for reservation in provision.reservations.all():
+            await apropagate_reservation_change(reservation)
+    
+    else:
+        print("The provision is not active, or the dependencies are not met. So we need to check the reservations.")
+        async for reservation in provision.reservations.all():
+            await apropagate_reservation_change(reservation)
+
+
+
+async def aset_provision_provided(provision: models.Provision):
+    provision.provided = True
+    await provision.asave()
+    await apropagate_provision_change(provision)
+
+
+   
+    return provision
+
+async def aset_provision_unprovided(provision: models.Provision):
+    provision.provided = False
+    await provision.asave()
+    await apropagate_provision_change(provision)
+
+
+   
+    return provision
+
+
+
+async def aset_provision_active(provision: models.Provision):
+    provision.active = True
+    await provision.asave()
+    await apropagate_provision_change(provision)
+
+
+   
+    return provision
+
+
+async def aset_provision_inactive(provision: models.Provision):
+    provision.active = False
+    await provision.asave()
+
+    apropagate_provision_change(provision)
+    return provision
 
 
 
@@ -205,10 +329,6 @@ def create_reservation_for_dependency(
 def schedule_provision(provision: models.Provision):
     """This should schedule a provision, and all of its dependencies"""
 
-    if provision.template.dependencies.count() == 0:
-        activate_provision(provision)
-        return
-
     for dependency in provision.template.dependencies.all():
         if dependency.node:
             # We are creating all of the reservations for the dependencies.
@@ -235,7 +355,7 @@ def schedule_provision(provision: models.Provision):
                 "No node specified. Template reservation not implemented yet."
             )
         
-    activate_provision(provision)
+    return activate_provision(provision)
         
             
 

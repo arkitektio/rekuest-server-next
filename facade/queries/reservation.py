@@ -24,3 +24,20 @@ def myreservations(
     waiter, _ = models.Waiter.objects.get_or_create(registry=registry, instance_id=instance_id , defaults=dict(name="default"))
 
     return models.Reservation.objects.filter(waiter=waiter).all
+
+
+def reservations(
+    info: Info,
+    instance_id: scalars.InstanceID | None = None,
+) -> list[types.ReservationEvent]:
+    
+    registry, _ = models.Registry.objects.get_or_create(
+        app=info.context.request.app, user=info.context.request.user
+    )
+
+    waiter, _ = models.Waiter.objects.get_or_create(
+        registry=registry, instance_id=instance_id, defaults=dict(name="default")
+    )
+
+    print("ID: ", waiter)
+    return models.Reservation.objects.filter(waiter=waiter)

@@ -8,6 +8,7 @@ from authentikate import models as auth_models
 from asgiref.sync import sync_to_async
 from authentikate.utils import authenticate_token_or_none
 from facade.persist_backend import persist_backend
+from facade.logic import schedule_reservation, schedule_provision, activate_provision , apropagate_provision_change, apropagate_reservation_change, aset_provision_unprovided
 import redis
 import asyncio
 import redis.asyncio as aredis
@@ -218,7 +219,9 @@ class AgentConsumer(AsyncWebsocketConsumer):
             async for i in models.Provision.objects.filter(agent=self.agent).all():
                 created = await models.ProvisionEvent.objects.acreate(provision=i, kind=enums.ProvisionEventKind.DISCONNECTED, message="Agent disconnected")
                 i.status = enums.ProvisionEventKind.DISCONNECTED
-                print("Deactivating provision", i.id)
+                i.provided = False
+               
+                await aset_provision_unprovided(i)
 
                 async for ass in models.Assignation.objects.filter(provision=i).exclude(status__in=[enums.AssignationEventKind.CANCELLED, enums.AssignationEventKind.DONE, enums.AssignationEventKind.CRITICAL]).all():
                     created = await models.AssignationEvent.objects.acreate(assignation=ass, kind=enums.AssignationEventKind.DISCONNECTED, message="Agent disconnected. Fate unknown")

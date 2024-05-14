@@ -8,7 +8,7 @@ import json
 import logging
 from facade.protocol import infer_protocols
 from facade.utils import hash_input
-from facade.logic import schedule_reservation, schedule_provision, link as link_provision_to_reservation, unlink as unlink_provision_from_reservation, check_viability
+from facade.logic import schedule_reservation, schedule_provision, link as link_provision_to_reservation, unlink as unlink_provision_from_reservation
 
 logger = logging.getLogger(__name__)
 from facade.connection import redis_pool
@@ -38,7 +38,7 @@ def reserve(info: Info, input: inputs.ReserveInput) -> types.Reservation:
 
 
 
-    res, _ = models.Reservation.objects.update_or_create(
+    res, created = models.Reservation.objects.update_or_create(
         reference=reference,
         node=node,
         template=template,
@@ -49,7 +49,24 @@ def reserve(info: Info, input: inputs.ReserveInput) -> types.Reservation:
         ),
     )
 
+
     schedule_reservation(res)
+
+    if created:
+        models.ReservationEvent.objects.create(
+            reservation=res,
+            kind=enums.ReservationEventKind.CREATED,
+            description="Created",
+        )
+    else:
+        models.ReservationEvent.objects.create(
+            reservation=res,
+            kind=enums.ReservationEventKind.RESCHEDULED,
+            description="Recreated",
+        )
+
+    
+
 
     return res
 
@@ -60,6 +77,16 @@ class UnreserveInput:
 
 
 def unreserve(info: Info, input: UnreserveInput) -> types.Reservation:
+
+    reservation = models.Reservation.objects.get(id=input.reservation)
+    reservation.status = enums.ReservationEventKind.DELETED
+
+    models.ReservationEvent.objects.create(
+        reservation=reservation,
+        kind=enums.ReservationEventKind.DELETED,
+        description="Deleted",
+    )
+
     return models.Reservation.objects.get(id=input.reservation)
 
 
@@ -113,15 +140,7 @@ def unprovide(info: Info, input: UnProvideInput) -> strawberry.ID:
 
 
     provision = models.Provision.objects.get(id=input.provision)
-    provision.active = False
-    provision.save()
-
-    res = provision.reservations.all()
-    for reservation in res:
-        check_viability(reservation)
-
-
-    controll_backend.unprovide(provision)
+    
 
     return input.provision
 

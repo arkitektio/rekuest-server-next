@@ -3,3 +3,4 @@ from .postman import *
 from .template import *
 from .test import *
 from .lifeline import *
+from .hardware_record import *
