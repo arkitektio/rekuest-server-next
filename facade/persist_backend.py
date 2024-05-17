@@ -1,10 +1,75 @@
 from typing import Protocol
 from facade import models, enums, logic
 import uuid
-
-
+import datetime
+from django.conf import settings
+from asgiref.sync import async_to_sync
 
 class ModelPersistBackend():
+
+
+
+
+
+
+
+    async def on_reinit(self, agent_id: str | None) -> None:
+        if agent_id:
+            agent = models.Agent.objects.aget(id=agent_id)
+
+            if agent.last_seen < datetime.datetime.now() - datetime.timedelta(seconds=settings.AGENT_DISCONNECTED_TIMEOUT):
+                await self.on_agent_disconnected(agent_id)
+
+        else:
+            agents = models.Agent.objects.filter(last_seen__lt=datetime.datetime.now() - datetime.timedelta(seconds=settings.AGENT_DISCONNECTED_TIMEOUT)).all()
+            async for agent in agents:
+               await self.on_agent_disconnected(agent.id)
+
+    async def on_agent_connected(self, agent_id: str) -> None:
+        x = await models.Agent.objects.aget(id=agent_id)
+        x.status = enums.AgentStatus.ACTIVE
+        x.connected = True
+        x.last_seen = datetime.datetime.now()
+        await x.asave()
+
+    async def on_agent_disconnected(self, agent_id: str) -> None:
+        agent = await models.Agent.objects.aget(id=agent_id)
+        agent.status = enums.AgentStatus.DISCONNECTED
+        agent.connected = False
+        agent.last_seen = datetime.datetime.now()
+
+        async for i in models.Provision.objects.filter(agent=agent).all():
+            created = await models.ProvisionEvent.objects.acreate(provision=i, kind=enums.ProvisionEventKind.DISCONNECTED, message="Agent disconnected")
+            i.status = enums.ProvisionEventKind.DISCONNECTED
+            i.provided = False
+            
+            await logic.aset_provision_unprovided(i)
+
+            async for ass in models.Assignation.objects.filter(provision=i).exclude(status__in=[enums.AssignationEventKind.CANCELLED, enums.AssignationEventKind.DONE, enums.AssignationEventKind.CRITICAL]).all():
+                created = await models.AssignationEvent.objects.acreate(assignation=ass, kind=enums.AssignationEventKind.DISCONNECTED, message="Agent disconnected. Fate unknown")
+                ass.status = enums.AssignationEventKind.DISCONNECTED
+                print("Deactivating Assignation", ass.id)
+                await ass.asave()
+
+
+            await i.asave()
+
+
+
+
+
+
+        await agent.asave()
+
+
+    async def on_agent_heartbeat(self, agent_id: str) -> None:
+        print("On agent Heartbeat")
+        x = await models.Agent.objects.aget(id=agent_id)
+        x.status = enums.AgentStatus.ACTIVE
+        x.connected = True
+        x.last_seen = datetime.datetime.now()
+
+        await x.asave()
 
 
 

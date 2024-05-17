@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 from facade.connection import redis_pool
 import redis
 from facade.backend import controll_backend
+from facade.persist_backend import persist_backend
 
 
 @strawberry.input
@@ -41,3 +42,15 @@ def deactivate(info: Info, input: DeActivateInput) -> types.Provision:
     controll_backend.deactivate_provision(provision)
 
     return provision
+
+
+
+@strawberry.input
+class ReInitInput:
+    agent: strawberry.ID | None = None
+
+
+async def reinit(info: Info, input: ReInitInput) -> str:
+    await persist_backend.on_reinit(agent_id=input.agent)
+
+    return "ok"

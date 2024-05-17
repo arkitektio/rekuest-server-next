@@ -11,7 +11,9 @@ from facade.persist_backend import persist_backend
 from facade.logic import schedule_reservation, schedule_provision, activate_provision , apropagate_provision_change, apropagate_reservation_change, aset_provision_unprovided
 import redis
 import asyncio
+import datetime
 import redis.asyncio as aredis
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +56,16 @@ class InitMessage(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
 
 
+class HeartbeatMessage(BaseModel):
+    type = "HEARTBEAT"
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
 
 
+HEARTBEAT_INTERVAL = settings.AGENT_HEARTBEAT_INTERVAL
+HEARTBEAT_RESPONSE_TIMEOUT = settings.AGENT_HEARTBEAT_RESPONSE_TIMEOUT
+
+
+HEARTBEAT_NOT_RESPONDED_CODE = settings.AGENT_HEARTBEAT_NOT_RESPONDED_CODE
 class AgentConsumer(AsyncWebsocketConsumer):
     groups = ["broadcast"]
 
@@ -112,8 +122,15 @@ class AgentConsumer(AsyncWebsocketConsumer):
             ),
         )
 
-        self.agent.status = enums.AgentStatus.ACTIVE
-        await self.agent.asave()
+
+        self.connection = aredis.Redis(host="redis", auto_close_connection_pool=True)
+
+        await persist_backend.on_agent_connected(self.agent.id)
+
+        self.answer_future = None
+
+
+
 
 
         self.provisions = []
@@ -139,18 +156,47 @@ class AgentConsumer(AsyncWebsocketConsumer):
         self.task = asyncio.create_task(self.listen_for_tasks(self.agent.id))
         self.task.add_done_callback(lambda x: print("DONE", x))
 
+
+        self.heartbeat_task = asyncio.create_task(self.heartbeat(self.agent.id))
+        self.heartbeat_task.add_done_callback(lambda x: print("DONE sending heartbease", x))
+
+
+    async def heartbeat(self, agent_id: str):
+        try:
+            while True:
+                await asyncio.sleep(HEARTBEAT_INTERVAL)
+                await self.send(text_data=HeartbeatMessage().json())
+
+                self.answer_future = asyncio.Future()
+
+                try:
+                    received = await asyncio.wait_for(self.answer_future, HEARTBEAT_RESPONSE_TIMEOUT)
+                    await persist_backend.on_agent_heartbeat(agent_id)
+
+                except asyncio.TimeoutError:
+                    print(f"TIMEOUT on client {self.agent.id}")
+                    await self.close(code=HEARTBEAT_NOT_RESPONDED_CODE)
+
+
+
+        except asyncio.CancelledError:
+            print("CANCELLED")
+            return
+        
+    
+    
+
     async def listen_for_tasks(self, agent_id: str):
         try:
-            connection = aredis.Redis(host="redis", auto_close_connection_pool=True)
             while True:
-                task = await connection.brpoplpush(f'{agent_id}_my_queue', 'processing_queue')
+                task = await self.connection.brpoplpush(f'{agent_id}_my_queue', 'processing_queue')
                 if task:
                     print("Receiving", task)
                     await self.send(text_data=task.decode("utf-8"))
-                    await connection.lrem('processing_queue', 0, task)
+                    await self.connection.lrem('processing_queue', 0, task)
         except asyncio.CancelledError:
             print("CANCELLED")
-            connection.close()
+            self.connection.close()
             return
             
         
@@ -183,6 +229,16 @@ class AgentConsumer(AsyncWebsocketConsumer):
                 if payload["type"] == "ASSIGNATION_EVENT":
                     await persist_backend.on_assign_changed(payload)
 
+                if payload["type"] == "HEARTBEAT":
+                    if self.answer_future:
+                        print("ANSWERING HEARTBEAT")
+                        self.answer_future.set_result(None)
+                    else:
+                        print("NO ANSWER FUTURE, this is a protocol error, as no heartbeat was sent")
+                        await self.disconnect(HEARTBEAT_NOT_RESPONDED_CODE)
+                        return
+
+                    
 
         
 
@@ -190,10 +246,6 @@ class AgentConsumer(AsyncWebsocketConsumer):
             logger.error("Error in consumer", exc_info=True)
             await self.send(text_data=ErrorMessages(error=str(e)).json())
             return
-
-
-
-
 
 
 
@@ -211,30 +263,20 @@ class AgentConsumer(AsyncWebsocketConsumer):
             except Exception as e:
                 logger.error("Error in consumer", exc_info=True)
                 return
+            
+        if hasattr(self, "heartbeat_task"):
+            print("CANCELLING SHOULD ALWAY BE CANCELLED")
+            self.heartbeat_task.cancel()
 
-        if self.agent:
-            self.agent.status = enums.AgentStatus.DISCONNECTED
+            try:
+                await self.heartbeat_task
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                logger.error("Error in consumer", exc_info=True)
+                return
 
-
-            async for i in models.Provision.objects.filter(agent=self.agent).all():
-                created = await models.ProvisionEvent.objects.acreate(provision=i, kind=enums.ProvisionEventKind.DISCONNECTED, message="Agent disconnected")
-                i.status = enums.ProvisionEventKind.DISCONNECTED
-                i.provided = False
-               
-                await aset_provision_unprovided(i)
-
-                async for ass in models.Assignation.objects.filter(provision=i).exclude(status__in=[enums.AssignationEventKind.CANCELLED, enums.AssignationEventKind.DONE, enums.AssignationEventKind.CRITICAL]).all():
-                    created = await models.AssignationEvent.objects.acreate(assignation=ass, kind=enums.AssignationEventKind.DISCONNECTED, message="Agent disconnected. Fate unknown")
-                    ass.status = enums.AssignationEventKind.DISCONNECTED
-                    print("Deactivating Assignation", ass.id)
-                    await ass.asave()
-
-
-                await i.asave()
-
-
-
-            await self.agent.asave()
+        await persist_backend.on_agent_disconnected(self.agent.id)
         print("DISCONNECTED")
         pass
 

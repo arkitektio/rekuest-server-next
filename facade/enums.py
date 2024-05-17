@@ -207,6 +207,7 @@ class ReservationStrategyChoices(TextChoices):
     LEAST_BUSY = "LEAST_BUSY", "Least Busy (Assignation is assigned to the least busy Provision)"
     LEAST_TIME = "LEAST_TIME", "Least Time (Assignation is assigned to the Provision with the least time left)"
     LEAST_LOAD = "LEAST_LOAD", "Least Load (Assignation is assigned to the Provision with the least load)"
+    DIRECT = "DIRECT", "Direct (Assignation is assigned to a direct Provision)"
 
 
 @strawberry.enum
@@ -216,6 +217,7 @@ class ReservationStrategy(str, Enum):
     LEAST_BUSY = "LEAST_BUSY"
     LEAST_TIME = "LEAST_TIME"
     LEAST_LOAD = "LEAST_LOAD"
+    DIRECT = "DIRECT"
 
 @strawberry.enum
 class AssignationStatus(str, Enum):

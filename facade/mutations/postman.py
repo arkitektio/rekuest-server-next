@@ -38,10 +38,13 @@ def reserve(info: Info, input: inputs.ReserveInput) -> types.Reservation:
 
 
 
+
+
     res, created = models.Reservation.objects.update_or_create(
         reference=reference,
-        node=node,
+        node=node or template.node,
         template=template,
+        strategy=enums.ReservationStrategy.DIRECT if template else enums.ReservationStrategy.ROUND_ROBIN,
         waiter=waiter,
         defaults=dict(
             title=input.title,
@@ -55,14 +58,14 @@ def reserve(info: Info, input: inputs.ReserveInput) -> types.Reservation:
     if created:
         models.ReservationEvent.objects.create(
             reservation=res,
-            kind=enums.ReservationEventKind.CREATED,
-            description="Created",
+            kind=enums.ReservationEventKind.PENDING,
+            message="Created",
         )
     else:
         models.ReservationEvent.objects.create(
             reservation=res,
-            kind=enums.ReservationEventKind.RESCHEDULED,
-            description="Recreated",
+            kind=enums.ReservationEventKind.RESCHEDULE,
+            message="Recreated",
         )
 
     

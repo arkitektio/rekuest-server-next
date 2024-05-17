@@ -15,6 +15,7 @@ from facade.enums import (
 )
 from authentikate.models import User, App
 import uuid
+import datetime
 
 # Create your models here.
 
@@ -149,6 +150,12 @@ class Agent(models.Model):
         default=AgentStatusChoices.VANILLA,
         help_text="The Status of this Agent",
     )
+    connected = models.BooleanField(
+        default=False, help_text="Is this Agent connected to the backend"
+    )
+    last_seen = models.DateTimeField(
+        auto_created=True, help_text="The last time this Agent was seen"
+    )
     registry = models.ForeignKey(
         Registry,
         on_delete=models.CASCADE,
@@ -176,6 +183,10 @@ class Agent(models.Model):
     @property
     def queue(self):
         return f"agent_{self.unique}"
+    
+    @property
+    def is_active(self):
+        return self.connected and self.last_seen > datetime.datetime.now() - datetime.timedelta(minutes=5)
     
 
 class HardwareRecord(models.Model):

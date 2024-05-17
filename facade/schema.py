@@ -85,6 +85,7 @@ class Mutation:
     interrupt: types.Assignation = strawberry_django.mutation(
         resolver=mutations.interrupt
     )
+    reinit = strawberry_django.mutation(resolver=mutations.reinit)
     provide: types.Provision = strawberry_django.mutation(resolver=mutations.provide, description="Provide a provision")
     unprovide = strawberry_django.mutation(resolver=mutations.unprovide)
     reserve: types.Reservation = strawberry_django.mutation(resolver=mutations.reserve)

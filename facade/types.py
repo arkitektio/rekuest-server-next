@@ -18,7 +18,10 @@ from rekuest_core import scalars as rscalars
 from rekuest_core import enums as renums
 from dep_graph.types import DependencyGraph
 from dep_graph.functions import build_template_graph, build_node_graph, build_reservation_graph
-
+import redis 
+from facade.connection import redis_pool
+from django.conf import settings
+from django.utils import timezone
 @strawberry_django.type(App,  filters=filters.AppFilter, pagination=True, order=filters.AppOrder)
 class App:
     id: strawberry.ID
@@ -145,6 +148,14 @@ class Agent:
     status: enums.AgentStatus
     hardware_records: list[HardwareRecord]
     templates: list["Template"]
+    provisions: list["Provision"]
+    last_seen: datetime.datetime | None
+    connected: bool
+
+
+    @strawberry_django.field()
+    def active(self) -> bool:
+        return self.connected and self.last_seen > timezone.now() - datetime.timedelta(seconds=settings.AGENT_DISCONNECTED_TIMEOUT)
 
     @strawberry_django.field()
     def latest_hardware_record(self) -> HardwareRecord | None:
