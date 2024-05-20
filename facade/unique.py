@@ -14,8 +14,8 @@ def traverse_scope(port: models.ChildPortInputModel, scope=enums.PortScope.LOCAL
     if port.kind == enums.PortKind.STRUCTURE:
         if port.scope == scope:
             return True
-    if port.child:
-        return traverse_scope(port.child, scope)
+    if port.children:
+        return any(traverse_scope(child, scope) for child in port.children)
     return False
 
 

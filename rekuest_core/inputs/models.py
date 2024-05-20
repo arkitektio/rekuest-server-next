@@ -1,6 +1,7 @@
 from typing import Any, Optional
 from rekuest_core import enums
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, root_validator
+from typing_extensions import Self
 
 
 class BindsInputModel(BaseModel):
@@ -57,17 +58,18 @@ class ReturnWidgetInputModel(BaseModel):
 
 
 class ChildPortInputModel(BaseModel):
+    key: str 
     label: str | None
     kind: enums.PortKind
     scope: enums.PortScope
     description: str | None = None
-    child: Optional["ChildPortInputModel"] = None
     identifier: str | None = None
     nullable: bool
-    variants: list["ChildPortInputModel"] | None = None
+    children: list["ChildPortInputModel"] | None = None
     effects: list[EffectInputModel] | None = None
     assign_widget: Optional["AssignWidgetInputModel"] = None
     return_widget: Optional["ReturnWidgetInputModel"] = None
+
 
 
 class PortInputModel(BaseModel):
@@ -81,11 +83,21 @@ class PortInputModel(BaseModel):
     nullable: bool = False
     effects: list[EffectInputModel] | None
     default: Any | None = None
-    child: ChildPortInputModel | None = None
-    variants: list["ChildPortInputModel"] | None
+    children: list["ChildPortInputModel"] | None
     assign_widget: Optional["AssignWidgetInputModel"] = None
     return_widget: Optional["ReturnWidgetInputModel"] = None
     groups: list[str] | None
+
+    @root_validator
+    def check_children_for_port(cls, values) -> Self:
+        kind = values.get("kind")
+        children = values.get("children")
+
+        if kind == enums.PortKind.LIST and (children is None or len(children) != 1):
+            raise ValueError("Port of kind LIST must have exactly on children")
+        return values
+
+
 
 
 class PortGroupInputModel(BaseModel):

@@ -154,7 +154,7 @@ class Agent(models.Model):
         default=False, help_text="Is this Agent connected to the backend"
     )
     last_seen = models.DateTimeField(
-        auto_created=True, help_text="The last time this Agent was seen"
+        help_text="The last time this Agent was seen", null=True
     )
     registry = models.ForeignKey(
         Registry,

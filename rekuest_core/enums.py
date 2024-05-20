@@ -19,6 +19,7 @@ class PortKind(str, Enum):
     FLOAT = "FLOAT"
     DATE = "DATE"
     UNION = "UNION"
+    MODEL = "MODEL"
 
 
 @strawberry.enum

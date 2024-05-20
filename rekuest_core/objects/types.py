@@ -106,18 +106,16 @@ class Binds:
 
 @pydantic.type(models.ChildPortModel)
 class ChildPort:
+    key: str 
     label: strawberry.auto
     identifier: scalars.Identifier | None
     default: scalars.AnyDefault | None
     scope: enums.PortScope
     kind: enums.PortKind
     nullable: bool
-    child: Optional[
+    children: Optional[list[
         LazyType["ChildPort", __name__]
-    ] = None  # this took me a while to figure out should be more obvious
-    variants: Optional[
-        list[LazyType["ChildPort", __name__]]
-    ] = None  # this took me a while to figure out should be more obvious
+    ]] = None  # this took me a while to figure out should be more obvious
     assign_widget: AssignWidget | None
     return_widget: ReturnWidget | None
 
@@ -146,8 +144,7 @@ class Port:
     label: str | None
     description: str | None
     effects: list[Effect] | None
-    child: Optional[ChildPort] = None
-    variants: list[ChildPort] | None = None
+    children: list[ChildPort] | None = None
     assign_widget: AssignWidget | None
     return_widget: ReturnWidget | None
     groups: list[str] | None

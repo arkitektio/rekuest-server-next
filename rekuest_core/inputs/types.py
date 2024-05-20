@@ -120,16 +120,15 @@ class ChildPortInput:
     is of kind integer.
 
     """
-
+    key: str 
     label: str | None
     kind: enums.PortKind
     scope: enums.PortScope
     description: str | None = None
-    child: Optional[LazyType["ChildPortInput", __name__]] = None
     identifier: scalars.Identifier | None = None
     nullable: bool
     default: scalars.AnyDefault | None = None
-    variants: list[LazyType["ChildPortInput", __name__]] | None = strawberry.field(
+    children: list[LazyType["ChildPortInput", __name__]] | None = strawberry.field(
         default_factory=list
     )
     effects: list[EffectInput] | None = strawberry.field(default_factory=list)
@@ -177,8 +176,7 @@ class PortInput:
     nullable: bool
     effects: list[EffectInput] | None = strawberry.field(default_factory=list)
     default: scalars.AnyDefault | None = None
-    child: Optional[LazyType["ChildPortInput", __name__]] = None
-    variants: list[LazyType["ChildPortInput", __name__]] | None = strawberry.field(
+    children: list[LazyType["ChildPortInput", __name__]] | None = strawberry.field(
         default_factory=list
     )
     assign_widget: Optional["AssignWidgetInput"] = None
