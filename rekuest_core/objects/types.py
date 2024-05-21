@@ -132,6 +132,7 @@ class Validator:
     function: scalars.ValidatorFunction
     dependencies: list[str] | None
     label: str | None
+    error_message: str | None = None
 
 
 @pydantic.type(models.PortModel)

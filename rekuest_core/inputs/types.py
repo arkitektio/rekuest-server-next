@@ -144,6 +144,7 @@ class ValidatorInput:
     function: scalars.ValidatorFunction
     dependencies: list[str] | None = strawberry.field(default_factory=list)
     label: str | None = None
+    error_message: str | None = None
 
 
 @pydantic.input(models.PortInputModel)

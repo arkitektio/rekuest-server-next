@@ -32,6 +32,7 @@ class ValidatorInputModel(BaseModel):
     function: str
     dependencies: list[str] | None = []
     label: str | None = None
+    error_message: str | None = None
 
 class AssignWidgetInputModel(BaseModel):
     kind: enums.AssignWidgetKind

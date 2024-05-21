@@ -129,6 +129,7 @@ class ValidatorModel(BaseModel):
     function: str
     dependencies: list[str] | None = []
     label: str | None = None
+    error_message: str | None = None
 
 
 class PortModel(BaseModel):
