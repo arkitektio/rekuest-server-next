@@ -37,6 +37,18 @@ def prov_post_save(sender, instance: models.Provision = None, created=None, **kw
     if created:
         assign_perm("can_link_to", instance.agent.registry.user, instance)
 
+        
+
+
+
+
+
+
+
+
+
+
+
 @receiver(pre_delete, sender=models.Provision)
 def prov_pre_delete(sender, instance: models.Provision = None, **kwargs):
     pass

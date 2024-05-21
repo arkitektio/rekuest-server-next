@@ -112,6 +112,7 @@ class ChildPort:
     default: scalars.AnyDefault | None
     scope: enums.PortScope
     kind: enums.PortKind
+    description: str | None
     nullable: bool
     children: Optional[list[
         LazyType["ChildPort", __name__]
