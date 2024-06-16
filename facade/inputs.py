@@ -1,19 +1,20 @@
-from facade import enums, scalars
+from typing import Any, Optional
+
 import strawberry
-from typing import Optional, Any
+from facade import enums, scalars
 from pydantic import BaseModel
-from strawberry.experimental import pydantic
-from typing import Any
-from strawberry import LazyType
-from rekuest_core.inputs import types as ritypes
-from rekuest_core.inputs import models as rimodels
 from rekuest_core import enums as renums
-from rekuest_core import scalars as rscalars    
+from rekuest_core import scalars as rscalars
+from rekuest_core.inputs import models as rimodels
+from rekuest_core.inputs import types as ritypes
+from strawberry import LazyType
+from strawberry.experimental import pydantic
+
 
 class DependencyInputModel(BaseModel):
     node: str
     hash: str
-    reference: str  | None
+    reference: str | None
     binds: rimodels.BindsInputModel | None
     optional: bool = False
     viable_instances: int | None
@@ -23,8 +24,11 @@ class DependencyInputModel(BaseModel):
 class DependencyInput:
     """A dependency for a template. By defining dependencies, you can
     create a dependency graph for your templates and nodes"""
+
     hash: scalars.NodeHash | None = None
-    reference: str | None = None  # How to reference this dependency (e.g. if it corresponds to a node_id in a flow)
+    reference: str | None = (
+        None  # How to reference this dependency (e.g. if it corresponds to a node_id in a flow)
+    )
     binds: ritypes.BindsInput | None = None
     optional: bool = False
     viable_instances: int | None = None
@@ -38,8 +42,6 @@ class ReserveInputModel(BaseModel):
     hash: str | None = None
     reference: str | None = None
     binds: rimodels.BindsInputModel | None = None
-
-    
 
 
 @pydantic.input(ReserveInputModel)
@@ -62,9 +64,9 @@ class AssignInputModel(BaseModel):
     log: bool = False
 
 
-
 class CancelInputModel(BaseModel):
     assignation: str
+
 
 @pydantic.input(CancelInputModel)
 class CancelInput:
@@ -74,10 +76,10 @@ class CancelInput:
 class InterruptInputModel(BaseModel):
     assignation: str
 
+
 @pydantic.input(InterruptInputModel)
 class InterruptInput:
     assignation: strawberry.ID
-
 
 
 @pydantic.input(AssignInputModel)
@@ -108,16 +110,15 @@ class CreateTemplateInput:
     params: rscalars.AnyDefault | None = None
     instance_id: scalars.InstanceID | None = None
 
+
 @strawberry.input
 class PortMatchInput:
     at: int | None = None
-    key: str | None  = None
-    kind: renums.PortKind | None  = None
-    identifier: str | None  = None
-    nullable: bool | None  = None
-    variants: Optional[list[LazyType["PortDemandInput", __name__]]]  = None
-    child: Optional[LazyType["PortDemandInput", __name__]]  = None
- 
+    key: str | None = None
+    kind: renums.PortKind | None = None
+    identifier: str | None = None
+    nullable: bool | None = None
+    children: Optional[list[LazyType["PortMatchInput", __name__]]] = None
 
 
 @strawberry.input
