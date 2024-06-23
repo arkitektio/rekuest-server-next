@@ -46,6 +46,9 @@ class ReserveInputModel(BaseModel):
 
 @pydantic.input(ReserveInputModel)
 class ReserveInput:
+    assignation_id: str | None = (
+        None  # Was this reservation caused during an assignation and is tide to it?
+    )
     instance_id: scalars.InstanceID
     node: strawberry.ID | None = None
     template: strawberry.ID | None = None
@@ -55,13 +58,22 @@ class ReserveInput:
     binds: ritypes.BindsInput | None = None
 
 
+class HookInputModel(BaseModel):
+    kind: enums.HookKind
+    hash: str
+
+
 class AssignInputModel(BaseModel):
-    reservation: str
-    args: list[Any | None]
+    node: str | None = None
+    template: str | None = None
+    reservation: str | None = None
+    hooks: list[HookInputModel]
+    args: dict[str, Any]
     reference: str | None = None
     parent: str | None = None
     cached: bool = False
     log: bool = False
+    is_hook: bool = False
 
 
 class CancelInputModel(BaseModel):
@@ -82,14 +94,25 @@ class InterruptInput:
     assignation: strawberry.ID
 
 
+@pydantic.input(HookInputModel)
+class HookInput:
+    kind: enums.HookKind
+    hash: str
+
+
 @pydantic.input(AssignInputModel)
 class AssignInput:
-    reservation: strawberry.ID
-    args: list[scalars.Arg | None]
+    node: str | None = None
+    template: str | None = None
+    reservation: str | None = None
+    hooks: list[HookInput]
+    reservation: strawberry.ID | None = None
+    args: scalars.Args
     reference: str | None = None
     parent: strawberry.ID | None = None
     cached: bool = False
     log: bool = False
+    is_hook: bool = False
 
 
 class CreateTemplateInputModel(BaseModel):
@@ -99,6 +122,7 @@ class CreateTemplateInputModel(BaseModel):
     extension: str
     params: dict[str, Any] | None = None
     instance_id: str | None = None
+    dynamic: str
 
 
 @pydantic.input(CreateTemplateInputModel)
@@ -109,6 +133,7 @@ class CreateTemplateInput:
     extension: str
     params: rscalars.AnyDefault | None = None
     instance_id: scalars.InstanceID | None = None
+    dynamic: str
 
 
 @strawberry.input

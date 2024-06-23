@@ -1,18 +1,15 @@
-from kante.types import Info
-import strawberry_django
-import strawberry
-from facade import types, models, inputs, enums, scalars
 import hashlib
 import json
 import logging
+
+import strawberry
+import strawberry_django
+from facade import enums, inputs, models, scalars, types
 from facade.protocol import infer_protocols
 from facade.unique import infer_node_scope
+from kante.types import Info
 
 logger = logging.getLogger(__name__)
-
-
-
-
 
 
 def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Template:
@@ -79,15 +76,12 @@ def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Temp
             agent=agent,
             defaults=dict(
                 status=enums.ProvisionStatus.INACTIVE,
-            )
+            ),
         )
-
 
         new_deps = []
 
         if input.dependencies:
-
-
             for i in input.dependencies:
 
                 try:
@@ -103,14 +97,13 @@ def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Temp
                         initial_hash=i.hash,
                         optional=i.optional,
                         binds=i.binds.dict() if i.binds else None,
-                    )
+                    ),
                 )
                 new_deps.append(dep)
 
         for dep in template.dependencies.all():
             if dep not in new_deps:
                 dep.delete()
-
 
         if template.node.hash != hash:
             if template.node.templates.count() == 1:
@@ -134,13 +127,12 @@ def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Temp
             agent=agent,
             defaults=dict(
                 status=enums.ProvisionStatus.INACTIVE,
-            )
+            ),
         )
 
         new_deps = []
 
         if input.dependencies:
-
 
             for i in input.dependencies:
 
@@ -157,9 +149,8 @@ def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Temp
                         initial_hash=i.hash,
                         optional=i.optional,
                         binds=i.binds.dict() if i.binds else None,
-                    )
+                    ),
                 )
                 new_deps.append(dep)
 
     return template
-

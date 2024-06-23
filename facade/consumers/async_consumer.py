@@ -1,21 +1,30 @@
-from channels.generic.websocket import AsyncWebsocketConsumer
-from pydantic import BaseModel, Field
-import uuid
-import json
-import logging 
-from facade import models, enums
-from authentikate import models as auth_models
-from asgiref.sync import sync_to_async
-from authentikate.utils import authenticate_token_or_none
-from facade.persist_backend import persist_backend
-from facade.logic import schedule_reservation, schedule_provision, activate_provision , apropagate_provision_change, apropagate_reservation_change, aset_provision_unprovided
-import redis
 import asyncio
 import datetime
+import json
+import logging
+import uuid
+
+import redis
 import redis.asyncio as aredis
+from asgiref.sync import sync_to_async
+from authentikate import models as auth_models
+from authentikate.utils import authenticate_token_or_none
+from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
+from facade import enums, models
+from facade.logic import (
+    activate_provision,
+    apropagate_provision_change,
+    apropagate_reservation_change,
+    aset_provision_unprovided,
+    schedule_provision,
+    schedule_reservation,
+)
+from facade.persist_backend import persist_backend
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
+
 
 class ErrorMessages(BaseModel):
     type = "ERROR"
@@ -28,6 +37,7 @@ class InitialMessage(BaseModel):
     instance_id: str = None
     token: str = None
 
+
 class ProvisionModel(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     provision: str
@@ -36,7 +46,8 @@ class ProvisionModel(BaseModel):
         return ProvisionModel(
             provision=str(provision.id),
         )
-    
+
+
 class InquiryModel(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     assignation: str
@@ -45,6 +56,7 @@ class InquiryModel(BaseModel):
         return InquiryModel(
             assignation=str(assignation.id),
         )
+
 
 class InitMessage(BaseModel):
     type = "INIT"
@@ -66,9 +78,10 @@ HEARTBEAT_RESPONSE_TIMEOUT = settings.AGENT_HEARTBEAT_RESPONSE_TIMEOUT
 
 
 HEARTBEAT_NOT_RESPONDED_CODE = settings.AGENT_HEARTBEAT_NOT_RESPONDED_CODE
+
+
 class AgentConsumer(AsyncWebsocketConsumer):
     groups = ["broadcast"]
-
 
     @classmethod
     def broadcast(cls, agent_id: str, message: dict):
@@ -80,10 +93,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
         if not isinstance(message, str):
             message = json.dumps(message)
 
-        connection.lpush(f'{agent_id}_my_queue', message)
-
-
-
+        connection.lpush(f"{agent_id}_my_queue", message)
 
     async def connect(self):
         # Called on connection.
@@ -96,22 +106,21 @@ class AgentConsumer(AsyncWebsocketConsumer):
         self.agent = None
         self.received_initial_payload = False
 
-
     async def send_base_model(self, model: BaseModel):
         await self.send(text_data=model.json())
 
-    async def on_initial_payload(self, payload: dict): 
+    async def on_initial_payload(self, payload: dict):
 
         input = InitialMessage(**payload)
-        
 
         auth = await sync_to_async(authenticate_token_or_none)(input.token)
         if not auth:
             raise ValueError("Invalid token")
 
+        # TODO: Hasch this
         self.registry, _ = await models.Registry.objects.aupdate_or_create(
             app=auth.app,
-            user= auth.user,
+            user=auth.user,
         )
 
         self.agent, _ = await models.Agent.objects.aupdate_or_create(
@@ -122,33 +131,30 @@ class AgentConsumer(AsyncWebsocketConsumer):
             ),
         )
 
-
         self.connection = aredis.Redis(host="redis", auto_close_connection_pool=True)
 
         await persist_backend.on_agent_connected(self.agent.id)
 
         self.answer_future = None
 
-
-
-
-
         self.provisions = []
         async for i in models.Provision.objects.filter(agent=self.agent).all():
             self.provisions.append(i)
 
         self.assignations = []
-        async for i in models.Assignation.objects.filter(provision__agent=self.agent, status=enums.AssignationEventKind.DISCONNECTED).all():
+        async for i in models.Assignation.objects.filter(
+            provision__agent=self.agent, status=enums.AssignationEventKind.DISCONNECTED
+        ).all():
             self.assignations.append(i)
 
-
-        await self.send(text_data=InitMessage(
-            instance_id=input.instance_id,
-            agent=str(self.agent.id),
-            registry=str(self.registry.id),
-            provisions=[ProvisionModel.from_provision(p) for p in self.provisions],
-            inquiries=[InquiryModel.from_assignation(p) for p in self.assignations]
-        ).json()
+        await self.send(
+            text_data=InitMessage(
+                instance_id=input.instance_id,
+                agent=str(self.agent.id),
+                registry=str(self.registry.id),
+                provisions=[ProvisionModel.from_provision(p) for p in self.provisions],
+                inquiries=[InquiryModel.from_assignation(p) for p in self.assignations],
+            ).json()
         )
 
         print("Connected agent", self.agent.id)
@@ -156,10 +162,10 @@ class AgentConsumer(AsyncWebsocketConsumer):
         self.task = asyncio.create_task(self.listen_for_tasks(self.agent.id))
         self.task.add_done_callback(lambda x: print("DONE", x))
 
-
         self.heartbeat_task = asyncio.create_task(self.heartbeat(self.agent.id))
-        self.heartbeat_task.add_done_callback(lambda x: print("DONE sending heartbease", x))
-
+        self.heartbeat_task.add_done_callback(
+            lambda x: print("DONE sending heartbease", x)
+        )
 
     async def heartbeat(self, agent_id: str):
         try:
@@ -170,38 +176,33 @@ class AgentConsumer(AsyncWebsocketConsumer):
                 self.answer_future = asyncio.Future()
 
                 try:
-                    received = await asyncio.wait_for(self.answer_future, HEARTBEAT_RESPONSE_TIMEOUT)
+                    received = await asyncio.wait_for(
+                        self.answer_future, HEARTBEAT_RESPONSE_TIMEOUT
+                    )
                     await persist_backend.on_agent_heartbeat(agent_id)
 
                 except asyncio.TimeoutError:
                     print(f"TIMEOUT on client {self.agent.id}")
                     await self.close(code=HEARTBEAT_NOT_RESPONDED_CODE)
 
-
-
         except asyncio.CancelledError:
             print("CANCELLED")
             return
-        
-    
-    
 
     async def listen_for_tasks(self, agent_id: str):
         try:
             while True:
-                task = await self.connection.brpoplpush(f'{agent_id}_my_queue', 'processing_queue')
+                task = await self.connection.brpoplpush(
+                    f"{agent_id}_my_queue", "processing_queue"
+                )
                 if task:
                     print("Receiving", task)
                     await self.send(text_data=task.decode("utf-8"))
-                    await self.connection.lrem('processing_queue', 0, task)
+                    await self.connection.lrem("processing_queue", 0, task)
         except asyncio.CancelledError:
             print("CANCELLED")
             self.connection.close()
             return
-            
-        
-
-
 
     async def receive(self, text_data=None, bytes_data=None):
         # Called with either text_data or bytes_data for each frame
@@ -212,7 +213,6 @@ class AgentConsumer(AsyncWebsocketConsumer):
         except json.JSONDecodeError:
             await self.send(text_data=ErrorMessages(error="Invalid JSON").json())
             return
-
 
         try:
 
@@ -234,20 +234,16 @@ class AgentConsumer(AsyncWebsocketConsumer):
                         print("ANSWERING HEARTBEAT")
                         self.answer_future.set_result(None)
                     else:
-                        print("NO ANSWER FUTURE, this is a protocol error, as no heartbeat was sent")
+                        print(
+                            "NO ANSWER FUTURE, this is a protocol error, as no heartbeat was sent"
+                        )
                         await self.disconnect(HEARTBEAT_NOT_RESPONDED_CODE)
                         return
-
-                    
-
-        
 
         except Exception as e:
             logger.error("Error in consumer", exc_info=True)
             await self.send(text_data=ErrorMessages(error=str(e)).json())
             return
-
-
 
     async def disconnect(self, close_code):
         # Called when the socket closes
@@ -263,7 +259,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
             except Exception as e:
                 logger.error("Error in consumer", exc_info=True)
                 return
-            
+
         if hasattr(self, "heartbeat_task"):
             print("CANCELLING SHOULD ALWAY BE CANCELLED")
             self.heartbeat_task.cancel()
@@ -280,3 +276,6 @@ class AgentConsumer(AsyncWebsocketConsumer):
         print("DISCONNECTED")
         pass
 
+        await persist_backend.on_agent_disconnected(self.agent.id)
+        print("DISCONNECTED")
+        pass

@@ -1,4 +1,5 @@
 from typing import NewType
+
 import strawberry
 
 Identifier = strawberry.scalar(
@@ -9,9 +10,9 @@ Identifier = strawberry.scalar(
     parse_value=lambda v: v,
 )
 
-Arg = strawberry.scalar(
+Args = strawberry.scalar(
     NewType("Arg", object),
-    description="The `Arg` scalar type represents a an Argument in a Node assignment",
+    description="The `Args` scalar type represents a Dictionary of arguments",
     serialize=lambda v: v,
     parse_value=lambda v: v,
 )

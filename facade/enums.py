@@ -1,4 +1,5 @@
 from enum import Enum
+
 import strawberry
 from django.db.models import TextChoices
 
@@ -48,8 +49,6 @@ class ReservationStatusChoices(TextChoices):
     # unhappy path
     UNHAPPY = "UNHAPPY"
     HAPPY = "HAPPY"
-    
-
 
 
 class ProvisionStatusChoices(TextChoices):
@@ -105,15 +104,14 @@ class AssignationStatusChoices(TextChoices):
     ERROR = "ERROR", "Error (Assignation resulted in an error)"
 
 
-
-
 class AssignationEventChoices(TextChoices):
     """These are the possible events that can happen to an Assignation.
-    
+
     The events are ordered by their appearance in the lifecycle of an Assignation.
-    
-    
+
+
     """
+
     QUEUED = "QUEUED", "Queued (Assignation was queued for a reservation)"
     BOUND = "BOUND", "Bound (Assignation was bound to an Agent)"
     ASSIGN = "ASSIGN", "Assign (Agent accepted the Assignation)"
@@ -126,7 +124,6 @@ class AssignationEventChoices(TextChoices):
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"
     DISCONNECTED = "DISCONNECTED"
-
 
     YIELD = (
         "YIELD",
@@ -145,7 +142,7 @@ class ReservationEventChoices(TextChoices):
     ACTIVE = "ACTIVE"
     INACTIVE = "INACTIVE"
     # Error States
-    UNCONNECTED ="UNCONNECTED"
+    UNCONNECTED = "UNCONNECTED"
 
     # End States
     ENDED = "ENDED"
@@ -157,7 +154,7 @@ class ReservationEventChoices(TextChoices):
 
 
 class ProvisionEventChoices(TextChoices):
-   # Start State
+    # Start State
     DENIED = "DENIED", "Denied (Provision was rejected by the platform)"
     PENDING = (
         "PENDING",
@@ -203,10 +200,22 @@ class ProvisionEventChoices(TextChoices):
 
 class ReservationStrategyChoices(TextChoices):
     RANDOM = "RANDOM", "Random (Assignation is assigned to a random Provision)"
-    ROUND_ROBIN = "ROUND_ROBIN", "Round Robin (Assignation is assigned to the next Provision)"
-    LEAST_BUSY = "LEAST_BUSY", "Least Busy (Assignation is assigned to the least busy Provision)"
-    LEAST_TIME = "LEAST_TIME", "Least Time (Assignation is assigned to the Provision with the least time left)"
-    LEAST_LOAD = "LEAST_LOAD", "Least Load (Assignation is assigned to the Provision with the least load)"
+    ROUND_ROBIN = (
+        "ROUND_ROBIN",
+        "Round Robin (Assignation is assigned to the next Provision)",
+    )
+    LEAST_BUSY = (
+        "LEAST_BUSY",
+        "Least Busy (Assignation is assigned to the least busy Provision)",
+    )
+    LEAST_TIME = (
+        "LEAST_TIME",
+        "Least Time (Assignation is assigned to the Provision with the least time left)",
+    )
+    LEAST_LOAD = (
+        "LEAST_LOAD",
+        "Least Load (Assignation is assigned to the Provision with the least load)",
+    )
     DIRECT = "DIRECT", "Direct (Assignation is assigned to a direct Provision)"
 
 
@@ -218,6 +227,7 @@ class ReservationStrategy(str, Enum):
     LEAST_TIME = "LEAST_TIME"
     LEAST_LOAD = "LEAST_LOAD"
     DIRECT = "DIRECT"
+
 
 @strawberry.enum
 class AssignationStatus(str, Enum):
@@ -237,7 +247,6 @@ class ReservationStatus(str, Enum):
     # unhappy path
     UNHAPPY = "UNHAPPY"
     HAPPY = "HAPPY"
-    
 
     # Error States
     UNCONNECTED = "UNCONNECTED"
@@ -286,7 +295,7 @@ class AssignationEventKind(str, Enum):
     CANCELING = "CANCELING"
     CANCELLED = "CANCELLED"
     INTERUPTING = "INTERUPTING"
-    INTERUPTED = "INTERUPTED",
+    INTERUPTED = ("INTERUPTED",)
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"
 
@@ -328,7 +337,7 @@ class ReservationEventKind(str, Enum):
     ACTIVE = "ACTIVE"
     INACTIVE = "INACTIVE"
     # Error States
-    UNCONNECTED ="UNCONNECTED"
+    UNCONNECTED = "UNCONNECTED"
 
     # End States
     ENDED = "ENDED"
@@ -356,13 +365,13 @@ class LogLevel(str, Enum):
     CRITICAL = "CRITICAL"
 
 
-
 @strawberry.enum
 class AgentStatus(str, Enum):
     ACTIVE = "ACTIVE"
     KICKED = "KICKED"
     DISCONNECTED = "DISCONNECTED"
     VANILLA = "VANILLA"
+
 
 @strawberry.enum
 class NodeScope(str, Enum):
@@ -371,7 +380,14 @@ class NodeScope(str, Enum):
     BRIDGE_GLOBAL_TO_LOCAL = "BRIDGE_GLOBAL_TO_LOCAL"
     BRIDGE_LOCAL_TO_GLOBAL = "BRIDGE_LOCAL_TO_GLOBAL"
 
+
 @strawberry.enum
 class DemandKind(str, Enum):
     ARGS = "args"
     RETURNS = "returns"
+
+
+@strawberry.enum
+class HookKind(str, Enum):
+    CLEANUP = "CLEANUP"
+    INIT = "INIT"

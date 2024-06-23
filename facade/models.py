@@ -1,21 +1,22 @@
+import datetime
+import uuid
+
+from authentikate.models import App, User
 from django.db import models
 from django_choices_field import TextChoicesField
 from facade.enums import (
-    NodeKindChoices,
     AgentStatusChoices,
-    WaiterStatusChoices,
-    ProvisionStatusChoices,
-    ReservationStatusChoices,
     AssignationEventChoices,
     AssignationStatusChoices,
-    ProvisionEventChoices,
-    ReservationStrategyChoices,
-    ReservationEventChoices,
     LogLevelChoices,
+    NodeKindChoices,
+    ProvisionEventChoices,
+    ProvisionStatusChoices,
+    ReservationEventChoices,
+    ReservationStatusChoices,
+    ReservationStrategyChoices,
+    WaiterStatusChoices,
 )
-from authentikate.models import User, App
-import uuid
-import datetime
 
 # Create your models here.
 
@@ -134,6 +135,11 @@ class Agent(models.Model):
     name = models.CharField(
         max_length=2000, help_text="This providers Name", default="Nana"
     )
+
+    health_check_interval = models.IntegerField(
+        default=60 * 5,
+        help_text="How often should this agent be checked for its health. Defaults to 5 mins",
+    )
     instance_id = models.CharField(default="main", max_length=1000)
     installed_at = models.DateTimeField(auto_created=True, auto_now_add=True)
     unique = models.CharField(
@@ -183,11 +189,14 @@ class Agent(models.Model):
     @property
     def queue(self):
         return f"agent_{self.unique}"
-    
+
     @property
     def is_active(self):
-        return self.connected and self.last_seen > datetime.datetime.now() - datetime.timedelta(minutes=5)
-    
+        return (
+            self.connected
+            and self.last_seen > datetime.datetime.now() - datetime.timedelta(minutes=5)
+        )
+
 
 class HardwareRecord(models.Model):
     agent = models.ForeignKey(
@@ -196,7 +205,7 @@ class HardwareRecord(models.Model):
         help_text="The associated agent for this HardwareRecord",
         related_name="hardware_records",
     )
- 
+
     created_at = models.DateTimeField(auto_now_add=True)
     cpu_count = models.IntegerField(default=0)
     cpu_vendor_name = models.CharField(max_length=1000, default="Unknown")
@@ -243,6 +252,17 @@ class Waiter(models.Model):
 
 
 class Dependency(models.Model):
+    """A Dependency
+
+    Dependencies are predeclared dependencies for functions
+    that will only ever rely on a specific set of functionality
+
+    Functions that declare dependencies CANNOT dynamically
+    reserve new functionality.
+
+
+    """
+
     template = models.ForeignKey(
         "Template",
         on_delete=models.CASCADE,
@@ -310,7 +330,9 @@ class Template(models.Model):
         default=list,
         help_text="The attached extensions for this Template",
     )
-    extension = models.CharField(verbose_name="Extension", max_length=1000, default="global")
+    extension = models.CharField(
+        verbose_name="Extension", max_length=1000, default="global"
+    )
 
     policy = models.JSONField(
         max_length=2000, default=dict, help_text="The attached policy for this template"
@@ -318,6 +340,9 @@ class Template(models.Model):
     params = models.JSONField(default=dict, help_text="Params for this Template")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    dynamic: str = models.BooleanField(
+        help_text="Dynamic Templates will be able to create new reservations on runtime"
+    )
 
     class Meta:
         permissions = [("providable", "Can provide this template")]
@@ -333,12 +358,9 @@ class Template(models.Model):
 
 
 class Provision(models.Model):
-    """Topic (STATEFUL MODEL)
+    """Topic
 
-    Topic represents the current state of active Topics that are caused by provisions, they store the reservations (links)
-    and are indexed by provision, a consumer connects through its provision to Arkitekt and sets the Topic to active, every
-    reservation that is connected gets signalled that this Topic is now active. On disconnect every reservation can design
-    according to its policy if it wants to wait for reconnect (if connection was Lost), raise an error, or choose another Topic.
+    Provisions represent a way of assigning tasks to a specific agent
 
     """
 
@@ -378,17 +400,17 @@ class Provision(models.Model):
 
     active = models.BooleanField(
         default=False,
-        help_text="Is this provision active (e.g. should the agent provide the associated template)"
+        help_text="Is this provision active (e.g. should the agent provide the associated template)",
     )
 
     provided = models.BooleanField(
         default=False,
-        help_text="Is the provision provided (e.g. is the template available on the agent). This does NOT mean that the provision is assignable. Only if all the dependencies are met, the provision is assignable"
+        help_text="Is the provision provided (e.g. is the template available on the agent). This does NOT mean that the provision is assignable. Only if all the dependencies are met, the provision is assignable",
     )
 
     dependencies_met = models.BooleanField(
         default=False,
-        help_text="Are all dependencies met for this provision. Should change to True if all dependencies are met (potential sync error)"
+        help_text="Are all dependencies met for this provision. Should change to True if all dependencies are met (potential sync error)",
     )
 
     # Status Field
@@ -414,7 +436,7 @@ class Provision(models.Model):
     @property
     def queue(self):
         return f"provision_{self.unique}"
-    
+
     @property
     def is_viable(self):
         return self.active and self.provided and self.dependencies_met
@@ -434,6 +456,13 @@ class Reservation(models.Model):
 
     """
 
+    causing_assignation = models.ForeignKey(
+        "Assignation",
+        on_delete=models.CASCADE,
+        related_name="caused_reservations",
+        help_text="The assignation that created this reservation",
+    )
+
     # Channel is the RabbitMQ channel that every user assigns to and that every topic listens to
     unique = models.UUIDField(
         max_length=1000,
@@ -442,20 +471,15 @@ class Reservation(models.Model):
         help_text="A Unique identifier for this Topic",
     )
 
+    args = models.JSONField(
+        default=dict,
+    )
+
     strategy = TextChoicesField(
         max_length=1000,
         choices_enum=ReservationStrategyChoices,
         default=ReservationStrategyChoices.RANDOM,
         help_text="The Strategy of this Reservation",
-    )
-
-    causing_provision = models.ForeignKey(
-        "Provision",
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        help_text="Was this Reservation caused by a Provision?",
-        related_name="caused_reservations",
     )
 
     causing_dependency = models.ForeignKey(
@@ -480,24 +504,13 @@ class Reservation(models.Model):
         default=False,
         help_text="Allow automatic requests for this reservation",
     )
+
     reference = models.CharField(
         max_length=200,
         help_text="A Short Hand Way to identify this reservation for the creating app",
         null=True,
         blank=True,
     )
-
-
-    happy = models.BooleanField(
-        default=False,
-        help_text="Is this reservation happily connected. E.g does it have enough links according to its policy"
-    )
-
-    viable = models.BooleanField(
-        default=False,
-        help_text="Is this reservation viable. E.g. does it have a viable amount of connections"
-    )
-
 
     # 1 Inputs to the the Reservation (it can be either already a template to provision or just a node)
     node = models.ForeignKey(
@@ -558,6 +571,13 @@ class Reservation(models.Model):
 class Assignation(models.Model):
     """A constant log of a tasks transition through finding a Node, Template and finally Pod , also a store for its results"""
 
+    waiter = models.ForeignKey(
+        Waiter, on_delete=models.CASCADE, help_text="Which Waiter assigned this?"
+    )
+    interfaces = models.JSONField(
+        default=list,
+        help_text="Which interfaces does this fullfill (e.g. is this on the fly download? This is dynamic and can change from app to app)",
+    )
     reservation = models.ForeignKey(
         Reservation,
         on_delete=models.CASCADE,
@@ -565,6 +585,10 @@ class Assignation(models.Model):
         related_name="assignations",
         blank=True,
         null=True,
+    )
+    hooks = models.JSONField(
+        default=list,
+        help_text="hooks that are tight to the lifecycle of this assignation",
     )
     reference = models.CharField(
         max_length=1000,
@@ -579,12 +603,13 @@ class Assignation(models.Model):
         help_text="The Assignations parent (the one that created this)",
         related_name="children",
     )
-
-    args = models.JSONField(blank=True, null=True, help_text="The Args", default=list)
+    saved_args = models.JSONField(
+        blank=True, null=True, help_text="The Args", default=list
+    )
     provision = models.ForeignKey(
         Provision,
         on_delete=models.CASCADE,
-        help_text="Which Provision did we end up being assigned to (will change after a bound)",
+        help_text="Which Provision did we end up being assigned to (will be set after a bound)",
         related_name="assignations",
         blank=True,
         null=True,
@@ -716,6 +741,9 @@ class TestCase(models.Model):
 
 
 class TestResult(models.Model):
+    assignation = models.ForeignKey(
+        Assignation, on_delete=models.CASCADE, related_name="test_result"
+    )
     case = models.ForeignKey(TestCase, on_delete=models.CASCADE, related_name="results")
     template = models.ForeignKey(
         Template, on_delete=models.CASCADE, related_name="testresults"
