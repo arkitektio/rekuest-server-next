@@ -56,7 +56,7 @@ class Protocol:
 )
 class Node:
     id: strawberry.ID
-    hash: scalars.NodeHash
+    hash: rscalars.NodeHash
     name: str
     kind: renums.NodeKind
     description: str | None
@@ -96,8 +96,8 @@ class Dependency:
     id: strawberry.ID
     template: "Template"
     node: Node | None
-    hash: scalars.NodeHash
-    initial_hash: scalars.NodeHash  
+    hash: rscalars.NodeHash
+    initial_hash: rscalars.NodeHash  
     reference: str | None
     optional: bool = False
 
@@ -245,7 +245,7 @@ class Assignation:
     name: str
     reference: str | None
     args: rscalars.AnyDefault
-    parent: "Assignation"
+    parent: Optional["Assignation"]
     reservation: Optional["Reservation"]
     node: "Node"
     template: Optional["Template"]
@@ -278,6 +278,10 @@ class AssignationEvent:
     @strawberry_django.field()
     def level(self) -> enums.LogLevel:
         return enums.LogLevel.INFO
+    
+    @strawberry_django.field()
+    def reference(self) -> str:
+        return self.assignation.reference
 
 
 @strawberry_django.type(

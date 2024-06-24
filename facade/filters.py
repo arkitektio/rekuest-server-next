@@ -6,7 +6,7 @@ from strawberry_django.filters import FilterLookup
 import strawberry_django
 from rekuest_core import enums as renums
 from authentikate.models import User, App
-
+from rekuest_core import scalars as rscalars
 
 @strawberry.input
 class SearchFilter:
@@ -182,7 +182,7 @@ class AppOrder:
 class AppFilter:
     interface: Optional[FilterLookup[str]]
     ids: list[strawberry.ID] | None
-    has_templates_for: list[scalars.NodeHash] | None
+    has_templates_for: list[rscalars.NodeHash] | None
     mine: bool | None
 
     def filter_ids(self, queryset, info):

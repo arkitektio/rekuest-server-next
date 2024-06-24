@@ -77,6 +77,9 @@ class Mutation:
     create_template: types.Template = strawberry_django.mutation(
         resolver=mutations.create_template
     )
+    set_extension_templates: list[types.Template] = strawberry_django.mutation(
+        resolver=mutations.set_extension_templates
+    )
     ack: types.Assignation = strawberry_django.mutation(resolver=mutations.ack)
     assign: types.Assignation = strawberry_django.mutation(resolver=mutations.assign)
     cancel: types.Assignation = strawberry_django.mutation(

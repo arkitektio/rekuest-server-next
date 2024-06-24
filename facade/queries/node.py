@@ -9,6 +9,7 @@ from kante.types import Info
 from facade import enums, inputs, models, scalars, types
 from facade.protocol import infer_protocols
 from facade.utils import hash_input
+from rekuest_core import scalars as rscalars
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ def node(
     reservation: strawberry.ID | None = None,
     assignation: strawberry.ID | None = None,
     template: strawberry.ID | None = None,
-    hash: scalars.NodeHash | None = None,
+    hash: rscalars.NodeHash | None = None,
 ) -> types.Node:
     if reservation:
         return models.Reservation.objects.get(id=reservation).node

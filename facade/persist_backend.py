@@ -100,11 +100,13 @@ class ModelPersistBackend():
         kind_of_change = message["kind"]
 
         await models.AssignationEvent.objects.acreate(assignation_id=message["assignation"], kind=message["kind"], message=message["message"], returns=message["returns"])
-        x = await models.Assignation.objects.aget(id=message["assignation"])
+       
 
-        if kind_of_change != "LOG":
-            x.status = message["kind"]
+        if kind_of_change != "DONE":
+            x = await models.Assignation.objects.aget(id=message["assignation"])
+            x.status = "DONE"
             await x.asave()
+            print("Changed Assignation")
             
         print("Assig  CHANGED", message)
 

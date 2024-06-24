@@ -22,7 +22,7 @@ def link(provision: models.Provision, reservation: models.Reservation):
 
 
 
-def get_desired_templates_for_dependency(dependency: inputs.DependencyInput):
+def get_desired_templates_for_dependency(dependency: rimodels.DependencyInputModel):
     templates = models.Template.objects
 
     if dependency.clients:
@@ -42,7 +42,7 @@ def get_desired_templates_for_dependency(dependency: inputs.DependencyInput):
 
 
 def get_desired_templates(
-    dependency: inputs.DependencyInput, reservation: models.Reservation
+    dependency: rimodels.DependencyInputModel, reservation: models.Reservation
 ):
     # us filter out templates that are not assignable to the waiter.
     templates = get_objects_for_user(reservation.waiter, "facade.can_depend_on")
@@ -275,7 +275,7 @@ async def aset_provision_inactive(provision: models.Provision):
 
 
 def link_or_linkcreate_provisions_for_dependency(
-    dependency: inputs.DependencyInput, reservation: models.Reservation
+    dependency: rimodels.DependencyInputModel, reservation: models.Reservation
 ):
     """hould return a list of provision ids that match the dependency.
 
@@ -306,7 +306,7 @@ def link_or_linkcreate_provisions_for_dependency(
 
 
 def create_reservation_for_dependency(
-    dependency: inputs.DependencyInput, waiter: models.Waiter
+    dependency: rimodels.DependencyInputModel, waiter: models.Waiter
 ):
     """Creates a reservation for a dependency."""
 

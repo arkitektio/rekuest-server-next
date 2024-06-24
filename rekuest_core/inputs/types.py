@@ -215,11 +215,36 @@ class DefinitionInput:
     """
 
     description: str | None = None
-    collections: list[str] | None = strawberry.field(default_factory=list)
+    collections: list[str] = strawberry.field(default_factory=list)
     name: str
-    port_groups: list[PortGroupInput] | None = strawberry.field(default_factory=list)
-    args: list[PortInput] | None = strawberry.field(default_factory=list)
-    returns: list[PortInput] | None = strawberry.field(default_factory=list)
+    port_groups: list[PortGroupInput] = strawberry.field(default_factory=list)
+    args: list[PortInput] = strawberry.field(default_factory=list)
+    returns: list[PortInput] = strawberry.field(default_factory=list)
     kind: enums.NodeKind
-    is_test_for: list[str] | None = strawberry.field(default_factory=list)
-    interfaces: list[str] | None = strawberry.field(default_factory=list)
+    is_test_for: list[str] = strawberry.field(default_factory=list)
+    interfaces: list[str] = strawberry.field(default_factory=list)
+
+
+@pydantic.input(models.DependencyInputModel)
+class DependencyInput:
+    """A dependency for a template. By defining dependencies, you can
+    create a dependency graph for your templates and nodes"""
+
+    hash: scalars.NodeHash | None = None
+    reference: str | None = (
+        None  # How to reference this dependency (e.g. if it corresponds to a node_id in a flow)
+    )
+    binds: BindsInput | None = None
+    optional: bool = False
+    viable_instances: int | None = None
+
+
+
+@pydantic.input(models.TemplateInputModel)
+class TemplateInput:
+    definition: DefinitionInput
+    dependencies: list[DependencyInput] = strawberry.field(default_factory=list)
+    interface: str
+    params: scalars.AnyDefault | None = None
+    dynamic: bool = False
+    logo: str | None = None

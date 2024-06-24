@@ -101,7 +101,7 @@ class RedisControllBackend(ControllBackend):
         if not provision:
             raise ValueError("No active provision found")
 
-        reference = self.create_message_id()
+        reference = input.reference or self.create_message_id()
 
         
 

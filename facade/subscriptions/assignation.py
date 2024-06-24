@@ -29,11 +29,17 @@ async def assignation_events(
 
 
 
+@strawberry.type
+class AssignationChangeEvent:
+    event: types.AssignationEvent | None
+    create: types.Assignation | None
+
+
 async def assignations(
     self,
     info: Info,
     instance_id: scalars.InstanceID,
-) -> AsyncGenerator[types.Assignation, None]:
+) -> AsyncGenerator[AssignationChangeEvent, None]:
     """Join and subscribe to message sent to the given rooms."""
 
     registry, _ = await models.Registry.objects.aget_or_create(
@@ -46,4 +52,11 @@ async def assignations(
 
     async for message in assignation_listen(info, [f"ass_waiter_{waiter.id}"]):
         print("ID", message)
-        yield await models.Assignation.objects.aget(id=message)
+
+
+        if message["type"] == "created":
+            ass = await models.Assignation.objects.aget(id=message["id"])
+            yield AssignationChangeEvent(create=ass, update=None)
+        else:
+            event = await models.AssignationEvent.objects.aget(id=message["id"])
+            yield AssignationChangeEvent(event=event, create=None)

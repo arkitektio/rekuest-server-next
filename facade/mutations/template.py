@@ -8,37 +8,24 @@ from facade import enums, inputs, models, scalars, types
 from facade.protocol import infer_protocols
 from facade.unique import infer_node_scope
 from kante.types import Info
+from rekuest_core.inputs.models import TemplateInputModel
 
 logger = logging.getLogger(__name__)
 
 
-def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Template:
-    print(info.context.request.headers)
+def _create_template(input: TemplateInputModel, agent: models.Agent, extension: str) -> models.Template:
 
-    registry, _ = models.Registry.objects.update_or_create(
-        app=info.context.request.app,
-        user=info.context.request.user,
-    )
-
-    agent, _ = models.Agent.objects.update_or_create(
-        registry=registry,
-        instance_id=input.instance_id or "default",
-        defaults=dict(
-            name=f"{str(registry)} on {input.instance_id}",
-        ),
-    )
-
-    definition = input.definition
+    definition= input.definition
 
     hash = hashlib.sha256(
-        json.dumps(strawberry.asdict(input.definition), sort_keys=True).encode()
+        json.dumps(strawberry.asdict(definition), sort_keys=True).encode()
     ).hexdigest()
     print(hash)
 
     try:
         node = models.Node.objects.get(hash=hash)
     except models.Node.DoesNotExist:
-        scope = infer_node_scope(input.definition)
+        scope = infer_node_scope(definition)
         node = models.Node.objects.create(
             hash=hash,
             description=definition.description or "No description",
@@ -111,7 +98,7 @@ def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Temp
                 template.node.delete()
 
         template.node = node
-        template.extension = input.extension
+        template.extension = extension
         template.dynamic = input.dynamic
         template.save()
 
@@ -120,7 +107,7 @@ def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Temp
             interface=input.interface,
             node=node,
             agent=agent,
-            extension=input.extension,
+            extension=extension,
             dynamic=input.dynamic
         )
 
@@ -156,3 +143,70 @@ def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Temp
                 new_deps.append(dep)
 
     return template
+
+
+def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Template:
+    print(info.context.request.headers)
+
+    registry, _ = models.Registry.objects.update_or_create(
+        app=info.context.request.app,
+        user=info.context.request.user,
+    )
+
+    agent, _ = models.Agent.objects.update_or_create(
+        registry=registry,
+        instance_id=input.instance_id or "default",
+        defaults=dict(
+            name=f"{str(registry)} on {input.instance_id}",
+        ),
+    )
+
+    return _create_template(input.template, agent, input.extension)
+
+
+
+    
+
+
+
+
+def set_extension_templates(info: Info, input: inputs.SetExtensionTemplatesInput) -> list[types.Template]:
+
+    registry, _ = models.Registry.objects.update_or_create(
+        app=info.context.request.app,
+        user=info.context.request.user,
+    )
+
+    agent, _ = models.Agent.objects.update_or_create(
+        registry=registry,
+        instance_id=input.instance_id or "default",
+        defaults=dict(
+            name=f"{str(registry)} on {input.instance_id}",
+        ),
+    )
+
+    
+
+    previous_templates = models.Template.objects.filter(agent=agent, extension=input.extension).all()
+
+
+    created_templates_id = []
+    created_templates = []
+    for template in input.templates:
+
+        created_template = _create_template(template, agent, input.extension)
+
+        created_templates_id.append(created_template.id)
+        created_templates.append(created_template)
+
+
+    if input.run_cleanup:
+        for i in previous_templates:
+            if i.id not in created_templates_id:
+                i.delete()
+                print("Deleted Template", id)
+
+
+    return created_templates
+
+

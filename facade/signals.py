@@ -55,14 +55,12 @@ def agent_post_save(sender, instance: models.Agent = None, created=None, **kwarg
 
 @receiver(post_save, sender=models.Assignation)
 def ass_post_save(sender, instance: models.Assignation = None, created=None, **kwargs):
-
     if created:
-        assignation_broadcast(instance.id, [f"ass_waiter_{instance.waiter.id}"])
+        assignation_broadcast({"id": instance.id, "type": "created"}, [f"ass_waiter_{instance.waiter.id}"])
     
 @receiver(post_save, sender=models.AssignationEvent)
 def ass_event_post_save(sender, instance: models.AssignationEvent = None, created=None, **kwargs):
-
-    assignation_event_broadcast(instance.id, [f"assignation_{instance.assignation.id}", f"waiter_{instance.assignation.waiter.id}"])
+    assignation_event_broadcast({"id": instance.id, "type": "event"}, [f"ass_waiter_{instance.assignation.waiter.id}"])
     
 
 @receiver(post_save, sender=models.Reservation)
