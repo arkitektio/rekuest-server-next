@@ -18,9 +18,9 @@ class ControllBackend(Protocol):
 
 
 def find_best_fitting_provision(
-    node: models.Node, user: models.User
+    node_id: str, user: models.User
 ) -> models.Provision:
-    return choice(node.templates.all()).provision
+    return choice(models.Node.objects.get(id=node_id).templates.all()).provision
 
 
 def get_waiter_for_context(info: Info, instance_id: str) -> None:
@@ -79,8 +79,10 @@ class RedisControllBackend(ControllBackend):
         # TODO: Check if function is cached and was
 
         provision = None
+        reservation= None
+        template = None
 
-        waiter = get_waiter_for_context()
+        waiter = get_waiter_for_context(info, input.instance_id)
 
         if input.reservation:
 
@@ -94,12 +96,26 @@ class RedisControllBackend(ControllBackend):
 
         else:
 
-            provision = find_best_fitting_provision(input.node)
+            provision = find_best_fitting_provision(input.node, info.context.request.user)
 
         if not provision:
             raise ValueError("No active provision found")
 
         reference = self.create_message_id()
+
+        
+
+        assignation = models.Assignation.objects.create(
+            reservation_id=input.reservation,
+            args=input.args,
+            reference=reference,
+            parent_id=input.parent,
+            node=provision.template.node,
+            provision=provision,
+            status="BOUND",
+            hooks=input.hooks,
+            waiter=waiter,
+        )
 
         AgentConsumer.broadcast(
             provision.agent.id,
@@ -112,18 +128,6 @@ class RedisControllBackend(ControllBackend):
                 "id": reference,
                 "assignation": assignation.id,
             },
-        )
-
-        assignation = models.Assignation.objects.create(
-            reservation_id=input.reservation,
-            args=input.args,
-            reference=reference,
-            parent_id=input.parent,
-            provision=provision,
-            status="BOUND",
-            hooks=input.hooks,
-            waiter=waiter,
-            is_hook=input.is_hook,
         )
 
         for hook in input.hooks:

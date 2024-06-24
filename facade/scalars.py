@@ -11,7 +11,7 @@ Identifier = strawberry.scalar(
 )
 
 Args = strawberry.scalar(
-    NewType("Arg", object),
+    NewType("Args", object),
     description="The `Args` scalar type represents a Dictionary of arguments",
     serialize=lambda v: v,
     parse_value=lambda v: v,

@@ -37,17 +37,6 @@ def prov_post_save(sender, instance: models.Provision = None, created=None, **kw
     if created:
         assign_perm("can_link_to", instance.agent.registry.user, instance)
 
-        
-
-
-
-
-
-
-
-
-
-
 
 @receiver(pre_delete, sender=models.Provision)
 def prov_pre_delete(sender, instance: models.Provision = None, **kwargs):
@@ -68,12 +57,12 @@ def agent_post_save(sender, instance: models.Agent = None, created=None, **kwarg
 def ass_post_save(sender, instance: models.Assignation = None, created=None, **kwargs):
 
     if created:
-        assignation_broadcast(instance.id, [f"ass_waiter_{instance.reservation.waiter.id}"])
+        assignation_broadcast(instance.id, [f"ass_waiter_{instance.waiter.id}"])
     
 @receiver(post_save, sender=models.AssignationEvent)
 def ass_event_post_save(sender, instance: models.AssignationEvent = None, created=None, **kwargs):
 
-    assignation_event_broadcast(instance.id, [f"assignation_{instance.assignation.id}", f"waiter_{instance.assignation.reservation.waiter.id}"])
+    assignation_event_broadcast(instance.id, [f"assignation_{instance.assignation.id}", f"waiter_{instance.assignation.waiter.id}"])
     
 
 @receiver(post_save, sender=models.Reservation)

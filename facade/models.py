@@ -60,6 +60,11 @@ class Registry(models.Model):
 
     def __str__(self) -> str:
         return f"{self.app} used by {self.user}"
+    
+
+class IconPack(models.Model):
+    name = models.CharField(max_length=1000)
+
 
 
 class Node(models.Model):
@@ -129,6 +134,17 @@ class Node(models.Model):
 
     def __str__(self):
         return f"{self.name}"
+
+
+
+class Icon(models.Model):
+    pack = models.ForeignKey(IconPack, on_delete=models.CASCADE)
+    icon_url = models.CharField(max_length=10000)
+    hash = models.CharField(max_length=1000)
+    node = models.ForeignKey(Node, on_delete=models.SET_NULL, null=True, related_name="icons")
+
+
+
 
 
 class Agent(models.Model):
@@ -440,6 +456,12 @@ class Provision(models.Model):
     @property
     def is_viable(self):
         return self.active and self.provided and self.dependencies_met
+    
+
+
+
+
+
 
 
 class Reservation(models.Model):
@@ -471,7 +493,7 @@ class Reservation(models.Model):
         help_text="A Unique identifier for this Topic",
     )
 
-    args = models.JSONField(
+    saved_args = models.JSONField(
         default=dict,
     )
 
@@ -586,6 +608,20 @@ class Assignation(models.Model):
         blank=True,
         null=True,
     )
+    template = models.ForeignKey(
+        Template,
+        on_delete=models.CASCADE,
+        help_text="Which tempalten are we assigning to",
+        related_name="assignations",
+        blank=True,
+        null=True,
+    )
+    node = models.ForeignKey(
+        Node,
+        on_delete=models.CASCADE,
+        help_text="The node this was assigned to"
+    )
+
     hooks = models.JSONField(
         default=list,
         help_text="hooks that are tight to the lifecycle of this assignation",
@@ -603,8 +639,8 @@ class Assignation(models.Model):
         help_text="The Assignations parent (the one that created this)",
         related_name="children",
     )
-    saved_args = models.JSONField(
-        blank=True, null=True, help_text="The Args", default=list
+    args = models.JSONField(
+        blank=True, null=True, help_text="The Args", default=dict
     )
     provision = models.ForeignKey(
         Provision,

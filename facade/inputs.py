@@ -64,6 +64,7 @@ class HookInputModel(BaseModel):
 
 
 class AssignInputModel(BaseModel):
+    instance_id: str
     node: str | None = None
     template: str | None = None
     reservation: str | None = None
@@ -102,10 +103,10 @@ class HookInput:
 
 @pydantic.input(AssignInputModel)
 class AssignInput:
-    node: str | None = None
-    template: str | None = None
-    reservation: str | None = None
-    hooks: list[HookInput]
+    instance_id: scalars.InstanceID
+    node: strawberry.ID  | None = None
+    template: strawberry.ID  | None = None
+    hooks: list[HookInput] | None = None
     reservation: strawberry.ID | None = None
     args: scalars.Args
     reference: str | None = None
@@ -122,7 +123,8 @@ class CreateTemplateInputModel(BaseModel):
     extension: str
     params: dict[str, Any] | None = None
     instance_id: str | None = None
-    dynamic: str
+    dynamic: bool = False
+    logo: str | None = None
 
 
 @pydantic.input(CreateTemplateInputModel)
@@ -133,7 +135,8 @@ class CreateTemplateInput:
     extension: str
     params: rscalars.AnyDefault | None = None
     instance_id: scalars.InstanceID | None = None
-    dynamic: str
+    dynamic: bool = False
+    logo: str | None = None
 
 
 @strawberry.input

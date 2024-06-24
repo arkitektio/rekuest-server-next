@@ -238,7 +238,6 @@ async def apropagate_provision_change(provision: models.Provision):
 async def aset_provision_provided(provision: models.Provision):
     provision.provided = True
     await provision.asave()
-    await apropagate_provision_change(provision)
 
 
    
@@ -247,8 +246,6 @@ async def aset_provision_provided(provision: models.Provision):
 async def aset_provision_unprovided(provision: models.Provision):
     provision.provided = False
     await provision.asave()
-    await apropagate_provision_change(provision)
-
 
    
     return provision

@@ -112,6 +112,7 @@ def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Temp
 
         template.node = node
         template.extension = input.extension
+        template.dynamic = input.dynamic
         template.save()
 
     except models.Template.DoesNotExist:
@@ -120,6 +121,7 @@ def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Temp
             node=node,
             agent=agent,
             extension=input.extension,
+            dynamic=input.dynamic
         )
 
         provision = models.Provision.objects.get_or_create(

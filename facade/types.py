@@ -246,7 +246,9 @@ class Assignation:
     reference: str | None
     args: rscalars.AnyDefault
     parent: "Assignation"
-    reservation: "Reservation"
+    reservation: Optional["Reservation"]
+    node: "Node"
+    template: Optional["Template"]
     status: enums.AssignationEventKind
     status_message: str | None
     waiter: "Waiter"
