@@ -118,6 +118,7 @@ class DefinitionInputModel(BaseModel):
     kind: enums.NodeKind
     is_test_for: list[str] = Field(default_factory=list)
     interfaces: list[str] = Field(default_factory=list)
+    is_dev: bool = False
 
 
 class DependencyInputModel(BaseModel):
@@ -127,6 +128,7 @@ class DependencyInputModel(BaseModel):
     binds: BindsInputModel | None
     optional: bool = False
     viable_instances: int | None
+    
 
 
 

@@ -6,6 +6,8 @@ agent_updated_broadcast, agent_updated_listen = build_channel("agent_updated_bro
 
 assignation_broadcast, assignation_listen = build_channel("assignation_broadcast")
 
+template_broadcast, template_listen = build_channel("template_broadcast")
+
 reservation_broadcast, reservation_listen = build_channel("reservation_broadcast")
 
 assignation_event_broadcast, assignation_event_listen = build_channel("assignation_event_broadcast")

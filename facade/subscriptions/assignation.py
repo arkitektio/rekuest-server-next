@@ -56,7 +56,7 @@ async def assignations(
 
         if message["type"] == "created":
             ass = await models.Assignation.objects.aget(id=message["id"])
-            yield AssignationChangeEvent(create=ass, update=None)
+            yield AssignationChangeEvent(create=ass, event=None)
         else:
             event = await models.AssignationEvent.objects.aget(id=message["id"])
             yield AssignationChangeEvent(event=event, create=None)

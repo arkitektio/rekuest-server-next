@@ -1,7 +1,7 @@
 from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 from facade import models
-from facade.channels import node_created_broadcast, agent_updated_broadcast, assignation_event_broadcast, provision_event_broadcast, reservation_event_broadcast, assignation_broadcast, reservation_broadcast
+from facade.channels import node_created_broadcast, agent_updated_broadcast, assignation_event_broadcast, provision_event_broadcast, reservation_event_broadcast, assignation_broadcast, reservation_broadcast, template_broadcast
 import logging
 from guardian.shortcuts import assign_perm
 
@@ -80,3 +80,8 @@ def res_event_post_save(sender, instance: models.ReservationEvent = None, create
 def prov_event_post_save(sender, instance: models.Provision = None, **kwargs):
     pass
 
+
+
+@receiver(post_save, sender=models.Template)
+def temp_post_save(sender, instance: models.Template = None, **kwargs):
+    template_broadcast(instance.id, [f"template_{instance.id}"])

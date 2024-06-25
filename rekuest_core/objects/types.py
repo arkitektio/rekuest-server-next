@@ -166,6 +166,7 @@ class Definition:
     tests: list[str]
     protocols: list[str]
     defined_at: datetime.datetime
+    is_dev: bool
 
     @strawberry_django.field()
     def args(self) -> list[Port]:

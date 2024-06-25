@@ -162,3 +162,4 @@ class DefinitionModel(BaseModel):
     tests: list[str]
     protocols: list[str]
     defined_at: datetime.datetime
+    is_dev: bool = False

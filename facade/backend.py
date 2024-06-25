@@ -84,6 +84,9 @@ class RedisControllBackend(ControllBackend):
 
         waiter = get_waiter_for_context(info, input.instance_id)
 
+
+
+
         if input.reservation:
 
             # TODO: Retrieve the reservation in the redis cache wth the provision keys set
@@ -94,9 +97,19 @@ class RedisControllBackend(ControllBackend):
             # TODO: Cache the reservation in the redis cache
             provision = choice(reservation.provisions)
 
-        else:
+        elif input.template:
+
+            template = models.Template.objects.get(id=input.template)
+
+             # TODO: Cache the reservation in the redis cache
+            provision = template.provision
+
+        elif input.node:
 
             provision = find_best_fitting_provision(input.node, info.context.request.user)
+
+        else:
+            raise ValueError("You need to provide either, node, template, or reservation to created an assignment")
 
         if not provision:
             raise ValueError("No active provision found")
@@ -106,7 +119,7 @@ class RedisControllBackend(ControllBackend):
         
 
         assignation = models.Assignation.objects.create(
-            reservation_id=input.reservation,
+            reservation=reservation,
             args=input.args,
             reference=reference,
             parent_id=input.parent,
@@ -115,6 +128,7 @@ class RedisControllBackend(ControllBackend):
             status="BOUND",
             hooks=input.hooks,
             waiter=waiter,
+            template=template
         )
 
         AgentConsumer.broadcast(

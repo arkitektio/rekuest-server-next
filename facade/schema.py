@@ -125,7 +125,7 @@ class Subscription:
     assignation_events = strawberry.subscription(resolver=subscriptions.assignation_events)
     reservation_events = strawberry.subscription(resolver=subscriptions.reservation_events)
     provision_events = strawberry.subscription(resolver=subscriptions.provision_events)
-
+    template_change = strawberry.subscription(resolver=subscriptions.template_change)
 
 schema = strawberry.Schema(
     query=Query,
