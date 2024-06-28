@@ -60,11 +60,10 @@ class Registry(models.Model):
 
     def __str__(self) -> str:
         return f"{self.app} used by {self.user}"
-    
+
 
 class IconPack(models.Model):
     name = models.CharField(max_length=1000)
-
 
 
 class Node(models.Model):
@@ -121,6 +120,9 @@ class Node(models.Model):
         blank=True,
         help_text="The protocols this Node implements (e.g. Predicate)",
     )
+    is_dev = models.BooleanField(
+        default=False, help_text="Is this Node a development Node"
+    )
 
     hash = models.CharField(
         max_length=1000,
@@ -136,15 +138,13 @@ class Node(models.Model):
         return f"{self.name}"
 
 
-
 class Icon(models.Model):
     pack = models.ForeignKey(IconPack, on_delete=models.CASCADE)
     icon_url = models.CharField(max_length=10000)
     hash = models.CharField(max_length=1000)
-    node = models.ForeignKey(Node, on_delete=models.SET_NULL, null=True, related_name="icons")
-
-
-
+    node = models.ForeignKey(
+        Node, on_delete=models.SET_NULL, null=True, related_name="icons"
+    )
 
 
 class Agent(models.Model):
@@ -456,12 +456,6 @@ class Provision(models.Model):
     @property
     def is_viable(self):
         return self.active and self.provided and self.dependencies_met
-    
-
-
-
-
-
 
 
 class Reservation(models.Model):
@@ -617,9 +611,7 @@ class Assignation(models.Model):
         null=True,
     )
     node = models.ForeignKey(
-        Node,
-        on_delete=models.CASCADE,
-        help_text="The node this was assigned to"
+        Node, on_delete=models.CASCADE, help_text="The node this was assigned to"
     )
 
     hooks = models.JSONField(
@@ -639,9 +631,7 @@ class Assignation(models.Model):
         help_text="The Assignations parent (the one that created this)",
         related_name="children",
     )
-    args = models.JSONField(
-        blank=True, null=True, help_text="The Args", default=dict
-    )
+    args = models.JSONField(blank=True, null=True, help_text="The Args", default=dict)
     provision = models.ForeignKey(
         Provision,
         on_delete=models.CASCADE,

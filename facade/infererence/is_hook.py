@@ -12,10 +12,7 @@ def is_hook(definition: DefinitionInputModel) -> Protocol:
     if len(definition.args) != 1:
         return None
 
-    if (
-        definition.args[0].key == "assignation"
-        and definition.args[0].identifier == "@rekuest/node"
-    ):
+    if definition.args[0].identifier == "@rekuest/assignationevent":
         x, _ = Protocol.objects.update_or_create(
             name="hook", defaults=dict(description="Is this a hook?")
         )

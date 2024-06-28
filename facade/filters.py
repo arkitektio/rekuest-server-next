@@ -1,12 +1,14 @@
-import strawberry
-from facade import models, scalars, enums, inputs, managers
-from strawberry import auto
 from typing import Optional
-from strawberry_django.filters import FilterLookup
+
+import strawberry
 import strawberry_django
+from authentikate.models import App, User
+from facade import enums, inputs, managers, models, scalars
 from rekuest_core import enums as renums
-from authentikate.models import User, App
 from rekuest_core import scalars as rscalars
+from strawberry import auto
+from strawberry_django.filters import FilterLookup
+
 
 @strawberry.input
 class SearchFilter:
@@ -121,7 +123,7 @@ class AssignationFilter:
         if self.status is None:
             return queryset
         return queryset.filter(status__in=self.status)
-    
+
     def filter_instance_id(self, queryset, info):
         if self.instance_id is None:
             return queryset
@@ -131,7 +133,6 @@ class AssignationFilter:
 @strawberry_django.filter(models.AssignationEvent)
 class AssignationEventFilter:
     kind: list[enums.AssignationEventKind] | None
-    
 
     def filter_kind(self, queryset, info):
         if self.kind is None:
@@ -159,7 +160,7 @@ class TemplateFilter:
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
-    
+
 
 @strawberry_django.filter(models.Dependency)
 class DependencyFilter:
@@ -169,13 +170,11 @@ class DependencyFilter:
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
-    
 
 
 @strawberry_django.order(App)
 class AppOrder:
     defined_at: auto
-
 
 
 @strawberry_django.filter(App)
@@ -189,18 +188,18 @@ class AppFilter:
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
-    
+
     def filter_has_templates_for(self, queryset, info):
         if self.has_templates_for is None:
             return queryset
-        return queryset.filter(registry__agents__templates__node__hash__in=self.has_templates_for).distinct()
-    
+        return queryset.filter(
+            registry__agents__templates__node__hash__in=self.has_templates_for
+        ).distinct()
+
     def filter_mine(self, queryset, info):
         if self.mine is None:
             return queryset
         return queryset.filter(user_id=info.context.user.id)
-
-
 
 
 @strawberry_django.order(models.Agent)
@@ -217,6 +216,7 @@ class NodeOrder:
 class ProtocolOrder:
     name: auto
 
+
 @strawberry_django.filter(models.Protocol)
 class ProtocolFilter(SearchFilter):
     name: Optional[FilterLookup[str]]
@@ -226,8 +226,6 @@ class ProtocolFilter(SearchFilter):
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
-    
-
 
 
 @strawberry_django.filter(models.HardwareRecord)
@@ -239,18 +237,12 @@ class HardwareRecordFilter:
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
-    
+
     def filter_cpu_vendor_name(self, queryset, info):
         if self.cpu_vendor_name is None:
             return queryset
-        
+
         return queryset.filter(cpu_vendor_name__contains=self.cpu_vendor_name)
-
-    
-
-
-
-
 
 
 @strawberry_django.filter(models.Node)
@@ -258,29 +250,33 @@ class NodeFilter(SearchFilter):
     name: Optional[FilterLookup[str]]
     ids: list[strawberry.ID] | None
     demands: list[inputs.PortDemandInput] | None
-    protocols: list[strawberry.ID] | None
+    protocols: list[str] | None
     kind: Optional[renums.NodeKind] | None
 
     def filter_demands(self, queryset, info):
         if self.demands is None:
             return queryset
-        
+
         for ports_demand in self.demands:
-            queryset = managers.filter_nodes_by_demands(queryset, ports_demand.matches, type=ports_demand.kind, force_length=ports_demand.force_length, force_non_nullable_length=ports_demand.force_non_nullable_length)
-        
-        
+            queryset = managers.filter_nodes_by_demands(
+                queryset,
+                ports_demand.matches,
+                type=ports_demand.kind,
+                force_length=ports_demand.force_length,
+                force_non_nullable_length=ports_demand.force_non_nullable_length,
+            )
+
         return queryset
-    
+
     def filter_kind(self, queryset, info):
         if self.kind is None:
             return queryset
         return queryset.filter(kind=self.kind)
-    
+
     def filter_protocols(self, queryset, info):
         if self.protocols is None:
             return queryset
-        return queryset.filter(protocols__id__in=self.protocols)
-
+        return queryset.filter(protocols__name__in=self.protocols)
 
     def filter_ids(self, queryset, info):
         if self.ids is None:

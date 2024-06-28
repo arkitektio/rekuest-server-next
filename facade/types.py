@@ -1,28 +1,34 @@
-import strawberry_django
-from facade import models, scalars, enums, filters
-import strawberry
+import datetime
 from enum import Enum
-from typing import Optional
-from pydantic import BaseModel, Field
-from strawberry.experimental import pydantic
-from typing import Any
-from typing import ForwardRef
-from strawberry import LazyType
-from typing import Literal, Union
+from typing import Any, ForwardRef, Literal, Optional, Union
+
+import redis
+import strawberry
+import strawberry_django
 from authentikate.models import App
 from authentikate.strawberry.types import User
-import datetime
-from rekuest_core.objects import models as rmodels
-from rekuest_core.objects import types as rtypes
-from rekuest_core import scalars as rscalars
-from rekuest_core import enums as renums
+from dep_graph.functions import (
+    build_node_graph,
+    build_reservation_graph,
+    build_template_graph,
+)
 from dep_graph.types import DependencyGraph
-from dep_graph.functions import build_template_graph, build_node_graph, build_reservation_graph
-import redis 
-from facade.connection import redis_pool
 from django.conf import settings
 from django.utils import timezone
-@strawberry_django.type(App,  filters=filters.AppFilter, pagination=True, order=filters.AppOrder)
+from facade import enums, filters, models, scalars
+from facade.connection import redis_pool
+from pydantic import BaseModel, Field
+from rekuest_core import enums as renums
+from rekuest_core import scalars as rscalars
+from rekuest_core.objects import models as rmodels
+from rekuest_core.objects import types as rtypes
+from strawberry import LazyType
+from strawberry.experimental import pydantic
+
+
+@strawberry_django.type(
+    App, filters=filters.AppFilter, pagination=True, order=filters.AppOrder
+)
 class App:
     id: strawberry.ID
     name: str
@@ -44,7 +50,12 @@ class Collection:
     nodes: list["Node"]
 
 
-@strawberry_django.type(models.Protocol, filters=filters.ProtocolFilter, pagination=True, order=filters.ProtocolOrder)
+@strawberry_django.type(
+    models.Protocol,
+    filters=filters.ProtocolFilter,
+    pagination=True,
+    order=filters.ProtocolOrder,
+)
 class Protocol:
     id: strawberry.ID
     name: str
@@ -64,17 +75,15 @@ class Node:
     templates: list["Template"]
     scope: enums.NodeScope
     is_test_for: list["Node"]
+    is_dev: bool
     tests: list["Node"]
     protocols: list["Protocol"]
     defined_at: datetime.datetime
     reservations: list[LazyType["Reservation", __name__]] | None
 
-
     @strawberry_django.field()
     def dependency_graph(self) -> DependencyGraph:
         return build_node_graph(self)
-
-
 
     @strawberry_django.field()
     def args(self) -> list[rtypes.Port]:
@@ -83,7 +92,7 @@ class Node:
     @strawberry_django.field()
     def returns(self) -> list[rtypes.Port]:
         return [rmodels.PortModel(**i) for i in self.returns]
-    
+
     @strawberry_django.field()
     def port_groups(self) -> list[rtypes.PortGroup]:
         return [rmodels.PortGroupModel(**i) for i in self.port_groups]
@@ -97,16 +106,12 @@ class Dependency:
     template: "Template"
     node: Node | None
     hash: rscalars.NodeHash
-    initial_hash: rscalars.NodeHash  
+    initial_hash: rscalars.NodeHash
     reference: str | None
     optional: bool = False
 
     def binds(self) -> rtypes.Binds | None:
         return rmodels.BindsModel(**self.binds) if self.binds else None
-
-
-
-
 
 
 @strawberry_django.type(
@@ -125,9 +130,11 @@ class Template:
     @strawberry_django.field()
     def dependency_graph(self) -> DependencyGraph:
         return build_template_graph(self)
-    
 
-@strawberry_django.type(models.HardwareRecord, filters=filters.HardwareRecordFilter, pagination=True)
+
+@strawberry_django.type(
+    models.HardwareRecord, filters=filters.HardwareRecordFilter, pagination=True
+)
 class HardwareRecord:
     id: strawberry.ID
     cpu_count: int
@@ -137,10 +144,9 @@ class HardwareRecord:
     agent: "Agent"
 
 
-
-
-
-@strawberry_django.type(models.Agent, filters=filters.AgentFilter, order=filters.AgentOrder, pagination=True)
+@strawberry_django.type(
+    models.Agent, filters=filters.AgentFilter, order=filters.AgentOrder, pagination=True
+)
 class Agent:
     id: strawberry.ID
     instance_id: scalars.InstanceID
@@ -152,14 +158,16 @@ class Agent:
     last_seen: datetime.datetime | None
     connected: bool
 
-
     @strawberry_django.field()
     def active(self) -> bool:
-        return self.connected and self.last_seen > timezone.now() - datetime.timedelta(seconds=settings.AGENT_DISCONNECTED_TIMEOUT)
+        return self.connected and self.last_seen > timezone.now() - datetime.timedelta(
+            seconds=settings.AGENT_DISCONNECTED_TIMEOUT
+        )
 
     @strawberry_django.field()
     def latest_hardware_record(self) -> HardwareRecord | None:
         return self.hardware_records.order_by("-created_at").first()
+
 
 @strawberry_django.type(models.Waiter, filters=filters.WaiterFilter, pagination=True)
 class Waiter:
@@ -220,7 +228,7 @@ class Reservation:
     @strawberry_django.field()
     def dependency_graph(self) -> DependencyGraph:
         return build_reservation_graph(self)
-    
+
     @strawberry_django.field()
     def events(self) -> list["ReservationEvent"]:
         return self.events.order_by("created_at")[:10]
@@ -272,13 +280,13 @@ class AssignationEvent:
     kind: enums.AssignationEventKind
     message: str | None
     level: enums.LogLevel | None
-    
+
     created_at: strawberry.auto
 
     @strawberry_django.field()
     def level(self) -> enums.LogLevel:
         return enums.LogLevel.INFO
-    
+
     @strawberry_django.field()
     def reference(self) -> str:
         return self.assignation.reference

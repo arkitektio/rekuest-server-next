@@ -1,18 +1,17 @@
-from kante.types import Info
-from typing import AsyncGenerator
-import strawberry
-from strawberry_django.optimizer import DjangoOptimizerExtension
+from typing import Any, AsyncGenerator, Type
 
-from strawberry import ID
-from kante.directives import upper, replace, relation
-from strawberry.permission import BasePermission
-from typing import Any, Type
-from facade import types, models, mutations, subscriptions, scalars, queries
-from strawberry.field_extensions import InputMutationExtension
+import strawberry
 import strawberry_django
-from koherent.strawberry.extension import KoherentExtension
 from authentikate.strawberry.permissions import IsAuthenticated
+from facade import models, mutations, queries, scalars, subscriptions, types
+from kante.directives import relation, replace, upper
+from kante.types import Info
+from koherent.strawberry.extension import KoherentExtension
 from rekuest_core.constants import interface_types
+from strawberry import ID
+from strawberry.field_extensions import InputMutationExtension
+from strawberry.permission import BasePermission
+from strawberry_django.optimizer import DjangoOptimizerExtension
 
 
 @strawberry.type
@@ -26,12 +25,16 @@ class Query:
     test_results: list[types.TestResult] = strawberry_django.field()
     test_cases: list[types.TestCase] = strawberry_django.field()
     reservations: list[types.Reservation] = strawberry_django.field()
-    reservations: list[types.Reservation] = strawberry_django.field(resolver=queries.reservations)
-    myreservations: list[types.Reservation] = strawberry_django.field(resolver=queries.myreservations)
+    reservations: list[types.Reservation] = strawberry_django.field(
+        resolver=queries.reservations
+    )
+    myreservations: list[types.Reservation] = strawberry_django.field(
+        resolver=queries.myreservations
+    )
     provisions: list[types.Provision] = strawberry_django.field()
     node = strawberry_django.field(resolver=queries.node)
     assignations = strawberry_django.field(resolver=queries.assignations)
-
+    event = strawberry_django.field(resolver=queries.event)
 
     @strawberry_django.field()
     def hardware_record(self, info: Info, id: strawberry.ID) -> types.HardwareRecord:
@@ -41,7 +44,7 @@ class Query:
     def agent(self, info: Info, id: strawberry.ID) -> types.Agent:
         print("hallo")
         return models.Agent.objects.get(id=id)
-    
+
     @strawberry_django.field()
     def dependency(self, info: Info, id: strawberry.ID) -> types.Dependency:
         print("hallo")
@@ -82,14 +85,14 @@ class Mutation:
     )
     ack: types.Assignation = strawberry_django.mutation(resolver=mutations.ack)
     assign: types.Assignation = strawberry_django.mutation(resolver=mutations.assign)
-    cancel: types.Assignation = strawberry_django.mutation(
-        resolver=mutations.cancel
-    )
+    cancel: types.Assignation = strawberry_django.mutation(resolver=mutations.cancel)
     interrupt: types.Assignation = strawberry_django.mutation(
         resolver=mutations.interrupt
     )
     reinit = strawberry_django.mutation(resolver=mutations.reinit)
-    provide: types.Provision = strawberry_django.mutation(resolver=mutations.provide, description="Provide a provision")
+    provide: types.Provision = strawberry_django.mutation(
+        resolver=mutations.provide, description="Provide a provision"
+    )
     unprovide = strawberry_django.mutation(resolver=mutations.unprovide)
     reserve: types.Reservation = strawberry_django.mutation(resolver=mutations.reserve)
     link: types.Provision = strawberry_django.mutation(resolver=mutations.link)
@@ -105,9 +108,7 @@ class Mutation:
         resolver=mutations.create_test_result
     )
 
-    activate: types.Provision = strawberry_django.mutation(
-        resolver=mutations.activate
-    )
+    activate: types.Provision = strawberry_django.mutation(resolver=mutations.activate)
 
     deactivate: types.Provision = strawberry_django.mutation(
         resolver=mutations.deactivate
@@ -117,15 +118,21 @@ class Mutation:
         resolver=mutations.create_hardware_record
     )
 
+
 @strawberry.type
 class Subscription:
     new_nodes = strawberry.subscription(resolver=subscriptions.new_nodes)
     assignations = strawberry.subscription(resolver=subscriptions.assignations)
     reservations = strawberry.subscription(resolver=subscriptions.reservations)
-    assignation_events = strawberry.subscription(resolver=subscriptions.assignation_events)
-    reservation_events = strawberry.subscription(resolver=subscriptions.reservation_events)
+    assignation_events = strawberry.subscription(
+        resolver=subscriptions.assignation_events
+    )
+    reservation_events = strawberry.subscription(
+        resolver=subscriptions.reservation_events
+    )
     provision_events = strawberry.subscription(resolver=subscriptions.provision_events)
     template_change = strawberry.subscription(resolver=subscriptions.template_change)
+
 
 schema = strawberry.Schema(
     query=Query,
@@ -136,7 +143,7 @@ schema = strawberry.Schema(
         DjangoOptimizerExtension,
         KoherentExtension,
     ],
-    types=interface_types
+    types=interface_types,
     # We really need to register
     # all the types here, otherwise the schema will not be able to resolve them
     # and will throw a cryptic error
