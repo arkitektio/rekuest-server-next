@@ -47,7 +47,7 @@ class AssignInputModel(BaseModel):
     node: str | None = None
     template: str | None = None
     reservation: str | None = None
-    hooks: list[HookInputModel]
+    hooks: list[HookInputModel] | None = None
     args: dict[str, Any]
     reference: str | None = None
     parent: str | None = None
@@ -85,7 +85,7 @@ class AssignInput:
     instance_id: scalars.InstanceID
     node: strawberry.ID  | None = None
     template: strawberry.ID  | None = None
-    hooks: list[HookInput] | None = None
+    hooks: list[HookInput] | None = strawberry.field(default_factory=list)
     reservation: strawberry.ID | None = None
     args: scalars.Args
     reference: str | None = None

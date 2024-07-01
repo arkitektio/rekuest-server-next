@@ -99,12 +99,12 @@ class ModelPersistBackend():
     async def on_assign_changed(self, message: dict) -> None:
         kind_of_change = message["kind"]
 
-        await models.AssignationEvent.objects.acreate(assignation_id=message["assignation"], kind=message["kind"], message=message["message"], returns=message["returns"])
+        await models.AssignationEvent.objects.acreate(assignation_id=message["assignation"], kind=message["kind"], message=message["message"], returns=message["returns"], progress=message.get("progress", None))
        
 
-        if kind_of_change != "DONE":
+        if kind_of_change == "DONE" or kind_of_change == "CANCELLED" or kind_of_change == "CRITICAL" or kind_of_change == "DISCONNECTED":
             x = await models.Assignation.objects.aget(id=message["assignation"])
-            x.status = "DONE"
+            x.status = kind_of_change
             await x.asave()
             print("Changed Assignation")
             

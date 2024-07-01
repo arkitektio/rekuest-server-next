@@ -151,15 +151,6 @@ class TestResultFilter:
         return queryset.filter(id__in=self.ids)
 
 
-@strawberry_django.filter(models.Template)
-class TemplateFilter:
-    interface: Optional[FilterLookup[str]]
-    ids: list[strawberry.ID] | None
-
-    def filter_ids(self, queryset, info):
-        if self.ids is None:
-            return queryset
-        return queryset.filter(id__in=self.ids)
 
 
 @strawberry_django.filter(models.Dependency)
@@ -282,3 +273,15 @@ class NodeFilter(SearchFilter):
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
+
+@strawberry_django.filter(models.Template)
+class TemplateFilter:
+    interface: Optional[FilterLookup[str]]
+    ids: list[strawberry.ID] | None
+    node: NodeFilter | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+    

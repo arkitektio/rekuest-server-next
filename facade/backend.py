@@ -126,7 +126,7 @@ class RedisControllBackend(ControllBackend):
             node=provision.template.node,
             provision=provision,
             status="BOUND",
-            hooks=input.hooks,
+            hooks=input.hooks or [],
             waiter=waiter,
             template=template
         )
@@ -143,16 +143,16 @@ class RedisControllBackend(ControllBackend):
                 "assignation": assignation.id,
             },
         )
-
-        for hook in input.hooks:
-            if hook.kind == enums.HookKind.INIT:
-                self.assign(
-                    inputs.AssignInputModel(
-                        node=hook.hash,
-                        args={"assignation": assignation.id},
-                        reference="init_hook_0",
+        if input.hooks:
+            for hook in input.hooks:
+                if hook.kind == enums.HookKind.INIT:
+                    self.assign(
+                        inputs.AssignInputModel(
+                            node=hook.hash,
+                            args={"assignation": assignation.id},
+                            reference="init_hook_0",
+                        )
                     )
-                )
 
         return assignation
 

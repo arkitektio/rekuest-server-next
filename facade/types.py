@@ -280,6 +280,7 @@ class AssignationEvent:
     kind: enums.AssignationEventKind
     message: str | None
     level: enums.LogLevel | None
+    progress: int | None
 
     created_at: strawberry.auto
 
