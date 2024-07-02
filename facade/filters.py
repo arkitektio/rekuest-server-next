@@ -33,13 +33,24 @@ class TestCaseFilter:
 
 @strawberry_django.filter(models.Agent)
 class AgentFilter:
-    instance_id: str
+    instance_id: str | None
     ids: list[strawberry.ID] | None
+    extensions: list[str] | None
 
     def filter_ids(self, queryset, info):
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
+    
+    def filter_instance_id(self, queryset, info):
+        if self.instance_id is None:
+            return queryset
+        return queryset.filter(instance_id=self.instance_id)
+    
+    def filter_extensions(self, queryset, info):
+        if self.extensions is None:
+            return queryset
+        return queryset.filter(extensions__contains=self.extensions)
 
 
 @strawberry_django.filter(models.Waiter)
@@ -279,9 +290,15 @@ class TemplateFilter:
     interface: Optional[FilterLookup[str]]
     ids: list[strawberry.ID] | None
     node: NodeFilter | None
+    extension: str | None
 
     def filter_ids(self, queryset, info):
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
+    
+    def filter_extension(self, queryset, info):
+        if self.extension is None:
+            return queryset
+        return queryset.filter(extension=self.extension)
     

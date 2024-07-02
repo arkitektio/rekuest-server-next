@@ -100,6 +100,7 @@ def _create_template(input: TemplateInputModel, agent: models.Agent, extension: 
         template.node = node
         template.extension = extension
         template.dynamic = input.dynamic
+        template.params = input.params or {}
         template.save()
 
     except models.Template.DoesNotExist:
@@ -108,7 +109,8 @@ def _create_template(input: TemplateInputModel, agent: models.Agent, extension: 
             node=node,
             agent=agent,
             extension=extension,
-            dynamic=input.dynamic
+            dynamic=input.dynamic,
+            params=input.params or {},
         )
 
         provision = models.Provision.objects.get_or_create(
@@ -142,6 +144,7 @@ def _create_template(input: TemplateInputModel, agent: models.Agent, extension: 
                 )
                 new_deps.append(dep)
 
+
     return template
 
 
@@ -165,7 +168,29 @@ def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Temp
 
 
 
+def create_foreign_template(info: Info, input: inputs.CreateForeignTemplateInput) -> types.Template:
     
+
+    agent = models.Agent.objects.get(
+        id=input.agent
+    )
+
+    assert input.extension in agent.extensions, f"Extension {input.extension} not supported by agent {agent}"
+
+    return _create_template(input.template, agent, input.extension)
+
+    
+def delete_template(info: Info, input: inputs.DeleteTemplateInput) -> str:
+    
+
+    template = models.Template.objects.get(
+        id=input.template
+    )
+
+    template.delete()
+
+
+    return input.id
 
 
 
@@ -177,7 +202,7 @@ def set_extension_templates(info: Info, input: inputs.SetExtensionTemplatesInput
         user=info.context.request.user,
     )
 
-    agent, _ = models.Agent.objects.update_or_create(
+    agent, _ = models.Agent.objects.get_or_create(
         registry=registry,
         instance_id=input.instance_id or "default",
         defaults=dict(

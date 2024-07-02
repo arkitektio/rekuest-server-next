@@ -152,6 +152,12 @@ class Agent(models.Model):
         max_length=2000, help_text="This providers Name", default="Nana"
     )
 
+    extensions = models.JSONField(
+        max_length=2000,
+        default=list,
+        help_text="The extensions for this Agent",
+    )
+
     health_check_interval = models.IntegerField(
         default=60 * 5,
         help_text="How often should this agent be checked for its health. Defaults to 5 mins",
@@ -405,11 +411,11 @@ class Provision(models.Model):
 
     # Provisions are bound to templates, and through that to an agent
     # A TEMPLATE CAN ONLY BE BOUND TO ONE PROVISION
-    template = models.OneToOneField(
+    template = models.ForeignKey(
         Template,
         on_delete=models.CASCADE,
         help_text="The Template for this Provision",
-        related_name="provision",
+        related_name="provisions",
         null=True,
         blank=True,
     )
@@ -475,6 +481,8 @@ class Reservation(models.Model):
     causing_assignation = models.ForeignKey(
         "Assignation",
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         related_name="caused_reservations",
         help_text="The assignation that created this reservation",
     )

@@ -35,7 +35,7 @@ class Query:
     node = strawberry_django.field(resolver=queries.node)
     assignations = strawberry_django.field(resolver=queries.assignations)
     event = strawberry_django.field(resolver=queries.event)
-
+    template_at = strawberry_django.field(resolver=queries.template_at)
     @strawberry_django.field()
     def hardware_record(self, info: Info, id: strawberry.ID) -> types.HardwareRecord:
         return models.HardwareRecord.objects.get(id=id)
@@ -80,6 +80,9 @@ class Mutation:
     create_template: types.Template = strawberry_django.mutation(
         resolver=mutations.create_template
     )
+    create_foreign_template: types.Template = strawberry_django.mutation(
+        resolver=mutations.create_foreign_template
+    )
     set_extension_templates: list[types.Template] = strawberry_django.mutation(
         resolver=mutations.set_extension_templates
     )
@@ -97,8 +100,14 @@ class Mutation:
     reserve: types.Reservation = strawberry_django.mutation(resolver=mutations.reserve)
     link: types.Provision = strawberry_django.mutation(resolver=mutations.link)
     unlink: types.Provision = strawberry_django.mutation(resolver=mutations.unlink)
-    unreserve: types.Reservation = strawberry_django.mutation(
+    unreserve: str = strawberry_django.mutation(
         resolver=mutations.unreserve
+    )
+
+    delete_template: str = strawberry_django.mutation(resolver=mutations.delete_template, description="Delete a template")
+
+    ensure_agent: types.Agent = strawberry_django.mutation(
+        resolver=mutations.ensure_agent
     )
     create_test_case: types.TestCase = strawberry_django.mutation(
         resolver=mutations.create_test_case

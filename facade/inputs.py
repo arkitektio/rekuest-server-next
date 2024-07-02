@@ -122,12 +122,32 @@ class CreateTemplateInputModel(BaseModel):
     extension: str
 
 
+class CreateForeignTemplateInputModel(BaseModel):
+    template: rimodels.TemplateInputModel
+    instance_id: str
+    extension: str
+
+
+
 @pydantic.input(CreateTemplateInputModel)
 class CreateTemplateInput:
     template: ritypes.TemplateInput
     instance_id: scalars.InstanceID
     extension: str
 
+@pydantic.input(CreateForeignTemplateInputModel)
+class CreateForeignTemplateInput:
+    template: ritypes.TemplateInput
+    agent: strawberry.ID
+    extension: str
+
+
+class DeleteTemplateInputModel(BaseModel):
+    template: str
+
+@pydantic.input(DeleteTemplateInputModel)
+class DeleteTemplateInput:
+    template: strawberry.ID
 
 
 class SetExtensionTemplatesInputModel(BaseModel):

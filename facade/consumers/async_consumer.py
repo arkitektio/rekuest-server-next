@@ -123,7 +123,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
             user=auth.user,
         )
 
-        self.agent, _ = await models.Agent.objects.aupdate_or_create(
+        self.agent, _ = await models.Agent.objects.aget_or_create(
             registry=self.registry,
             instance_id=input.instance_id or "default",
             defaults=dict(

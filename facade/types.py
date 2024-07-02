@@ -126,6 +126,7 @@ class Template:
     node: "Node"
     params: rscalars.AnyDefault
     dependencies: list["Dependency"]
+    provisions: list["Provision"]
 
     @strawberry_django.field()
     def dependency_graph(self) -> DependencyGraph:
@@ -157,6 +158,7 @@ class Agent:
     provisions: list["Provision"]
     last_seen: datetime.datetime | None
     connected: bool
+    extensions: list[str]
 
     @strawberry_django.field()
     def active(self) -> bool:

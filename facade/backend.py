@@ -20,7 +20,20 @@ class ControllBackend(Protocol):
 def find_best_fitting_provision(
     node_id: str, user: models.User
 ) -> models.Provision:
-    return choice(models.Node.objects.get(id=node_id).templates.all()).provision
+    
+    provision = models.Provision.objects.filter(template__node_id=node_id, status=enums.ProvisionStatus.ACTIVE).first()
+
+
+    return provision
+
+def find_best_fitting_provision(
+    node_id: str, user: models.User
+) -> models.Provision:
+    
+    provision = models.Provision.objects.filter(template__node_id=node_id, status=enums.ProvisionStatus.ACTIVE).first()
+
+
+    return provision
 
 
 def get_waiter_for_context(info: Info, instance_id: str) -> None:
@@ -57,6 +70,69 @@ class RedisControllBackend(ControllBackend):
             },
         )
         return assignation
+    
+
+    def reserve(self, info: Info, input: inputs.ReserveInputModel) -> types.Reservation:
+
+        if input.node is None and input.template is None:
+            raise ValueError("Either node or template must be provided")
+        
+
+
+
+        node = models.Node.objects.get(id=input.node) if input.node else None
+        template = models.Template.objects.get(id=input.template) if input.template else None
+
+
+        node_id = node.id if node else template.node.id
+
+
+        provision = find_best_fitting_provision(node_id, info.context.request.user)
+        if not provision:
+            raise ValueError("No Assignable Provisions found")
+
+        reference = input.reference or self.create_message_id()
+
+        registry, _ = models.Registry.objects.get_or_create(
+            app=info.context.request.app, user=info.context.request.user
+        )
+
+        waiter, _ = models.Waiter.objects.get_or_create(
+            registry=registry, instance_id=input.instance_id, defaults=dict(name="default")
+        )
+
+
+
+        res, created = models.Reservation.objects.update_or_create(
+            reference=reference,
+            node=node or template.node,
+            template=template,
+            strategy=(
+                enums.ReservationStrategy.DIRECT
+                if template
+                else enums.ReservationStrategy.ROUND_ROBIN
+            ),
+            waiter=waiter,
+            defaults=dict(
+                title=input.title,
+                binds=input.binds.dict() if input.binds else None,
+            ),
+            causing_assignation_id=input.assignation_id,
+        )
+
+        # TODO: Find really the best fitting provision
+
+        res.provisions.set([provision])
+
+
+
+
+        # TODO: Cache the reservation in the redis cache and make it available for the assignation
+
+
+
+        return res
+
 
     def cancel(self, input: inputs.CancelInputModel) -> types.Assignation:
         assignation = models.Assignation.objects.get(id=input.assignation)
@@ -95,7 +171,7 @@ class RedisControllBackend(ControllBackend):
             )
 
             # TODO: Cache the reservation in the redis cache
-            provision = choice(reservation.provisions)
+            provision = choice(reservation.provisions.all())
 
         elif input.template:
 

@@ -20,58 +20,7 @@ from facade.connection import redis_pool
 
 
 def reserve(info: Info, input: inputs.ReserveInput) -> types.Reservation:
-    if input.node is None and input.template is None:
-        raise ValueError("Either node or template must be provided")
-
-    node = models.Node.objects.get(hash=input.node) if input.node else None
-    template = (
-        models.Template.objects.get(id=input.template) if input.template else None
-    )
-
-    reference = input.reference or hash_input(
-        input.binds or rimodels.BindsInputModel(templates=[])
-    )
-
-    registry, _ = models.Registry.objects.get_or_create(
-        app=info.context.request.app, user=info.context.request.user
-    )
-
-    waiter, _ = models.Waiter.objects.get_or_create(
-        registry=registry, instance_id=input.instance_id, defaults=dict(name="default")
-    )
-
-    res, created = models.Reservation.objects.update_or_create(
-        reference=reference,
-        node=node or template.node,
-        template=template,
-        strategy=(
-            enums.ReservationStrategy.DIRECT
-            if template
-            else enums.ReservationStrategy.ROUND_ROBIN
-        ),
-        waiter=waiter,
-        defaults=dict(
-            title=input.title,
-            binds=input.binds.dict() if input.binds else None,
-        ),
-    )
-
-    schedule_reservation(res)
-
-    if created:
-        models.ReservationEvent.objects.create(
-            reservation=res,
-            kind=enums.ReservationEventKind.PENDING,
-            message="Created",
-        )
-    else:
-        models.ReservationEvent.objects.create(
-            reservation=res,
-            kind=enums.ReservationEventKind.RESCHEDULE,
-            message="Recreated",
-        )
-
-    return res
+    return controll_backend.reserve(info, input)
 
 
 @strawberry.input
@@ -79,12 +28,12 @@ class UnreserveInput:
     reservation: strawberry.ID
 
 
-def unreserve(info: Info, input: UnreserveInput) -> types.Reservation:
+def unreserve(info: Info, input: UnreserveInput) -> str:
 
     reservation = models.Reservation.objects.get(id=input.reservation)
     reservation.delete()
 
-    return models.Reservation.objects.get(id=input.reservation)
+    return input.reservation
 
 
 def assign(info: Info, input: inputs.AssignInput) -> types.Assignation:
