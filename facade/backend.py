@@ -178,7 +178,7 @@ class RedisControllBackend(ControllBackend):
             template = models.Template.objects.get(id=input.template)
 
              # TODO: Cache the reservation in the redis cache
-            provision = template.provision
+            provision = template.provisions.filter(status=enums.ProvisionStatus.ACTIVE).first()
 
         elif input.node:
 

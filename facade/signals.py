@@ -67,7 +67,8 @@ def ass_event_post_save(sender, instance: models.AssignationEvent = None, create
 def res_post_save(sender, instance: models.Reservation = None, created=None, **kwargs):
 
     if created:
-        reservation_broadcast(instance.id, [f"res_waiter_{instance.waiter.id}"])
+        pass
+        #reservation_broadcast(instance.id, [f"res_waiter_{instance.waiter.id}"])
     
 @receiver(post_save, sender=models.ReservationEvent)
 def res_event_post_save(sender, instance: models.ReservationEvent = None, created=None, **kwargs):

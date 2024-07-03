@@ -10,5 +10,5 @@ def template_at(
     agent: strawberry.ID,
     extension: str,
     interface: str,
-) -> list[types.Template]:
+) -> types.Template:
     return models.Template.objects.get(agent_id=agent, extension=extension, interface=interface)

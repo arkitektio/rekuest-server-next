@@ -265,6 +265,7 @@ class Assignation:
     node: "Node"
     created_at: datetime.datetime
     updated_at: datetime.datetime
+    provision: Optional["Provision"]
 
     @strawberry_django.field()
     def events(self) -> list["AssignationEvent"]:
