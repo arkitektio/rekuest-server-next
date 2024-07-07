@@ -159,6 +159,7 @@ class Agent:
     last_seen: datetime.datetime | None
     connected: bool
     extensions: list[str]
+    name: str 
 
     @strawberry_django.field()
     def active(self) -> bool:
