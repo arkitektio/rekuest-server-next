@@ -8,19 +8,27 @@ from facade import enums, inputs, models, scalars, types
 from facade.protocol import infer_protocols
 from facade.unique import infer_node_scope
 from kante.types import Info
-from rekuest_core.inputs.models import TemplateInputModel
+from rekuest_core.inputs.models import DefinitionInputModel, TemplateInputModel
 
 logger = logging.getLogger(__name__)
+
+def hash_definition(definition: DefinitionInputModel) -> str:
+    hashable_definition = {
+        key: value
+        for key, value in dict(strawberry.asdict(definition)).items()
+        if key in ["name", "description", "args", "returns"]
+    }
+    return hashlib.sha256(
+        json.dumps(hashable_definition, sort_keys=True).encode()
+    ).hexdigest()
+
 
 
 def _create_template(input: TemplateInputModel, agent: models.Agent, extension: str) -> models.Template:
 
     definition= input.definition
 
-    hash = hashlib.sha256(
-        json.dumps(strawberry.asdict(definition), sort_keys=True).encode()
-    ).hexdigest()
-    print(hash)
+    hash = hash_definition(definition)
 
     try:
         node = models.Node.objects.get(hash=hash)
@@ -75,6 +83,8 @@ def _create_template(input: TemplateInputModel, agent: models.Agent, extension: 
                     depending_node = models.Node.objects.get(hash=i.hash)
                 except models.Node.DoesNotExist:
                     depending_node = None
+
+                print(i)
 
                 dep, _ = models.Dependency.objects.update_or_create(
                     template=template,

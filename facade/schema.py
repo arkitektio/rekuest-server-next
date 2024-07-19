@@ -36,6 +36,10 @@ class Query:
     assignations = strawberry_django.field(resolver=queries.assignations)
     event = strawberry_django.field(resolver=queries.event)
     template_at = strawberry_django.field(resolver=queries.template_at)
+    my_template_at = strawberry_django.field(resolver=queries.my_template_at)
+
+
+
     @strawberry_django.field()
     def hardware_record(self, info: Info, id: strawberry.ID) -> types.HardwareRecord:
         return models.HardwareRecord.objects.get(id=id)

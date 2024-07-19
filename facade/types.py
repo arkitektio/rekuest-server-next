@@ -24,7 +24,7 @@ from rekuest_core.objects import models as rmodels
 from rekuest_core.objects import types as rtypes
 from strawberry import LazyType
 from strawberry.experimental import pydantic
-
+from kante.types import Info
 
 @strawberry_django.type(
     App, filters=filters.AppFilter, pagination=True, order=filters.AppOrder
@@ -80,6 +80,7 @@ class Node:
     protocols: list["Protocol"]
     defined_at: datetime.datetime
     reservations: list[LazyType["Reservation", __name__]] | None
+    test_cases: list[LazyType["TestCase", __name__]] | None
 
     @strawberry_django.field()
     def dependency_graph(self) -> DependencyGraph:
@@ -110,8 +111,22 @@ class Dependency:
     reference: str | None
     optional: bool = False
 
+    @strawberry_django.field()
     def binds(self) -> rtypes.Binds | None:
         return rmodels.BindsModel(**self.binds) if self.binds else None
+    
+    @strawberry_django.field()
+    def resolvable(self, info: Info) -> bool:
+
+        provisions = models.Provision.objects.filter(
+            template__node__hash=self.initial_hash,
+            provided=True,
+        )
+
+        provisions
+
+
+        return provisions.exists()
 
 
 @strawberry_django.type(
@@ -131,6 +146,9 @@ class Template:
     @strawberry_django.field()
     def dependency_graph(self) -> DependencyGraph:
         return build_template_graph(self)
+    
+
+
 
 
 @strawberry_django.type(
@@ -302,7 +320,7 @@ class AssignationEvent:
 )
 class TestCase:
     id: strawberry.ID
-    key: str
+    tester: "Node"
     node: "Node"
     is_benchmark: bool
     description: str
@@ -316,6 +334,7 @@ class TestCase:
 class TestResult:
     id: strawberry.ID
     template: "Template"
+    tester: "Template"
     case: "TestCase"
     passed: bool
     created_at: datetime.datetime

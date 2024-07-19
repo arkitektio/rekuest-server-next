@@ -306,7 +306,7 @@ class Dependency(models.Model):
         blank=True,
     )
     reference = models.CharField(
-        max_length=1000,
+        max_length=2000,
         help_text="A reference for this dependency",
         null=True,
         blank=True,
@@ -316,7 +316,6 @@ class Dependency(models.Model):
         help_text="Is this dependency optional (e.g. can we still use the template if this dependency is not met)",
     )
     binds = models.JSONField(
-        max_length=2000,
         default=dict,
         help_text="The binds for this dependency (Determines which templates can be used for this dependency)",
         null=True,
@@ -764,23 +763,39 @@ class TestCase(models.Model):
     node = models.ForeignKey(
         Node,
         on_delete=models.CASCADE,
-        related_name="testcases",
+        related_name="test_cases",
         help_text="The node this test belongs to",
     )
-    key = models.CharField(max_length=2000, null=True, blank=True)
+    tester = models.ForeignKey(
+        Node,
+        on_delete=models.CASCADE,
+        related_name="testing_cases",
+        help_text="The node that is testing this test",
+    )
     name = models.CharField(max_length=2000, null=True, blank=True)
     description = models.CharField(max_length=2000, null=True, blank=True)
     is_benchmark = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["node", "tester"],
+                name="No multiple Tests for same Node and Tester allowed",
+            )
+        ]
+
 
 class TestResult(models.Model):
-    assignation = models.ForeignKey(
-        Assignation, on_delete=models.CASCADE, related_name="test_result"
-    )
     case = models.ForeignKey(TestCase, on_delete=models.CASCADE, related_name="results")
     template = models.ForeignKey(
         Template, on_delete=models.CASCADE, related_name="testresults"
+    )
+    tester = models.ForeignKey(
+        Template,
+        on_delete=models.CASCADE,
+        related_name="testing_results",
+        help_text="The template that is testing this test",
     )
     passed = models.BooleanField(default=False)
     result = models.JSONField(default=dict, null=True, blank=True)

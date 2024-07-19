@@ -5,6 +5,7 @@ from facade.channels import node_created_broadcast, agent_updated_broadcast, ass
 import logging
 from guardian.shortcuts import assign_perm
 
+
 logger = logging.getLogger(__name__)
 logger.info("Loading signals")
 
@@ -22,25 +23,26 @@ def reservation_signal(sender, instance=None, **kwargs):
     logger.info("Reservation received!")
 
 @receiver(post_save, sender=models.Provision)
-def provision_signal(sender, instance=None, **kwargs):
-    logger.info("Reservation received!")
+def provision_signal(sender, instance=None,  created=None, **kwargs):
+    from facade.backend import controll_backend
+    logger.info("Provision received!")
+    if created:
+        controll_backend.provide(instance)
+        assign_perm("can_link_to", instance.agent.registry.user, instance)
+
 
 
 @receiver(post_save, sender=models.Template)
 def template_post_save(sender, instance: models.Template =None, created=None, **kwargs):
     assign_perm("providable", instance.agent.registry.user, instance)
 
-@receiver(post_save, sender=models.Provision)
-def prov_post_save(sender, instance: models.Provision = None, created=None, **kwargs):
-
-
-    if created:
-        assign_perm("can_link_to", instance.agent.registry.user, instance)
 
 
 @receiver(pre_delete, sender=models.Provision)
 def prov_pre_delete(sender, instance: models.Provision = None, **kwargs):
+    from facade.backend import controll_backend
     pass
+    controll_backend.unprovide(instance)
 
 
     

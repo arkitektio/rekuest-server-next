@@ -289,6 +289,7 @@ class NodeFilter(SearchFilter):
 class TemplateFilter:
     interface: Optional[FilterLookup[str]]
     ids: list[strawberry.ID] | None
+    node_hash: rscalars.NodeHash | None
     node: NodeFilter | None
     extension: str | None
 
@@ -301,4 +302,9 @@ class TemplateFilter:
         if self.extension is None:
             return queryset
         return queryset.filter(extension=self.extension)
+    
+    def filter_node_hash(self, queryset, info):
+        if self.node_hash is None:
+            return queryset
+        return queryset.filter(node__hash=self.node_hash)
     
