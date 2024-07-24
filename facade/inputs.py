@@ -12,7 +12,6 @@ from strawberry import LazyType
 from strawberry.experimental import pydantic
 
 
-
 class ReserveInputModel(BaseModel):
     instance_id: str
     node: str | None = None
@@ -53,6 +52,7 @@ class AssignInputModel(BaseModel):
     parent: str | None = None
     cached: bool = False
     log: bool = False
+    ephemeral: bool = False
     is_hook: bool = False
 
 
@@ -83,19 +83,17 @@ class HookInput:
 @pydantic.input(AssignInputModel)
 class AssignInput:
     instance_id: scalars.InstanceID
-    node: strawberry.ID  | None = None
-    template: strawberry.ID  | None = None
+    node: strawberry.ID | None = None
+    template: strawberry.ID | None = None
     hooks: list[HookInput] | None = strawberry.field(default_factory=list)
     reservation: strawberry.ID | None = None
     args: scalars.Args
     reference: str | None = None
     parent: strawberry.ID | None = None
     cached: bool = False
+    ephemeral: bool = False
     log: bool = False
     is_hook: bool = False
-
-
-
 
 
 @strawberry.input
@@ -128,12 +126,12 @@ class CreateForeignTemplateInputModel(BaseModel):
     extension: str
 
 
-
 @pydantic.input(CreateTemplateInputModel)
 class CreateTemplateInput:
     template: ritypes.TemplateInput
     instance_id: scalars.InstanceID
     extension: str
+
 
 @pydantic.input(CreateForeignTemplateInputModel)
 class CreateForeignTemplateInput:
@@ -145,6 +143,7 @@ class CreateForeignTemplateInput:
 class DeleteTemplateInputModel(BaseModel):
     template: str
 
+
 @pydantic.input(DeleteTemplateInputModel)
 class DeleteTemplateInput:
     template: strawberry.ID
@@ -155,7 +154,6 @@ class SetExtensionTemplatesInputModel(BaseModel):
     instance_id: str
     extension: str
     run_cleanup: bool = False
-
 
 
 @pydantic.input(SetExtensionTemplatesInputModel)

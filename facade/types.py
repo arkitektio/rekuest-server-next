@@ -26,6 +26,7 @@ from strawberry import LazyType
 from strawberry.experimental import pydantic
 from kante.types import Info
 
+
 @strawberry_django.type(
     App, filters=filters.AppFilter, pagination=True, order=filters.AppOrder
 )
@@ -114,17 +115,15 @@ class Dependency:
     @strawberry_django.field()
     def binds(self) -> rtypes.Binds | None:
         return rmodels.BindsModel(**self.binds) if self.binds else None
-    
+
     @strawberry_django.field()
     def resolvable(self, info: Info) -> bool:
-
         provisions = models.Provision.objects.filter(
             template__node__hash=self.initial_hash,
             provided=True,
         )
 
         provisions
-
 
         return provisions.exists()
 
@@ -146,9 +145,6 @@ class Template:
     @strawberry_django.field()
     def dependency_graph(self) -> DependencyGraph:
         return build_template_graph(self)
-    
-
-
 
 
 @strawberry_django.type(
@@ -177,7 +173,11 @@ class Agent:
     last_seen: datetime.datetime | None
     connected: bool
     extensions: list[str]
-    name: str 
+    name: str
+
+    @strawberry_django.field()
+    def template(self, interface: str) -> Template | None:
+        return self.templates.filter(interface=interface).first()
 
     @strawberry_django.field()
     def active(self) -> bool:

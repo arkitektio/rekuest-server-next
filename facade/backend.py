@@ -8,7 +8,6 @@ from kante.types import Info
 
 
 class ControllBackend(Protocol):
-
     def activate_provision(self, provision: models.Provision) -> None: ...
 
     def deactivate_provision(self, provision: models.Provision) -> None: ...
@@ -17,21 +16,18 @@ class ControllBackend(Protocol):
 # Basic finder
 
 
-def find_best_fitting_provision(
-    node_id: str, user: models.User
-) -> models.Provision:
-    
-    provision = models.Provision.objects.filter(template__node_id=node_id, status=enums.ProvisionStatus.ACTIVE).first()
-
+def find_best_fitting_provision(node_id: str, user: models.User) -> models.Provision:
+    provision = models.Provision.objects.filter(
+        template__node_id=node_id, status=enums.ProvisionStatus.ACTIVE
+    ).first()
 
     return provision
 
-def find_best_fitting_provision(
-    node_id: str, user: models.User
-) -> models.Provision:
-    
-    provision = models.Provision.objects.filter(template__node_id=node_id, status=enums.ProvisionStatus.ACTIVE).first()
 
+def find_best_fitting_provision(node_id: str, user: models.User) -> models.Provision:
+    provision = models.Provision.objects.filter(
+        template__node_id=node_id, status=enums.ProvisionStatus.ACTIVE
+    ).first()
 
     return provision
 
@@ -49,7 +45,6 @@ def get_waiter_for_context(info: Info, instance_id: str) -> None:
 
 
 class RedisControllBackend(ControllBackend):
-
     def create_message_id(self) -> str:
         return str(uuid.uuid4())
 
@@ -70,22 +65,17 @@ class RedisControllBackend(ControllBackend):
             },
         )
         return assignation
-    
 
     def reserve(self, info: Info, input: inputs.ReserveInputModel) -> types.Reservation:
-
         if input.node is None and input.template is None:
             raise ValueError("Either node or template must be provided")
-        
-
-
 
         node = models.Node.objects.get(id=input.node) if input.node else None
-        template = models.Template.objects.get(id=input.template) if input.template else None
-
+        template = (
+            models.Template.objects.get(id=input.template) if input.template else None
+        )
 
         node_id = node.id if node else template.node.id
-
 
         provision = find_best_fitting_provision(node_id, info.context.request.user)
         if not provision:
@@ -98,10 +88,10 @@ class RedisControllBackend(ControllBackend):
         )
 
         waiter, _ = models.Waiter.objects.get_or_create(
-            registry=registry, instance_id=input.instance_id, defaults=dict(name="default")
+            registry=registry,
+            instance_id=input.instance_id,
+            defaults=dict(name="default"),
         )
-
-
 
         res, created = models.Reservation.objects.update_or_create(
             reference=reference,
@@ -124,15 +114,9 @@ class RedisControllBackend(ControllBackend):
 
         res.provisions.set([provision])
 
-
-
-
         # TODO: Cache the reservation in the redis cache and make it available for the assignation
 
-
-
         return res
-
 
     def cancel(self, input: inputs.CancelInputModel) -> types.Assignation:
         assignation = models.Assignation.objects.get(id=input.assignation)
@@ -151,20 +135,15 @@ class RedisControllBackend(ControllBackend):
         return assignation
 
     def assign(self, info: Info, input: inputs.AssignInputModel) -> types.Assignation:
-
         # TODO: Check if function is cached and was
 
         provision = None
-        reservation= None
+        reservation = None
         template = None
 
         waiter = get_waiter_for_context(info, input.instance_id)
 
-
-
-
         if input.reservation:
-
             # TODO: Retrieve the reservation in the redis cache wth the provision keys set
             reservation = models.Reservation.objects.prefetch_related("provisions").get(
                 id=input.reservation
@@ -174,25 +153,27 @@ class RedisControllBackend(ControllBackend):
             provision = choice(reservation.provisions.all())
 
         elif input.template:
-
             template = models.Template.objects.get(id=input.template)
 
-             # TODO: Cache the reservation in the redis cache
-            provision = template.provisions.filter(status=enums.ProvisionStatus.ACTIVE).first()
+            # TODO: Cache the reservation in the redis cache
+            provision = template.provisions.filter(
+                status=enums.ProvisionStatus.ACTIVE
+            ).first()
 
         elif input.node:
-
-            provision = find_best_fitting_provision(input.node, info.context.request.user)
+            provision = find_best_fitting_provision(
+                input.node, info.context.request.user
+            )
 
         else:
-            raise ValueError("You need to provide either, node, template, or reservation to created an assignment")
+            raise ValueError(
+                "You need to provide either, node, template, or reservation to created an assignment"
+            )
 
         if not provision:
             raise ValueError("No active provision found")
 
         reference = input.reference or self.create_message_id()
-
-        
 
         assignation = models.Assignation.objects.create(
             reservation=reservation,
@@ -204,7 +185,7 @@ class RedisControllBackend(ControllBackend):
             status="BOUND",
             hooks=input.hooks or [],
             waiter=waiter,
-            template=template
+            template=template,
         )
 
         AgentConsumer.broadcast(
