@@ -802,4 +802,19 @@ class TestResult(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+
+class Structure(models.Model):
+    identifier = models.CharField(max_length=2000)
+    object = models.CharField(max_length=6000)
+
+
+class Dashboard(models.Model):
+    structure = models.ForeignKey(Structure, on_delete=models.CASCADE)
+    ui_tree = models.JSONField(default=dict)
+    reservations = models.ManyToManyField(Reservation, related_name="dashboard_uses")
+
+
+
+
+
 import facade.signals

@@ -8,6 +8,8 @@ from rekuest_core import scalars as rscalars
 
 from rekuest_core.inputs import models as rimodels
 from rekuest_core.inputs import types as ritypes
+from rekuest_ui_core.inputs import models as uimodels
+from rekuest_ui_core.inputs import types as uitypes
 from strawberry import LazyType
 from strawberry.experimental import pydantic
 
@@ -162,3 +164,12 @@ class SetExtensionTemplatesInput:
     extension: str
     run_cleanup: bool = False
     instance_id: scalars.InstanceID
+
+
+class CreateDashboardInputModel(BaseModel):
+    tree: uimodels.UITreeInputModel
+
+
+@pydantic.input(CreateDashboardInputModel)
+class CreateDashboardInput:
+    tree: uitypes.UITreeInput

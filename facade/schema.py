@@ -8,6 +8,7 @@ from kante.directives import relation, replace, upper
 from kante.types import Info
 from koherent.strawberry.extension import KoherentExtension
 from rekuest_core.constants import interface_types
+from rekuest_ui_core.constants import interface_types as uiinterface_types
 from strawberry import ID
 from strawberry.field_extensions import InputMutationExtension
 from strawberry.permission import BasePermission
@@ -131,6 +132,10 @@ class Mutation:
         resolver=mutations.create_hardware_record
     )
 
+    create_dashboard: types.Dashboard = strawberry_django.mutation(
+        resolver=mutations.create_dashboard
+    )
+
 
 @strawberry.type
 class Subscription:
@@ -156,7 +161,7 @@ schema = strawberry.Schema(
         DjangoOptimizerExtension,
         KoherentExtension,
     ],
-    types=interface_types,
+    types=interface_types + uiinterface_types,
     # We really need to register
     # all the types here, otherwise the schema will not be able to resolve them
     # and will throw a cryptic error

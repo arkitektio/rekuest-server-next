@@ -25,6 +25,8 @@ from rekuest_core.objects import types as rtypes
 from strawberry import LazyType
 from strawberry.experimental import pydantic
 from kante.types import Info
+from rekuest_ui_core.objects import models as uimodels
+from rekuest_ui_core.objects import types as uitypes
 
 
 @strawberry_django.type(
@@ -339,3 +341,20 @@ class TestResult:
     passed: bool
     created_at: datetime.datetime
     updated_at: datetime.datetime
+
+@strawberry_django.type(
+    models.Structure
+)
+class Structure:
+    identifier: strawberry.ID
+    object: strawberry.ID
+
+
+@strawberry_django.type(
+    models.Dashboard
+)
+class Dashboard:
+    id: strawberry.ID
+    structure: Structure | None
+    name: str | None 
+    ui_tree: uitypes.UITree
