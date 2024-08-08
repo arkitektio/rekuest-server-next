@@ -38,7 +38,7 @@ class Query:
     event = strawberry_django.field(resolver=queries.event)
     template_at = strawberry_django.field(resolver=queries.template_at)
     my_template_at = strawberry_django.field(resolver=queries.my_template_at)
-
+    dashboards: list[types.Dashboard] = strawberry_django.field()
 
 
     @strawberry_django.field()
@@ -49,6 +49,12 @@ class Query:
     def agent(self, info: Info, id: strawberry.ID) -> types.Agent:
         print("hallo")
         return models.Agent.objects.get(id=id)
+    
+    @strawberry_django.field()
+    def dashboard(self, info: Info, id: strawberry.ID) -> types.Dashboard:
+        print("hallo")
+        return models.Dashboard.objects.get(id=id)
+
 
     @strawberry_django.field()
     def dependency(self, info: Info, id: strawberry.ID) -> types.Dependency:
