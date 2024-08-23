@@ -18,22 +18,41 @@ class UIChild:
 
 @pydantic.type(models.UIGridItemModel)
 class UIGridItem:
-    span: int
+    x: int
+    y: int
+    w: int
+    h: int
+    min_w: int
+    max_w: int
     child: UIChild
+
+
+
+@pydantic.type(models.UIBreakpointModel)
+class UIBreakpoint:
+    lg: int = 12
+    md: int = 8
+    sm: int = 4
+    xs: int = 2
+    xxs: int = 24
 
 
 @pydantic.type(models.UIGridModel)
 class UIGrid(UIChild):
-    rows: int
+    row_height:  int
     columns: int
     children: list[UIGridItem]
-
 
 
 @pydantic.type(models.UISplitModel)
 class UISplit(UIChild):
     left: UIChild
     right: UIChild
+
+
+@pydantic.type(models.UIStateModel)
+class UIState(UIChild):
+    state: str
 
 @pydantic.type(models.UITreeModel)
 class UITree:

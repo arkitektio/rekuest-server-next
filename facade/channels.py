@@ -12,6 +12,8 @@ reservation_broadcast, reservation_listen = build_channel("reservation_broadcast
 
 assignation_event_broadcast, assignation_event_listen = build_channel("assignation_event_broadcast")
 
+state_update_event_broadcast, state_update_event_listen = build_channel("state_update_event_broadcast")
+
 provision_event_broadcast, provision_event_listen = build_channel("provision_event_broadcast")
 
 reservation_event_broadcast, reservation_event_listen = build_channel("reservation_event_broadcast")

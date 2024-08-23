@@ -28,7 +28,8 @@ class AgentInput:
 
 async def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
 
-
+    print("ensure_agent", info.context.request.user)
+    print("ensure_agent app_id", info.context.request.app.id)
 
     # TODO: Hasch this
     registry, _ = await models.Registry.objects.aupdate_or_create(

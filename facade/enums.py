@@ -9,6 +9,11 @@ class NodeKindChoices(TextChoices):
     GENERATOR = "GENERATOR", "Generator"
 
 
+class PanelKindChoices(TextChoices):
+    STATE = "STATE", "State"
+    ASSIGN = "ASSIGN", "Assign"
+    TEMPLATE = "TEMPLATE", "Template"
+
 class LogLevelChoices(TextChoices):
     DEBUG = "DEBUG", "DEBUG Level"
     INFO = "INFO", "INFO Level"
@@ -391,3 +396,18 @@ class DemandKind(str, Enum):
 class HookKind(str, Enum):
     CLEANUP = "CLEANUP"
     INIT = "INIT"
+
+@strawberry.enum
+class JSONPatchOperation(str, Enum):
+    add = "add"
+    remove = "remove"
+    replace = "replace"
+    move = "move"
+    copy = "copy"
+    test = "test"
+
+
+@strawberry.enum
+class PanelKind(str, Enum):
+    STATE = "STATE"
+    ASSIGN = "ASSIGN"

@@ -6,4 +6,5 @@ class UIChildKind(str, Enum):
     GRID = "GRID"
     SPLIT = "SPLIT"
     RESERVATION = "RESERVATION"
+    STATE = "STATE"
 

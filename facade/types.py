@@ -176,6 +176,7 @@ class Agent:
     connected: bool
     extensions: list[str]
     name: str
+    state_schemas: list["StateSchema"]
 
     @strawberry_django.field()
     def template(self, interface: str) -> Template | None:
@@ -190,6 +191,17 @@ class Agent:
     @strawberry_django.field()
     def latest_hardware_record(self) -> HardwareRecord | None:
         return self.hardware_records.order_by("-created_at").first()
+    
+    @strawberry_django.field()
+    def latest_states(self) -> list["State"]:
+        states = []
+        for i in self.state_schemas.all():
+            first = i.states.first()
+            if first:
+                states.append(first)
+
+
+        return states
 
 
 @strawberry_django.type(models.Waiter, filters=filters.WaiterFilter, pagination=True)
@@ -247,6 +259,7 @@ class Reservation:
     strategy: enums.ReservationStrategy
     viable: bool
     happy: bool
+    template: Optional["Template"]
 
     @strawberry_django.field()
     def dependency_graph(self) -> DependencyGraph:
@@ -355,6 +368,71 @@ class Structure:
 )
 class Dashboard:
     id: strawberry.ID
-    structure: Structure | None
     name: str | None 
-    ui_tree: uitypes.UITree
+    panels: list["Panel"] | None
+
+    @strawberry_django.field()
+    def ui_tree(self) -> uitypes.UITree | None:
+
+
+        model = uimodels.UITreeModel(**self.ui_tree) if self.ui_tree else None
+        print(model)
+        return model
+
+@strawberry_django.type(
+    models.Panel
+)
+class Panel:
+    id: strawberry.ID
+    kind: enums.PanelKind
+    reservation: Reservation | None 
+    state: Optional["State"]
+    accessors: list[str] | None
+
+
+
+
+@strawberry_django.type(
+    models.StateSchema
+)
+class StateSchema:
+    id: strawberry.ID
+    agent: Agent
+    name: str
+   
+    @strawberry_django.field()
+    def ports(self) -> list[rtypes.Port]:
+        return [rmodels.PortModel(**i) for i in self.ports]
+    
+
+@strawberry_django.type(
+    models.State
+)
+class State:
+    id: strawberry.ID
+    state_schema: StateSchema
+    value: scalars.Args
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+    historical_states: list["HistoricalState"]
+
+@strawberry_django.type(
+    models.HistoricalState
+)
+class HistoricalState:
+    id: strawberry.ID
+    state: State
+    value: scalars.Args
+    archived_at: datetime.datetime
+
+
+@strawberry.type
+class JSONPatch:
+    op: enums.JSONPatchOperation
+    path: str
+    value: scalars.Args
+
+@strawberry.type
+class StateUpdateEvent:
+    state_id: str
+    patches: list[JSONPatch]

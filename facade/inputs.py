@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Dict, Literal, Optional
 
 import strawberry
 from facade import enums, scalars
@@ -167,9 +167,95 @@ class SetExtensionTemplatesInput:
 
 
 class CreateDashboardInputModel(BaseModel):
-    tree: uimodels.UITreeInputModel
+    tree: uimodels.UITreeInputModel | None = None
+
 
 
 @pydantic.input(CreateDashboardInputModel)
 class CreateDashboardInput:
-    tree: uitypes.UITreeInput
+    name: str | None = None
+    tree: uitypes.UITreeInput | None = None
+    panels: list[strawberry.ID] | None = None
+
+
+class CreatePanelInputModel(BaseModel):
+    kind: enums.PanelKind
+    state: str | None = None
+    state_key: str | None = None
+    reservation: str | None = None
+    instance_id: str | None = None
+    state_accessors: list[str] | None = None
+    interface: str | None = None
+    args: dict[str, Any] | None = None
+
+
+@pydantic.input(CreatePanelInputModel)
+class CreatePanelInput:
+    kind: enums.PanelKind
+    state: strawberry.ID | None = None
+    state_key: str | None = None
+    state_accessors: list[str] | None = None
+    reservation: strawberry.ID | None = None
+    instance_id: scalars.InstanceID | None = None
+    interface: str | None = None
+    args: scalars.Args | None = None
+
+
+
+class StateSchemaInputModel(BaseModel):
+    ports: list[rimodels.PortInputModel]
+    name: str
+
+
+@pydantic.input(StateSchemaInputModel)
+class StateSchemaInput:
+    ports: list[ritypes.PortInput]
+    name: str
+
+class CreateStateSchemaInputModel(BaseModel):
+    state_schema: StateSchemaInputModel
+    instance_id: str
+
+
+
+@pydantic.input(CreateStateSchemaInputModel)
+class CreateStateSchemaInput:
+    state_schema: StateSchemaInput
+    instance_id: scalars.InstanceID
+
+
+
+class SetStateInputModel(BaseModel):
+    state_schema: strawberry.ID
+    value: Dict[str, Any]
+
+
+@pydantic.input(SetStateInputModel)
+class SetStateInput:
+    state_schema: strawberry.ID
+    value: scalars.Args
+
+
+class JSONPatchInputModel(BaseModel):
+    op: Literal['add', 'remove', 'replace', 'move', 'copy', 'test']
+    path: str
+    value: Any | None = None
+
+
+class UpdateStateInputModel(BaseModel):
+    state_schema: strawberry.ID
+    patches: list[JSONPatchInputModel]
+
+
+@pydantic.input(UpdateStateInputModel)
+class UpdateStateInput:
+    state_schema: strawberry.ID
+    patches: list[scalars.Args]
+
+
+class ArchiveStateInputModel(BaseModel):
+    state_schema: strawberry.ID
+
+@pydantic.input(ArchiveStateInputModel)
+class ArchiveStateInput:
+    state_schema: strawberry.ID

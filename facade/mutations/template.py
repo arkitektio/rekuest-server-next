@@ -159,7 +159,8 @@ def _create_template(input: TemplateInputModel, agent: models.Agent, extension: 
 
 
 def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Template:
-    print(info.context.request.headers)
+    print(info.context.request.app)
+    print(info.context.request.user)
 
     registry, _ = models.Registry.objects.update_or_create(
         app=info.context.request.app,

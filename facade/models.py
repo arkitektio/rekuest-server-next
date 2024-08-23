@@ -517,8 +517,10 @@ class Reservation(models.Model):
     waiter = models.ForeignKey(
         Waiter,
         on_delete=models.CASCADE,
+        null = True,
+        blank = True,
         max_length=1000,
-        help_text="This Reservations app",
+        help_text="Which Waiter created this Reservation (if any?)",
         related_name="reservations",
     )
 
@@ -809,9 +811,52 @@ class Structure(models.Model):
 
 
 class Dashboard(models.Model):
-    structure = models.ForeignKey(Structure, on_delete=models.CASCADE)
-    ui_tree = models.JSONField(default=dict)
-    reservations = models.ManyToManyField(Reservation, related_name="dashboard_uses")
+    name = models.CharField(max_length=2000)
+    structure = models.ForeignKey(Structure, on_delete=models.CASCADE, null=True, blank=True)
+    ui_tree = models.JSONField(null=True, blank=True)
+    panels = models.ManyToManyField("Panel", related_name="dashboard")
+
+
+class Panel(models.Model):
+    kind = models.CharField(max_length=2000)
+    state = models.ForeignKey("State", on_delete=models.CASCADE, related_name="panels", null=True, blank=True)
+    reservation = models.ForeignKey(
+        Reservation, on_delete=models.CASCADE, related_name="panels", null=True, blank=True
+    )
+    template = models.ForeignKey(
+        Template, on_delete=models.CASCADE, related_name="panels", null=True, blank=True
+    )
+    accessors = models.JSONField( null=True, blank=True)
+
+class StateSchema(models.Model):
+    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="state_schemas")
+    name = models.CharField(max_length=2000)
+    ports = models.JSONField(default=dict)
+    description = models.CharField(max_length=2000)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["agent", "name"],
+                name="No multiple Schemas for same Agent and Name allowed",
+            )
+        ]
+
+
+class State(models.Model):
+    state_schema = models.ForeignKey(StateSchema, on_delete=models.CASCADE, related_name="states")
+    value = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class HistoricalState(models.Model):
+    state = models.ForeignKey(State, on_delete=models.CASCADE, related_name="historical_states")
+    value = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    archived_at = models.DateTimeField(auto_now_add=True)
+
 
 
 

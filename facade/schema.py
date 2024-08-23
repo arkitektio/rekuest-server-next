@@ -39,6 +39,23 @@ class Query:
     template_at = strawberry_django.field(resolver=queries.template_at)
     my_template_at = strawberry_django.field(resolver=queries.my_template_at)
     dashboards: list[types.Dashboard] = strawberry_django.field()
+    states: list[types.State] = strawberry_django.field()
+    panels: list[types.Panel] = strawberry_django.field()
+    state_schemas: list[types.StateSchema] = strawberry_django.field()
+
+
+    @strawberry_django.field()
+    def state(self, info: Info, id: strawberry.ID) -> types.State:
+        return models.State.objects.get(id=id)
+    
+
+    @strawberry_django.field()
+    def panel(self, info: Info, id: strawberry.ID) -> types.Panel:
+        return models.Panel.objects.get(id=id)
+    
+    @strawberry_django.field()
+    def state_schema(self, info: Info, id: strawberry.ID) -> types.StateSchema:
+        return models.StateSchema.objects.get(id=id)
 
 
     @strawberry_django.field()
@@ -142,6 +159,28 @@ class Mutation:
         resolver=mutations.create_dashboard
     )
 
+    create_state_schema: types.StateSchema = strawberry_django.mutation(
+        resolver=mutations.create_state_schema
+    )
+
+    create_panel: types.Panel = strawberry_django.mutation(
+        resolver=mutations.create_panel
+    )
+
+
+
+    set_state: types.State = strawberry_django.mutation(
+        resolver=mutations.set_state
+    )
+
+    update_state: types.State = strawberry_django.mutation(
+        resolver=mutations.update_state
+    )
+
+    archive_state: types.StateSchema = strawberry_django.mutation(
+        resolver=mutations.archive_state
+    )
+
 
 @strawberry.type
 class Subscription:
@@ -156,6 +195,7 @@ class Subscription:
     )
     provision_events = strawberry.subscription(resolver=subscriptions.provision_events)
     template_change = strawberry.subscription(resolver=subscriptions.template_change)
+    state_update_events = strawberry.subscription(resolver=subscriptions.state_update_events)
 
 
 schema = strawberry.Schema(

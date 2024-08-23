@@ -1,0 +1,98 @@
+from kante.types import Info
+import strawberry_django
+import strawberry
+from facade import types, models, inputs, enums, scalars
+import hashlib
+import json
+import logging
+from facade.protocol import infer_protocols
+from facade.utils import hash_input
+import uuid
+
+logger = logging.getLogger(__name__)
+
+
+def create_panel(info: Info, input: inputs.CreatePanelInput)-> types.Panel:
+
+    state = None
+    accesors = None
+    reservation = None
+
+    if input.kind == enums.PanelKind.STATE:
+        if input.state:
+            state = models.State.objects.get(state_schema_id=input.state)
+            accesors = input.state_accessors
+
+        elif input.state_key:
+            registry = models.Registry.objects.get(
+                app=info.context.request.app,
+                user=info.context.request.user,
+            )
+
+            agent= models.Agent.objects.get(
+                registry=registry,
+                instance_id=input.instance_id or "default",
+            )
+
+            state_key, accesor = tuple(input.state_key.split(":"))
+            accesors = accesor.split(".")
+
+            state_schema = models.StateSchema.objects.get(name=state_key, agent=agent)
+
+
+            state = state_schema.states.first()
+        
+
+        else:
+            state = None
+            accesors = None
+
+    elif input.kind == enums.PanelKind.ASSIGN:
+
+        if input.interface:
+            print(info.context.request.app)
+            print(info.context.request.user)
+            registry = models.Registry.objects.get(
+                app=info.context.request.app,
+                user=info.context.request.user,
+            )
+            print(input.instance_id)
+
+            agent = models.Agent.objects.get(
+                registry=registry,
+                instance_id=input.instance_id or "default",
+            )
+
+            print(input.interface)
+            print(agent)
+
+            template = models.Template.objects.get(interface=input.interface, agent=agent)
+
+            reservation, created = models.Reservation.objects.update_or_create(
+                reference=uuid.uuid4(),
+                node=template.node,
+                template=template,
+                strategy=(
+                    enums.ReservationStrategy.DIRECT
+                    if template
+                    else enums.ReservationStrategy.ROUND_ROBIN
+                ),
+                waiter=None,
+                saved_args = input.args if input.args else {},
+            )
+
+    else:
+        raise Exception("Invalid kind")
+
+
+
+
+    x, _ = models.Panel.objects.update_or_create(
+        kind=input.kind,
+        state = state,
+        accessors = accesors,
+        reservation = reservation,
+    )
+
+    return x
+
