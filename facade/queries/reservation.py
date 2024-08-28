@@ -39,5 +39,4 @@ def reservations(
         registry=registry, instance_id=instance_id, defaults=dict(name="default")
     )
 
-    print("ID: ", waiter)
     return models.Reservation.objects.filter(waiter=waiter)

@@ -17,7 +17,7 @@ def underscore(s: str) -> str:
 
 
 def create_state_schema(info: Info, input: inputs.CreateStateSchemaInput)-> types.Dashboard:
-    print(info.context.request.headers)
+   
 
     registry = models.Registry.objects.get(
         app=info.context.request.app,

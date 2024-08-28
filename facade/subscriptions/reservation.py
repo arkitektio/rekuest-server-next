@@ -30,7 +30,7 @@ async def reservations(
     )
 
     async for message in reservation_listen(info, [f"res_waiter_{waiter.id}"]):
-        print("ID", message)
+        
         continue
         yield await models.Reservation.objects.aget(id=message)
 
@@ -54,7 +54,7 @@ async def reservation_events(
     )
 
     async for message in reservation_event_listen(info, [f"res_waiter_{waiter.id}"]):
-        print("ID: ", message)
+       
         continue
         yield await models.ReservationEvent.objects.aget(id=message)
 

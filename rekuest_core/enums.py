@@ -29,6 +29,7 @@ class AssignWidgetKind(str, Enum):
     SLIDER = "SLIDER"
     CUSTOM = "CUSTOM"
     STRING = "STRING"
+    STATE_CHOICE = "STATE_CHOICE"
 
 
 @strawberry.enum

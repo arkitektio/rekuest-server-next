@@ -6,7 +6,7 @@ import strawberry
 import strawberry_django
 from facade import enums, inputs, models, scalars, types
 from facade.protocol import infer_protocols
-from facade.unique import infer_node_scope
+from facade.unique import assert_non_statefullness, infer_node_scope
 from kante.types import Info
 from rekuest_core.inputs.models import DefinitionInputModel, TemplateInputModel
 
@@ -16,7 +16,7 @@ def hash_definition(definition: DefinitionInputModel) -> str:
     hashable_definition = {
         key: value
         for key, value in dict(strawberry.asdict(definition)).items()
-        if key in ["name", "description", "args", "returns"]
+        if key in ["name", "description", "args", "returns", "stateful"]
     }
     return hashlib.sha256(
         json.dumps(hashable_definition, sort_keys=True).encode()
@@ -34,11 +34,18 @@ def _create_template(input: TemplateInputModel, agent: models.Agent, extension: 
         node = models.Node.objects.get(hash=hash)
     except models.Node.DoesNotExist:
         scope = infer_node_scope(definition)
+
+        if definition.stateful is False:
+            assert_non_statefullness(definition)
+
+
+
         node = models.Node.objects.create(
             hash=hash,
             description=definition.description or "No description",
             args=[strawberry.asdict(i) for i in definition.args],
             scope=scope,
+            stateful=definition.stateful,
             kind=definition.kind,
             port_groups=[strawberry.asdict(i) for i in definition.port_groups],
             returns=[strawberry.asdict(i) for i in definition.returns],
@@ -159,8 +166,7 @@ def _create_template(input: TemplateInputModel, agent: models.Agent, extension: 
 
 
 def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Template:
-    print(info.context.request.app)
-    print(info.context.request.user)
+   
 
     registry, _ = models.Registry.objects.update_or_create(
         app=info.context.request.app,

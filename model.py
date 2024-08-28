@@ -86,4 +86,3 @@ def build_graph(template_id: int) -> Graph:
 
 
 x = build_graph(8)
-print(x.json())

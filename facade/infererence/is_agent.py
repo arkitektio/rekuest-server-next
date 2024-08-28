@@ -4,7 +4,7 @@ from rekuest_core.inputs.models import DefinitionInputModel
 
 
 def is_agent(definition: DefinitionInputModel) -> Protocol:
-    print(definition)
+    
 
     if not definition.args:
         return None

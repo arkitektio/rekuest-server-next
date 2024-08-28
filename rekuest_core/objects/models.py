@@ -15,6 +15,7 @@ class ChoiceModel(BaseModel):
 
 class AssignWidgetModel(BaseModel):
     kind: str
+    follow_value: str | None
 
 
 class SliderAssignWidgetModel(AssignWidgetModel):
@@ -40,6 +41,11 @@ class SearchAssignWidgetModel(AssignWidgetModel):
     ward: str
 
 
+class StateChoiceAssignWidgetModel(AssignWidgetModel):
+    kind: Literal["STATE_CHOICE"]
+    state_choices: str
+
+
 class StringWidgetModel(AssignWidgetModel):
     kind: Literal["STRING"]
     placeholder: str
@@ -47,7 +53,7 @@ class StringWidgetModel(AssignWidgetModel):
 
 
 AssignWidgetModelUnion = Union[
-    SliderAssignWidgetModel, ChoiceAssignWidgetModel, SearchAssignWidgetModel
+    SliderAssignWidgetModel, ChoiceAssignWidgetModel, SearchAssignWidgetModel, StateChoiceAssignWidgetModel, StringWidgetModel, CustomAssignWidgetModel
 ]
 
 

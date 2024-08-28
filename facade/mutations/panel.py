@@ -50,21 +50,15 @@ def create_panel(info: Info, input: inputs.CreatePanelInput)-> types.Panel:
     elif input.kind == enums.PanelKind.ASSIGN:
 
         if input.interface:
-            print(info.context.request.app)
-            print(info.context.request.user)
             registry = models.Registry.objects.get(
                 app=info.context.request.app,
                 user=info.context.request.user,
             )
-            print(input.instance_id)
 
             agent = models.Agent.objects.get(
                 registry=registry,
                 instance_id=input.instance_id or "default",
             )
-
-            print(input.interface)
-            print(agent)
 
             template = models.Template.objects.get(interface=input.interface, agent=agent)
 
@@ -89,9 +83,14 @@ def create_panel(info: Info, input: inputs.CreatePanelInput)-> types.Panel:
 
     x, _ = models.Panel.objects.update_or_create(
         kind=input.kind,
-        state = state,
-        accessors = accesors,
-        reservation = reservation,
+        name=input.name,
+        defaults=dict(
+            state = state,
+            accessors = accesors,
+            reservation = reservation,
+            submit_on_change = input.submit_on_change if input.submit_on_change is not None else False,
+            submit_on_load = input.submit_on_load if input.submit_on_load is not None else False,
+        )
     )
 
     return x

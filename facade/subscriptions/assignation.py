@@ -13,8 +13,6 @@ async def assignation_events(
 ) -> AsyncGenerator[types.AssignationEvent, None]:
     """Join and subscribe to message sent to the given rooms."""
 
-    print(info)
-
     registry, _ = await models.Registry.objects.aget_or_create(
         app=info.context.request.app, user=info.context.request.user
     )
@@ -24,7 +22,6 @@ async def assignation_events(
     )
 
     async for message in assignation_event_listen(info, [f"waiter_{waiter.id}"]):
-        print("ID: ", message)
         yield await models.AssignationEvent.objects.aget(id=message)
 
 
@@ -51,7 +48,7 @@ async def assignations(
     )
 
     async for message in assignation_listen(info, [f"ass_waiter_{waiter.id}"]):
-        print("ID", message)
+       
 
 
         if message["type"] == "created":

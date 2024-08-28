@@ -5,6 +5,7 @@ interface_types = [
     types.SliderAssignWidget,
     types.ChoiceAssignWidget,
     types.SearchAssignWidget,
+    types.StateChoiceAssignWidget,
     types.CustomReturnWidget,
     types.ChoiceReturnWidget,
     types.StringAssignWidget,

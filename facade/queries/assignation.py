@@ -15,5 +15,4 @@ def assignations(
         registry=registry, instance_id=instance_id, defaults=dict(name="default")
     )
 
-    print("ID: ", waiter)
     return models.Assignation.objects.filter(reservation__waiter=waiter).order_by("created_at").all()

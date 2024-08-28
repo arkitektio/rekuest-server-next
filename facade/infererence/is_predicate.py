@@ -3,7 +3,7 @@ from facade.models import Protocol
 from rekuest_core.enums import PortKind
 
 def is_predicate(definition: DefinitionInputModel) -> Protocol:
-    print(definition)
+  
 
     if not definition.returns:
         return None

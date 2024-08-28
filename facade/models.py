@@ -80,7 +80,10 @@ class Node(models.Model):
         default=False, help_text="Is this function pure. e.g can we cache the result?"
     )
     idempotent = models.BooleanField(
-        default=False, help_text="Is this function pure. e.g can we cache the result?"
+        default=False, help_text="Is this function idempotent. e.g can we run it multiple times without ?"
+    )
+    stateful = models.BooleanField(
+        default=False, help_text="Is this function stateful. e.g does it inherently depend on or change state (think physical devices)?"
     )
     kind = TextChoicesField(
         max_length=1000,
@@ -818,6 +821,7 @@ class Dashboard(models.Model):
 
 
 class Panel(models.Model):
+    name = models.CharField(max_length=2000, default="Unnamed")
     kind = models.CharField(max_length=2000)
     state = models.ForeignKey("State", on_delete=models.CASCADE, related_name="panels", null=True, blank=True)
     reservation = models.ForeignKey(
@@ -827,6 +831,9 @@ class Panel(models.Model):
         Template, on_delete=models.CASCADE, related_name="panels", null=True, blank=True
     )
     accessors = models.JSONField( null=True, blank=True)
+    submit_on_change = models.BooleanField(default=False)
+    submit_on_load = models.BooleanField(default=False)
+    
 
 class StateSchema(models.Model):
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="state_schemas")

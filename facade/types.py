@@ -73,6 +73,7 @@ class Node:
     hash: rscalars.NodeHash
     name: str
     kind: renums.NodeKind
+    stateful: bool
     description: str | None
     collections: list["Collection"]
     templates: list["Template"]
@@ -385,9 +386,12 @@ class Dashboard:
 class Panel:
     id: strawberry.ID
     kind: enums.PanelKind
+    name: str 
     reservation: Reservation | None 
     state: Optional["State"]
     accessors: list[str] | None
+    submit_on_load: bool
+    submit_on_change: bool
 
 
 

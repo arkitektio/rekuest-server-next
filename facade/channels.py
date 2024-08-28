@@ -17,3 +17,6 @@ state_update_event_broadcast, state_update_event_listen = build_channel("state_u
 provision_event_broadcast, provision_event_listen = build_channel("provision_event_broadcast")
 
 reservation_event_broadcast, reservation_event_listen = build_channel("reservation_event_broadcast")
+
+
+new_state_broadcast, new_state_listen = build_channel("new_state_")

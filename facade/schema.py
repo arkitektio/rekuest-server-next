@@ -43,6 +43,8 @@ class Query:
     panels: list[types.Panel] = strawberry_django.field()
     state_schemas: list[types.StateSchema] = strawberry_django.field()
 
+    state_for = strawberry_django.field(resolver=queries.state_for)
+
 
     @strawberry_django.field()
     def state(self, info: Info, id: strawberry.ID) -> types.State:

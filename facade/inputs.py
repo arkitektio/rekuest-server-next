@@ -179,6 +179,7 @@ class CreateDashboardInput:
 
 
 class CreatePanelInputModel(BaseModel):
+    name: str
     kind: enums.PanelKind
     state: str | None = None
     state_key: str | None = None
@@ -187,10 +188,13 @@ class CreatePanelInputModel(BaseModel):
     state_accessors: list[str] | None = None
     interface: str | None = None
     args: dict[str, Any] | None = None
+    submit_on_change: bool = False
+    submit_on_load: bool = False
 
 
 @pydantic.input(CreatePanelInputModel)
 class CreatePanelInput:
+    name: str 
     kind: enums.PanelKind
     state: strawberry.ID | None = None
     state_key: str | None = None
@@ -199,6 +203,8 @@ class CreatePanelInput:
     instance_id: scalars.InstanceID | None = None
     interface: str | None = None
     args: scalars.Args | None = None
+    submit_on_change: bool | None = False
+    submit_on_load: bool  | None = False
 
 
 

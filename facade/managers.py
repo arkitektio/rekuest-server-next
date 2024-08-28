@@ -97,7 +97,7 @@ def build_params(
         individual_queries.append(count_condition)
 
     full_sql = "SELECT id FROM facade_node WHERE " + " AND ".join(individual_queries)
-    print(full_sql, all_params)
+
     return full_sql, all_params
 
 
@@ -123,7 +123,7 @@ def filter_nodes_by_demands(
         cursor.execute(full_sql, all_params)
         rows = cursor.fetchall()
         ids = [row[0] for row in rows]
-        print(ids)
+       
 
     qs = qs.filter(id__in=ids)
     return qs

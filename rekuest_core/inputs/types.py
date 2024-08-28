@@ -83,6 +83,9 @@ class AssignWidgetInput:
     as_paragraph: bool | None = None
     hook: str | None = None
     ward: str | None = None
+    fallback: Optional[LazyType["AssignWidgetInput", __name__]] = None
+    follow_value: str | None = None
+    state_choices: str | None = None
 
 
 @pydantic.input(models.ReturnWidgetInputModel)
@@ -217,6 +220,7 @@ class DefinitionInput:
     description: str | None = None
     collections: list[str] = strawberry.field(default_factory=list)
     name: str
+    stateful: bool = False
     port_groups: list[PortGroupInput] = strawberry.field(default_factory=list)
     args: list[PortInput] = strawberry.field(default_factory=list)
     returns: list[PortInput] = strawberry.field(default_factory=list)
