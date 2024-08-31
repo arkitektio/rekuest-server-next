@@ -227,18 +227,19 @@ class CreateStateSchemaInputModel(BaseModel):
 @pydantic.input(CreateStateSchemaInputModel)
 class CreateStateSchemaInput:
     state_schema: StateSchemaInput
-    instance_id: scalars.InstanceID
 
 
 
 class SetStateInputModel(BaseModel):
     state_schema: strawberry.ID
+    instance_id: str
     value: Dict[str, Any]
 
 
 @pydantic.input(SetStateInputModel)
 class SetStateInput:
     state_schema: strawberry.ID
+    instance_id: scalars.InstanceID
     value: scalars.Args
 
 
@@ -250,12 +251,14 @@ class JSONPatchInputModel(BaseModel):
 
 class UpdateStateInputModel(BaseModel):
     state_schema: strawberry.ID
+    instance_id: str
     patches: list[JSONPatchInputModel]
 
 
 @pydantic.input(UpdateStateInputModel)
 class UpdateStateInput:
     state_schema: strawberry.ID
+    instance_id: scalars.InstanceID
     patches: list[scalars.Args]
 
 

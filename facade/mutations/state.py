@@ -17,10 +17,26 @@ def underscore(s: str) -> str:
 
 
 
-def set_state(info: Info, input: inputs.SetStateInput) -> types.State:
+async def set_state(info: Info, input: inputs.SetStateInput) -> types.State:
 
-    state, _ = models.State.objects.update_or_create(
+
+    registry, _ = await models.Registry.objects.aget_or_create(
+        app=info.context.request.app,
+        user=info.context.request.user,
+    )
+
+    agent, _ = await models.Agent.objects.aget_or_create(
+        registry=registry,
+        instance_id=input.instance_id or "default",
+        defaults=dict(
+            name=f"{str(registry.id)} on {input.instance_id}",
+        ),
+    )
+
+
+    state, _ = await models.State.objects.aupdate_or_create(
         state_schema_id=input.state_schema,
+        agent=agent,
         defaults=dict(
             value=input.value,
         ),
@@ -31,8 +47,21 @@ def set_state(info: Info, input: inputs.SetStateInput) -> types.State:
 
 
 def update_state(info: Info, input: inputs.UpdateStateInput)-> types.State:
+
+    registry, _ = models.Registry.objects.get_or_create(
+        app=info.context.request.app,
+        user=info.context.request.user,
+    )
+
+    agent, _ = models.Agent.objects.get_or_create(
+        registry=registry,
+        instance_id=input.instance_id or "default",
+        defaults=dict(
+            name=f"{str(registry.id)} on {input.instance_id}",
+        ),
+    )
     
-    state = models.State.objects.get(state_schema_id=input.state_schema)
+    state = models.State.objects.get(state_schema_id=input.state_schema, agent=agent)
     
     old_state = state.value
 
@@ -53,15 +82,27 @@ def update_state(info: Info, input: inputs.UpdateStateInput)-> types.State:
 
 def archive_state(info: Info, input: inputs.ArchiveStateInput)-> types.State:
 
+    registry, _ = models.Registry.objects.aget_or_create(
+        app=info.context.request.app,
+        user=info.context.request.user,
+    )
 
-    state = models.State.objects.get(state_schema_id=input.state_schema)
+    agent, _ = models.Agent.objects.aget_or_create(
+        registry=registry,
+        instance_id=input.instance_id or "default",
+        defaults=dict(
+            name=f"{str(registry.id)} on {input.instance_id}",
+        ),
+    )
+
+
+    state = models.State.objects.get(state_schema_id=input.state_schema, agent=agent)
 
     historical_state = models.HistoricalState.objects.create(
         state=state,
         value=state.value,
     )
 
-    
 
     return historical_state.state
 

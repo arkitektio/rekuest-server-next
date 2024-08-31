@@ -177,7 +177,7 @@ class Agent:
     connected: bool
     extensions: list[str]
     name: str
-    state_schemas: list["StateSchema"]
+    states: list["State"]
 
     @strawberry_django.field()
     def template(self, interface: str) -> Template | None:
@@ -193,16 +193,6 @@ class Agent:
     def latest_hardware_record(self) -> HardwareRecord | None:
         return self.hardware_records.order_by("-created_at").first()
     
-    @strawberry_django.field()
-    def latest_states(self) -> list["State"]:
-        states = []
-        for i in self.state_schemas.all():
-            first = i.states.first()
-            if first:
-                states.append(first)
-
-
-        return states
 
 
 @strawberry_django.type(models.Waiter, filters=filters.WaiterFilter, pagination=True)
@@ -401,7 +391,7 @@ class Panel:
 )
 class StateSchema:
     id: strawberry.ID
-    agent: Agent
+    hash: str
     name: str
    
     @strawberry_django.field()
@@ -416,6 +406,7 @@ class State:
     id: strawberry.ID
     state_schema: StateSchema
     value: scalars.Args
+    agent: Agent
     created_at: datetime.datetime
     updated_at: datetime.datetime
     historical_states: list["HistoricalState"]

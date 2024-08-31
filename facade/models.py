@@ -836,25 +836,26 @@ class Panel(models.Model):
     
 
 class StateSchema(models.Model):
-    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="state_schemas")
     name = models.CharField(max_length=2000)
+    hash = models.CharField(max_length=2000, unique=True)
     ports = models.JSONField(default=dict)
     description = models.CharField(max_length=2000)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["agent", "name"],
-                name="No multiple Schemas for same Agent and Name allowed",
-            )
-        ]
 
 
 class State(models.Model):
     state_schema = models.ForeignKey(StateSchema, on_delete=models.CASCADE, related_name="states")
+    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="states")
     value = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["state_schema", "agent"],
+                name="No multiple States for same Agent and Schema allowed",
+            )
+        ]
 
 
 class HistoricalState(models.Model):

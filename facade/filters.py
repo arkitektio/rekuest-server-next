@@ -36,6 +36,8 @@ class AgentFilter:
     instance_id: str | None
     ids: list[strawberry.ID] | None
     extensions: list[str] | None
+    has_templates: list[str] | None
+    has_states: list[str] | None
 
     def filter_ids(self, queryset, info):
         if self.ids is None:
@@ -51,6 +53,19 @@ class AgentFilter:
         if self.extensions is None:
             return queryset
         return queryset.filter(extensions__contains=self.extensions)
+    
+
+    def filter_has_templates(self, queryset, info):
+        if self.has_templates is None:
+            return queryset
+        return queryset.filter(templates__node__hash__in=self.has_templates)
+
+    def filter_has_states(self, queryset, info):
+        if self.has_states is None:
+            return queryset
+        return queryset.filter(states__state_schema__hash__in=self.has_states)
+
+
 
 
 @strawberry_django.filter(models.Waiter)
