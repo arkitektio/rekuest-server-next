@@ -7,7 +7,7 @@ def state_for(
     info: Info,
     template: strawberry.ID | None = None,
     agent: strawberry.ID | None = None,
-    state_key: str | None = None,
+    state_hash: str | None = None,
 ) -> types.State:
     
     if agent:
@@ -15,8 +15,7 @@ def state_for(
     elif template: 
         agent = models.Template.objects.get(id=template).agent
     else:
-        agent = None
+        raise ValueError("Either agent or template must be provided")
 
-
-    return models.StateSchema.objects.get(agent=agent, name=state_key).states.first()
+    return models.State.objects.get(agent=agent, state_schema__hash=state_hash)
     

@@ -8,9 +8,13 @@ from kante.types import Info
 def template_at(
     info: Info,
     agent: strawberry.ID,
-    extension: str,
-    interface: str,
+    extension: str | None = None,
+    interface: str | None = None,
+    node_hash: str | None = None,
 ) -> types.Template:
+    if node_hash:
+        return models.Template.objects.get(agent_id=agent, node__hash=node_hash)
+    
     return models.Template.objects.get(agent_id=agent, extension=extension, interface=interface)
 
 
