@@ -49,7 +49,12 @@ class CustomAssignWidget(AssignWidget):
 class SearchAssignWidget(AssignWidget):
     query: str
     ward: str
-
+    filters: Optional[list[
+        LazyType["ChildPort", __name__]
+    ]] = None  
+    
+    
+    # this took me a while to figure out should be more obvious
 @pydantic.type(models.StateChoiceAssignWidgetModel)
 class StateChoiceAssignWidget(AssignWidget):
     state_choices: str

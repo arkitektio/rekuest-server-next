@@ -4,7 +4,6 @@ from facade import models
 from facade.channels import (
     node_created_broadcast,
     agent_updated_broadcast,
-    assignation_event_broadcast,
     provision_event_broadcast,
     reservation_event_broadcast,
     assignation_broadcast,
@@ -16,7 +15,7 @@ from guardian.shortcuts import assign_perm
 
 
 logger = logging.getLogger(__name__)
-logger.info("Loading signals")
+logger.info("Loading sssignals")
 
 
 @receiver(post_save, sender=models.Node)
@@ -75,7 +74,8 @@ def ass_post_save(sender, instance: models.Assignation = None, created=None, **k
 def ass_event_post_save(
     sender, instance: models.AssignationEvent = None, created=None, **kwargs
 ):
-    assignation_event_broadcast(
+    print("Forwarding ass evenddt", f"ass_waiter_{instance.assignation.waiter.id}")
+    assignation_broadcast(
         {"id": instance.id, "type": "event"},
         [f"ass_waiter_{instance.assignation.waiter.id}"],
     )

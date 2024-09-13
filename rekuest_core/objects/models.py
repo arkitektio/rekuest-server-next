@@ -39,6 +39,7 @@ class SearchAssignWidgetModel(AssignWidgetModel):
     kind: Literal["SEARCH"]
     query: str  # TODO: Validators
     ward: str
+    filters: list["ChildPortModel"] | None = None
 
 
 class StateChoiceAssignWidgetModel(AssignWidgetModel):
@@ -169,3 +170,6 @@ class DefinitionModel(BaseModel):
     protocols: list[str]
     defined_at: datetime.datetime
     is_dev: bool = False
+
+
+SearchAssignWidgetModel.update_forward_refs()

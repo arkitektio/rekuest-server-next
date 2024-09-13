@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 from strawberry.experimental import pydantic
 from strawberry import LazyType
 from rekuest_core.inputs import models
@@ -86,6 +86,7 @@ class AssignWidgetInput:
     fallback: Optional[LazyType["AssignWidgetInput", __name__]] = None
     follow_value: str | None = None
     state_choices: str | None = None
+    filters: Optional[List[LazyType["ChildPortInput", __name__]]] = None
 
 
 @pydantic.input(models.ReturnWidgetInputModel)

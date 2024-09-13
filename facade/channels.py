@@ -10,7 +10,6 @@ template_broadcast, template_listen = build_channel("template_broadcast")
 
 reservation_broadcast, reservation_listen = build_channel("reservation_broadcast")
 
-assignation_event_broadcast, assignation_event_listen = build_channel("assignation_event_broadcast")
 
 state_update_event_broadcast, state_update_event_listen = build_channel("state_update_event_broadcast")
 

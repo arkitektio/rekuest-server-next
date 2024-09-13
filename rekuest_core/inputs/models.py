@@ -47,6 +47,7 @@ class AssignWidgetInputModel(BaseModel):
     hook: str | None = None
     ward: str | None = None
     fallback: Optional["AssignWidgetInputModel"] = None
+    filters: list["ChildPortInputModel"] | None
 
 
 class ReturnWidgetInputModel(BaseModel):
