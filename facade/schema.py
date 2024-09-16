@@ -197,6 +197,7 @@ class Subscription:
     )
     provision_events = strawberry.subscription(resolver=subscriptions.provision_events)
     template_change = strawberry.subscription(resolver=subscriptions.template_change)
+    templates = strawberry.subscription(resolver=subscriptions.templates)
     state_update_events = strawberry.subscription(resolver=subscriptions.state_update_events)
 
 
