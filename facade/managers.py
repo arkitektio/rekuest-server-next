@@ -128,4 +128,27 @@ def filter_nodes_by_demands(
     qs = qs.filter(id__in=ids)
     return qs
 
-    return qs
+def get_node_ids_by_demands(
+    demands: list[PortMatchInput] = None,
+    type: t.Literal["args", "returns"] = "args",
+    force_length: t.Optional[int] = None,
+    force_non_nullable_length: t.Optional[int] = None,
+):
+
+    if type not in ["args", "returns"]:
+        raise ValueError("Type must be either 'args' or 'returns'")
+
+    full_sql, all_params = build_params(
+        demands,
+        type=type,
+        force_length=force_length,
+        force_non_nullable_length=force_non_nullable_length,
+    )
+
+    with connection.cursor() as cursor:
+        cursor.execute(full_sql, all_params)
+        rows = cursor.fetchall()
+        ids = [row[0] for row in rows]
+        return ids
+       
+

@@ -33,11 +33,17 @@ class TestCaseFilter:
 
 @strawberry_django.filter(models.Agent)
 class AgentFilter:
+    client_id: str | None
     instance_id: str | None
     ids: list[strawberry.ID] | None
     extensions: list[str] | None
     has_templates: list[str] | None
     has_states: list[str] | None
+
+    def filter_client_id(self, queryset, info):
+        if self.client_id is None:
+            return queryset
+        return queryset.filter(registry__app__client_id=self.client_id)
 
     def filter_ids(self, queryset, info):
         if self.ids is None:
@@ -300,13 +306,103 @@ class NodeFilter(SearchFilter):
             return queryset
         return queryset.filter(id__in=self.ids)
 
+@strawberry_django.filter(models.Agent)
+class TemplateAgentFilter:
+    client_id: str | None
+    instance_id: str | None
+    ids: list[strawberry.ID] | None
+    extensions: list[str] | None
+    has_templates: list[str] | None
+    has_states: list[str] | None
+
+    def filter_client_id(self, queryset, info):
+        if self.client_id is None:
+            return queryset
+        return queryset.filter(agent__registry__app__client_id=self.client_id)
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(agent__id__in=self.ids)
+    
+    def filter_instance_id(self, queryset, info):
+        if self.instance_id is None:
+            return queryset
+        return queryset.filter(agent__instance_id=self.instance_id)
+    
+    def filter_extensions(self, queryset, info):
+        if self.extensions is None:
+            return queryset
+        return queryset.filter(agent__extensions__contains=self.extensions)
+    
+
+    def filter_has_states(self, queryset, info):
+        if self.has_states is None:
+            return queryset
+        return queryset.filter(agent__states__state_schema__hash__in=self.has_states)
+
+
+@strawberry_django.filter(models.Node)
+class TemplateNodeFilter(SearchFilter):
+    name: str | None
+    ids: list[strawberry.ID] | None
+    demands: list[inputs.PortDemandInput] | None
+    protocols: list[str] | None
+    kind: Optional[renums.NodeKind] | None
+
+    def filter_name(self, queryset, info):
+        if self.name is None:
+            return queryset
+        return queryset.filter(node__name=self.name)
+
+    def filter_demands(self, queryset, info):
+        if self.demands is None:
+            return queryset
+        
+
+        filtered_ids = None
+
+        for ports_demand in self.demands:
+            new_ids =  managers.get_node_ids_by_demands(ports_demand.matches,
+                type=ports_demand.kind,
+                force_length=ports_demand.force_length,
+                force_non_nullable_length=ports_demand.force_non_nullable_length)
+            
+
+            if filtered_ids is None:
+                filtered_ids = set(new_ids)
+            else:
+                filtered_ids = filtered_ids.intersection(new_ids)
+            
+
+        return queryset.filter(node__id__in=filtered_ids)
+    
+
+    def filter_kind(self, queryset, info):
+        if self.kind is None:
+            return queryset
+        return queryset.filter(node__kind=self.kind)
+
+    def filter_protocols(self, queryset, info):
+        if self.protocols is None:
+            return queryset
+        return queryset.filter(node__protocols__name__in=self.protocols)
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(node__id__in=self.ids)
+
+
+
 @strawberry_django.filter(models.Template)
 class TemplateFilter:
     interface: Optional[FilterLookup[str]]
     ids: list[strawberry.ID] | None
     node_hash: rscalars.NodeHash | None
-    node: NodeFilter | None
+    node: TemplateNodeFilter | None
     extension: str | None
+    agent: TemplateAgentFilter | None
 
     def filter_ids(self, queryset, info):
         if self.ids is None:
