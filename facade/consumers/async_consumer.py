@@ -167,6 +167,9 @@ class AgentConsumer(AsyncWebsocketConsumer):
             lambda x: print("DONE sending heartbease", x)
         )
 
+        self.agent.last_seen = datetime.datetime.now()
+        await self.agent.save()
+
     async def heartbeat(self, agent_id: str):
         try:
             while True:

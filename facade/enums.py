@@ -286,6 +286,11 @@ class ProvisionStatus(str, Enum):
 
 @strawberry.enum
 class AssignationEventKind(str, Enum):
+    """ These are the possible events that can happen to an Assignation.
+    
+    The events are ordered by their appearance in the lifecycle of an Assignation.
+    """
+
     BOUND = "BOUND"
     ASSIGN = "ASSIGN"
     PROGRESS = "PROGRESS"

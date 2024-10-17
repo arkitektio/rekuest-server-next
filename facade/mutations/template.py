@@ -16,7 +16,7 @@ def hash_definition(definition: DefinitionInputModel) -> str:
     hashable_definition = {
         key: value
         for key, value in dict(strawberry.asdict(definition)).items()
-        if key in ["name", "description", "args", "returns", "stateful"]
+        if key in ["name", "description", "args", "returns", "stateful", "is_test_for", "collections"]
     }
     return hashlib.sha256(
         json.dumps(hashable_definition, sort_keys=True).encode()
@@ -65,6 +65,7 @@ def _create_template(input: TemplateInputModel, agent: models.Agent, extension: 
                 node.collections.add(c)
 
         logger.info(f"Created {node}")
+        node.save()
 
     try:
 
@@ -252,3 +253,12 @@ def set_extension_templates(info: Info, input: inputs.SetExtensionTemplatesInput
     return created_templates
 
 
+
+def pin_template(info, input: inputs.PinInput) -> types.Template:
+    agent = models.Template.objects.get(id=input.id)
+    if input.pin:
+        agent.pinned_by.add(info.context.request.user)
+    else:
+        agent.pinned_by.remove(info.context.request.user)
+    agent.save()
+    return agent

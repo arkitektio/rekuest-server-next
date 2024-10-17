@@ -39,6 +39,16 @@ class AgentFilter:
     extensions: list[str] | None
     has_templates: list[str] | None
     has_states: list[str] | None
+    pinned: bool | None
+
+    def filter_pinned(self, queryset, info):
+        if self.pinned is None:
+            return queryset
+        if self.pinned:
+            # Check if the user is in the pinned_by list
+            return queryset.filter(pinned_by__id=info.context.request.user.id)
+        else:
+            return queryset.exclude(pinned_by__id=info.context.request.user.id)
 
     def filter_client_id(self, queryset, info):
         if self.client_id is None:
@@ -200,6 +210,8 @@ class AppOrder:
     defined_at: auto
 
 
+
+
 @strawberry_django.filter(App)
 class AppFilter:
     interface: Optional[FilterLookup[str]]
@@ -227,7 +239,7 @@ class AppFilter:
 
 @strawberry_django.order(models.Agent)
 class AgentOrder:
-    installed_at: auto
+    last_seen: auto
 
 
 @strawberry_django.order(models.Node)

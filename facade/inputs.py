@@ -14,6 +14,18 @@ from strawberry import LazyType
 from strawberry.experimental import pydantic
 
 
+
+class PinInputModel(BaseModel):
+    id: str
+    pin: bool 
+
+@pydantic.input(PinInputModel)
+class PinInput:
+    id: strawberry.ID
+    pin: bool
+
+
+
 class ReserveInputModel(BaseModel):
     instance_id: str
     node: str | None = None

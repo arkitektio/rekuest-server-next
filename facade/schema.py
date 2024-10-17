@@ -183,6 +183,12 @@ class Mutation:
         resolver=mutations.archive_state
     )
 
+    # pins
+    pin_agent: types.Agent = strawberry_django.mutation(resolver=mutations.pin_agent)
+    pin_template: types.Template = strawberry_django.mutation(
+        resolver=mutations.pin_template
+    )
+
 
 @strawberry.type
 class Subscription:

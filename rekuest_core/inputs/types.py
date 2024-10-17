@@ -226,7 +226,7 @@ class DefinitionInput:
     args: list[PortInput] = strawberry.field(default_factory=list)
     returns: list[PortInput] = strawberry.field(default_factory=list)
     kind: enums.NodeKind
-    is_test_for: list[str] = strawberry.field(default_factory=list)
+    is_test_for: list["str"] = strawberry.field(default_factory=list)
     interfaces: list[str] = strawberry.field(default_factory=list)
     is_dev: bool = False
 

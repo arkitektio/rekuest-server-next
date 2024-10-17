@@ -47,3 +47,14 @@ async def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
 
     return agent
 
+
+
+
+def pin_agent(info, input: inputs.PinInput) -> types.Agent:
+    agent = models.Agent.objects.get(id=input.id)
+    if input.pin:
+        agent.pinned_by.add(info.context.request.user)
+    else:
+        agent.pinned_by.remove(info.context.request.user)
+    agent.save()
+    return agent

@@ -81,10 +81,18 @@ class Node:
     is_test_for: list["Node"]
     is_dev: bool
     tests: list["Node"]
+    interfaces: list[str]
     protocols: list["Protocol"]
     defined_at: datetime.datetime
     reservations: list[LazyType["Reservation", __name__]] | None
     test_cases: list[LazyType["TestCase", __name__]] | None
+
+
+    @strawberry_django.field()
+    def runs(self) -> list[LazyType["Assignation", __name__]] | None:
+        return models.Assignation.objects.filter(provision__template__node=self).order_by("-created_at")
+
+
 
     @strawberry_django.field()
     def dependency_graph(self) -> DependencyGraph:
@@ -101,6 +109,14 @@ class Node:
     @strawberry_django.field()
     def port_groups(self) -> list[rtypes.PortGroup]:
         return [rmodels.PortGroupModel(**i) for i in self.port_groups]
+    
+    @strawberry_django.field()
+    def pinned(self, info: Info) -> bool:
+        return (
+            self
+            .pinned_by.filter(id=info.context.request.user.id)
+            .exists()
+        )
 
 
 @strawberry_django.type(
@@ -136,7 +152,6 @@ class Dependency:
 )
 class Template:
     id: strawberry.ID
-    name: str | None
     interface: str
     extension: str
     agent: "Agent"
@@ -148,6 +163,18 @@ class Template:
     @strawberry_django.field()
     def dependency_graph(self) -> DependencyGraph:
         return build_template_graph(self)
+    
+    @strawberry_django.field()
+    def name(self) -> str:
+        return self.interface + "@" +self.agent.name
+    
+    @strawberry_django.field()
+    def pinned(self, info: Info) -> bool:
+        return (
+            self
+            .pinned_by.filter(id=info.context.request.user.id)
+            .exists()
+        )
 
 
 @strawberry_django.type(
@@ -192,6 +219,14 @@ class Agent:
     @strawberry_django.field()
     def latest_hardware_record(self) -> HardwareRecord | None:
         return self.hardware_records.order_by("-created_at").first()
+    
+    @strawberry_django.field()
+    def pinned(self, info: Info) -> bool:
+        return (
+            self
+            .pinned_by.filter(id=info.context.request.user.id)
+            .exists()
+        )
     
 
 
@@ -280,21 +315,27 @@ class Assignation:
     name: str
     reference: str | None
     args: rscalars.AnyDefault
-    parent: Optional["Assignation"]
-    reservation: Optional["Reservation"]
-    node: "Node"
-    template: Optional["Template"]
-    status: enums.AssignationEventKind
+    mother: Optional["Assignation"] = strawberry.field(description="A mother assignation is the root assignation that caused this assignation to be created. This mother is always created by intent (e.g a user action). If null, this assignation is the mother")
+    parent: Optional["Assignation"] = strawberry.field(description="A parent assignation is the next assignation in the chain of assignations that caused this assignation to be created. Parents can be created by intent or by the system. If null, this assignation is the parent")
+    reservation: Optional["Reservation"] = strawberry.field(description="If this assignation is the result of a reservation, this field will contain the reservation that caused this assignation to be created")
+    node: "Node" = strawberry.field(description="The node that this assignation is assigned to")
+    template: Optional["Template"] = strawberry.field(description="If set, this assignation was directly assigned to a template")
+    status: enums.AssignationEventKind = strawberry.field(description="The status of this assignation")
     status_message: str | None
-    waiter: "Waiter"
+    waiter: "Waiter" = strawberry.field(description="The Waiter that this assignation was created by")
     node: "Node"
     created_at: datetime.datetime
     updated_at: datetime.datetime
-    provision: Optional["Provision"]
+    provision: Optional["Provision"] = strawberry.field(description="The provision that this assignation was assigned to")
 
     @strawberry_django.field()
     def events(self) -> list["AssignationEvent"]:
         return self.events.order_by("created_at")[:10]
+    
+
+    @strawberry_django.field()
+    def arg(self, key: str) -> scalars.Args | None:
+        return self.args.get(key, None)
 
 
 @strawberry_django.type(

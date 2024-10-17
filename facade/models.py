@@ -17,7 +17,7 @@ from facade.enums import (
     ReservationStrategyChoices,
     WaiterStatusChoices,
 )
-
+from django.contrib.auth import get_user_model
 # Create your models here.
 
 
@@ -84,6 +84,12 @@ class Node(models.Model):
     )
     stateful = models.BooleanField(
         default=False, help_text="Is this function stateful. e.g does it inherently depend on or change state (think physical devices)?"
+    )
+    pinned_by = models.ManyToManyField(
+        get_user_model(),
+        related_name="pinned_nodes",
+        blank=True,
+        help_text="The users that pinned this Nodes",
     )
     kind = TextChoicesField(
         max_length=1000,
@@ -186,6 +192,12 @@ class Agent(models.Model):
     )
     last_seen = models.DateTimeField(
         help_text="The last time this Agent was seen", null=True
+    )
+    pinned_by = models.ManyToManyField(
+        get_user_model(),
+        related_name="pinned_agents",
+        blank=True,
+        help_text="The users that pinned this Agent",
     )
     registry = models.ForeignKey(
         Registry,
@@ -348,6 +360,12 @@ class Template(models.Model):
         max_length=1000,
         default="Unnamed",
         help_text="A name for this Template",
+    )
+    pinned_by = models.ManyToManyField(
+        get_user_model(),
+        related_name="pinned_templates",
+        blank=True,
+        help_text="The users that pinned this Agent",
     )
     extensions = models.JSONField(
         max_length=2000,
