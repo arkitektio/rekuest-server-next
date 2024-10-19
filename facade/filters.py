@@ -407,6 +407,11 @@ class TemplateNodeFilter(SearchFilter):
 
 
 
+@strawberry.input
+class ParamPair:
+    key: str
+    value: str
+
 @strawberry_django.filter(models.Template)
 class TemplateFilter:
     interface: Optional[FilterLookup[str]]
@@ -415,6 +420,7 @@ class TemplateFilter:
     node: TemplateNodeFilter | None
     extension: str | None
     agent: TemplateAgentFilter | None
+    parameters: list[ParamPair] | None
 
     def filter_ids(self, queryset, info):
         if self.ids is None:
@@ -430,4 +436,11 @@ class TemplateFilter:
         if self.node_hash is None:
             return queryset
         return queryset.filter(node__hash=self.node_hash)
+    
+    def filter_parameters(self, queryset, info):
+        if self.parameters is None:
+            return queryset
+        for param in self.parameters:
+            queryset = queryset.filter(params__contains={param.key: param.value})
+        return queryset
     
