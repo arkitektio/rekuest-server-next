@@ -18,7 +18,7 @@ def hash_state_schema(definition: inputs.StateSchemaInput) -> str:
     hashable_schema = {
         key: value
         for key, value in dict(strawberry.asdict(definition)).items()
-        if key in ["name", "ports"]
+        if key in ["ports"]
     }
     return hashlib.sha256(
         json.dumps(hashable_schema, sort_keys=True).encode()
@@ -30,7 +30,6 @@ def create_state_schema(info: Info, input: inputs.CreateStateSchemaInput)-> type
 
     schema = input.state_schema
 
-    assert underscore(schema.name) == schema.name, "State schema names must be snake case lower letter"
 
 
 
