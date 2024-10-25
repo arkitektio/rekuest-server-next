@@ -221,7 +221,7 @@ class Agent(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.status} {self.registry} on {self.instance_id} managed by {self.on_instance}"
+        return f"{self.name}"
 
     @property
     def queue(self):
@@ -396,7 +396,7 @@ class Template(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.node} implemented by {self.agent} on {self.interface}"
+        return f"{self.node} implemented by {self.agent}"
 
 
 class Provision(models.Model):

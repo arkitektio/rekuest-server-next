@@ -160,6 +160,9 @@ class RedisControllBackend(ControllBackend):
                 status=enums.ProvisionStatus.ACTIVE
             ).first()
 
+            if not provision:
+                raise ValueError(f"No active provision found for {template}. Maybe restart the app?")
+
         elif input.node:
             provision = find_best_fitting_provision(
                 input.node, info.context.request.user
