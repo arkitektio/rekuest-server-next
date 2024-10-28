@@ -188,6 +188,9 @@ class Mutation:
     pin_template: types.Template = strawberry_django.mutation(
         resolver=mutations.pin_template
     )
+    delete_agent = strawberry_django.mutation(
+        resolver=mutations.delete_agent
+    )
 
 
 @strawberry.type

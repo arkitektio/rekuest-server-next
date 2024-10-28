@@ -1,4 +1,4 @@
-from django.db.models.signals import post_save, pre_delete
+from django.db.models.signals import post_save, pre_delete, post_delete
 from django.dispatch import receiver
 from facade import models
 from facade.channels import (
@@ -113,3 +113,13 @@ def prov_event_post_save(sender, instance: models.Provision = None, **kwargs):
 @receiver(post_save, sender=models.Template)
 def temp_post_save(sender, instance: models.Template = None, **kwargs):
     template_broadcast(instance.id, [f"template_{instance.id}"])
+
+
+@receiver(post_delete, sender=models.Template)
+def temp_post_save(sender, instance: models.Template = None, **kwargs):
+
+    print(instance)
+
+
+
+

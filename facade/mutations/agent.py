@@ -25,6 +25,11 @@ class AgentInput:
     extensions: list[str] | None = None
 
 
+@strawberry.input
+class DeleteAgentInput:
+    id: strawberry.ID
+
+
 
 async def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
 
@@ -58,3 +63,10 @@ def pin_agent(info, input: inputs.PinInput) -> types.Agent:
         agent.pinned_by.remove(info.context.request.user)
     agent.save()
     return agent
+
+
+
+def delete_agent(info, input: DeleteAgentInput) -> strawberry.ID:
+    agent = models.Agent.objects.get(id=input.id)
+    agent.delete()
+    return input.id
