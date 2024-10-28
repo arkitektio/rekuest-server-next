@@ -3,7 +3,6 @@ name: Container Build
 on:
   push:
     branches: [main]
-  
 
 jobs:
   docker:
@@ -26,4 +25,4 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: jhnnsrs/rekuest:next
+          tags: jhnnsrs/rekuest_next:nightly
