@@ -40,9 +40,9 @@ class AssignWidgetInputModel(BaseModel):
     choices: list[ChoiceInputModel] | None = None
     state_choices: str | None = None
     follow_value: str | None = None
-    min: int | None = None
-    max: int | None = None
-    step: int | None = None
+    min: float | None = None
+    max: float | None = None
+    step: float | None = None
     placeholder: str | None = None
     hook: str | None = None
     ward: str | None = None

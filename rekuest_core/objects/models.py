@@ -20,8 +20,9 @@ class AssignWidgetModel(BaseModel):
 
 class SliderAssignWidgetModel(AssignWidgetModel):
     kind: Literal["SLIDER"]
-    min: int | None
-    max: int | None
+    min: float | None
+    max: float | None
+    step: float | None
 
 
 class ChoiceAssignWidgetModel(AssignWidgetModel):
@@ -49,8 +50,8 @@ class StateChoiceAssignWidgetModel(AssignWidgetModel):
 
 class StringWidgetModel(AssignWidgetModel):
     kind: Literal["STRING"]
-    placeholder: str
-    as_paragraph: bool
+    placeholder: str | None
+    as_paragraph: bool | None
 
 
 AssignWidgetModelUnion = Union[

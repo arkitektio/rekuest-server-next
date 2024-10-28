@@ -76,9 +76,9 @@ class AssignWidgetInput:
     kind: enums.AssignWidgetKind
     query: scalars.SearchQuery | None = None
     choices: list[ChoiceInput] | None = None
-    min: int | None = None
-    max: int | None = None
-    step: int | None = None
+    min: float | None = None
+    max: float | None = None
+    step: float | None = None
     placeholder: str | None = None
     as_paragraph: bool | None = None
     hook: str | None = None

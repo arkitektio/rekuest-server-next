@@ -30,8 +30,9 @@ class AssignWidget:
 
 @pydantic.type(models.SliderAssignWidgetModel)
 class SliderAssignWidget(AssignWidget):
-    min: int | None
-    max: int | None
+    min: float | None
+    max: float | None
+    step: float | None
 
 
 @pydantic.type(models.ChoiceAssignWidgetModel)
