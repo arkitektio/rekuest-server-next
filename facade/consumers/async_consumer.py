@@ -168,7 +168,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
         )
 
         self.agent.last_seen = datetime.datetime.now()
-        await self.agent.save()
+        await self.agent.asave()
 
     async def heartbeat(self, agent_id: str):
         try:
