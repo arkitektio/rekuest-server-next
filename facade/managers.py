@@ -70,6 +70,7 @@ def build_params(
     type: t.Literal["args", "returns"] = "args",
     force_length: t.Optional[int] = None,
     force_non_nullable_length: t.Optional[int] = None,
+    force_structure_length: t.Optional[int] = None,
 ):
     individual_queries = []
     all_params = {}
@@ -89,14 +90,21 @@ def build_params(
 
     if force_non_nullable_length is not None:
         sql_part = f"item->>'nullable'::text = 'false'"
-        count_condition = f"""
-            (SELECT COUNT(*)
-            FROM jsonb_array_elements({type}) AS j(item)
-            WHERE {sql_part}) = {force_non_nullable_length}
-        """
+        count_condition = f"""(SELECT COUNT(*) FROM jsonb_array_elements({type}) AS j(item) WHERE {sql_part}) = {force_non_nullable_length}"""
         individual_queries.append(count_condition)
 
+    if force_structure_length is not None:
+        print("force_structure_length")
+        sql_part = f"item->>'kind' = 'STRUCTURE'" 
+        count_condition = f"""(SELECT COUNT(*) FROM jsonb_array_elements({type}) AS j(item) WHERE {sql_part}) = {force_structure_length}"""
+        individual_queries.append(count_condition)
+
+
+    if not individual_queries:
+        raise ValueError("No search params provided")
+    
     full_sql = "SELECT id FROM facade_node WHERE " + " AND ".join(individual_queries)
+    print(full_sql)
 
     return full_sql, all_params
 
@@ -107,6 +115,7 @@ def filter_nodes_by_demands(
     type: t.Literal["args", "returns"] = "args",
     force_length: t.Optional[int] = None,
     force_non_nullable_length: t.Optional[int] = None,
+    force_structure_length: t.Optional[int] = None,
 ):
 
     if type not in ["args", "returns"]:
@@ -117,6 +126,8 @@ def filter_nodes_by_demands(
         type=type,
         force_length=force_length,
         force_non_nullable_length=force_non_nullable_length,
+        force_structure_length=force_structure_length,
+        
     )
 
     with connection.cursor() as cursor:
@@ -133,6 +144,7 @@ def get_node_ids_by_demands(
     type: t.Literal["args", "returns"] = "args",
     force_length: t.Optional[int] = None,
     force_non_nullable_length: t.Optional[int] = None,
+    force_structure_length: t.Optional[int] = None,
 ):
 
     if type not in ["args", "returns"]:
@@ -143,6 +155,7 @@ def get_node_ids_by_demands(
         type=type,
         force_length=force_length,
         force_non_nullable_length=force_non_nullable_length,
+        force_structure_length=force_structure_length,
     )
 
     with connection.cursor() as cursor:

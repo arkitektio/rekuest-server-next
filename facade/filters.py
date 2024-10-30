@@ -299,6 +299,7 @@ class NodeFilter(SearchFilter):
                 type=ports_demand.kind,
                 force_length=ports_demand.force_length,
                 force_non_nullable_length=ports_demand.force_non_nullable_length,
+                force_structure_length=ports_demand.force_structure_length,
             )
 
         return queryset
@@ -378,7 +379,11 @@ class TemplateNodeFilter(SearchFilter):
             new_ids =  managers.get_node_ids_by_demands(ports_demand.matches,
                 type=ports_demand.kind,
                 force_length=ports_demand.force_length,
-                force_non_nullable_length=ports_demand.force_non_nullable_length)
+                force_non_nullable_length=ports_demand.force_non_nullable_length,
+                force_structure_length=ports_demand.force_structure_length
+                
+                
+                )
             
 
             if filtered_ids is None:

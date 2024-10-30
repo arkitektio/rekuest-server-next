@@ -74,7 +74,7 @@ def _create_template(input: TemplateInputModel, agent: models.Agent, extension: 
             agent=agent,
         )
 
-        provision = models.Provision.objects.get_or_create(
+        provision = models.Provision.objects.update_or_create(
             template=template,
             agent=agent,
             defaults=dict(
@@ -131,7 +131,7 @@ def _create_template(input: TemplateInputModel, agent: models.Agent, extension: 
             params=input.params or {},
         )
 
-        provision = models.Provision.objects.get_or_create(
+        provision = models.Provision.objects.update_or_create(
             template=template,
             agent=agent,
             defaults=dict(
