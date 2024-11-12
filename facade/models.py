@@ -718,7 +718,7 @@ class AssignationEvent(models.Model):
         null=True,
         blank=True,
     )
-    message = models.CharField(max_length=2000, null=True, blank=True)
+    message = models.CharField(max_length=30000, null=True, blank=True)
     # Status Field
     kind = TextChoicesField(
         max_length=1000,

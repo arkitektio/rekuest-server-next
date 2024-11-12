@@ -78,7 +78,7 @@ def _create_template(input: TemplateInputModel, agent: models.Agent, extension: 
             template=template,
             agent=agent,
             defaults=dict(
-                status=enums.ProvisionStatus.INACTIVE,
+                status=enums.ProvisionStatus.ACTIVE,
             ),
         )
 
@@ -135,7 +135,7 @@ def _create_template(input: TemplateInputModel, agent: models.Agent, extension: 
             template=template,
             agent=agent,
             defaults=dict(
-                status=enums.ProvisionStatus.INACTIVE,
+                status=enums.ProvisionStatus.ACTIVE,
             ),
         )
 
