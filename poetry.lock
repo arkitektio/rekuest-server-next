@@ -476,6 +476,17 @@ files = [
 Django = ">=2.2"
 
 [[package]]
+name = "django-probes"
+version = "1.7.0"
+description = "Make Django wait until database is ready. Probes for Docker and Kubernetes."
+optional = false
+python-versions = "*"
+files = [
+    {file = "django_probes-1.7.0-py3-none-any.whl", hash = "sha256:60e656b83cbd0e290fca8263b256d7ebc42452f8c55a07044e56736f986c99a5"},
+    {file = "django_probes-1.7.0.tar.gz", hash = "sha256:bb54c9db54f9c6aaadb032fcf77dfb6c6b17e597df1585d667cfe7491d2747d0"},
+]
+
+[[package]]
 name = "django-simple-history"
 version = "3.3.0"
 description = "Store model history and view/revert changes from admin site."
@@ -1683,4 +1694,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "7b37b297bc95bafb9761694236d77853ab7cbf4b67a1dc84e3677e704b0f1660"
+content-hash = "8059d81fac72c930b5bc8f73f2e1e36756a93de33fea7a7eb8694c3ace61392d"

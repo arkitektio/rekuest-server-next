@@ -25,6 +25,7 @@ ujson = "^5.8.0"
 kombu = "^5.3.2"
 aioredis = "^2.0.1"
 jsonpatch = "^1.33"
+django-probes = "^1.7.0"
 
 
 [tool.poetry.group.dev.dependencies]

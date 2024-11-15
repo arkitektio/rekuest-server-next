@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "guardian",
     "channels",
     "authentikate",
+    "django_probes",
     "koherent",
     "kante",
     "facade",
