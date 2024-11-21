@@ -292,6 +292,7 @@ class AssignationEventKind(str, Enum):
     """
 
     BOUND = "BOUND"
+    QUEUED = "QUEUED"
     ASSIGN = "ASSIGN"
     PROGRESS = "PROGRESS"
 
