@@ -59,7 +59,10 @@ class AssignInputModel(BaseModel):
     instance_id: str
     node: str | None = None
     template: str | None = None
+    agent: str | None = None
+    node_hash: str | None = None
     reservation: str | None = None
+    interface: str | None = None
     hooks: list[HookInputModel] | None = None
     args: dict[str, Any]
     reference: str | None = None
@@ -99,6 +102,9 @@ class AssignInput:
     instance_id: scalars.InstanceID
     node: strawberry.ID | None = None
     template: strawberry.ID | None = None
+    agent: strawberry.ID | None = None
+    node_hash: rscalars.NodeHash | None = None
+    interface: str | None = None
     hooks: list[HookInput] | None = strawberry.field(default_factory=list)
     reservation: strawberry.ID | None = None
     args: scalars.Args

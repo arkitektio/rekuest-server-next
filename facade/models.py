@@ -643,6 +643,11 @@ class Assignation(models.Model):
     node = models.ForeignKey(
         Node, on_delete=models.CASCADE, help_text="The node this was assigned to"
     )
+    ephemeral = models.BooleanField(
+        default=False,
+        help_text="Is this Assignation ephemeral (e.g. should it be deleted after its done or should it be kept for future reference)",
+    )
+    
 
     hooks = models.JSONField(
         default=list,

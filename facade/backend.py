@@ -152,6 +152,27 @@ class RedisControllBackend(ControllBackend):
             # TODO: Cache the reservation in the redis cache
             provision = choice(reservation.provisions.all())
 
+        elif input.agent:
+
+
+            if input.node:
+                provision = models.Provision.objects.filter(
+                    agent_id=input.agent, template__node_id=input.node
+                ).first()
+            elif input.node_hash:
+                provision = models.Provision.objects.filter(
+                    agent_id=input.agent, template__node__hash=input.node_hash
+                ).first()
+            elif input.interface:
+                provision = models.Provision.objects.filter(
+                    agent_id=input.agent, template__interface=input.interface
+                ).first()
+
+            else:
+                raise ValueError(
+                    "You need to provide either, node_hash or node_id, to create an assignment for an agent"
+                )
+
         elif input.template:
             template = models.Template.objects.get(id=input.template)
 
@@ -168,9 +189,11 @@ class RedisControllBackend(ControllBackend):
                 input.node, info.context.request.user
             )
 
+       
+
         else:
             raise ValueError(
-                "You need to provide either, node, template, or reservation to created an assignment"
+                "You need to provide either, node, template, agent, or reservation to created an assignment"
             )
 
         if not provision:
@@ -189,6 +212,7 @@ class RedisControllBackend(ControllBackend):
             hooks=input.hooks or [],
             waiter=waiter,
             template=template,
+            ephemeral=input.ephemeral,
         )
 
         AgentConsumer.broadcast(

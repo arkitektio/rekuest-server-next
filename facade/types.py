@@ -327,6 +327,7 @@ class Assignation:
     created_at: datetime.datetime
     updated_at: datetime.datetime
     provision: Optional["Provision"] = strawberry.field(description="The provision that this assignation was assigned to")
+    ephemeral: bool = strawberry.field(description="If true, this assignation will be deleted after the assignation is completed")
 
     @strawberry_django.field()
     def events(self) -> list["AssignationEvent"]:
