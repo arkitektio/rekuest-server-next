@@ -86,7 +86,6 @@ class AgentConsumer(AsyncWebsocketConsumer):
     @classmethod
     def broadcast(cls, agent_id: str, message: dict):
 
-        print("BROADCASTING", agent_id, message)
 
         connection = redis.Redis(host="redis")
 
@@ -133,7 +132,11 @@ class AgentConsumer(AsyncWebsocketConsumer):
 
         self.connection = aredis.Redis(host="redis", auto_close_connection_pool=True)
 
-        await persist_backend.on_agent_connected(self.agent.id)
+        self.agent.status = enums.AgentStatus.ACTIVE
+        self.agent.connected = True
+        self.agent.last_seen = datetime.datetime.now()
+        await self.agent.asave()
+
 
         self.answer_future = None
 
@@ -157,18 +160,17 @@ class AgentConsumer(AsyncWebsocketConsumer):
             ).json()
         )
 
-        print("Connected agent", self.agent.id)
-        print("SENT CONNECTED MESSAGE")
         self.task = asyncio.create_task(self.listen_for_tasks(self.agent.id))
-        self.task.add_done_callback(lambda x: print("DONE", x))
 
         self.heartbeat_task = asyncio.create_task(self.heartbeat(self.agent.id))
         self.heartbeat_task.add_done_callback(
-            lambda x: print("DONE sending heartbease", x)
+            lambda x: logging.error(f"Done sending heartbeats {x}")
         )
 
+    async def on_agent_heartbeat(self):
         self.agent.last_seen = datetime.datetime.now()
         await self.agent.asave()
+
 
     async def heartbeat(self, agent_id: str):
         try:
@@ -182,14 +184,13 @@ class AgentConsumer(AsyncWebsocketConsumer):
                     received = await asyncio.wait_for(
                         self.answer_future, HEARTBEAT_RESPONSE_TIMEOUT
                     )
-                    await persist_backend.on_agent_heartbeat(agent_id)
+                    await self.on_agent_heartbeat()
 
                 except asyncio.TimeoutError:
-                    print(f"TIMEOUT on client {self.agent.id}")
+                    logging.error(f"Timeout on client {self.agent.id} for heatbeat")
                     await self.close(code=HEARTBEAT_NOT_RESPONDED_CODE)
 
         except asyncio.CancelledError:
-            print("CANCELLED")
             return
 
     async def listen_for_tasks(self, agent_id: str):
@@ -199,11 +200,9 @@ class AgentConsumer(AsyncWebsocketConsumer):
                     f"{agent_id}_my_queue", "processing_queue"
                 )
                 if task:
-                    print("Receiving", task)
                     await self.send(text_data=task.decode("utf-8"))
                     await self.connection.lrem("processing_queue", 0, task)
         except asyncio.CancelledError:
-            print("CANCELLED")
             self.connection.close()
             return
 
@@ -225,7 +224,6 @@ class AgentConsumer(AsyncWebsocketConsumer):
 
             else:
 
-                print("RECEIVED", payload)
                 if payload["type"] == "PROVISION_EVENT":
                     await persist_backend.on_provide_changed(payload)
 
@@ -234,12 +232,10 @@ class AgentConsumer(AsyncWebsocketConsumer):
 
                 if payload["type"] == "HEARTBEAT":
                     if self.answer_future:
-                        print("ANSWERING HEARTBEAT")
+                        logging.debug("ANSWERING HEARTBEAT")
                         self.answer_future.set_result(None)
                     else:
-                        print(
-                            "NO ANSWER FUTURE, this is a protocol error, as no heartbeat was sent"
-                        )
+                        logging.error("Receidved heartbeat without future, holy moly, this is a protocol error")
                         await self.disconnect(HEARTBEAT_NOT_RESPONDED_CODE)
                         return
 
@@ -252,7 +248,6 @@ class AgentConsumer(AsyncWebsocketConsumer):
         # Called when the socket closes
 
         if hasattr(self, "task"):
-            print("CANCELLING SHOULD ALWAY BE CANCELLED")
             self.task.cancel()
 
             try:
@@ -264,7 +259,6 @@ class AgentConsumer(AsyncWebsocketConsumer):
                 return
 
         if hasattr(self, "heartbeat_task"):
-            print("CANCELLING SHOULD ALWAY BE CANCELLED")
             self.heartbeat_task.cancel()
 
             try:
@@ -276,9 +270,9 @@ class AgentConsumer(AsyncWebsocketConsumer):
                 return
 
         await persist_backend.on_agent_disconnected(self.agent.id)
-        print("DISCONNECTED")
         pass
 
         await persist_backend.on_agent_disconnected(self.agent.id)
-        print("DISCONNECTED")
         pass
+
+        logging.warning(f"{self.agent.id} disconnected with code {close_code}")

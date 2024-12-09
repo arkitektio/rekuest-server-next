@@ -158,6 +158,13 @@ class ReservationEventChoices(TextChoices):
     LOG = "LOG"
 
 
+class AgentEventChoices(TextChoices):
+    DISCONNECT = "DISCONNECT", "Disconnect (Agent disconnected)"
+    CONNECT = "CONNECT", "Connect (Agent connected)"
+
+
+
+
 class ProvisionEventChoices(TextChoices):
     # Start State
     DENIED = "DENIED", "Denied (Provision was rejected by the platform)"
@@ -232,6 +239,12 @@ class ReservationStrategy(str, Enum):
     LEAST_TIME = "LEAST_TIME"
     LEAST_LOAD = "LEAST_LOAD"
     DIRECT = "DIRECT"
+
+
+@strawberry.enum
+class AgentEventKind(str, Enum):
+    DISCONNECT = "DISCONNECT"
+    CONNECT = "CONNECT"
 
 
 @strawberry.enum

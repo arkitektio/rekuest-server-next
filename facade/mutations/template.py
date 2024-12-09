@@ -92,7 +92,6 @@ def _create_template(input: TemplateInputModel, agent: models.Agent, extension: 
                 except models.Node.DoesNotExist:
                     depending_node = None
 
-                print(i)
 
                 dep, _ = models.Dependency.objects.update_or_create(
                     template=template,
@@ -247,7 +246,6 @@ def set_extension_templates(info: Info, input: inputs.SetExtensionTemplatesInput
         for i in previous_templates:
             if i.id not in created_templates_id:
                 i.delete()
-                print("Deleted Template", id)
 
 
     return created_templates

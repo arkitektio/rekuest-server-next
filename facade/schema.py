@@ -66,18 +66,15 @@ class Query:
 
     @strawberry_django.field()
     def agent(self, info: Info, id: strawberry.ID) -> types.Agent:
-        print("hallo")
         return models.Agent.objects.get(id=id)
     
     @strawberry_django.field()
     def dashboard(self, info: Info, id: strawberry.ID) -> types.Dashboard:
-        print("hallo")
         return models.Dashboard.objects.get(id=id)
 
 
     @strawberry_django.field()
     def dependency(self, info: Info, id: strawberry.ID) -> types.Dependency:
-        print("hallo")
         return models.Dependency.objects.get(id=id)
 
     @strawberry_django.field()

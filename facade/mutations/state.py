@@ -72,7 +72,7 @@ def update_state(info: Info, input: inputs.UpdateStateInput)-> types.State:
     state.value = new_state
 
     state.save()
-    print("UPDATING STATE", state.id)
+    logging.info(f"UPDATING STATE {state.id}")
     new_state_broadcast(state.id, [f"new_state_stuff{state.id}", "farticarti"])
 
 

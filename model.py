@@ -64,14 +64,12 @@ def build_graph_recursive(template_id: int, edges: list[DependencyEdge], nodes: 
 
     for dep in template.dependencies.all():
         if dep.node is not None:
-            print("Valid node")
             nodes.append(NodeNode(id=dep.node.id, node_id=dep.node.id))
             edges.append(DependencyEdge(id=dep.id, source=dep.node.hash, target=template.node.hash, optional=dep.optional))
             for template in dep.node.templates.all():
                 build_graph_recursive(template.id, edges, nodes)
 
         else:
-            print("Invalid node")
             nodes.append(InvalidNode(id=dep.id, initial_hash=dep.initial_hash))
             edges.append(DependencyEdge(id=dep.id, source=dep.initial_hash, target=template.node.hash, optional=dep.optional))
 

@@ -361,6 +361,23 @@ class AssignationEvent:
     @strawberry_django.field()
     def reference(self) -> str:
         return self.assignation.reference
+    
+
+@strawberry_django.type(
+    models.AgentEvent, filters=filters.AssignationEventFilter, pagination=True
+)
+class AgentEvent:
+    id: strawberry.ID
+    status: enums.AgentStatus
+
+    @strawberry_django.field()
+    def level(self) -> enums.LogLevel:
+        return enums.LogLevel.INFO
+
+    @strawberry_django.field()
+    def reference(self) -> str:
+        return self.assignation.reference
+
 
 
 @strawberry_django.type(
@@ -406,10 +423,7 @@ class Dashboard:
 
     @strawberry_django.field()
     def ui_tree(self) -> uitypes.UITree | None:
-
-
         model = uimodels.UITreeModel(**self.ui_tree) if self.ui_tree else None
-        print(model)
         return model
 
 @strawberry_django.type(

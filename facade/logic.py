@@ -1,4 +1,5 @@
 import json
+import logging
 from facade import models, types, enums, inputs
 from django.db.models import Q
 from guardian.shortcuts import get_objects_for_user
@@ -168,7 +169,6 @@ async def apropagate_reservation_change(reservation: models.Reservation):
             active_provisions.append(provision)
 
 
-    print("Active provisions", active_provisions)
         
 
     if len(active_provisions) >= binds.minimum_instances:
@@ -186,7 +186,6 @@ async def apropagate_reservation_change(reservation: models.Reservation):
 
     
     if old_viable != reservation.viable:
-        print("We changed state. So we need to propagate. Create a new event.")
         x = await models.ReservationEvent.objects.acreate(
             reservation=reservation,
             kind=enums.ReservationEventKind.CHANGE,
@@ -194,11 +193,10 @@ async def apropagate_reservation_change(reservation: models.Reservation):
         )
 
         if reservation.causing_provision:
-            print("This reservation was caused by a provision. So we need to propagate.")
             await apropagate_provision_change(reservation.causing_provision)
 
     else:
-        print("We didn't change state. So no need to propagate.")
+        logging.info("We didn't change state. So no need to propagate.")
         await reservation.asave()
 
 
@@ -224,12 +222,12 @@ async def apropagate_provision_change(provision: models.Provision):
     await provision.asave()
 
     if provision.is_viable:
-        print("The provision is now active, and the dependencies are met. We can active potential reservations.")
+        logging.info("The provision is now active, and the dependencies are met. We can active potential reservations.")
         async for reservation in provision.reservations.all():
             await apropagate_reservation_change(reservation)
     
     else:
-        print("The provision is not active, or the dependencies are not met. So we need to check the reservations.")
+        logging.info("The provision is not active, or the dependencies are not met. So we need to check the reservations.")
         async for reservation in provision.reservations.all():
             await apropagate_reservation_change(reservation)
 
@@ -410,11 +408,8 @@ def schedule_reservation(reservation: models.Reservation):
                     causing_reservation=reservation,
                 )
 
-                print("Created new provision", prov)
 
                 for dependency in template.dependencies.all():
-
-                    print("Scheduling dependencies")
 
                     waiter, _ = models.Waiter.objects.get_or_create(
                         registry=template.agent.registry, instance_id=template.agent.instance_id, defaults=dict(name="default")

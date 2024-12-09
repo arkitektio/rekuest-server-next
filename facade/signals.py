@@ -20,14 +20,12 @@ logger.info("Loading sssignals")
 
 @receiver(post_save, sender=models.Node)
 def node_singal(sender, instance=None, **kwargs):
-    print("Signal received!")
     if instance:
         node_created_broadcast(instance.id, [f"nodes"])
 
 
 @receiver(post_save, sender=models.Reservation)
 def reservation_signal(sender, instance=None, **kwargs):
-    print("Signal received!")
     logger.info("Reservation received!")
 
 
@@ -35,7 +33,6 @@ def reservation_signal(sender, instance=None, **kwargs):
 def provision_signal(sender, instance=None, created=None, **kwargs):
     from facade.backend import controll_backend
 
-    logger.info("Provision received!")
     if created:
         controll_backend.provide(instance)
         assign_perm("can_link_to", instance.agent.registry.user, instance)
@@ -78,7 +75,6 @@ def ass_post_save(sender, instance: models.Assignation = None, created=None, **k
 def ass_event_post_save(
     sender, instance: models.AssignationEvent = None, created=None, **kwargs
 ):
-    print("Forwarding ass evenddt", f"ass_waiter_{instance.assignation.waiter.id}")
     assignation_broadcast(
         {"id": instance.id, "type": "event"},
         [f"ass_waiter_{instance.assignation.waiter.id}"],
@@ -117,9 +113,7 @@ def temp_post_save(sender, instance: models.Template = None, **kwargs):
 
 @receiver(post_delete, sender=models.Template)
 def temp_post_save(sender, instance: models.Template = None, **kwargs):
-
-    print(instance)
-
+    pass
 
 
 

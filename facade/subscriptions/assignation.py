@@ -47,17 +47,13 @@ async def assignations(
         registry=registry, instance_id=instance_id, defaults=dict(name="default")
     )
 
-    print("Listenissng for assignations on", f"ass_waiter_{waiter.id}")
 
     async for message in assignation_listen(info, [f"ass_waiter_{waiter.id}"]):
        
-        print("Doing this")
-
 
         if message["type"] == "created":
             ass = await models.Assignation.objects.aget(id=message["id"])
             yield AssignationChangeEvent(create=ass, event=None)
         else:
-            print("Got another message")
             event = await models.AssignationEvent.objects.aget(id=message["id"])
             yield AssignationChangeEvent(event=event, create=None)

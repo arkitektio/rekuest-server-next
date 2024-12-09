@@ -16,10 +16,8 @@ async def state_update_events(
 
     state = await models.State.objects.aget(id=state_id)
 
-    print("Starting state update events", state.id)
 
     async for message in new_state_listen(info, [f"new_state_stuff{state.id}", "cactusfart"]):
-        print("CHANGED STATE", message)
         yield await models.State.objects.aget(id=message)
 
 

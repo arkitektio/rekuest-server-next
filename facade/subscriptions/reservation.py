@@ -43,7 +43,6 @@ async def reservation_events(
 ) -> AsyncGenerator[types.ReservationEvent, None]:
     """Join and subscribe to message sent to the given rooms."""
 
-    print(info)
 
     registry, _ = await models.Registry.objects.aget_or_create(
         app=info.context.request.app, user=info.context.request.user

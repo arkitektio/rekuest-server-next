@@ -5,6 +5,7 @@ from authentikate.models import App, User
 from django.db import models
 from django_choices_field import TextChoicesField
 from facade.enums import (
+    AgentEventChoices,
     AgentStatusChoices,
     AssignationEventChoices,
     AssignationStatusChoices,
@@ -762,6 +763,29 @@ class ReservationEvent(models.Model):
         blank=True,
     )
 
+
+class AgentEvent(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    agent = models.ForeignKey(
+        Agent,
+        help_text="The agent",
+        related_name="events",
+        on_delete=models.CASCADE,
+    )
+    message = models.CharField(max_length=2000, null=True, blank=True)
+    # Status Field
+    kind = TextChoicesField(
+        max_length=1000,
+        choices_enum=AgentEventChoices,
+        help_text="The event kind",
+    )
+    level = TextChoicesField(
+        max_length=1000,
+        choices_enum=LogLevelChoices,
+        help_text="The event level",
+        null=True,
+        blank=True,
+    )
 
 class ProvisionEvent(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)

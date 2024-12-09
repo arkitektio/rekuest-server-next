@@ -4,7 +4,6 @@ from rekuest_core.inputs.models import DefinitionInputModel
 
 
 def is_hook(definition: DefinitionInputModel) -> Protocol:
-    print(definition)
 
     if not definition.args:
         return None

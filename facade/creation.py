@@ -48,8 +48,6 @@ def create_node_from_definition(definition: ritypes.DefinitionInput) -> models.N
         json.dumps(definition.dict(), sort_keys=True).encode()
     ).hexdigest()
      
-    print(hash)
-
     try:
         node = models.Node.objects.get(hash=hash)
     except models.Node.DoesNotExist:

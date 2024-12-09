@@ -94,7 +94,6 @@ def build_params(
         individual_queries.append(count_condition)
 
     if force_structure_length is not None:
-        print("force_structure_length")
         sql_part = f"item->>'kind' = 'STRUCTURE'" 
         count_condition = f"""(SELECT COUNT(*) FROM jsonb_array_elements({type}) AS j(item) WHERE {sql_part}) = {force_structure_length}"""
         individual_queries.append(count_condition)
@@ -104,7 +103,6 @@ def build_params(
         raise ValueError("No search params provided")
     
     full_sql = "SELECT id FROM facade_node WHERE " + " AND ".join(individual_queries)
-    print(full_sql)
 
     return full_sql, all_params
 
