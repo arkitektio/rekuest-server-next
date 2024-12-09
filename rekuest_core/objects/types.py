@@ -50,16 +50,14 @@ class CustomAssignWidget(AssignWidget):
 class SearchAssignWidget(AssignWidget):
     query: str
     ward: str
-    filters: Optional[list[
-        LazyType["ChildPort", __name__]
-    ]] = None  
-    
-    
+    filters: Optional[list[LazyType["ChildPort", __name__]]] = None
+
     # this took me a while to figure out should be more obvious
+
+
 @pydantic.type(models.StateChoiceAssignWidgetModel)
 class StateChoiceAssignWidget(AssignWidget):
     state_choices: str
-
 
 
 @pydantic.type(models.StringWidgetModel)
@@ -118,7 +116,7 @@ class Binds:
 
 @pydantic.type(models.ChildPortModel)
 class ChildPort:
-    key: str 
+    key: str
     label: strawberry.auto
     identifier: scalars.Identifier | None
     default: scalars.AnyDefault | None
@@ -126,9 +124,9 @@ class ChildPort:
     kind: enums.PortKind
     description: str | None
     nullable: bool
-    children: Optional[list[
-        LazyType["ChildPort", __name__]
-    ]] = None  # this took me a while to figure out should be more obvious
+    children: Optional[list[LazyType["ChildPort", __name__]]] = (
+        None  # this took me a while to figure out should be more obvious
+    )
     assign_widget: AssignWidget | None
     return_widget: ReturnWidget | None
 

@@ -32,7 +32,6 @@ class AgentMessageTypes(str, Enum):
     LIST_ASSIGNATIONS_REPLY = "LIST_ASSIGNATIONS_REPLY"
     LIST_ASSIGNATIONS_DENIED = "LIST_ASSIGNATIONS_DENIED"
 
-
     INQUIRY = "INQUIRY"
 
     LIST_PROVISIONS = "LIST_PROVISIONS"
@@ -59,31 +58,28 @@ class JSONMessage(BaseModel):
 
 
 class AssignationsList(JSONMessage):
-    type: Literal[
+    type: Literal[AgentMessageTypes.LIST_ASSIGNATIONS] = (
         AgentMessageTypes.LIST_ASSIGNATIONS
-    ] = AgentMessageTypes.LIST_ASSIGNATIONS
+    )
     exclude: Optional[List[AssignationStatus]]
 
 
 class AssignationsInquiry(JSONMessage):
-    type: Literal[
-        AgentMessageTypes.INQUIRY
-    ] = AgentMessageTypes.INQUIRY
+    type: Literal[AgentMessageTypes.INQUIRY] = AgentMessageTypes.INQUIRY
     assignations: List[Assignation]
 
 
-
 class AssignationsListReply(JSONMessage):
-    type: Literal[
+    type: Literal[AgentMessageTypes.LIST_ASSIGNATIONS_REPLY] = (
         AgentMessageTypes.LIST_ASSIGNATIONS_REPLY
-    ] = AgentMessageTypes.LIST_ASSIGNATIONS_REPLY
+    )
     assignations: List[Assignation]
 
 
 class AssignationsListDenied(JSONMessage):
-    type: Literal[
+    type: Literal[AgentMessageTypes.LIST_ASSIGNATIONS_DENIED] = (
         AgentMessageTypes.LIST_ASSIGNATIONS_DENIED
-    ] = AgentMessageTypes.LIST_ASSIGNATIONS_DENIED
+    )
     error: str
 
 
@@ -93,16 +89,16 @@ class ProvisionList(JSONMessage):
 
 
 class ProvisionListReply(JSONMessage):
-    type: Literal[
+    type: Literal[AgentMessageTypes.LIST_PROVISIONS_REPLY] = (
         AgentMessageTypes.LIST_PROVISIONS_REPLY
-    ] = AgentMessageTypes.LIST_PROVISIONS_REPLY
+    )
     provisions: List[Provision]
 
 
 class ProvisionListDenied(JSONMessage):
-    type: Literal[
+    type: Literal[AgentMessageTypes.LIST_PROVISIONS_DENIED] = (
         AgentMessageTypes.LIST_PROVISIONS_DENIED
-    ] = AgentMessageTypes.LIST_PROVISIONS_DENIED
+    )
     error: str
 
 

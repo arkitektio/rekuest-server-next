@@ -10,8 +10,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-
-def create_template_from_definition(input: inputs.CreateTemplateInput, agent: models.Agent) -> models.Template:
+def create_template_from_definition(
+    input: inputs.CreateTemplateInput, agent: models.Agent
+) -> models.Template:
 
     node = create_node_from_definition(input.definition)
 
@@ -39,15 +40,12 @@ def create_template_from_definition(input: inputs.CreateTemplateInput, agent: mo
     return template
 
 
-
-
 def create_node_from_definition(definition: ritypes.DefinitionInput) -> models.Node:
-
 
     hash = hashlib.sha256(
         json.dumps(definition.dict(), sort_keys=True).encode()
     ).hexdigest()
-     
+
     try:
         node = models.Node.objects.get(hash=hash)
     except models.Node.DoesNotExist:

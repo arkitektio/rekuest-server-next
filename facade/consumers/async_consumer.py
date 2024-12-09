@@ -86,7 +86,6 @@ class AgentConsumer(AsyncWebsocketConsumer):
     @classmethod
     def broadcast(cls, agent_id: str, message: dict):
 
-
         connection = redis.Redis(host="redis")
 
         if not isinstance(message, str):
@@ -137,7 +136,6 @@ class AgentConsumer(AsyncWebsocketConsumer):
         self.agent.last_seen = datetime.datetime.now()
         await self.agent.asave()
 
-
         self.answer_future = None
 
         self.provisions = []
@@ -170,7 +168,6 @@ class AgentConsumer(AsyncWebsocketConsumer):
     async def on_agent_heartbeat(self):
         self.agent.last_seen = datetime.datetime.now()
         await self.agent.asave()
-
 
     async def heartbeat(self, agent_id: str):
         try:
@@ -235,7 +232,9 @@ class AgentConsumer(AsyncWebsocketConsumer):
                         logging.debug("ANSWERING HEARTBEAT")
                         self.answer_future.set_result(None)
                     else:
-                        logging.error("Receidved heartbeat without future, holy moly, this is a protocol error")
+                        logging.error(
+                            "Receidved heartbeat without future, holy moly, this is a protocol error"
+                        )
                         await self.disconnect(HEARTBEAT_NOT_RESPONDED_CODE)
                         return
 

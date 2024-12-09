@@ -21,7 +21,6 @@ from facade.utils import cascade_agent_failure
 logger = logging.getLogger(__name__)
 
 
-
 def cascade_agent_failure(agent: Agent, agent_status: AgentStatus):
     """Cascades agent failure to all reservations and provisions"""
 
@@ -183,10 +182,7 @@ def change_provision(m: ProvisionChangedMessage, agent: models.Agent):
 
         if provision.status == ProvisionStatus.CRITICAL:
             for res in provision.reservations.filter(status=ReservationStatus.ACTIVE):
-                if (
-                    res.provisions.filter(status=ProvisionStatus.ACTIVE).count()
-                    == 0
-                ):
+                if res.provisions.filter(status=ProvisionStatus.ACTIVE).count() == 0:
                     res.status = ReservationStatus.DISCONNECT
                     res.save()
                     forward += [
@@ -200,10 +196,7 @@ def change_provision(m: ProvisionChangedMessage, agent: models.Agent):
         if provision.status == ProvisionStatus.CANCELLED:
             for res in provision.reservations.filter(status=ReservationStatus.ACTIVE):
 
-                if (
-                    res.provisions.filter(status=ProvisionStatus.ACTIVE).count()
-                    == 0
-                ):
+                if res.provisions.filter(status=ProvisionStatus.ACTIVE).count() == 0:
                     res.status = ReservationStatus.CANCELLED
                     res.save()
                     forward += [
@@ -232,10 +225,7 @@ def accept_reservation(m: ReserveHareMessage, agent: models.Agent):
     try:
         res = models.Reservation.objects.get(id=m.reservation)
 
-        if (
-            res.provisions.filter(status=ProvisionStatus.ACTIVE).count()
-            > 0
-        ):
+        if res.provisions.filter(status=ProvisionStatus.ACTIVE).count() > 0:
             res.status = ReservationStatus.ACTIVE
             res.save()
             forward += [
@@ -300,10 +290,7 @@ def activate_provision(m: ProvisionChangedMessage, agent: models.Agent):
         provision.save()
 
         for res in provision.reservations.filter():
-            if (
-                res.provisions.filter(status=ProvisionStatus.ACTIVE).count()
-                > 0
-            ):
+            if res.provisions.filter(status=ProvisionStatus.ACTIVE).count() > 0:
                 res.status = ReservationStatus.ACTIVE
                 res.save()
                 forward += [

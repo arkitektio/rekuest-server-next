@@ -94,14 +94,13 @@ def build_params(
         individual_queries.append(count_condition)
 
     if force_structure_length is not None:
-        sql_part = f"item->>'kind' = 'STRUCTURE'" 
+        sql_part = f"item->>'kind' = 'STRUCTURE'"
         count_condition = f"""(SELECT COUNT(*) FROM jsonb_array_elements({type}) AS j(item) WHERE {sql_part}) = {force_structure_length}"""
         individual_queries.append(count_condition)
 
-
     if not individual_queries:
         raise ValueError("No search params provided")
-    
+
     full_sql = "SELECT id FROM facade_node WHERE " + " AND ".join(individual_queries)
 
     return full_sql, all_params
@@ -125,17 +124,16 @@ def filter_nodes_by_demands(
         force_length=force_length,
         force_non_nullable_length=force_non_nullable_length,
         force_structure_length=force_structure_length,
-        
     )
 
     with connection.cursor() as cursor:
         cursor.execute(full_sql, all_params)
         rows = cursor.fetchall()
         ids = [row[0] for row in rows]
-       
 
     qs = qs.filter(id__in=ids)
     return qs
+
 
 def get_node_ids_by_demands(
     demands: list[PortMatchInput] = None,
@@ -161,5 +159,3 @@ def get_node_ids_by_demands(
         rows = cursor.fetchall()
         ids = [row[0] for row in rows]
         return ids
-       
-

@@ -3,8 +3,12 @@ import strawberry_django
 import strawberry
 from facade import types, models, scalars, enums
 from typing import AsyncGenerator, Optional
-from facade.channels import node_created_listen, state_update_event_listen, assignation_listen, new_state_listen
-
+from facade.channels import (
+    node_created_listen,
+    state_update_event_listen,
+    assignation_listen,
+    new_state_listen,
+)
 
 
 async def state_update_events(
@@ -16,8 +20,7 @@ async def state_update_events(
 
     state = await models.State.objects.aget(id=state_id)
 
-
-    async for message in new_state_listen(info, [f"new_state_stuff{state.id}", "cactusfart"]):
+    async for message in new_state_listen(
+        info, [f"new_state_stuff{state.id}", "cactusfart"]
+    ):
         yield await models.State.objects.aget(id=message)
-
-

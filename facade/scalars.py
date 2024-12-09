@@ -3,7 +3,6 @@ from typing import NewType
 import strawberry
 
 
-
 Args = strawberry.scalar(
     NewType("Args", object),
     description="The `Args` scalar type represents a Dictionary of arguments",
@@ -26,4 +25,3 @@ InstanceID = strawberry.scalar(
     serialize=lambda v: v,
     parse_value=lambda v: v,
 )
-

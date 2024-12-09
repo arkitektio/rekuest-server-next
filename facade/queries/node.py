@@ -30,19 +30,20 @@ def node(
         return models.Assignation.objects.get(id=assignation).reservation.node
     if template:
         return models.Template.objects.get(id=template).node
-    
+
     if hash:
         return models.Node.objects.get(hash=hash)
-    
+
     if agent:
         if interface:
-            return models.Template.objects.filter(
-                node__hash=hash, interface=interface
-            ).first().node
+            return (
+                models.Template.objects.filter(node__hash=hash, interface=interface)
+                .first()
+                .node
+            )
         else:
             raise ValueError(
                 "You need to provide either, node_hash or node_id, if you want to inspect the node of an agent"
             )
-    
 
     return models.Node.objects.get(id=id)

@@ -10,6 +10,7 @@ from facade.utils import hash_input
 
 logger = logging.getLogger(__name__)
 
+
 def underscore(s: str) -> str:
     return s.replace(" ", "_").replace("-", "_").lower()
 
@@ -25,22 +26,19 @@ def hash_state_schema(definition: inputs.StateSchemaInput) -> str:
     ).hexdigest()
 
 
-def create_state_schema(info: Info, input: inputs.CreateStateSchemaInput)-> types.Dashboard:
-   
+def create_state_schema(
+    info: Info, input: inputs.CreateStateSchemaInput
+) -> types.Dashboard:
 
     schema = input.state_schema
 
-
-
-
     state_schema, _ = models.StateSchema.objects.update_or_create(
-        hash = hash_state_schema(schema),
-        defaults = dict(
-            name = underscore(schema.name),
-            ports = [strawberry.asdict(i) for i in schema.ports],
-            description = "A state schema",
-        )
+        hash=hash_state_schema(schema),
+        defaults=dict(
+            name=underscore(schema.name),
+            ports=[strawberry.asdict(i) for i in schema.ports],
+            description="A state schema",
+        ),
     )
 
     return state_schema
-

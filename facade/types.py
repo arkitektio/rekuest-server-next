@@ -87,12 +87,11 @@ class Node:
     reservations: list[LazyType["Reservation", __name__]] | None
     test_cases: list[LazyType["TestCase", __name__]] | None
 
-
     @strawberry_django.field()
     def runs(self) -> list[LazyType["Assignation", __name__]] | None:
-        return models.Assignation.objects.filter(provision__template__node=self).order_by("-created_at")
-
-
+        return models.Assignation.objects.filter(
+            provision__template__node=self
+        ).order_by("-created_at")
 
     @strawberry_django.field()
     def dependency_graph(self) -> DependencyGraph:
@@ -109,14 +108,10 @@ class Node:
     @strawberry_django.field()
     def port_groups(self) -> list[rtypes.PortGroup]:
         return [rmodels.PortGroupModel(**i) for i in self.port_groups]
-    
+
     @strawberry_django.field()
     def pinned(self, info: Info) -> bool:
-        return (
-            self
-            .pinned_by.filter(id=info.context.request.user.id)
-            .exists()
-        )
+        return self.pinned_by.filter(id=info.context.request.user.id).exists()
 
 
 @strawberry_django.type(
@@ -163,18 +158,14 @@ class Template:
     @strawberry_django.field()
     def dependency_graph(self) -> DependencyGraph:
         return build_template_graph(self)
-    
+
     @strawberry_django.field()
     def name(self) -> str:
-        return self.interface + "@" +self.agent.name
-    
+        return self.interface + "@" + self.agent.name
+
     @strawberry_django.field()
     def pinned(self, info: Info) -> bool:
-        return (
-            self
-            .pinned_by.filter(id=info.context.request.user.id)
-            .exists()
-        )
+        return self.pinned_by.filter(id=info.context.request.user.id).exists()
 
 
 @strawberry_django.type(
@@ -219,15 +210,10 @@ class Agent:
     @strawberry_django.field()
     def latest_hardware_record(self) -> HardwareRecord | None:
         return self.hardware_records.order_by("-created_at").first()
-    
+
     @strawberry_django.field()
     def pinned(self, info: Info) -> bool:
-        return (
-            self
-            .pinned_by.filter(id=info.context.request.user.id)
-            .exists()
-        )
-    
+        return self.pinned_by.filter(id=info.context.request.user.id).exists()
 
 
 @strawberry_django.type(models.Waiter, filters=filters.WaiterFilter, pagination=True)
@@ -315,24 +301,41 @@ class Assignation:
     name: str
     reference: str | None
     args: rscalars.AnyDefault
-    mother: Optional["Assignation"] = strawberry.field(description="A mother assignation is the root assignation that caused this assignation to be created. This mother is always created by intent (e.g a user action). If null, this assignation is the mother")
-    parent: Optional["Assignation"] = strawberry.field(description="A parent assignation is the next assignation in the chain of assignations that caused this assignation to be created. Parents can be created by intent or by the system. If null, this assignation is the parent")
-    reservation: Optional["Reservation"] = strawberry.field(description="If this assignation is the result of a reservation, this field will contain the reservation that caused this assignation to be created")
-    node: "Node" = strawberry.field(description="The node that this assignation is assigned to")
-    template: Optional["Template"] = strawberry.field(description="If set, this assignation was directly assigned to a template")
-    status: enums.AssignationEventKind = strawberry.field(description="The status of this assignation")
+    mother: Optional["Assignation"] = strawberry.field(
+        description="A mother assignation is the root assignation that caused this assignation to be created. This mother is always created by intent (e.g a user action). If null, this assignation is the mother"
+    )
+    parent: Optional["Assignation"] = strawberry.field(
+        description="A parent assignation is the next assignation in the chain of assignations that caused this assignation to be created. Parents can be created by intent or by the system. If null, this assignation is the parent"
+    )
+    reservation: Optional["Reservation"] = strawberry.field(
+        description="If this assignation is the result of a reservation, this field will contain the reservation that caused this assignation to be created"
+    )
+    node: "Node" = strawberry.field(
+        description="The node that this assignation is assigned to"
+    )
+    template: Optional["Template"] = strawberry.field(
+        description="If set, this assignation was directly assigned to a template"
+    )
+    status: enums.AssignationEventKind = strawberry.field(
+        description="The status of this assignation"
+    )
     status_message: str | None
-    waiter: "Waiter" = strawberry.field(description="The Waiter that this assignation was created by")
+    waiter: "Waiter" = strawberry.field(
+        description="The Waiter that this assignation was created by"
+    )
     node: "Node"
     created_at: datetime.datetime
     updated_at: datetime.datetime
-    provision: Optional["Provision"] = strawberry.field(description="The provision that this assignation was assigned to")
-    ephemeral: bool = strawberry.field(description="If true, this assignation will be deleted after the assignation is completed")
+    provision: Optional["Provision"] = strawberry.field(
+        description="The provision that this assignation was assigned to"
+    )
+    ephemeral: bool = strawberry.field(
+        description="If true, this assignation will be deleted after the assignation is completed"
+    )
 
     @strawberry_django.field()
     def events(self) -> list["AssignationEvent"]:
         return self.events.order_by("created_at")[:10]
-    
 
     @strawberry_django.field()
     def arg(self, key: str) -> scalars.Args | None:
@@ -361,7 +364,7 @@ class AssignationEvent:
     @strawberry_django.field()
     def reference(self) -> str:
         return self.assignation.reference
-    
+
 
 @strawberry_django.type(
     models.AgentEvent, filters=filters.AssignationEventFilter, pagination=True
@@ -377,7 +380,6 @@ class AgentEvent:
     @strawberry_django.field()
     def reference(self) -> str:
         return self.assignation.reference
-
 
 
 @strawberry_django.type(
@@ -405,20 +407,17 @@ class TestResult:
     created_at: datetime.datetime
     updated_at: datetime.datetime
 
-@strawberry_django.type(
-    models.Structure
-)
+
+@strawberry_django.type(models.Structure)
 class Structure:
     identifier: strawberry.ID
     object: strawberry.ID
 
 
-@strawberry_django.type(
-    models.Dashboard
-)
+@strawberry_django.type(models.Dashboard)
 class Dashboard:
     id: strawberry.ID
-    name: str | None 
+    name: str | None
     panels: list["Panel"] | None
 
     @strawberry_django.field()
@@ -426,38 +425,31 @@ class Dashboard:
         model = uimodels.UITreeModel(**self.ui_tree) if self.ui_tree else None
         return model
 
-@strawberry_django.type(
-    models.Panel
-)
+
+@strawberry_django.type(models.Panel)
 class Panel:
     id: strawberry.ID
     kind: enums.PanelKind
-    name: str 
-    reservation: Reservation | None 
+    name: str
+    reservation: Reservation | None
     state: Optional["State"]
     accessors: list[str] | None
     submit_on_load: bool
     submit_on_change: bool
 
 
-
-
-@strawberry_django.type(
-    models.StateSchema
-)
+@strawberry_django.type(models.StateSchema)
 class StateSchema:
     id: strawberry.ID
     hash: str
     name: str
-   
+
     @strawberry_django.field()
     def ports(self) -> list[rtypes.Port]:
         return [rmodels.PortModel(**i) for i in self.ports]
-    
 
-@strawberry_django.type(
-    models.State
-)
+
+@strawberry_django.type(models.State)
 class State:
     id: strawberry.ID
     state_schema: StateSchema
@@ -467,9 +459,8 @@ class State:
     updated_at: datetime.datetime
     historical_states: list["HistoricalState"]
 
-@strawberry_django.type(
-    models.HistoricalState
-)
+
+@strawberry_django.type(models.HistoricalState)
 class HistoricalState:
     id: strawberry.ID
     state: State
@@ -482,6 +473,7 @@ class JSONPatch:
     op: enums.JSONPatchOperation
     path: str
     value: scalars.Args
+
 
 @strawberry.type
 class StateUpdateEvent:

@@ -12,21 +12,32 @@ from rekuest_core.inputs.models import DefinitionInputModel, TemplateInputModel
 
 logger = logging.getLogger(__name__)
 
+
 def hash_definition(definition: DefinitionInputModel) -> str:
     hashable_definition = {
         key: value
         for key, value in dict(strawberry.asdict(definition)).items()
-        if key in ["name", "description", "args", "returns", "stateful", "is_test_for", "collections"]
+        if key
+        in [
+            "name",
+            "description",
+            "args",
+            "returns",
+            "stateful",
+            "is_test_for",
+            "collections",
+        ]
     }
     return hashlib.sha256(
         json.dumps(hashable_definition, sort_keys=True).encode()
     ).hexdigest()
 
 
+def _create_template(
+    input: TemplateInputModel, agent: models.Agent, extension: str
+) -> models.Template:
 
-def _create_template(input: TemplateInputModel, agent: models.Agent, extension: str) -> models.Template:
-
-    definition= input.definition
+    definition = input.definition
 
     hash = hash_definition(definition)
 
@@ -37,8 +48,6 @@ def _create_template(input: TemplateInputModel, agent: models.Agent, extension: 
 
         if definition.stateful is False:
             assert_non_statefullness(definition)
-
-
 
         node = models.Node.objects.create(
             hash=hash,
@@ -91,7 +100,6 @@ def _create_template(input: TemplateInputModel, agent: models.Agent, extension: 
                     depending_node = models.Node.objects.get(hash=i.hash)
                 except models.Node.DoesNotExist:
                     depending_node = None
-
 
                 dep, _ = models.Dependency.objects.update_or_create(
                     template=template,
@@ -161,12 +169,10 @@ def _create_template(input: TemplateInputModel, agent: models.Agent, extension: 
                 )
                 new_deps.append(dep)
 
-
     return template
 
 
 def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Template:
-   
 
     registry, _ = models.Registry.objects.update_or_create(
         app=info.context.request.app,
@@ -184,35 +190,31 @@ def create_template(info: Info, input: inputs.CreateTemplateInput) -> types.Temp
     return _create_template(input.template, agent, input.extension)
 
 
+def create_foreign_template(
+    info: Info, input: inputs.CreateForeignTemplateInput
+) -> types.Template:
 
-def create_foreign_template(info: Info, input: inputs.CreateForeignTemplateInput) -> types.Template:
-    
+    agent = models.Agent.objects.get(id=input.agent)
 
-    agent = models.Agent.objects.get(
-        id=input.agent
-    )
-
-    assert input.extension in agent.extensions, f"Extension {input.extension} not supported by agent {agent}"
+    assert (
+        input.extension in agent.extensions
+    ), f"Extension {input.extension} not supported by agent {agent}"
 
     return _create_template(input.template, agent, input.extension)
 
-    
-def delete_template(info: Info, input: inputs.DeleteTemplateInput) -> str:
-    
 
-    template = models.Template.objects.get(
-        id=input.template
-    )
+def delete_template(info: Info, input: inputs.DeleteTemplateInput) -> str:
+
+    template = models.Template.objects.get(id=input.template)
 
     template.delete()
-
 
     return input.id
 
 
-
-
-def set_extension_templates(info: Info, input: inputs.SetExtensionTemplatesInput) -> list[types.Template]:
+def set_extension_templates(
+    info: Info, input: inputs.SetExtensionTemplatesInput
+) -> list[types.Template]:
 
     registry, _ = models.Registry.objects.update_or_create(
         app=info.context.request.app,
@@ -227,10 +229,9 @@ def set_extension_templates(info: Info, input: inputs.SetExtensionTemplatesInput
         ),
     )
 
-    
-
-    previous_templates = models.Template.objects.filter(agent=agent, extension=input.extension).all()
-
+    previous_templates = models.Template.objects.filter(
+        agent=agent, extension=input.extension
+    ).all()
 
     created_templates_id = []
     created_templates = []
@@ -241,15 +242,12 @@ def set_extension_templates(info: Info, input: inputs.SetExtensionTemplatesInput
         created_templates_id.append(created_template.id)
         created_templates.append(created_template)
 
-
     if input.run_cleanup:
         for i in previous_templates:
             if i.id not in created_templates_id:
                 i.delete()
 
-
     return created_templates
-
 
 
 def pin_template(info, input: inputs.PinInput) -> types.Template:

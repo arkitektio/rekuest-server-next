@@ -19,6 +19,7 @@ from facade.enums import (
     WaiterStatusChoices,
 )
 from django.contrib.auth import get_user_model
+
 # Create your models here.
 
 
@@ -81,10 +82,12 @@ class Node(models.Model):
         default=False, help_text="Is this function pure. e.g can we cache the result?"
     )
     idempotent = models.BooleanField(
-        default=False, help_text="Is this function idempotent. e.g can we run it multiple times without ?"
+        default=False,
+        help_text="Is this function idempotent. e.g can we run it multiple times without ?",
     )
     stateful = models.BooleanField(
-        default=False, help_text="Is this function stateful. e.g does it inherently depend on or change state (think physical devices)?"
+        default=False,
+        help_text="Is this function stateful. e.g does it inherently depend on or change state (think physical devices)?",
     )
     pinned_by = models.ManyToManyField(
         get_user_model(),
@@ -539,8 +542,8 @@ class Reservation(models.Model):
     waiter = models.ForeignKey(
         Waiter,
         on_delete=models.CASCADE,
-        null = True,
-        blank = True,
+        null=True,
+        blank=True,
         max_length=1000,
         help_text="Which Waiter created this Reservation (if any?)",
         related_name="reservations",
@@ -648,7 +651,6 @@ class Assignation(models.Model):
         default=False,
         help_text="Is this Assignation ephemeral (e.g. should it be deleted after its done or should it be kept for future reference)",
     )
-    
 
     hooks = models.JSONField(
         default=list,
@@ -787,6 +789,7 @@ class AgentEvent(models.Model):
         blank=True,
     )
 
+
 class ProvisionEvent(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     provision = models.ForeignKey(
@@ -854,7 +857,6 @@ class TestResult(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
-
 class Structure(models.Model):
     identifier = models.CharField(max_length=2000)
     object = models.CharField(max_length=6000)
@@ -862,7 +864,9 @@ class Structure(models.Model):
 
 class Dashboard(models.Model):
     name = models.CharField(max_length=2000)
-    structure = models.ForeignKey(Structure, on_delete=models.CASCADE, null=True, blank=True)
+    structure = models.ForeignKey(
+        Structure, on_delete=models.CASCADE, null=True, blank=True
+    )
     ui_tree = models.JSONField(null=True, blank=True)
     panels = models.ManyToManyField("Panel", related_name="dashboard")
 
@@ -870,17 +874,23 @@ class Dashboard(models.Model):
 class Panel(models.Model):
     name = models.CharField(max_length=2000, default="Unnamed")
     kind = models.CharField(max_length=2000)
-    state = models.ForeignKey("State", on_delete=models.CASCADE, related_name="panels", null=True, blank=True)
+    state = models.ForeignKey(
+        "State", on_delete=models.CASCADE, related_name="panels", null=True, blank=True
+    )
     reservation = models.ForeignKey(
-        Reservation, on_delete=models.CASCADE, related_name="panels", null=True, blank=True
+        Reservation,
+        on_delete=models.CASCADE,
+        related_name="panels",
+        null=True,
+        blank=True,
     )
     template = models.ForeignKey(
         Template, on_delete=models.CASCADE, related_name="panels", null=True, blank=True
     )
-    accessors = models.JSONField( null=True, blank=True)
+    accessors = models.JSONField(null=True, blank=True)
     submit_on_change = models.BooleanField(default=False)
     submit_on_load = models.BooleanField(default=False)
-    
+
 
 class StateSchema(models.Model):
     name = models.CharField(max_length=2000)
@@ -890,7 +900,9 @@ class StateSchema(models.Model):
 
 
 class State(models.Model):
-    state_schema = models.ForeignKey(StateSchema, on_delete=models.CASCADE, related_name="states")
+    state_schema = models.ForeignKey(
+        StateSchema, on_delete=models.CASCADE, related_name="states"
+    )
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="states")
     value = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -906,15 +918,13 @@ class State(models.Model):
 
 
 class HistoricalState(models.Model):
-    state = models.ForeignKey(State, on_delete=models.CASCADE, related_name="historical_states")
+    state = models.ForeignKey(
+        State, on_delete=models.CASCADE, related_name="historical_states"
+    )
     value = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     archived_at = models.DateTimeField(auto_now_add=True)
-
-
-
-
 
 
 import facade.signals

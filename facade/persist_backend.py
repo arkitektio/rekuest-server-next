@@ -5,27 +5,27 @@ import datetime
 from django.conf import settings
 from asgiref.sync import async_to_sync
 import logging
-class ModelPersistBackend():
 
 
-
-
-
-
+class ModelPersistBackend:
 
     async def on_reinit(self, agent_id: str | None) -> None:
         if agent_id:
             agent = models.Agent.objects.aget(id=agent_id)
 
-            if agent.last_seen < datetime.datetime.now() - datetime.timedelta(seconds=settings.AGENT_DISCONNECTED_TIMEOUT):
+            if agent.last_seen < datetime.datetime.now() - datetime.timedelta(
+                seconds=settings.AGENT_DISCONNECTED_TIMEOUT
+            ):
                 await self.on_agent_disconnected(agent_id)
 
         else:
-            agents = models.Agent.objects.filter(last_seen__lt=datetime.datetime.now() - datetime.timedelta(seconds=settings.AGENT_DISCONNECTED_TIMEOUT)).all()
+            agents = models.Agent.objects.filter(
+                last_seen__lt=datetime.datetime.now()
+                - datetime.timedelta(seconds=settings.AGENT_DISCONNECTED_TIMEOUT)
+            ).all()
             async for agent in agents:
-               await self.on_agent_disconnected(agent.id)
+                await self.on_agent_disconnected(agent.id)
 
-        
     async def on_agent_disconnected(self, agent_id: str) -> None:
         agent = await models.Agent.objects.aget(id=agent_id)
         agent.status = enums.AgentStatus.DISCONNECTED
@@ -33,27 +33,38 @@ class ModelPersistBackend():
         agent.last_seen = datetime.datetime.now()
 
         async for i in models.Provision.objects.filter(agent=agent).all():
-            created = await models.ProvisionEvent.objects.acreate(provision=i, kind=enums.ProvisionEventKind.DISCONNECTED, message="Agent disconnected")
+            created = await models.ProvisionEvent.objects.acreate(
+                provision=i,
+                kind=enums.ProvisionEventKind.DISCONNECTED,
+                message="Agent disconnected",
+            )
             i.status = enums.ProvisionEventKind.DISCONNECTED
             i.provided = False
-            
+
             await logic.aset_provision_unprovided(i)
 
-            async for ass in models.Assignation.objects.filter(provision=i).exclude(status__in=[enums.AssignationEventKind.CANCELLED, enums.AssignationEventKind.DONE, enums.AssignationEventKind.CRITICAL]).all():
-                created = await models.AssignationEvent.objects.acreate(assignation=ass, kind=enums.AssignationEventKind.DISCONNECTED, message="Agent disconnected. Fate unknown")
+            async for ass in (
+                models.Assignation.objects.filter(provision=i)
+                .exclude(
+                    status__in=[
+                        enums.AssignationEventKind.CANCELLED,
+                        enums.AssignationEventKind.DONE,
+                        enums.AssignationEventKind.CRITICAL,
+                    ]
+                )
+                .all()
+            ):
+                created = await models.AssignationEvent.objects.acreate(
+                    assignation=ass,
+                    kind=enums.AssignationEventKind.DISCONNECTED,
+                    message="Agent disconnected. Fate unknown",
+                )
                 ass.status = enums.AssignationEventKind.DISCONNECTED
                 await ass.asave()
 
-
             await i.asave()
 
-
-
-
-
-
         await agent.asave()
-
 
     async def on_agent_heartbeat(self, agent_id: str) -> None:
         logging.debug(f"On agent Heartbeat {agent_id}")
@@ -64,18 +75,18 @@ class ModelPersistBackend():
 
         await x.asave()
 
-
-
     async def on_provide_changed(self, message: dict) -> None:
 
         logging.info(f"Changed Provision {message}")
 
         kind_of_change = message["kind"]
 
-
-        await models.ProvisionEvent.objects.acreate(provision_id=message["provision"], kind=message["kind"], message=message["message"])
+        await models.ProvisionEvent.objects.acreate(
+            provision_id=message["provision"],
+            kind=message["kind"],
+            message=message["message"],
+        )
         x = await models.Provision.objects.aget(id=message["provision"])
-
 
         if kind_of_change == enums.ProvisionEventKind.ACTIVE:
 
@@ -84,36 +95,35 @@ class ModelPersistBackend():
         if kind_of_change == enums.ProvisionEventKind.DISCONNECTED:
             await logic.aset_provision_unprovided(x)
 
-
         if kind_of_change != "LOG":
             x.status = message["kind"]
             await x.asave()
 
     async def on_assign_changed(self, message: dict) -> None:
 
-
         logging.info(f"Changed Assignation {message}")
         kind_of_change = message["kind"]
 
-        await models.AssignationEvent.objects.acreate(assignation_id=message["assignation"], kind=message["kind"], message=message["message"], returns=message["returns"], progress=message.get("progress", None))
-       
+        await models.AssignationEvent.objects.acreate(
+            assignation_id=message["assignation"],
+            kind=message["kind"],
+            message=message["message"],
+            returns=message["returns"],
+            progress=message.get("progress", None),
+        )
 
-        if kind_of_change == "DONE" or kind_of_change == "CANCELLED" or kind_of_change == "CRITICAL" or kind_of_change == "DISCONNECTED":
+        if (
+            kind_of_change == "DONE"
+            or kind_of_change == "CANCELLED"
+            or kind_of_change == "CRITICAL"
+            or kind_of_change == "DISCONNECTED"
+        ):
             x = await models.Assignation.objects.aget(id=message["assignation"])
             x.status = kind_of_change
             await x.asave()
-            
-
 
     async def aget_provisions(self, agent: models.Agent) -> list[models.Provision]:
         return await agent.provisions.aall()
-
-
-
-
-
-
-
 
 
 persist_backend = ModelPersistBackend()

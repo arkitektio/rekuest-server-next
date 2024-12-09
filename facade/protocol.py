@@ -24,4 +24,3 @@ def infer_protocols(definition: DefinitionInputModel) -> List[Protocol]:
             protocols.append(protocol)
 
     return protocols
-

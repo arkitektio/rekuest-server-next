@@ -5,7 +5,5 @@ import dataclasses
 
 
 def hash_input(input: dataclasses.dataclass):
-    hash = hashlib.sha256(
-            json.dumps(input.dict(), sort_keys=True).encode()
-        ).hexdigest()
+    hash = hashlib.sha256(json.dumps(input.dict(), sort_keys=True).encode()).hexdigest()
     return hash

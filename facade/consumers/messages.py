@@ -47,7 +47,6 @@ class BindParams(BaseModel):
         return "binds-" + "t".join(self.templates) + "c".join(self.clients)
 
 
-
 class Assignation(UpdatableModel):
     assignation: str
     provision: Optional[str]

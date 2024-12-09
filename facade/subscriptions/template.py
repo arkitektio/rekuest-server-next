@@ -28,7 +28,6 @@ async def templates(
             yield message["id"]
 
 
-
 async def template_change(
     self,
     info: Info,
@@ -39,5 +38,3 @@ async def template_change(
 
     async for message in template_listen(info, [f"template_{x.id}"]):
         yield await models.Template.objects.aget(id=message)
-
-

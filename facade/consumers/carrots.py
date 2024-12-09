@@ -17,7 +17,6 @@ class HareMessageTypes(str, Enum):
     CONNECT = "CONNECT"
     UNCONNECT = "UNCONNECT"
 
-
     KICK = "KICK"
     HEARTBEAT = "HEARTBEAT"
 
@@ -40,7 +39,6 @@ class HareMessageTypes(str, Enum):
     ASSIGN_CHANGED = "ASSIGN_CHANGED"
 
 
-
 class HareMessage(BaseModel):
     queue: str
 
@@ -56,7 +54,6 @@ class RouteHareMessage(HareMessage):
     queue = "route"
     type: Literal[HareMessageTypes.ROUTE] = HareMessageTypes.ROUTE
     reservation: str
-
 
 
 class RouteHareMessage(HareMessage):
@@ -86,10 +83,10 @@ class KickHareMessage(HareMessage):
 class BounceHareMessage(HareMessage):
     type: Literal[HareMessageTypes.BOUNCE] = HareMessageTypes.BOUNCE
 
+
 class HeartbeatHareMessage(HareMessage):
     type: Literal[HareMessageTypes.HEARTBEAT] = HareMessageTypes.HEARTBEAT
     provision: str
-
 
 
 class UnprovideHareMessage(HareMessage):
@@ -121,7 +118,6 @@ class AssignHareMessage(HareMessage):
     reservation: str
     args: List[Any]
     log: bool = True
-    
 
 
 class UnassignHareMessage(HareMessage):

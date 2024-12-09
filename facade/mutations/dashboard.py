@@ -11,14 +11,13 @@ from facade.utils import hash_input
 logger = logging.getLogger(__name__)
 
 
-def create_dashboard(info: Info, input: inputs.CreateDashboardInput)-> types.Dashboard:
+def create_dashboard(info: Info, input: inputs.CreateDashboardInput) -> types.Dashboard:
 
-    dashboard =  models.Dashboard.objects.create(
-        ui_tree = strawberry.asdict(input.tree) if input.tree else None,
-        name = input.name,
+    dashboard = models.Dashboard.objects.create(
+        ui_tree=strawberry.asdict(input.tree) if input.tree else None,
+        name=input.name,
     )
 
     dashboard.panels.set([models.Panel.objects.get(id=i) for i in input.panels])
 
     return dashboard
-

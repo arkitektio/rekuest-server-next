@@ -20,7 +20,7 @@ from facade.persist_backend import persist_backend
 
 @strawberry.input
 class AgentInput:
-    instance_id: scalars.InstanceID 
+    instance_id: scalars.InstanceID
     name: str | None = None
     extensions: list[str] | None = None
 
@@ -30,9 +30,7 @@ class DeleteAgentInput:
     id: strawberry.ID
 
 
-
 async def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
-
 
     # TODO: Hasch this
     registry, _ = await models.Registry.objects.aupdate_or_create(
@@ -49,10 +47,7 @@ async def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
         ),
     )
 
-
     return agent
-
-
 
 
 def pin_agent(info, input: inputs.PinInput) -> types.Agent:
@@ -63,7 +58,6 @@ def pin_agent(info, input: inputs.PinInput) -> types.Agent:
         agent.pinned_by.remove(info.context.request.user)
     agent.save()
     return agent
-
 
 
 def delete_agent(info, input: DeleteAgentInput) -> strawberry.ID:

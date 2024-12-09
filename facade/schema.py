@@ -45,20 +45,17 @@ class Query:
 
     state_for = strawberry_django.field(resolver=queries.state_for)
 
-
     @strawberry_django.field()
     def state(self, info: Info, id: strawberry.ID) -> types.State:
         return models.State.objects.get(id=id)
-    
 
     @strawberry_django.field()
     def panel(self, info: Info, id: strawberry.ID) -> types.Panel:
         return models.Panel.objects.get(id=id)
-    
+
     @strawberry_django.field()
     def state_schema(self, info: Info, id: strawberry.ID) -> types.StateSchema:
         return models.StateSchema.objects.get(id=id)
-
 
     @strawberry_django.field()
     def hardware_record(self, info: Info, id: strawberry.ID) -> types.HardwareRecord:
@@ -67,11 +64,10 @@ class Query:
     @strawberry_django.field()
     def agent(self, info: Info, id: strawberry.ID) -> types.Agent:
         return models.Agent.objects.get(id=id)
-    
+
     @strawberry_django.field()
     def dashboard(self, info: Info, id: strawberry.ID) -> types.Dashboard:
         return models.Dashboard.objects.get(id=id)
-
 
     @strawberry_django.field()
     def dependency(self, info: Info, id: strawberry.ID) -> types.Dependency:
@@ -127,11 +123,11 @@ class Mutation:
     reserve: types.Reservation = strawberry_django.mutation(resolver=mutations.reserve)
     link: types.Provision = strawberry_django.mutation(resolver=mutations.link)
     unlink: types.Provision = strawberry_django.mutation(resolver=mutations.unlink)
-    unreserve: str = strawberry_django.mutation(
-        resolver=mutations.unreserve
-    )
+    unreserve: str = strawberry_django.mutation(resolver=mutations.unreserve)
 
-    delete_template: str = strawberry_django.mutation(resolver=mutations.delete_template, description="Delete a template")
+    delete_template: str = strawberry_django.mutation(
+        resolver=mutations.delete_template, description="Delete a template"
+    )
 
     ensure_agent: types.Agent = strawberry_django.mutation(
         resolver=mutations.ensure_agent
@@ -166,11 +162,7 @@ class Mutation:
         resolver=mutations.create_panel
     )
 
-
-
-    set_state: types.State = strawberry_django.mutation(
-        resolver=mutations.set_state
-    )
+    set_state: types.State = strawberry_django.mutation(resolver=mutations.set_state)
 
     update_state: types.State = strawberry_django.mutation(
         resolver=mutations.update_state
@@ -185,9 +177,7 @@ class Mutation:
     pin_template: types.Template = strawberry_django.mutation(
         resolver=mutations.pin_template
     )
-    delete_agent = strawberry_django.mutation(
-        resolver=mutations.delete_agent
-    )
+    delete_agent = strawberry_django.mutation(resolver=mutations.delete_agent)
 
 
 @strawberry.type
@@ -204,7 +194,9 @@ class Subscription:
     provision_events = strawberry.subscription(resolver=subscriptions.provision_events)
     template_change = strawberry.subscription(resolver=subscriptions.template_change)
     templates = strawberry.subscription(resolver=subscriptions.templates)
-    state_update_events = strawberry.subscription(resolver=subscriptions.state_update_events)
+    state_update_events = strawberry.subscription(
+        resolver=subscriptions.state_update_events
+    )
 
 
 schema = strawberry.Schema(

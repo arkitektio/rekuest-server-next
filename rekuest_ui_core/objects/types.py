@@ -11,10 +11,10 @@ from rekuest_ui_core.objects import models
 from rekuest_ui_core import enums, scalars
 
 
-
 @pydantic.interface(models.UIChildModel)
 class UIChild:
     kind: enums.UIChildKind
+
 
 @pydantic.type(models.UIGridItemModel)
 class UIGridItem:
@@ -25,7 +25,6 @@ class UIGridItem:
     min_w: int
     max_w: int
     child: UIChild
-
 
 
 @pydantic.type(models.UIBreakpointModel)
@@ -39,7 +38,7 @@ class UIBreakpoint:
 
 @pydantic.type(models.UIGridModel)
 class UIGrid(UIChild):
-    row_height:  int
+    row_height: int
     columns: int
     children: list[UIGridItem]
 
@@ -53,6 +52,7 @@ class UISplit(UIChild):
 @pydantic.type(models.UIStateModel)
 class UIState(UIChild):
     state: str
+
 
 @pydantic.type(models.UITreeModel)
 class UITree:

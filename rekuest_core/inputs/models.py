@@ -34,6 +34,7 @@ class ValidatorInputModel(BaseModel):
     label: str | None = None
     error_message: str | None = None
 
+
 class AssignWidgetInputModel(BaseModel):
     kind: enums.AssignWidgetKind
     query: str | None = None
@@ -63,7 +64,7 @@ class ReturnWidgetInputModel(BaseModel):
 
 
 class ChildPortInputModel(BaseModel):
-    key: str 
+    key: str
     label: str | None
     kind: enums.PortKind
     scope: enums.PortScope
@@ -74,7 +75,6 @@ class ChildPortInputModel(BaseModel):
     effects: list[EffectInputModel] | None = None
     assign_widget: Optional["AssignWidgetInputModel"] = None
     return_widget: Optional["ReturnWidgetInputModel"] = None
-
 
 
 class PortInputModel(BaseModel):
@@ -101,8 +101,6 @@ class PortInputModel(BaseModel):
         if kind == enums.PortKind.LIST and (children is None or len(children) != 1):
             raise ValueError("Port of kind LIST must have exactly on children")
         return values
-
-
 
 
 class PortGroupInputModel(BaseModel):
@@ -133,8 +131,6 @@ class DependencyInputModel(BaseModel):
     binds: BindsInputModel | None
     optional: bool = False
     viable_instances: int | None
-    
-
 
 
 class TemplateInputModel(BaseModel):
@@ -145,7 +141,6 @@ class TemplateInputModel(BaseModel):
     instance_id: str | None = None
     dynamic: bool = False
     logo: str | None = None
-
 
 
 AssignWidgetInputModel.update_forward_refs()

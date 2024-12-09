@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 import uuid
 
+
 class InvalidNodeModel(BaseModel):
     kind: str = "InvalidNode"
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -9,7 +10,7 @@ class InvalidNodeModel(BaseModel):
 
 class NodeNodeModel(BaseModel):
     kind: str = "NodeNode"
-    id: str =Field(default_factory=lambda: str(uuid.uuid4()))
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     node_id: str
     name: str
     status: str | None
@@ -29,11 +30,10 @@ class TemplateNodeModel(BaseModel):
     active: bool = False
 
 
-
 class DependencyEdgeModel(BaseModel):
     kind: str = "DependencyEdge"
-    id: str =Field(default_factory=lambda: str(uuid.uuid4()))
-    source: str 
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    source: str
     target: str
     optional: bool
     dep_id: str | None
@@ -43,7 +43,7 @@ class DependencyEdgeModel(BaseModel):
 class ImplementationEdgeModel(BaseModel):
     kind: str = "ImplementationEdge"
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    source: str 
+    source: str
     target: str
     optional: bool
     reservation_id: str | None
@@ -53,10 +53,7 @@ class ImplementationEdgeModel(BaseModel):
 NodeModel = NodeNodeModel | InvalidNodeModel | TemplateNodeModel
 EdgeModel = DependencyEdgeModel | ImplementationEdgeModel
 
+
 class DependencyGraphModel(BaseModel):
     nodes: list[NodeModel]
     edges: list[EdgeModel]
-
-
-
-

@@ -14,18 +14,19 @@ def template_at(
 ) -> types.Template:
     if node_hash:
         return models.Template.objects.get(agent_id=agent, node__hash=node_hash)
-    
-    return models.Template.objects.get(agent_id=agent, extension=extension, interface=interface)
 
+    return models.Template.objects.get(
+        agent_id=agent, extension=extension, interface=interface
+    )
 
 
 async def my_template_at(
     info: Info,
-    instance_id: str, 
+    instance_id: str,
     node_id: strawberry.ID | None = None,
     interface: str | None = None,
 ) -> types.Template:
-    
+
     # TODO: Hasch this
     registry, _ = await models.Registry.objects.aget_or_create(
         app=info.context.request.app,
@@ -36,12 +37,11 @@ async def my_template_at(
         registry=registry,
         instance_id=instance_id,
     )
-    
+
     if node_id:
         return await models.Template.objects.aget(agent=agent, node_id=node_id)
-    
+
     if interface:
         return await models.Template.objects.aget(agent=agent, interface=interface)
-    
+
     raise ValueError("Either node_id or interface must be provided")
-    

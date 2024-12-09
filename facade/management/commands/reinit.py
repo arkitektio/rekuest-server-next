@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.conf import settings
-from facade.models import  Agent, Registry
-from rekuest_core.inputs import models 
+from facade.models import Agent, Registry
+from rekuest_core.inputs import models
 from facade.unique import calculate_node_hash, infer_node_scope
 from facade.creation import create_template_from_definition
 from authentikate.models import App
@@ -17,6 +17,4 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
 
-
         persist_backend.on_reinit()
-

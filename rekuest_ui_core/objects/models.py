@@ -6,8 +6,9 @@ from typing import Literal, Union
 import datetime
 from rekuest_core import enums
 
+
 class UIChildModel(BaseModel):
-    kind: str 
+    kind: str
 
 
 class UIGridItemModel(BaseModel):
@@ -16,23 +17,25 @@ class UIGridItemModel(BaseModel):
 
 
 class UIBreakpointModel(BaseModel):
-    lg: int  = 12
+    lg: int = 12
     md: int = 8
     sm: int = 4
     xs: int = 2
     xxs: int = 24
 
-    
+
 class UIGridModel(UIChildModel):
     kind: Literal["GRID"] = "GRID"
-    rows: int 
+    rows: int
     columns: int
     children: list["UIChildModelUnion"]
+
 
 class UISplitModel(UIChildModel):
     kind: Literal["SPLIT"] = "SPLIT"
     left: "UIChildModelUnion"
     right: "UIChildModelUnion"
+
 
 class UIStateModel(UIChildModel):
     kind: Literal["STATE"] = "STATE"
@@ -40,6 +43,7 @@ class UIStateModel(UIChildModel):
 
 
 UIChildModelUnion = UIGridModel | UISplitModel | UIStateModel
+
 
 class UITreeModel(BaseModel):
     label: str | None = None

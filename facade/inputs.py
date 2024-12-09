@@ -14,16 +14,15 @@ from strawberry import LazyType
 from strawberry.experimental import pydantic
 
 
-
 class PinInputModel(BaseModel):
     id: str
-    pin: bool 
+    pin: bool
+
 
 @pydantic.input(PinInputModel)
 class PinInput:
     id: strawberry.ID
     pin: bool
-
 
 
 class ReserveInputModel(BaseModel):
@@ -189,7 +188,6 @@ class CreateDashboardInputModel(BaseModel):
     tree: uimodels.UITreeInputModel | None = None
 
 
-
 @pydantic.input(CreateDashboardInputModel)
 class CreateDashboardInput:
     name: str | None = None
@@ -213,7 +211,7 @@ class CreatePanelInputModel(BaseModel):
 
 @pydantic.input(CreatePanelInputModel)
 class CreatePanelInput:
-    name: str 
+    name: str
     kind: enums.PanelKind
     state: strawberry.ID | None = None
     state_key: str | None = None
@@ -223,8 +221,7 @@ class CreatePanelInput:
     interface: str | None = None
     args: scalars.Args | None = None
     submit_on_change: bool | None = False
-    submit_on_load: bool  | None = False
-
+    submit_on_load: bool | None = False
 
 
 class StateSchemaInputModel(BaseModel):
@@ -237,16 +234,15 @@ class StateSchemaInput:
     ports: list[ritypes.PortInput]
     name: str
 
+
 class CreateStateSchemaInputModel(BaseModel):
     state_schema: StateSchemaInputModel
     instance_id: str
 
 
-
 @pydantic.input(CreateStateSchemaInputModel)
 class CreateStateSchemaInput:
     state_schema: StateSchemaInput
-
 
 
 class SetStateInputModel(BaseModel):
@@ -263,7 +259,7 @@ class SetStateInput:
 
 
 class JSONPatchInputModel(BaseModel):
-    op: Literal['add', 'remove', 'replace', 'move', 'copy', 'test']
+    op: Literal["add", "remove", "replace", "move", "copy", "test"]
     path: str
     value: Any | None = None
 
@@ -283,6 +279,7 @@ class UpdateStateInput:
 
 class ArchiveStateInputModel(BaseModel):
     state_schema: strawberry.ID
+
 
 @pydantic.input(ArchiveStateInputModel)
 class ArchiveStateInput:

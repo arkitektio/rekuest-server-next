@@ -8,9 +8,14 @@ from strawberry import LazyType
 from strawberry.experimental import pydantic
 
 
-from .models import NodeNodeModel, InvalidNodeModel, TemplateNodeModel, DependencyEdgeModel, DependencyGraphModel, ImplementationEdgeModel
-
-
+from .models import (
+    NodeNodeModel,
+    InvalidNodeModel,
+    TemplateNodeModel,
+    DependencyEdgeModel,
+    DependencyGraphModel,
+    ImplementationEdgeModel,
+)
 
 
 @pydantic.type(NodeNodeModel)
@@ -26,7 +31,6 @@ class NodeNode:
 class InvalidNode:
     id: str
     initial_hash: str
-
 
 
 @pydantic.type(TemplateNodeModel)
@@ -51,6 +55,7 @@ class DependencyEdge:
     dep_id: str
     reservation_id: str | None
 
+
 @pydantic.type(ImplementationEdgeModel)
 class ImplementationEdge:
     id: str
@@ -60,12 +65,7 @@ class ImplementationEdge:
     linked: bool = False
 
 
-
-
 @pydantic.type(DependencyGraphModel)
 class DependencyGraph:
     nodes: list[NodeNode | InvalidNode | TemplateNode]
     edges: list[DependencyEdge | ImplementationEdge]
-
-
-

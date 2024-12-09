@@ -7,7 +7,6 @@ For more information on this file, see
 https://docs.djangoproject.com/en/4.2/howto/deployment/asgi/
 """
 
-
 import os
 
 from channels.routing import ProtocolTypeRouter, URLRouter
@@ -36,7 +35,7 @@ gql_ws_consumer = KanteWsConsumer.as_asgi(schema=schema)
 
 websocket_urlpatterns = [
     re_basepath(r"graphql", gql_ws_consumer),
-    re_basepath(r"agi", AgentConsumer.as_asgi() )
+    re_basepath(r"agi", AgentConsumer.as_asgi()),
 ]
 
 application = ProtocolTypeRouter(

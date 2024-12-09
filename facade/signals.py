@@ -44,9 +44,9 @@ def template_post_save(
 ):
     assign_perm("providable", instance.agent.registry.user, instance)
     template_broadcast(
-            {"id": instance.id, "type": "create" if created else "update"}, [f"agent_{instance.agent.id}"]
+        {"id": instance.id, "type": "create" if created else "update"},
+        [f"agent_{instance.agent.id}"],
     )
-    
 
 
 @receiver(pre_delete, sender=models.Provision)
@@ -114,6 +114,3 @@ def temp_post_save(sender, instance: models.Template = None, **kwargs):
 @receiver(post_delete, sender=models.Template)
 def temp_post_save(sender, instance: models.Template = None, **kwargs):
     pass
-
-
-

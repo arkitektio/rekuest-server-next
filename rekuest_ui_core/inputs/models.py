@@ -4,7 +4,6 @@ from pydantic import BaseModel, Field, root_validator
 from typing_extensions import Self
 
 
-
 class UIChildInputModel(BaseModel):
     kind: enums.UIChildKind
     hidden: bool
@@ -13,14 +12,8 @@ class UIChildInputModel(BaseModel):
     right: Optional["UIChildInputModel"]
 
 
-
 class UITreeInputModel(BaseModel):
     """A definition for a template"""
 
     description: str = "No description provided"
     child: UIChildInputModel
-
-
-
-
-

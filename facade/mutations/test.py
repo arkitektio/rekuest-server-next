@@ -19,18 +19,17 @@ class CreateTestCaseInput:
     name: str | None = None
 
 
-def create_test_case(info: Info, input: CreateTestCaseInput)-> types.TestCase:
+def create_test_case(info: Info, input: CreateTestCaseInput) -> types.TestCase:
 
-    x, _  = models.TestCase.objects.update_or_create(
+    x, _ = models.TestCase.objects.update_or_create(
         node=models.Node.objects.get(pk=input.node),
         tester=models.Node.objects.get(pk=input.tester),
         defaults=dict(
-        description=input.description,
-        name=input.name,
-        )
+            description=input.description,
+            name=input.name,
+        ),
     )
     return x
-
 
 
 @strawberry.input
@@ -42,8 +41,7 @@ class CreateTestResultInput:
     result: str | None = None
 
 
-
-def create_test_result(info: Info, input: CreateTestResultInput)-> types.TestResult:
+def create_test_result(info: Info, input: CreateTestResultInput) -> types.TestResult:
 
     return models.TestResult.objects.create(
         case=models.TestCase.objects.get(pk=input.case),
@@ -52,4 +50,3 @@ def create_test_result(info: Info, input: CreateTestResultInput)-> types.TestRes
         passed=input.passed,
         result=input.result,
     )
-

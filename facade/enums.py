@@ -14,6 +14,7 @@ class PanelKindChoices(TextChoices):
     ASSIGN = "ASSIGN", "Assign"
     TEMPLATE = "TEMPLATE", "Template"
 
+
 class LogLevelChoices(TextChoices):
     DEBUG = "DEBUG", "DEBUG Level"
     INFO = "INFO", "INFO Level"
@@ -163,8 +164,6 @@ class AgentEventChoices(TextChoices):
     CONNECT = "CONNECT", "Connect (Agent connected)"
 
 
-
-
 class ProvisionEventChoices(TextChoices):
     # Start State
     DENIED = "DENIED", "Denied (Provision was rejected by the platform)"
@@ -299,8 +298,8 @@ class ProvisionStatus(str, Enum):
 
 @strawberry.enum
 class AssignationEventKind(str, Enum):
-    """ These are the possible events that can happen to an Assignation.
-    
+    """These are the possible events that can happen to an Assignation.
+
     The events are ordered by their appearance in the lifecycle of an Assignation.
     """
 
@@ -415,6 +414,7 @@ class DemandKind(str, Enum):
 class HookKind(str, Enum):
     CLEANUP = "CLEANUP"
     INIT = "INIT"
+
 
 @strawberry.enum
 class JSONPatchOperation(str, Enum):

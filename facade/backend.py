@@ -154,7 +154,6 @@ class RedisControllBackend(ControllBackend):
 
         elif input.agent:
 
-
             if input.node:
                 provision = models.Provision.objects.filter(
                     agent_id=input.agent, template__node_id=input.node
@@ -182,14 +181,14 @@ class RedisControllBackend(ControllBackend):
             ).first()
 
             if not provision:
-                raise ValueError(f"No active provision found for {template}. Maybe restart the app?")
+                raise ValueError(
+                    f"No active provision found for {template}. Maybe restart the app?"
+                )
 
         elif input.node:
             provision = find_best_fitting_provision(
                 input.node, info.context.request.user
             )
-
-       
 
         else:
             raise ValueError(

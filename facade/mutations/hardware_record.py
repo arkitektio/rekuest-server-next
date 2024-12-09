@@ -25,7 +25,9 @@ class CreateHardwareRecordInput:
     instance_id: scalars.InstanceID | None = None
 
 
-def create_hardware_record(info: Info, input: CreateHardwareRecordInput) -> types.HardwareRecord:
+def create_hardware_record(
+    info: Info, input: CreateHardwareRecordInput
+) -> types.HardwareRecord:
 
     registry, _ = models.Registry.objects.update_or_create(
         app=info.context.request.app,
@@ -40,14 +42,11 @@ def create_hardware_record(info: Info, input: CreateHardwareRecordInput) -> type
         ),
     )
 
-   
     record = models.HardwareRecord.objects.create(
         cpu_count=input.cpu_count,
         cpu_frequency=input.cpu_frequency,
         cpu_vendor_name=input.cpu_vendor_name or "Unknown",
-        agent=agent
-
+        agent=agent,
     )
 
     return record
-

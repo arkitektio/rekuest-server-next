@@ -6,8 +6,6 @@ from typing import AsyncGenerator
 from facade.channels import node_created_listen
 
 
-
-
 async def new_nodes(
     self,
     info: Info,

@@ -6,7 +6,6 @@ from typing import AsyncGenerator
 from facade.channels import agent_updated_listen
 
 
-
 @strawberry.type
 class AgentChangeEvent:
     event: types.AgentEvent | None
@@ -27,7 +26,6 @@ async def agents(
     waiter, _ = await models.Waiter.objects.aget_or_create(
         registry=registry, instance_id=instance_id, defaults=dict(name="default")
     )
-
 
     async for message in agent_updated_listen(info, [f"agents"]):
 

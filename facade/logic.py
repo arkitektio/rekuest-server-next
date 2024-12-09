@@ -5,6 +5,8 @@ from django.db.models import Q
 from guardian.shortcuts import get_objects_for_user
 from rekuest_core.inputs import models as rimodels
 import hashlib
+
+
 class UnresolvableDependencyError(Exception):
     pass
 
@@ -14,13 +16,9 @@ def unlink(provision: models.Provision, reservation: models.Reservation):
     provision.save()
 
 
-
 def link(provision: models.Provision, reservation: models.Reservation):
     provision.reservations.add(reservation)
     provision.save()
-
-
-
 
 
 def get_desired_templates_for_dependency(dependency: rimodels.DependencyInputModel):
@@ -107,14 +105,13 @@ def check_viability(reservation: models.Reservation):
     old_status = reservation.status
 
     if len(reservation.provisions.all()) == 0:
-        new_status =  enums.ReservationEventKind.INACTIVE
-    
+        new_status = enums.ReservationEventKind.INACTIVE
+
     if len(reservation.provisions.all()) < binds.minimum_instances:
         new_status = enums.ReservationEventKind.UNHAPPY
 
     if len(reservation.provisions.all()) >= binds.desired_instances:
         new_status = enums.ReservationEventKind.HAPPY
-    
 
     if old_status != new_status:
         reservation.status = new_status
@@ -130,25 +127,21 @@ def check_viability(reservation: models.Reservation):
     return reservation
 
 
-
-
-
 def activate_provision(provision: models.Provision) -> models.Provision:
     """This should recursively active the reservations that are linked to this provision"""
     provision.active = True
     provision.save()
 
     for connecting_reservation in provision.reservations.all():
-        check_viability(connecting_reservation) # We need to check if the reservation is viable, and happy.
+        check_viability(
+            connecting_reservation
+        )  # We need to check if the reservation is viable, and happy.
 
     return provision
 
 
-
-
-
 async def apropagate_reservation_change(reservation: models.Reservation):
-    """ This should propagate the change to a reservation which
+    """This should propagate the change to a reservation which
     links where potentially updated.
 
     """
@@ -161,15 +154,11 @@ async def apropagate_reservation_change(reservation: models.Reservation):
 
     old_viable = reservation.viable
 
-
     active_provisions = []
 
     async for provision in reservation.provisions.all():
         if provision.is_viable:
             active_provisions.append(provision)
-
-
-        
 
     if len(active_provisions) >= binds.minimum_instances:
         reservation.viable = True
@@ -181,10 +170,8 @@ async def apropagate_reservation_change(reservation: models.Reservation):
     else:
         reservation.happy = False
 
-    
     await reservation.asave()
 
-    
     if old_viable != reservation.viable:
         x = await models.ReservationEvent.objects.acreate(
             reservation=reservation,
@@ -200,8 +187,6 @@ async def apropagate_reservation_change(reservation: models.Reservation):
         await reservation.asave()
 
 
-
-
 async def apropagate_provision_change(provision: models.Provision):
 
     unactive_reservations = []
@@ -212,7 +197,6 @@ async def apropagate_provision_change(provision: models.Provision):
         else:
             unactive_reservations.append(reservation)
 
-
     if len(unactive_reservations) == 0:
         provision.dependencies_met = True
 
@@ -222,32 +206,32 @@ async def apropagate_provision_change(provision: models.Provision):
     await provision.asave()
 
     if provision.is_viable:
-        logging.info("The provision is now active, and the dependencies are met. We can active potential reservations.")
-        async for reservation in provision.reservations.all():
-            await apropagate_reservation_change(reservation)
-    
-    else:
-        logging.info("The provision is not active, or the dependencies are not met. So we need to check the reservations.")
+        logging.info(
+            "The provision is now active, and the dependencies are met. We can active potential reservations."
+        )
         async for reservation in provision.reservations.all():
             await apropagate_reservation_change(reservation)
 
+    else:
+        logging.info(
+            "The provision is not active, or the dependencies are not met. So we need to check the reservations."
+        )
+        async for reservation in provision.reservations.all():
+            await apropagate_reservation_change(reservation)
 
 
 async def aset_provision_provided(provision: models.Provision):
     provision.provided = True
     await provision.asave()
 
-
-   
     return provision
+
 
 async def aset_provision_unprovided(provision: models.Provision):
     provision.provided = False
     await provision.asave()
 
-   
     return provision
-
 
 
 async def aset_provision_active(provision: models.Provision):
@@ -255,8 +239,6 @@ async def aset_provision_active(provision: models.Provision):
     await provision.asave()
     await apropagate_provision_change(provision)
 
-
-   
     return provision
 
 
@@ -266,10 +248,6 @@ async def aset_provision_inactive(provision: models.Provision):
 
     apropagate_provision_change(provision)
     return provision
-
-
-
-
 
 
 def link_or_linkcreate_provisions_for_dependency(
@@ -318,9 +296,6 @@ def create_reservation_for_dependency(
     link_or_linkcreate_provisions_for_dependency(dependency, reservation)
 
 
-
-
-
 def schedule_provision(provision: models.Provision):
     """This should schedule a provision, and all of its dependencies"""
 
@@ -328,7 +303,9 @@ def schedule_provision(provision: models.Provision):
         if dependency.node:
             # We are creating all of the reservations for the dependencies.
             waiter, _ = models.Waiter.objects.get_or_create(
-                registry=provision.agent.registry, instance_id=provision.agent.instance_id, defaults=dict(name="default")
+                registry=provision.agent.registry,
+                instance_id=provision.agent.instance_id,
+                defaults=dict(name="default"),
             )
 
             res, _ = models.Reservation.objects.update_or_create(
@@ -349,10 +326,8 @@ def schedule_provision(provision: models.Provision):
             raise NotImplementedError(
                 "No node specified. Template reservation not implemented yet."
             )
-        
+
     return activate_provision(provision)
-        
-            
 
 
 def schedule_reservation(reservation: models.Reservation):
@@ -408,29 +383,31 @@ def schedule_reservation(reservation: models.Reservation):
                     causing_reservation=reservation,
                 )
 
-
                 for dependency in template.dependencies.all():
 
                     waiter, _ = models.Waiter.objects.get_or_create(
-                        registry=template.agent.registry, instance_id=template.agent.instance_id, defaults=dict(name="default")
+                        registry=template.agent.registry,
+                        instance_id=template.agent.instance_id,
+                        defaults=dict(name="default"),
                     )
 
                     res, _ = models.Reservation.objects.update_or_create(
-                            reference=dependency.reference,
-                            node=models.Node.objects.get(hash=dependency.initial_hash) if dependency.initial_hash else None,
-                            waiter=waiter,
-                            defaults=dict(
-                                title=dependency.reference,
-                                binds=dependency.binds,
-                                causing_provision=prov,
-                                causing_dependency=dependency,
-                            ),
+                        reference=dependency.reference,
+                        node=(
+                            models.Node.objects.get(hash=dependency.initial_hash)
+                            if dependency.initial_hash
+                            else None
+                        ),
+                        waiter=waiter,
+                        defaults=dict(
+                            title=dependency.reference,
+                            binds=dependency.binds,
+                            causing_provision=prov,
+                            causing_dependency=dependency,
+                        ),
                     )
 
                     schedule_reservation(res)
-
-
-
 
                 link(prov, reservation)
                 linked_provisions.append(prov)
@@ -455,9 +432,3 @@ def schedule_reservation(reservation: models.Reservation):
     reservation.save()
 
     return reservation
-
-
-
-
-
-

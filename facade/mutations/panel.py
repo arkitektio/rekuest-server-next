@@ -12,7 +12,7 @@ import uuid
 logger = logging.getLogger(__name__)
 
 
-def create_panel(info: Info, input: inputs.CreatePanelInput)-> types.Panel:
+def create_panel(info: Info, input: inputs.CreatePanelInput) -> types.Panel:
 
     state = None
     accesors = None
@@ -29,7 +29,7 @@ def create_panel(info: Info, input: inputs.CreatePanelInput)-> types.Panel:
                 user=info.context.request.user,
             )
 
-            agent= models.Agent.objects.get(
+            agent = models.Agent.objects.get(
                 registry=registry,
                 instance_id=input.instance_id or "default",
             )
@@ -39,9 +39,7 @@ def create_panel(info: Info, input: inputs.CreatePanelInput)-> types.Panel:
 
             state_schema = models.StateSchema.objects.get(name=state_key, agent=agent)
 
-
             state = state_schema.states.first()
-        
 
         else:
             state = None
@@ -60,7 +58,9 @@ def create_panel(info: Info, input: inputs.CreatePanelInput)-> types.Panel:
                 instance_id=input.instance_id or "default",
             )
 
-            template = models.Template.objects.get(interface=input.interface, agent=agent)
+            template = models.Template.objects.get(
+                interface=input.interface, agent=agent
+            )
 
             reservation, created = models.Reservation.objects.update_or_create(
                 reference=uuid.uuid4(),
@@ -72,26 +72,26 @@ def create_panel(info: Info, input: inputs.CreatePanelInput)-> types.Panel:
                     else enums.ReservationStrategy.ROUND_ROBIN
                 ),
                 waiter=None,
-                saved_args = input.args if input.args else {},
+                saved_args=input.args if input.args else {},
             )
 
     else:
         raise Exception("Invalid kind")
 
-
-
-
     x, _ = models.Panel.objects.update_or_create(
         kind=input.kind,
         name=input.name,
         defaults=dict(
-            state = state,
-            accessors = accesors,
-            reservation = reservation,
-            submit_on_change = input.submit_on_change if input.submit_on_change is not None else False,
-            submit_on_load = input.submit_on_load if input.submit_on_load is not None else False,
-        )
+            state=state,
+            accessors=accesors,
+            reservation=reservation,
+            submit_on_change=(
+                input.submit_on_change if input.submit_on_change is not None else False
+            ),
+            submit_on_load=(
+                input.submit_on_load if input.submit_on_load is not None else False
+            ),
+        ),
     )
 
     return x
-

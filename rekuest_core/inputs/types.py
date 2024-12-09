@@ -36,6 +36,7 @@ class EffectInput:
 
 
     """
+
     kind: enums.EffectKind
     dependencies: list[EffectDependencyInput]
     label: str
@@ -124,7 +125,8 @@ class ChildPortInput:
     is of kind integer.
 
     """
-    key: str 
+
+    key: str
     label: str | None
     kind: enums.PortKind
     scope: enums.PortScope
@@ -138,9 +140,6 @@ class ChildPortInput:
     effects: list[EffectInput] | None = strawberry.field(default_factory=list)
     assign_widget: Optional["AssignWidgetInput"] = None
     return_widget: Optional["ReturnWidgetInput"] = None
-
-
-
 
 
 @pydantic.input(models.ValidatorInputModel)
@@ -171,6 +170,7 @@ class PortInput:
 
 
     """
+
     validators: list[ValidatorInput] | None = strawberry.field(default_factory=list)
     key: str
     scope: enums.PortScope
@@ -193,6 +193,7 @@ class PortInput:
 class PortGroupInput:
     key: str
     hidden: bool
+
 
 @pydantic.input(models.BindsInputModel)
 class BindsInput:
@@ -230,6 +231,7 @@ class DefinitionInput:
     interfaces: list[str] = strawberry.field(default_factory=list)
     is_dev: bool = False
 
+
 @pydantic.input(models.DependencyInputModel)
 class DependencyInput:
     """A dependency for a template. By defining dependencies, you can
@@ -242,7 +244,6 @@ class DependencyInput:
     binds: BindsInput | None = None
     optional: bool = False
     viable_instances: int | None = None
-
 
 
 @pydantic.input(models.TemplateInputModel)

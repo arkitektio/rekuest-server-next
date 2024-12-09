@@ -44,7 +44,6 @@ def deactivate(info: Info, input: DeActivateInput) -> types.Provision:
     return provision
 
 
-
 @strawberry.input
 class ReInitInput:
     agent: strawberry.ID | None = None
