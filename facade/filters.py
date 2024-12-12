@@ -40,6 +40,7 @@ class AgentFilter:
     has_templates: list[str] | None
     has_states: list[str] | None
     pinned: bool | None
+    distinct: bool | None
 
     def filter_pinned(self, queryset, info):
         if self.pinned is None:
@@ -79,6 +80,12 @@ class AgentFilter:
         if self.has_states is None:
             return queryset
         return queryset.filter(states__state_schema__hash__in=self.has_states)
+    
+
+    def filter_distinct(self, queryset, info):
+        if self.distinct is None:
+            return queryset
+        return queryset.distinct()
 
 
 @strawberry_django.filter(models.Waiter)
