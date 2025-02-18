@@ -176,11 +176,10 @@ class RedisControllBackend(ControllBackend):
             template = models.Template.objects.get(id=input.template)
 
             # TODO: Cache the reservation in the redis cache
-            provision = template.provisions.filter(
-                status=enums.ProvisionStatus.ACTIVE
-            ).first()
+            provision = template.provisions.first()
 
             if not provision:
+
                 raise ValueError(
                     f"No active provision found for {template}. Maybe restart the app?"
                 )
