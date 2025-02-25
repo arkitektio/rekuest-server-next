@@ -42,6 +42,7 @@ class SearchAssignWidgetModel(AssignWidgetModel):
     query: str  # TODO: Validators
     ward: str
     filters: list["ChildPortModel"] | None = None
+    dependencies: list[str] | None = None
 
 
 class StateChoiceAssignWidgetModel(AssignWidgetModel):

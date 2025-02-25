@@ -88,6 +88,7 @@ class AssignWidgetInput:
     follow_value: str | None = None
     state_choices: str | None = None
     filters: Optional[List[LazyType["ChildPortInput", __name__]]] = None
+    dependencies: list[str] | None = None
 
 
 @pydantic.input(models.ReturnWidgetInputModel)
