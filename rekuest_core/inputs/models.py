@@ -18,13 +18,18 @@ class EffectDependencyInputModel(BaseModel):
 
 
 class EffectInputModel(BaseModel):
-    dependencies: list[EffectDependencyInputModel]
+    function: str 
+    dependencies: list[str] | None = []
+    message: str | None = None
     kind: enums.EffectKind
+    hook: str | None
+    ward: str | None
 
 
 class ChoiceInputModel(BaseModel):
     value: str
     label: str
+    image: str | None
     description: str | None
 
 
@@ -92,7 +97,6 @@ class PortInputModel(BaseModel):
     children: list["ChildPortInputModel"] | None
     assign_widget: Optional["AssignWidgetInputModel"] = None
     return_widget: Optional["ReturnWidgetInputModel"] = None
-    groups: list[str] | None
 
     @root_validator
     def check_children_for_port(cls, values) -> Self:
@@ -106,7 +110,10 @@ class PortInputModel(BaseModel):
 
 class PortGroupInputModel(BaseModel):
     key: str
-    hidden: bool
+    title: str | None
+    description: str | None
+    effects: list[EffectInputModel] | None
+    ports: list[str]
 
 
 class DefinitionInputModel(BaseModel):

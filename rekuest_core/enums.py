@@ -41,14 +41,8 @@ class ReturnWidgetKind(str, Enum):
 @strawberry.enum
 class EffectKind(str, Enum):
     MESSAGE = "MESSAGE"
+    HIDE = "HIDE"
     CUSTOM = "CUSTOM"
-
-
-@strawberry.enum
-class LogicalCondition(str, Enum):
-    IS = "IS"
-    IS_NOT = "IS_NOT"
-    IN = "IN"
 
 
 @strawberry.enum
