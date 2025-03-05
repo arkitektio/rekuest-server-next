@@ -233,9 +233,9 @@ class AgentConsumer(AsyncWebsocketConsumer):
                         self.answer_future.set_result(None)
                     else:
                         logging.error(
-                            "Receidved heartbeat without future, holy moly, this is a protocol error"
+                            "Receidved heartbeat without future, holy moly, this is a race condition error"
                         )
-                        await self.disconnect(HEARTBEAT_NOT_RESPONDED_CODE)
+                        #await self.disconnect(HEARTBEAT_NOT_RESPONDED_CODE)
                         return
 
         except Exception as e:
