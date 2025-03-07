@@ -66,6 +66,21 @@ class Registry(models.Model):
 
 class IconPack(models.Model):
     name = models.CharField(max_length=1000)
+    
+    
+
+class Toolbox(models.Model):
+    name = models.CharField(max_length=1000)
+    description = models.TextField()
+    creator = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.CASCADE,
+        related_name="toolboxes",
+        help_text="The user that created this Shortcut",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
 
 
 class Node(models.Model):
@@ -149,6 +164,39 @@ class Node(models.Model):
 
     def __str__(self):
         return f"{self.name}"
+
+
+
+class Shortcut(models.Model):
+    name: str = models.CharField(max_length=1000)
+    description: str = models.TextField(null=True, blank=True)
+    toolbox = models.ForeignKey(
+        Toolbox, on_delete=models.CASCADE, related_name="shortcuts"
+    )
+    node = models.ForeignKey(
+        Node, on_delete=models.CASCADE, related_name="shortcuts", null=True
+    )
+    template = models.ForeignKey(
+        "Template", on_delete=models.CASCADE, related_name="shortcuts", null=True
+    )
+    saved_args = models.JSONField(default=dict)
+    creator = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.CASCADE,
+        related_name="shortcuts",
+        help_text="The user that created this Shortcut",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    args = models.JSONField(default=list, help_text="Inputs for this Shortcut")
+    returns = models.JSONField(default=list, help_text="Outputs for this Shortcut")
+    allow_quick = models.BooleanField(
+        default=False, help_text="Allow quick execution of this Shortcut (e.g. run without confirmation)"   
+    )
+    use_returns = models.BooleanField(
+        default=False, help_text="Use the result of this Shortcut (e.g. use the result in the next Shortcut)"
+    )
+
 
 
 class Icon(models.Model):

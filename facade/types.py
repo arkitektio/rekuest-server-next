@@ -63,6 +63,48 @@ class Protocol:
     id: strawberry.ID
     name: str
     nodes: list["Node"]
+    
+
+
+@strawberry_django.type(
+    models.Toolbox,
+    filters=filters.ToolboxFilter,
+    pagination=True,
+    order=filters.ToolboxOrder,
+)
+class Toolbox:
+    id: strawberry.ID
+    name: str
+    description: str
+    shortcuts: list["Shortcut"]
+    
+
+@strawberry_django.type(
+    models.Shortcut,
+    filters=filters.ShortcutFilter,
+    pagination=True,
+    order=filters.ShortcutOrder,
+)
+class Shortcut:
+    id: strawberry.ID
+    name: str
+    description: str | None
+    node: "Node" 
+    template: Optional["Template"]
+    toolboxes: list["Toolbox"]
+    saved_args: rscalars.AnyDefault
+    allow_quick: bool
+    use_returns: bool
+    
+    @strawberry_django.field()
+    def args(self) -> list[rtypes.Port]:
+        return [rmodels.PortModel(**i) for i in self.args]
+
+    @strawberry_django.field()
+    def returns(self) -> list[rtypes.Port]:
+        return [rmodels.PortModel(**i) for i in self.returns]
+
+
 
 
 @strawberry_django.type(

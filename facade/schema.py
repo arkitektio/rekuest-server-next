@@ -32,6 +32,10 @@ class Query:
     myreservations: list[types.Reservation] = strawberry_django.field(
         resolver=queries.myreservations
     )
+    shortcuts: list[types.Shortcut] = strawberry_django.field()
+    toolboxes: list[types.Toolbox] = strawberry_django.field()
+    
+    
     provisions: list[types.Provision] = strawberry_django.field()
     node = strawberry_django.field(resolver=queries.node)
     assignations = strawberry_django.field(resolver=queries.assignations)
@@ -56,6 +60,14 @@ class Query:
     @strawberry_django.field()
     def state_schema(self, info: Info, id: strawberry.ID) -> types.StateSchema:
         return models.StateSchema.objects.get(id=id)
+    
+    @strawberry_django.field()
+    def toolbox(self, info: Info, id: strawberry.ID) -> types.Toolbox:
+        return models.Toolbox.objects.get(id=id)
+    
+    @strawberry_django.field()
+    def shortcut(self, info: Info, id: strawberry.ID) -> types.Shortcut:
+        return models.Shortcut.objects.get(id=id)
 
     @strawberry_django.field()
     def hardware_record(self, info: Info, id: strawberry.ID) -> types.HardwareRecord:
@@ -179,6 +191,15 @@ class Mutation:
     )
     delete_agent = strawberry_django.mutation(resolver=mutations.delete_agent)
 
+    # shortcuts
+    create_shortcut: types.Shortcut = strawberry_django.mutation(
+        resolver=mutations.create_shortcut
+    )
+    
+    # toolbox
+    create_toolbox: types.Toolbox = strawberry_django.mutation(
+        resolver=mutations.create_toolbox
+    )
 
 @strawberry.type
 class Subscription:

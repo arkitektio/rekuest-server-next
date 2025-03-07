@@ -26,7 +26,7 @@ class PinInput:
 
 
 class ReserveInputModel(BaseModel):
-    instance_id: str
+    instance_id: str 
     node: str | None = None
     template: str | None = None
     title: str | None = None
@@ -37,10 +37,7 @@ class ReserveInputModel(BaseModel):
 
 @pydantic.input(ReserveInputModel)
 class ReserveInput:
-    assignation_id: str | None = (
-        None  # Was this reservation caused during an assignation and is tide to it?
-    )
-    instance_id: scalars.InstanceID
+    instance_id: scalars.InstanceID 
     node: strawberry.ID | None = None
     template: strawberry.ID | None = None
     title: str | None = None
@@ -222,6 +219,44 @@ class CreatePanelInput:
     args: scalars.Args | None = None
     submit_on_change: bool | None = False
     submit_on_load: bool | None = False
+
+
+
+class CreateToolboxInputModel(BaseModel):
+    name: str
+    description: str
+
+
+@pydantic.input(CreateToolboxInputModel)
+class CreateToolboxInput:
+    name: str
+    description: str
+    
+    
+class CreateShortcutInputModel(BaseModel):
+    name: str
+    description: str | None = None
+    node: str 
+    template: str | None = None
+    args: Dict[str, Any]
+    allow_quick: bool = False
+    use_returns: bool = False
+    
+
+
+@pydantic.input(CreateShortcutInputModel)
+class CreateShortcutInput:
+    node: strawberry.ID 
+    name: str
+    toolbox: strawberry.ID | None = None
+    description: str | None = None
+    template: strawberry.ID | None = None 
+    args: scalars.Args
+    allow_quick: bool = False
+    use_returns: bool = False
+
+       
+    
 
 
 class StateSchemaInputModel(BaseModel):

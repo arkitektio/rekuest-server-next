@@ -40,7 +40,13 @@ class AgentFilter:
     has_templates: list[str] | None
     has_states: list[str] | None
     pinned: bool | None
+    search: str | None
     distinct: bool | None
+    
+    def filter_search(self, queryset, info):
+        if self.search is None:
+            return queryset
+        return queryset.filter(name__icontains=self.search)
 
     def filter_pinned(self, queryset, info):
         if self.pinned is None:
@@ -252,6 +258,14 @@ class ProtocolOrder:
     name: auto
 
 
+@strawberry_django.order(models.Shortcut)
+class ShortcutOrder:
+    name: auto
+    
+@strawberry_django.order(models.Toolbox)
+class ToolboxOrder:
+    name: auto
+
 @strawberry_django.filter(models.Protocol)
 class ProtocolFilter(SearchFilter):
     name: Optional[FilterLookup[str]]
@@ -262,6 +276,112 @@ class ProtocolFilter(SearchFilter):
             return queryset
         return queryset.filter(id__in=self.ids)
 
+
+@strawberry_django.filter(models.Toolbox)
+class ToolboxFilter(SearchFilter):
+    name: Optional[FilterLookup[str]]
+    ids: list[strawberry.ID] | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+    
+    def filter_mine(self, queryset, info):
+        if self.mine is None:
+            return queryset
+        return queryset.filter(user_id=info.context.user.id)
+
+
+@strawberry_django.filter(models.Node)
+class ShortcutNodeFilter(SearchFilter):
+    name: str | None
+    ids: list[strawberry.ID] | None
+    demands: list[inputs.PortDemandInput] | None
+    protocols: list[str] | None
+    kind: Optional[renums.NodeKind] | None
+
+    def filter_name(self, queryset, info):
+        if self.name is None:
+            return queryset
+        return queryset.filter(node__name=self.name)
+
+    def filter_demands(self, queryset, info):
+        if self.demands is None:
+            return queryset
+
+        filtered_ids = None
+
+        for ports_demand in self.demands:
+            new_ids = managers.get_node_ids_by_demands(
+                ports_demand.matches,
+                type=ports_demand.kind,
+                force_length=ports_demand.force_length,
+                force_non_nullable_length=ports_demand.force_non_nullable_length,
+                force_structure_length=ports_demand.force_structure_length,
+            )
+
+            if filtered_ids is None:
+                filtered_ids = set(new_ids)
+            else:
+                filtered_ids = filtered_ids.intersection(new_ids)
+
+        return queryset.filter(node__id__in=filtered_ids)
+
+    def filter_kind(self, queryset, info):
+        if self.kind is None:
+            return queryset
+        return queryset.filter(node__kind=self.kind)
+
+    def filter_protocols(self, queryset, info):
+        if self.protocols is None:
+            return queryset
+        return queryset.filter(node__protocols__name__in=self.protocols)
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(node__id__in=self.ids)
+
+@strawberry_django.filter(models.Shortcut)
+class ShortcutFilter(SearchFilter):
+    ids: list[strawberry.ID] | None
+    demands: list[inputs.PortDemandInput] | None
+    
+    
+    def filter_demands(self, queryset, info):
+        if self.demands is None:
+            return queryset
+
+        filtered_ids = None
+
+        for ports_demand in self.demands:
+            new_ids = managers.get_node_ids_by_demands(
+                ports_demand.matches,
+                type=ports_demand.kind,
+                force_length=ports_demand.force_length,
+                force_non_nullable_length=ports_demand.force_non_nullable_length,
+                force_structure_length=ports_demand.force_structure_length,
+                model="facade_shortcut",
+            )
+
+            if filtered_ids is None:
+                filtered_ids = set(new_ids)
+            else:
+                filtered_ids = filtered_ids.intersection(new_ids)
+
+        return queryset.filter(id__in=filtered_ids)
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+    
+    def filter_mine(self, queryset, info):
+        if self.mine is None:
+            return queryset
+        
+        return queryset.filter(user_id=info.context.user.id)
 
 @strawberry_django.filter(models.HardwareRecord)
 class HardwareRecordFilter:

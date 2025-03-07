@@ -71,6 +71,7 @@ def build_params(
     force_length: t.Optional[int] = None,
     force_non_nullable_length: t.Optional[int] = None,
     force_structure_length: t.Optional[int] = None,
+    model: str = "facade_node",
 ):
     individual_queries = []
     all_params = {}
@@ -101,7 +102,7 @@ def build_params(
     if not individual_queries:
         raise ValueError("No search params provided")
 
-    full_sql = "SELECT id FROM facade_node WHERE " + " AND ".join(individual_queries)
+    full_sql = f"SELECT id FROM {model} WHERE " + " AND ".join(individual_queries)
 
     return full_sql, all_params
 
@@ -113,6 +114,7 @@ def filter_nodes_by_demands(
     force_length: t.Optional[int] = None,
     force_non_nullable_length: t.Optional[int] = None,
     force_structure_length: t.Optional[int] = None,
+    model: str = "facade_node",
 ):
 
     if type not in ["args", "returns"]:
@@ -124,6 +126,7 @@ def filter_nodes_by_demands(
         force_length=force_length,
         force_non_nullable_length=force_non_nullable_length,
         force_structure_length=force_structure_length,
+        model=model,
     )
 
     with connection.cursor() as cursor:
@@ -141,6 +144,7 @@ def get_node_ids_by_demands(
     force_length: t.Optional[int] = None,
     force_non_nullable_length: t.Optional[int] = None,
     force_structure_length: t.Optional[int] = None,
+    model: str = "facade_node",
 ):
 
     if type not in ["args", "returns"]:
@@ -152,6 +156,7 @@ def get_node_ids_by_demands(
         force_length=force_length,
         force_non_nullable_length=force_non_nullable_length,
         force_structure_length=force_structure_length,
+        model=model,
     )
 
     with connection.cursor() as cursor:

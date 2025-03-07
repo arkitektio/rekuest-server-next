@@ -7,5 +7,7 @@ from .hardware_record import *
 from .agent import *
 from .dashboard import *
 from .state_schema import *
+from .shortcut import *
+from .toolbox import *
 from .state import *
 from .panel import *
