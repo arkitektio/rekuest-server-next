@@ -347,7 +347,13 @@ class ShortcutNodeFilter(SearchFilter):
 class ShortcutFilter(SearchFilter):
     ids: list[strawberry.ID] | None
     demands: list[inputs.PortDemandInput] | None
+    toolbox: strawberry.ID | None
     
+    def filter_toolbox(self, queryset, info):
+        if self.toolbox is None:
+            return queryset
+        
+        return queryset.filter(toolbox_id=self.toolbox)
     
     def filter_demands(self, queryset, info):
         if self.demands is None:
