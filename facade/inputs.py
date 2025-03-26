@@ -256,6 +256,13 @@ class CreateShortcutInput:
     use_returns: bool = False
 
        
+       
+class DeleteShortcutInputModel(BaseModel):
+    id: str
+    
+@pydantic.input(DeleteShortcutInputModel)
+class DeleteShortcutInput:
+    id: strawberry.ID
     
 
 

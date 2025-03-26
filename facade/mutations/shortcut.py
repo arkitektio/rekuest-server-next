@@ -49,3 +49,9 @@ def create_shortcut(info: Info, input: inputs.CreateShortcutInput) -> types.Shor
     logger.info(f"Shortcut created: {shortcut}")
 
     return shortcut
+
+
+def delete_shortcut(info: Info, input: inputs.DeleteShortcutInput) -> strawberry.ID:
+    shortcut = models.Shortcut.objects.get(id=input.id)
+    shortcut.delete()
+    return input.id

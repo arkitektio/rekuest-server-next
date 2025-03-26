@@ -195,6 +195,9 @@ class Mutation:
     create_shortcut: types.Shortcut = strawberry_django.mutation(
         resolver=mutations.create_shortcut
     )
+    delete_shortcut: str = strawberry_django.mutation(
+        resolver=mutations.delete_shortcut
+    )
     
     # toolbox
     create_toolbox: types.Toolbox = strawberry_django.mutation(
