@@ -174,14 +174,12 @@ class Dependency:
 
     @strawberry_django.field()
     def resolvable(self, info: Info) -> bool:
-        provisions = models.Provision.objects.filter(
-            template__node__hash=self.initial_hash,
-            provided=True,
+        qs = models.Template.objects.filter(
+            node__hash=self.initial_hash,
         )
 
-        provisions
 
-        return provisions.exists()
+        return qs.exists()
 
 
 @strawberry_django.type(
@@ -195,7 +193,6 @@ class Template:
     node: "Node"
     params: rscalars.AnyDefault
     dependencies: list["Dependency"]
-    provisions: list["Provision"]
 
     @strawberry_django.field()
     def dependency_graph(self) -> DependencyGraph:
@@ -229,10 +226,8 @@ class Agent:
     id: strawberry.ID
     instance_id: scalars.InstanceID
     registry: "Registry"
-    status: enums.AgentStatus
     hardware_records: list[HardwareRecord]
     templates: list["Template"]
-    provisions: list["Provision"]
     last_seen: datetime.datetime | None
     connected: bool
     extensions: list[str]
@@ -265,33 +260,7 @@ class Waiter:
     registry: "Registry"
 
 
-@strawberry_django.type(
-    models.Provision, filters=filters.ProvisionFilter, pagination=True
-)
-class Provision:
-    id: strawberry.ID
-    name: str
-    agent: "Agent"
-    template: "Template"
-    status: enums.ProvisionEventKind
-    caused_reservations: list["Reservation"]
-    provided: bool
-    active: bool
 
-    @strawberry_django.field()
-    def dependencies_met(self) -> bool:
-        return self.dependencies_met
-
-
-@strawberry_django.type(
-    models.ProvisionEvent, filters=filters.ProvisionEventFilter, pagination=True
-)
-class ProvisionEvent:
-    id: strawberry.ID
-    provision: "Provision"
-    kind: enums.ProvisionEventKind
-    level: enums.LogLevel | None
-    created_at: strawberry.auto
 
 
 @strawberry_django.type(
@@ -303,13 +272,11 @@ class Reservation:
     waiter: "Waiter"
     title: str | None
     node: "Node"
-    status: enums.ReservationEventKind
     updated_at: datetime.datetime
     reference: str
-    provisions: list["Provision"]
+    templates: list["Template"]
     binds: rtypes.Binds | None
     causing_dependency: Dependency | None
-    causing_provision: Provision | None
     strategy: enums.ReservationStrategy
     viable: bool
     happy: bool
@@ -319,20 +286,7 @@ class Reservation:
     def dependency_graph(self) -> DependencyGraph:
         return build_reservation_graph(self)
 
-    @strawberry_django.field()
-    def events(self) -> list["ReservationEvent"]:
-        return self.events.order_by("created_at")[:10]
 
-
-@strawberry_django.type(
-    models.ReservationEvent, filters=filters.ReservationEventFilter, pagination=True
-)
-class ReservationEvent:
-    id: strawberry.ID
-    reservation: "Reservation"
-    kind: enums.ReservationEventKind
-    level: enums.LogLevel | None
-    created_at: strawberry.auto
 
 
 @strawberry_django.type(
@@ -340,11 +294,11 @@ class ReservationEvent:
 )
 class Assignation:
     id: strawberry.ID
-    name: str
     reference: str | None
+    is_done: bool
     args: rscalars.AnyDefault
-    mother: Optional["Assignation"] = strawberry.field(
-        description="A mother assignation is the root assignation that caused this assignation to be created. This mother is always created by intent (e.g a user action). If null, this assignation is the mother"
+    root: Optional["Assignation"] = strawberry.field(
+        description="A root assignation is the root assignation that caused this assignation to be created. This mother is always created by intent (e.g a user action). If null, this assignation is the mother"
     )
     parent: Optional["Assignation"] = strawberry.field(
         description="A parent assignation is the next assignation in the chain of assignations that caused this assignation to be created. Parents can be created by intent or by the system. If null, this assignation is the parent"
@@ -355,11 +309,14 @@ class Assignation:
     node: "Node" = strawberry.field(
         description="The node that this assignation is assigned to"
     )
-    template: Optional["Template"] = strawberry.field(
-        description="If set, this assignation was directly assigned to a template"
+    template: Template = strawberry.field(
+        description="The template that this assignation is assigned to"
     )
-    status: enums.AssignationEventKind = strawberry.field(
+    latest_event_kind: enums.AssignationEventKind = strawberry.field(
         description="The status of this assignation"
+    )
+    latest_instruct_kind: enums.AssignationInstructKind = strawberry.field(
+        description="The latest instruct that was sent to this assignation"
     )
     status_message: str | None
     waiter: "Waiter" = strawberry.field(
@@ -368,9 +325,6 @@ class Assignation:
     node: "Node"
     created_at: datetime.datetime
     updated_at: datetime.datetime
-    provision: Optional["Provision"] = strawberry.field(
-        description="The provision that this assignation was assigned to"
-    )
     ephemeral: bool = strawberry.field(
         description="If true, this assignation will be deleted after the assignation is completed"
     )
@@ -378,6 +332,11 @@ class Assignation:
     @strawberry_django.field()
     def events(self) -> list["AssignationEvent"]:
         return self.events.order_by("created_at")[:10]
+
+    @strawberry_django.field()
+    def instructs(self) -> list["AssignationInstruct"]:
+        return self.instructs.order_by("created_at")[:10]
+
 
     @strawberry_django.field()
     def arg(self, key: str) -> scalars.Args | None:
@@ -406,6 +365,16 @@ class AssignationEvent:
     @strawberry_django.field()
     def reference(self) -> str:
         return self.assignation.reference
+    
+    
+@strawberry_django.type(
+    models.AssignationInstruct, filters=filters.AssignationEventFilter, pagination=True
+)
+class AssignationInstruct:
+    id: strawberry.ID
+    assignation: "Assignation"
+    kind: enums.AssignationInstructKind
+    created_at: strawberry.auto
 
 
 @strawberry_django.type(

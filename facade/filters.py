@@ -105,33 +105,6 @@ class WaiterFilter:
         return queryset.filter(id__in=self.ids)
 
 
-@strawberry_django.filter(models.Provision)
-class ProvisionFilter:
-    agent: AgentFilter | None
-    ids: list[strawberry.ID] | None
-    status: list[enums.ProvisionStatus] | None
-
-    def filter_ids(self, queryset, info):
-        if self.ids is None:
-            return queryset
-        return queryset.filter(id__in=self.ids)
-
-    def filter_status(self, queryset, info):
-        if self.status is None:
-            return queryset
-        return queryset.filter(status__in=self.status)
-
-
-@strawberry_django.filter(models.ProvisionEvent)
-class ProvisionEventFilter:
-    kind: list[enums.ProvisionEventKind] | None
-
-    def filter_kind(self, queryset, info):
-        if self.kind is None:
-            return queryset
-        return queryset.filter(kind__in=self.kind)
-
-
 @strawberry_django.filter(models.Reservation)
 class ReservationFilter:
     waiter: WaiterFilter | None
@@ -148,15 +121,6 @@ class ReservationFilter:
             return queryset
         return queryset.filter(status__in=self.status)
 
-
-@strawberry_django.filter(models.ReservationEvent)
-class ReservationEventFilter:
-    kind: list[enums.ReservationEventKind] | None
-
-    def filter_kind(self, queryset, info):
-        if self.kind is None:
-            return queryset
-        return queryset.filter(kind__in=self.kind)
 
 
 @strawberry_django.filter(models.Assignation)

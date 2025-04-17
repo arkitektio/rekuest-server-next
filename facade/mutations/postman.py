@@ -1,13 +1,8 @@
-import hashlib
-import json
+
 import logging
 
 import strawberry
-import strawberry_django
 from facade import enums, inputs, models, scalars, types
-from facade.logic import link as link_provision_to_reservation
-from facade.logic import schedule_provision, schedule_reservation
-from facade.logic import unlink as unlink_provision_from_reservation
 from facade.protocol import infer_protocols
 from facade.utils import hash_input
 from kante.types import Info
@@ -40,6 +35,22 @@ def assign(info: Info, input: inputs.AssignInput) -> types.Assignation:
     return controll_backend.assign(info, input)
 
 
+
+def pause(info: Info, input: inputs.PauseInput) -> types.Assignation:
+    return controll_backend.pause(input)
+
+
+def resume(info: Info, input: inputs.ResumeInput) -> types.Assignation:
+    return controll_backend.resume(input)
+
+def collect(info: Info, input: inputs.CollectInput) -> types.Assignation:
+    return controll_backend.resume(input)
+
+
+def step(info: Info, input: inputs.StepInput) -> types.Assignation:
+    return controll_backend.step(input)
+
+
 @strawberry.input
 class AckInput:
     assignation: strawberry.ID
@@ -57,57 +68,3 @@ def interrupt(info: Info, input: inputs.InterruptInput) -> types.Assignation:
     return controll_backend.interrupt(input)
 
 
-@strawberry.input
-class ProvideInput:
-    provision: strawberry.ID
-
-
-def provide(info: Info, input: ProvideInput) -> types.Provision:
-
-    provision = models.Provision.objects.get(id=input.provision)
-
-    schedule_provision(provision)
-
-    return provision
-
-
-@strawberry.input
-class UnProvideInput:
-    provision: strawberry.ID
-
-
-def unprovide(info: Info, input: UnProvideInput) -> strawberry.ID:
-
-    provision = models.Provision.objects.get(id=input.provision)
-
-    return input.provision
-
-
-@strawberry.input
-class LinkInput:
-    provision: strawberry.ID
-    reservation: strawberry.ID
-
-
-def link(info: Info, input: LinkInput) -> types.Provision:
-    provision = models.Provision.objects.get(id=input.provision)
-    reservation = models.Reservation.objects.get(id=input.reservation)
-
-    link_provision_to_reservation(provision, reservation)
-
-    return provision
-
-
-@strawberry.input
-class UnlinkInput:
-    provision: strawberry.ID
-    reservation: strawberry.ID
-
-
-def unlink(info: Info, input: UnlinkInput) -> types.Provision:
-    provision = models.Provision.objects.get(id=input.provision)
-    reservation = models.Reservation.objects.get(id=input.reservation)
-
-    unlink_provision_from_reservation(provision, reservation)
-
-    return provision

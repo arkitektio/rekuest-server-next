@@ -4,34 +4,51 @@ import uuid
 from authentikate.models import App, User
 from django.db import models
 from django_choices_field import TextChoicesField
-from facade.enums import (
-    AgentEventChoices,
-    AgentStatusChoices,
-    AssignationEventChoices,
-    AssignationStatusChoices,
-    LogLevelChoices,
-    NodeKindChoices,
-    ProvisionEventChoices,
-    ProvisionStatusChoices,
-    ReservationEventChoices,
-    ReservationStatusChoices,
-    ReservationStrategyChoices,
-    WaiterStatusChoices,
-)
+from facade import enums
 from django.contrib.auth import get_user_model
 
 # Create your models here.
 
 
 class Collection(models.Model):
+    """ A collection is a group of nodes that are related to each other. 
+    
+    You can put nodes into a collection to group them together, and
+    app developers can specify which collection a node belongs to
+    by default.
+    
+    Collections should remain domain specific.
+    
+    Example collections are:
+    - Segmentation
+    - Classification
+    - Image Processing
+    
+    
+    """
     name = models.CharField(
         max_length=1000, unique=True, help_text="The name of this Collection"
     )
     description = models.TextField(help_text="A description for the Collection")
-    defined_at = models.DateTimeField(auto_created=True, auto_now_add=True)
+    defined_at = models.DateTimeField(auto_created=True, auto_now_add=True, help_text="Date this Collection was created")
+    updated_at = models.DateTimeField(auto_now=True, help_text="Date this Collection was last updated")
+    creator = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.CASCADE,
+        related_name="collections",
+        help_text="The user that created this Collection",
+    )
 
 
 class Protocol(models.Model):
+    """ Protocols are ways to describe the input and output relations
+    of a node. When a new node is created the
+    interference module will try to infer the protocol of the node
+    and assign it to the node. This is done by looking at the
+    input and output types of the node and matching them to the
+    protocols that are defined by your installed inference modules.
+    
+    """
     name = models.CharField(
         max_length=1000, unique=True, help_text="The name of this Protocol"
     )
@@ -42,6 +59,15 @@ class Protocol(models.Model):
 
 
 class Registry(models.Model):
+    """ A registry is an app that is bound to a specific user on the
+    backend. 
+    
+    It is the root type for all agents and waiters that are
+    created by this app.
+    
+    """
+    
+    
     app = models.ForeignKey(
         App, on_delete=models.CASCADE, null=True, help_text="The Associated App"
     )
@@ -56,7 +82,7 @@ class Registry(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["app", "user"],
-                name="No multiple Clients for same App and User allowed",
+                name="No multiple Registries for same App and User allowed",
             )
         ]
 
@@ -65,6 +91,11 @@ class Registry(models.Model):
 
 
 class IconPack(models.Model):
+    """ An IconPack is a collection of icons that are used to
+    represent nodes in the UI. You can create your own icon packs
+    and use them to customize the look of your nodes.
+    
+    """
     name = models.CharField(max_length=1000)
     
     
@@ -98,7 +129,7 @@ class Node(models.Model):
     )
     idempotent = models.BooleanField(
         default=False,
-        help_text="Is this function idempotent. e.g can we run it multiple times without ?",
+        help_text="Is this function idempotent. e.g can we run it multiple times without changing the data again ?",
     )
     stateful = models.BooleanField(
         default=False,
@@ -112,12 +143,12 @@ class Node(models.Model):
     )
     kind = TextChoicesField(
         max_length=1000,
-        choices_enum=NodeKindChoices,
-        default=NodeKindChoices.FUNCTION.value,
-        help_text="Function, generator? Check async Programming Textbook",
+        choices_enum=enums.NodeKindChoices,
+        default=enums.NodeKindChoices.FUNCTION.value,
+        help_text="Function, generator? Will this function generate multiple results?",
     )
     interfaces = models.JSONField(
-        default=list, help_text="Intercae that we use to interpret the meta data"
+        default=list, help_text="Interfaces that we use to interpret the meta data"
     )
     port_groups = models.JSONField(
         default=list, help_text="Intercae that we use to interpret the meta data"
@@ -125,10 +156,6 @@ class Node(models.Model):
     name = models.CharField(
         max_length=1000, help_text="The cleartext name of this Node"
     )
-    meta = models.JSONField(
-        null=True, blank=True, help_text="Meta data about this Node"
-    )
-
     description = models.TextField(help_text="A description for the Node")
     scope = models.CharField(
         max_length=1000,
@@ -212,7 +239,6 @@ class Agent(models.Model):
     name = models.CharField(
         max_length=2000, help_text="This providers Name", default="Nana"
     )
-
     extensions = models.JSONField(
         max_length=2000,
         default=list,
@@ -233,10 +259,10 @@ class Agent(models.Model):
         help_text="The Instance this Agent is running on",
         default="all",
     )
-    status = TextChoicesField(
+    latest_event = TextChoicesField(
         max_length=1000,
-        choices_enum=AgentStatusChoices,
-        default=AgentStatusChoices.VANILLA,
+        choices_enum=enums.AgentEventChoices,
+        default=enums.AgentEventChoices.DISCONNECT,
         help_text="The Status of this Agent",
     )
     connected = models.BooleanField(
@@ -310,10 +336,10 @@ class Waiter(models.Model):
     unique = models.CharField(
         max_length=1000, default=uuid.uuid4, help_text="The Channel we are listening to"
     )
-    status = TextChoicesField(
+    latest_event = TextChoicesField(
         max_length=1000,
-        choices_enum=WaiterStatusChoices,
-        default=WaiterStatusChoices.VANILLA,
+        choices_enum=enums.WaiterStatusChoices,
+        default=enums.WaiterStatusChoices.VANILLA,
         help_text="The Status of this Waiter",
     )
     registry = models.ForeignKey(
@@ -451,91 +477,6 @@ class Template(models.Model):
         return f"{self.node} implemented by {self.agent}"
 
 
-class Provision(models.Model):
-    """Topic
-
-    Provisions represent a way of assigning tasks to a specific agent
-
-    """
-
-    agent = models.ForeignKey(
-        Agent,
-        on_delete=models.CASCADE,
-        help_text="The associated agent for this Provision",
-        related_name="provisions",
-    )
-
-    unique = models.UUIDField(
-        max_length=1000,
-        unique=True,
-        default=uuid.uuid4,
-        help_text="A Unique identifier for this Topic",
-    )
-
-    causing_reservation = models.ForeignKey(
-        "Reservation",
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        help_text="Reservation that created this provision",
-        related_name="created_provisions",
-    )
-
-    # Provisions are bound to templates, and through that to an agent
-    # A TEMPLATE CAN ONLY BE BOUND TO ONE PROVISION
-    template = models.ForeignKey(
-        Template,
-        on_delete=models.CASCADE,
-        help_text="The Template for this Provision",
-        related_name="provisions",
-        null=True,
-        blank=True,
-    )
-
-    active = models.BooleanField(
-        default=False,
-        help_text="Is this provision active (e.g. should the agent provide the associated template)",
-    )
-
-    provided = models.BooleanField(
-        default=False,
-        help_text="Is the provision provided (e.g. is the template available on the agent). This does NOT mean that the provision is assignable. Only if all the dependencies are met, the provision is assignable",
-    )
-
-    dependencies_met = models.BooleanField(
-        default=False,
-        help_text="Are all dependencies met for this provision. Should change to True if all dependencies are met (potential sync error)",
-    )
-
-    # Status Field
-    status = TextChoicesField(
-        max_length=1000,
-        choices_enum=ProvisionEventChoices,
-        default=ProvisionEventChoices.INACTIVE,
-        help_text="The Status of this Provision",
-    )
-
-    statusmessage = models.CharField(
-        max_length=10000,
-        help_text="Clear Text status of the Provision as for now",
-        blank=True,
-    )
-    # Meta fields of the creator of this
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        permissions = [("can_link_to", "Can link a reservation to a provision")]
-
-    @property
-    def queue(self):
-        return f"provision_{self.unique}"
-
-    @property
-    def is_viable(self):
-        return self.active and self.provided and self.dependencies_met
-
-
 class Reservation(models.Model):
     """Reservation (CONTRACT MODEL)
 
@@ -573,8 +514,8 @@ class Reservation(models.Model):
 
     strategy = TextChoicesField(
         max_length=1000,
-        choices_enum=ReservationStrategyChoices,
-        default=ReservationStrategyChoices.RANDOM,
+        choices_enum=enums.ReservationStrategyChoices,
+        default=enums.ReservationStrategyChoices.RANDOM,
         help_text="The Strategy of this Reservation",
     )
 
@@ -623,22 +564,12 @@ class Reservation(models.Model):
         null=True,
         blank=True,
     )
-    template = models.ForeignKey(
-        Template,
-        on_delete=models.CASCADE,
-        help_text="The template this reservation connects",
-        related_name="reservations",
-        null=True,
-        blank=True,
-    )
 
     # The connections
-    provisions = models.ManyToManyField(
-        Provision,
-        help_text="The Provisions this reservation connects",
+    templates = models.ManyToManyField(
+        Template,
+        help_text="The templates this reservation connects",
         related_name="reservations",
-        null=True,
-        blank=True,
     )
 
     # Platform specific Details (non relational Data)
@@ -648,13 +579,6 @@ class Reservation(models.Model):
         blank=True,
     )
 
-    # Status Field
-    status = TextChoicesField(
-        max_length=1000,
-        choices_enum=ReservationEventChoices,
-        default=ReservationEventChoices.PENDING,
-        help_text="The Status of this Provision",
-    )
     statusmessage = models.CharField(
         max_length=1000,
         help_text="Clear Text status of the ssssssProvision as for now",
@@ -672,14 +596,10 @@ class Assignation(models.Model):
     waiter = models.ForeignKey(
         Waiter, on_delete=models.CASCADE, help_text="Which Waiter assigned this?"
     )
-    interfaces = models.JSONField(
-        default=list,
-        help_text="Which interfaces does this fullfill (e.g. is this on the fly download? This is dynamic and can change from app to app)",
-    )
     reservation = models.ForeignKey(
         Reservation,
         on_delete=models.CASCADE,
-        help_text="Which reservation are we assigning to",
+        help_text="Was this assigned through a reservation?",
         related_name="assignations",
         blank=True,
         null=True,
@@ -687,7 +607,7 @@ class Assignation(models.Model):
     template = models.ForeignKey(
         Template,
         on_delete=models.CASCADE,
-        help_text="Which tempalten are we assigning to",
+        help_text="Which template is the assignation currently mapped (can be reassigned)?",
         related_name="assignations",
         blank=True,
         null=True,
@@ -699,7 +619,6 @@ class Assignation(models.Model):
         default=False,
         help_text="Is this Assignation ephemeral (e.g. should it be deleted after its done or should it be kept for future reference)",
     )
-
     hooks = models.JSONField(
         default=list,
         help_text="hooks that are tight to the lifecycle of this assignation",
@@ -714,18 +633,18 @@ class Assignation(models.Model):
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        help_text="The Assignations parent (the one that created this)",
+        help_text="The Assignations parent (the one that created this (none if there is no parent))",
         related_name="children",
     )
-    args = models.JSONField(blank=True, null=True, help_text="The Args", default=dict)
-    provision = models.ForeignKey(
-        Provision,
+    root = models.ForeignKey(
+        "self",
         on_delete=models.CASCADE,
-        help_text="Which Provision did we end up being assigned to (will be set after a bound)",
-        related_name="assignations",
-        blank=True,
         null=True,
+        blank=True,
+        help_text="The Root parent (the one that was created by the user (none if this is the root))",
+        related_name="all_children",
     )
+    args = models.JSONField(blank=True, null=True, help_text="The Args", default=dict)
     waiter = models.ForeignKey(
         Waiter,
         on_delete=models.CASCADE,
@@ -735,15 +654,31 @@ class Assignation(models.Model):
         blank=True,
         related_name="assignations",
     )
-    status = TextChoicesField(
+    agent = models.ForeignKey(
+        Agent,
+        on_delete=models.CASCADE,
         max_length=1000,
-        choices_enum=AssignationEventChoices,
+        help_text="This Assignation app",
+        related_name="assignations",
+    )
+    latest_event_kind = TextChoicesField(
+        max_length=1000,
+        choices_enum=enums.AssignationEventChoices,
         help_text="The latest Status of this Provision (transitioned by events)",
+    )
+    latest_instruct_kind = TextChoicesField(
+        max_length=1000,
+        choices_enum=enums.AssignationInstructChoices,
+        help_text="The latest Instruct of this Provision (transitioned by events)",
     )
     statusmessage = models.CharField(
         max_length=1000,
         help_text="Clear Text status of the Provision as for now",
         blank=True,
+    )
+    is_done = models.BooleanField(
+        default=False,
+        help_text="Is this Assignation done (e.g. has it been completed and resulted in an error?)",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -765,12 +700,12 @@ class AssignationEvent(models.Model):
         on_delete=models.CASCADE,
     )
     returns = models.JSONField(
-        help_text="The return of the assignation",
+        help_text="The returns of the events (true for yield events)",
         null=True,
         blank=True,
     )
     progress = models.IntegerField(
-        help_text="The progress of the assignation",
+        help_text="The progress of the assignation (0-100) (set for yield events)",
         null=True,
         blank=True,
     )
@@ -778,41 +713,41 @@ class AssignationEvent(models.Model):
     # Status Field
     kind = TextChoicesField(
         max_length=1000,
-        choices_enum=AssignationEventChoices,
+        choices_enum=enums.AssignationEventChoices,
         help_text="The event kind",
     )
     level = TextChoicesField(
         max_length=1000,
-        choices_enum=LogLevelChoices,
-        help_text="The event level",
+        choices_enum=enums.AssignationEventChoices,
+        help_text="The log level",
         null=True,
         blank=True,
     )
 
 
-class ReservationEvent(models.Model):
+class AssignationInstruct(models.Model):
+    waiter = models.ForeignKey(
+        Waiter,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        max_length=1000,
+        help_text="Which Waiter created this Instruction (if any?)",
+        related_name="instructions",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
-    reservation = models.ForeignKey(
-        Reservation,
+    assignation = models.ForeignKey(
+        Assignation,
         help_text="The reservation this log item belongs to",
-        related_name="events",
+        related_name="instructs",
         on_delete=models.CASCADE,
     )
-    message = models.CharField(max_length=2000, null=True, blank=True)
     # Status Field
     kind = TextChoicesField(
         max_length=1000,
-        choices_enum=ReservationEventChoices,
+        choices_enum=enums.AssignationInstructChoices,
         help_text="The event kind",
     )
-    level = TextChoicesField(
-        max_length=1000,
-        choices_enum=LogLevelChoices,
-        help_text="The event level",
-        null=True,
-        blank=True,
-    )
-
 
 class AgentEvent(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
@@ -826,36 +761,12 @@ class AgentEvent(models.Model):
     # Status Field
     kind = TextChoicesField(
         max_length=1000,
-        choices_enum=AgentEventChoices,
+        choices_enum=enums.AgentEventChoices,
         help_text="The event kind",
     )
     level = TextChoicesField(
         max_length=1000,
-        choices_enum=LogLevelChoices,
-        help_text="The event level",
-        null=True,
-        blank=True,
-    )
-
-
-class ProvisionEvent(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
-    provision = models.ForeignKey(
-        Provision,
-        help_text="The provision this log item belongs to",
-        related_name="events",
-        on_delete=models.CASCADE,
-    )
-    message = models.CharField(max_length=2000, null=True, blank=True)
-    # Status Field
-    kind = TextChoicesField(
-        max_length=1000,
-        choices_enum=ProvisionEventChoices,
-        help_text="The event kind",
-    )
-    level = TextChoicesField(
-        max_length=1000,
-        choices_enum=LogLevelChoices,
+        choices_enum=enums.LogLevelChoices,
         help_text="The event level",
         null=True,
         blank=True,
@@ -908,6 +819,18 @@ class TestResult(models.Model):
 class Structure(models.Model):
     identifier = models.CharField(max_length=2000)
     object = models.CharField(max_length=6000)
+    
+    
+    
+class Widgets(models.Model):
+    name = models.CharField(max_length=2000)
+    kind = models.CharField(max_length=2000)
+    structure = models.ForeignKey(
+        Structure, on_delete=models.CASCADE, null=True, blank=True
+    )
+    hash = models.CharField(max_length=2000, unique=True)
+    values = models.JSONField(null=True, blank=True)
+    
 
 
 class Dashboard(models.Model):
@@ -941,6 +864,22 @@ class Panel(models.Model):
 
 
 class StateSchema(models.Model):
+    """ A state schema is an abstract representation of a state and describes
+    the ports (datatypes) that a state can have. States also follow the
+    port schema
+    
+    State schemas do not belong directly to an agent, but are
+    used by agents to describe the states they can have. 
+    
+    The concept is closing linked to the concepot of a "Node", but
+    representing state, rather than a function.
+    
+
+    """
+    
+    
+    
+    
     name = models.CharField(max_length=2000)
     hash = models.CharField(max_length=2000, unique=True)
     ports = models.JSONField(default=dict)
@@ -948,13 +887,22 @@ class StateSchema(models.Model):
 
 
 class State(models.Model):
+    """ A state is a representation of the current state of a node.
+    
+    States always follow a schema and represent the current
+    state of a node. States are used to represent the current
+    
+    """
+    
+    
+    
     state_schema = models.ForeignKey(
         StateSchema, on_delete=models.CASCADE, related_name="states"
     )
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="states")
-    value = models.JSONField(default=dict)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    value = models.JSONField(default=dict, help_text=" The current value of this state")
+    created_at = models.DateTimeField(auto_now_add=True, help_text="Date this State was first ever written to")
+    updated_at = models.DateTimeField(auto_now=True, help_text="Date this State was last updated")
 
     class Meta:
         constraints = [
@@ -966,13 +914,19 @@ class State(models.Model):
 
 
 class HistoricalState(models.Model):
+    """ A historical state 
+    
+    A historical state is a frzoen state of an agent at a specific
+    point in time. Historical states are used to conserve the
+    state of an agent at a specific point in time, for example
+    for debugging or for testing purposes.
+    
+    
+    """
     state = models.ForeignKey(
         State, on_delete=models.CASCADE, related_name="historical_states"
     )
-    value = models.JSONField(default=dict)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    archived_at = models.DateTimeField(auto_now_add=True)
+    value = models.JSONField(default=dict, help_text=" The  value of this state atht he time of creation")
+    archived_at = models.DateTimeField(auto_now_add=True, help_text="Date this State was archived")
 
 
-import facade.signals

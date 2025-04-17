@@ -8,7 +8,6 @@ import json
 import logging
 from facade.protocol import infer_protocols
 from facade.utils import hash_input
-from facade.logic import schedule_reservation
 from facade.consumers.async_consumer import AgentConsumer
 
 logger = logging.getLogger(__name__)

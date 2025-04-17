@@ -36,7 +36,6 @@ class Query:
     toolboxes: list[types.Toolbox] = strawberry_django.field()
     
     
-    provisions: list[types.Provision] = strawberry_django.field()
     node = strawberry_django.field(resolver=queries.node)
     assignations = strawberry_django.field(resolver=queries.assignations)
     event = strawberry_django.field(resolver=queries.event)
@@ -102,10 +101,6 @@ class Query:
         return models.Template.objects.get(id=id)
 
     @strawberry_django.field()
-    def provision(self, info: Info, id: strawberry.ID) -> types.Provision:
-        return models.Provision.objects.get(id=id)
-
-    @strawberry_django.field()
     def assignation(self, info: Info, id: strawberry.ID) -> types.Assignation:
         return models.Assignation.objects.get(id=id)
 
@@ -124,17 +119,25 @@ class Mutation:
     ack: types.Assignation = strawberry_django.mutation(resolver=mutations.ack)
     assign: types.Assignation = strawberry_django.mutation(resolver=mutations.assign)
     cancel: types.Assignation = strawberry_django.mutation(resolver=mutations.cancel)
+    step: types.Assignation = strawberry_django.mutation(
+        resolver=mutations.step, description="Step a assignation"
+    )
+    pause: types.Assignation = strawberry_django.mutation(
+        resolver=mutations.pause, description="Pause a assignation"
+    )
+    resume: types.Assignation = strawberry_django.mutation(
+        resolver=mutations.resume, description="Resume a assignation"
+    )
+    collect: types.Assignation = strawberry_django.mutation(
+        resolver=mutations.collect, description="Collect data from a assignation"
+    )
+    
+    
     interrupt: types.Assignation = strawberry_django.mutation(
         resolver=mutations.interrupt
     )
     reinit = strawberry_django.mutation(resolver=mutations.reinit)
-    provide: types.Provision = strawberry_django.mutation(
-        resolver=mutations.provide, description="Provide a provision"
-    )
-    unprovide = strawberry_django.mutation(resolver=mutations.unprovide)
     reserve: types.Reservation = strawberry_django.mutation(resolver=mutations.reserve)
-    link: types.Provision = strawberry_django.mutation(resolver=mutations.link)
-    unlink: types.Provision = strawberry_django.mutation(resolver=mutations.unlink)
     unreserve: str = strawberry_django.mutation(resolver=mutations.unreserve)
 
     delete_template: str = strawberry_django.mutation(
@@ -152,11 +155,6 @@ class Mutation:
         resolver=mutations.create_test_result
     )
 
-    activate: types.Provision = strawberry_django.mutation(resolver=mutations.activate)
-
-    deactivate: types.Provision = strawberry_django.mutation(
-        resolver=mutations.deactivate
-    )
 
     create_hardware_record: types.HardwareRecord = strawberry_django.mutation(
         resolver=mutations.create_hardware_record
@@ -212,10 +210,7 @@ class Subscription:
     assignation_events = strawberry.subscription(
         resolver=subscriptions.assignation_events
     )
-    reservation_events = strawberry.subscription(
-        resolver=subscriptions.reservation_events
-    )
-    provision_events = strawberry.subscription(resolver=subscriptions.provision_events)
+    agents = strawberry.subscription(resolver=subscriptions.agents)
     template_change = strawberry.subscription(resolver=subscriptions.template_change)
     templates = strawberry.subscription(resolver=subscriptions.templates)
     state_update_events = strawberry.subscription(

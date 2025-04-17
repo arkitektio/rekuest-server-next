@@ -18,6 +18,10 @@ Including another URLconf
 from django.contrib import admin
 from .basepath import basepath
 
+reload = "fd"
+
+
+
 urlpatterns = [
     basepath("admin/", admin.site.urls),
 ]

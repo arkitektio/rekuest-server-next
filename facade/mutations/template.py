@@ -83,14 +83,6 @@ def _create_template(
             agent=agent,
         )
 
-        provision = models.Provision.objects.update_or_create(
-            template=template,
-            agent=agent,
-            defaults=dict(
-                status=enums.ProvisionStatus.ACTIVE,
-            ),
-        )
-
         new_deps = []
 
         if input.dependencies:
@@ -136,14 +128,6 @@ def _create_template(
             extension=extension,
             dynamic=input.dynamic,
             params=input.params or {},
-        )
-
-        provision = models.Provision.objects.update_or_create(
-            template=template,
-            agent=agent,
-            defaults=dict(
-                status=enums.ProvisionStatus.ACTIVE,
-            ),
         )
 
         new_deps = []

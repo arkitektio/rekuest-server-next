@@ -8,28 +8,26 @@ from facade.channels import agent_updated_listen
 
 @strawberry.type
 class AgentChangeEvent:
-    event: types.AgentEvent | None
-    create: types.Agent | None
+    update: types.Agent | None = None
+    create: types.Agent | None = None
+    delete: strawberry.ID | None = None
 
 
 async def agents(
     self,
     info: Info,
-    instance_id: str,
-) -> AsyncGenerator[types.AgentEvent, None]:
+) -> AsyncGenerator[AgentChangeEvent, None]:
     """Join and subscribe to message sent to the given rooms."""
+    
+    print("Agent subscription", [f"agents_for_{info.context.request.user.id}"])
 
-    registry, _ = await models.Registry.objects.aget_or_create(
-        app=info.context.request.app, user=info.context.request.user
-    )
-
-    waiter, _ = await models.Waiter.objects.aget_or_create(
-        registry=registry, instance_id=instance_id, defaults=dict(name="default")
-    )
-
-    async for message in agent_updated_listen(info, [f"agents"]):
-
-        if message["type"] == "created":
-            yield await models.Agent.objects.aget(id=message["id"])
-        elif message["type"] == "updated":
-            yield await models.Agent.objects.aget(id=message["id"])
+    async for message in agent_updated_listen(info, [f"agents_for_{info.context.request.user.id}"]):
+        print("Message received", message)
+        if message["type"] == "create":
+            yield AgentChangeEvent(create=await models.Agent.objects.aget(id=message["id"]))
+        elif message["type"] == "update":
+            yield AgentChangeEvent(update=await models.Agent.objects.aget(id=message["id"]))
+        elif message["type"] == "delete":
+            yield AgentChangeEvent(delete=message["id"])
+        else:
+            raise ValueError("Unknown message type")

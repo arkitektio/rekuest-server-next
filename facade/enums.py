@@ -137,6 +137,19 @@ class AssignationEventChoices(TextChoices):
     )  # One yield can be interpreted as a return
     DONE = "DONE", "Done (Agent finished the Assignation)"
     LOG = "LOG", "Log (Agent logged a message)"
+    
+class AssignationInstructChoices(TextChoices):
+    """These are the possible events that are instructed to an Assignation.
+
+    """
+    ASSIGN = "ASSIGN", "Assign (Agent accepted the Assignation)"
+    CANCEL = "CANCEL", "Unassign (Agent received the Assignation)"
+    STEP = "STEP", "Step (Agent is making progress on the Assignation)"
+    RESUME = "RESUME", "Resume (Agent resumed the Assignation)"
+    PAUSE = "PAUSE", "Pause (Agent paused the Assignation)"
+    INTERRUPT = "INTERRUPT", "Interrupt (Agent interupted the Assignation)"
+    COLLECT = "COLLECT", "Collect instruction received"
+    
 
 
 class ReservationEventChoices(TextChoices):
@@ -255,6 +268,21 @@ class AssignationStatus(str, Enum):
     DONE = "DONE"
 
 
+
+@strawberry.enum
+class AssignationInstructKind(str, Enum):
+    """These are the possible events that are instructed to an Assignation.
+
+    """
+
+    ASSIGN = "ASSIGN"
+    CANCEL = "CANCEL"
+    STEP = "STEP"
+    RESUME = "RESUME"
+    PAUSE = "PAUSE"
+    INTERRUPT = "INTERRUPT"
+    COLLECT = "COLLECT"
+
 @strawberry.enum
 class ReservationStatus(str, Enum):
     # LifeCycle States
@@ -295,6 +323,19 @@ class ProvisionStatus(str, Enum):
     ENDED = "ENDED"
     CANCELLED = "CANCELLED"
 
+
+@strawberry.enum
+class AssignationInstructKind(str, Enum):
+    """These are the possible events that are instructed to an Assignation.
+
+    """
+
+    ASSIGN = "ASSIGN"
+    CANCEL = "CANCEL"
+    STEP = "STEP"
+    RESUME = "RESUME"
+    PAUSE = "PAUSE"
+    INTERRUPT = "INTERRUPT"
 
 @strawberry.enum
 class AssignationEventKind(str, Enum):

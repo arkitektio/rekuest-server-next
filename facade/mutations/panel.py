@@ -1,15 +1,8 @@
 from kante.types import Info
 import strawberry_django
 import strawberry
-from facade import types, models, inputs, enums, scalars
-import hashlib
-import json
-import logging
-from facade.protocol import infer_protocols
-from facade.utils import hash_input
+from facade import types, models, inputs, enums
 import uuid
-
-logger = logging.getLogger(__name__)
 
 
 def create_panel(info: Info, input: inputs.CreatePanelInput) -> types.Panel:

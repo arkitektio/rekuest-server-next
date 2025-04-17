@@ -30,7 +30,7 @@ def myreservations(
 def reservations(
     info: Info,
     instance_id: scalars.InstanceID | None = None,
-) -> list[types.ReservationEvent]:
+) -> list[types.Reservation]:
 
     registry, _ = models.Registry.objects.get_or_create(
         app=info.context.request.app, user=info.context.request.user

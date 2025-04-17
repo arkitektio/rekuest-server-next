@@ -5,8 +5,6 @@ from facade import types, models, inputs, enums, scalars
 import hashlib
 import json
 import logging
-from facade.protocol import infer_protocols
-from facade.utils import hash_input
 
 logger = logging.getLogger(__name__)
 

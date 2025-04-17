@@ -29,15 +29,6 @@ def reservation_signal(sender, instance=None, **kwargs):
     logger.info("Reservation received!")
 
 
-@receiver(post_save, sender=models.Provision)
-def provision_signal(sender, instance=None, created=None, **kwargs):
-    from facade.backend import controll_backend
-
-    if created:
-        controll_backend.provide(instance)
-        assign_perm("can_link_to", instance.agent.registry.user, instance)
-
-
 @receiver(post_save, sender=models.Template)
 def template_post_save(
     sender, instance: models.Template = None, created=None, **kwargs
@@ -49,19 +40,15 @@ def template_post_save(
     )
 
 
-@receiver(pre_delete, sender=models.Provision)
-def prov_pre_delete(sender, instance: models.Provision = None, **kwargs):
-    from facade.backend import controll_backend
-
-    pass
-    controll_backend.unprovide(instance)
-
 
 @receiver(post_save, sender=models.Agent)
 def agent_post_save(sender, instance: models.Agent = None, created=None, **kwargs):
     if instance:
-        agent_updated_broadcast(instance.id, [f"agents"])
-
+       print("Agent post save")
+       agent_updated_broadcast(
+            {"id": instance.id, "type": "create" if created else "update"},
+            [f"agents_for_{instance.registry.user.id}"],
+        )
 
 @receiver(post_save, sender=models.Assignation)
 def ass_post_save(sender, instance: models.Assignation = None, created=None, **kwargs):
@@ -86,24 +73,6 @@ def res_post_save(sender, instance: models.Reservation = None, created=None, **k
     if created:
         pass
         # reservation_broadcast(instance.id, [f"res_waiter_{instance.waiter.id}"])
-
-
-@receiver(post_save, sender=models.ReservationEvent)
-def res_event_post_save(
-    sender, instance: models.ReservationEvent = None, created=None, **kwargs
-):
-    reservation_event_broadcast(
-        instance.id,
-        [
-            f"reservation_{instance.reservation.id}",
-            f"res_waiter_{instance.reservation.waiter.id}",
-        ],
-    )
-
-
-@receiver(post_save, sender=models.ProvisionEvent)
-def prov_event_post_save(sender, instance: models.Provision = None, **kwargs):
-    pass
 
 
 @receiver(post_save, sender=models.Template)

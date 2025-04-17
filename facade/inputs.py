@@ -2,7 +2,7 @@ from typing import Any, Dict, Literal, Optional
 
 import strawberry
 from facade import enums, scalars
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from rekuest_core import enums as renums
 from rekuest_core import scalars as rscalars
 
@@ -12,6 +12,7 @@ from rekuest_ui_core.inputs import models as uimodels
 from rekuest_ui_core.inputs import types as uitypes
 from strawberry import LazyType
 from strawberry.experimental import pydantic
+import uuid
 
 
 class PinInputModel(BaseModel):
@@ -26,13 +27,15 @@ class PinInput:
 
 
 class ReserveInputModel(BaseModel):
-    instance_id: str 
+    reference: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    instance_id: str = Field(default="default")
     node: str | None = None
     template: str | None = None
     title: str | None = None
     hash: str | None = None
-    reference: str | None = None
     binds: rimodels.BindsInputModel | None = None
+    assignation_id: str | None = None
+    
 
 
 @pydantic.input(ReserveInputModel)
@@ -44,6 +47,7 @@ class ReserveInput:
     hash: rscalars.NodeHash | None = None
     reference: str | None = None
     binds: ritypes.BindsInput | None = None
+    assignation_id: strawberry.ID | None = None
 
 
 class HookInputModel(BaseModel):
@@ -61,12 +65,13 @@ class AssignInputModel(BaseModel):
     interface: str | None = None
     hooks: list[HookInputModel] | None = None
     args: dict[str, Any]
-    reference: str | None = None
+    reference: str = Field(default_factory=lambda: str(uuid.uuid4()))
     parent: str | None = None
     cached: bool = False
     log: bool = False
     ephemeral: bool = False
     is_hook: bool = False
+    step: bool = False
 
 
 class CancelInputModel(BaseModel):
@@ -75,6 +80,41 @@ class CancelInputModel(BaseModel):
 
 @pydantic.input(CancelInputModel)
 class CancelInput:
+    assignation: strawberry.ID
+
+
+class PauseInputModel(BaseModel):
+    assignation: str
+
+
+@pydantic.input(PauseInputModel)
+class PauseInput:
+    assignation: strawberry.ID
+
+
+class CollectInputModel(BaseModel):
+    assignation: str
+    
+@pydantic.input(CollectInputModel)
+class CollectInput:
+    assignation: strawberry.ID
+
+
+class ResumeInputModel(BaseModel):
+    assignation: str
+
+
+@pydantic.input(ResumeInputModel)
+class ResumeInput:
+    assignation: strawberry.ID
+    
+    
+class StepInputModel(BaseModel):
+    assignation: str
+
+
+@pydantic.input(StepInputModel)
+class StepInput:
     assignation: strawberry.ID
 
 
@@ -95,7 +135,7 @@ class HookInput:
 
 @pydantic.input(AssignInputModel)
 class AssignInput:
-    instance_id: scalars.InstanceID
+    instance_id: scalars.InstanceID 
     node: strawberry.ID | None = None
     template: strawberry.ID | None = None
     agent: strawberry.ID | None = None
@@ -110,6 +150,7 @@ class AssignInput:
     ephemeral: bool = False
     log: bool = False
     is_hook: bool = False
+    step: bool = False
 
 
 @strawberry.input
