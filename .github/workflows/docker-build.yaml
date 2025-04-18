@@ -25,4 +25,4 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: jhnnsrs/rekuest_next:stable
+          tags: jhnnsrs/rekuest_next:nightly
