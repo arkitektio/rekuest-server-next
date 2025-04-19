@@ -120,8 +120,7 @@ class ModelPersistBackend:
         await x.asave()
         
     async def on_agent_progress(self, agent_id: str, message: messages.ProgressEvent) -> None:
-        logging.info(f"Yield Assignation {message}")
-        
+        logging.info(f"Progress Assignation {message}")
         
         await models.AssignationEvent.objects.acreate(
             assignation_id=message.assignation,
