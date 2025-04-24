@@ -137,7 +137,10 @@ class Collect(Message):
     
     """
     type: Literal[ToAgentMessageType.COLLECT] = ToAgentMessageType.COLLECT
-    assignation: int
+    assignation: Optional[int]
+    structure: Optional[str]
+    
+
 
 
 class Interrupt(Message):
