@@ -2,6 +2,7 @@ from typing import Any, Optional
 from rekuest_core import enums
 from pydantic import BaseModel, Field, root_validator
 from typing_extensions import Self
+from strawberry import LazyType
 
 
 class BindsInputModel(BaseModel):
@@ -94,7 +95,7 @@ class PortInputModel(BaseModel):
     nullable: bool = False
     effects: list[EffectInputModel] | None
     default: Any | None = None
-    children: list["ChildPortInputModel"] | None
+    children: list["PortInputModel"] | None
     assign_widget: Optional["AssignWidgetInputModel"] = None
     return_widget: Optional["ReturnWidgetInputModel"] = None
 

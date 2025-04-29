@@ -155,7 +155,7 @@ class PortModel(BaseModel):
     nullable: bool
     effects: list[EffectModelUnion] | None
     default: Any | None = None
-    children: list[ChildPortModel] | None
+    children: list["PortModel"] | None
     assign_widget: AssignWidgetModelUnion | None
     return_widget: ReturnWidgetModelUnion | None
     validators: list[ValidatorModel] | None

@@ -71,7 +71,7 @@ class AssignWidgetInput:
     fallback: Optional[LazyType["AssignWidgetInput", __name__]] = None
     follow_value: str | None = None
     state_choices: str | None = None
-    filters: Optional[List[LazyType["ChildPortInput", __name__]]] = None
+    filters: Optional[List[LazyType["PortInput", __name__]]] = None
     dependencies: list[str] | None = None
 
 
@@ -119,7 +119,7 @@ class ChildPortInput:
     identifier: scalars.Identifier | None = None
     nullable: bool
     default: scalars.AnyDefault | None = None
-    children: list[LazyType["ChildPortInput", __name__]] | None = strawberry.field(
+    children: list[LazyType["PortInput", __name__]] | None = strawberry.field(
         default_factory=list
     )
     effects: list[EffectInput] | None = strawberry.field(default_factory=list)
@@ -166,7 +166,7 @@ class PortInput:
     nullable: bool
     effects: list[EffectInput] | None = strawberry.field(default_factory=list)
     default: scalars.AnyDefault | None = None
-    children: list[LazyType["ChildPortInput", __name__]] | None = strawberry.field(
+    children: list[LazyType["PortInput", __name__]] | None = strawberry.field(
         default_factory=list
     )
     assign_widget: Optional["AssignWidgetInput"] = None

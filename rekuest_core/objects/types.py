@@ -11,6 +11,7 @@ from rekuest_core.objects import models
 from rekuest_core import enums, scalars
 
 
+
 class ChoiceModel(BaseModel):
     label: str
     value: str
@@ -51,7 +52,7 @@ class CustomAssignWidget(AssignWidget):
 class SearchAssignWidget(AssignWidget):
     query: str
     ward: str
-    filters: Optional[list[LazyType["ChildPort", __name__]]] = None
+    filters: Optional[list[LazyType["Port", __name__]]] = None
     dependencies: list[str] | None = None
 
     # this took me a while to figure out should be more obvious
@@ -156,7 +157,7 @@ class Port:
     label: str | None
     description: str | None
     effects: list[Effect] | None
-    children: list[ChildPort] | None = None
+    children: list[LazyType["Port", __name__]] | None = None
     assign_widget: AssignWidget | None
     return_widget: ReturnWidget | None
     validators: list[Validator] | None
