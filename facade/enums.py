@@ -4,7 +4,7 @@ import strawberry
 from django.db.models import TextChoices
 
 
-class NodeKindChoices(TextChoices):
+class ActionKindChoices(TextChoices):
     FUNCTION = "FUNCTION", "Function"
     GENERATOR = "GENERATOR", "Generator"
 
@@ -12,7 +12,7 @@ class NodeKindChoices(TextChoices):
 class PanelKindChoices(TextChoices):
     STATE = "STATE", "State"
     ASSIGN = "ASSIGN", "Assign"
-    TEMPLATE = "TEMPLATE", "Template"
+    TEMPLATE = "TEMPLATE", "Implementation"
 
 
 class LogLevelChoices(TextChoices):
@@ -137,11 +137,11 @@ class AssignationEventChoices(TextChoices):
     )  # One yield can be interpreted as a return
     DONE = "DONE", "Done (Agent finished the Assignation)"
     LOG = "LOG", "Log (Agent logged a message)"
-    
-class AssignationInstructChoices(TextChoices):
-    """These are the possible events that are instructed to an Assignation.
 
-    """
+
+class AssignationInstructChoices(TextChoices):
+    """These are the possible events that are instructed to an Assignation."""
+
     ASSIGN = "ASSIGN", "Assign (Agent accepted the Assignation)"
     CANCEL = "CANCEL", "Unassign (Agent received the Assignation)"
     STEP = "STEP", "Step (Agent is making progress on the Assignation)"
@@ -149,7 +149,6 @@ class AssignationInstructChoices(TextChoices):
     PAUSE = "PAUSE", "Pause (Agent paused the Assignation)"
     INTERRUPT = "INTERRUPT", "Interrupt (Agent interupted the Assignation)"
     COLLECT = "COLLECT", "Collect instruction received"
-    
 
 
 class ReservationEventChoices(TextChoices):
@@ -243,7 +242,7 @@ class ReservationStrategyChoices(TextChoices):
     DIRECT = "DIRECT", "Direct (Assignation is assigned to a direct Provision)"
 
 
-@strawberry.enum
+@strawberry.enum(description="The pattern of assignment of the reservation")
 class ReservationStrategy(str, Enum):
     RANDOM = "RANDOM"
     ROUND_ROBIN = "ROUND_ROBIN"
@@ -253,13 +252,13 @@ class ReservationStrategy(str, Enum):
     DIRECT = "DIRECT"
 
 
-@strawberry.enum
+@strawberry.enum(description="The event kind of the agentevent")
 class AgentEventKind(str, Enum):
     DISCONNECT = "DISCONNECT"
     CONNECT = "CONNECT"
 
 
-@strawberry.enum
+@strawberry.enum(description="The event kind of the assignationevent")
 class AssignationStatus(str, Enum):
     ASSIGNING = "ASSIGNING"
     ONGOING = "ONGOING"
@@ -267,21 +266,6 @@ class AssignationStatus(str, Enum):
     CANCELLED = "CANCELLED"
     DONE = "DONE"
 
-
-
-@strawberry.enum
-class AssignationInstructKind(str, Enum):
-    """These are the possible events that are instructed to an Assignation.
-
-    """
-
-    ASSIGN = "ASSIGN"
-    CANCEL = "CANCEL"
-    STEP = "STEP"
-    RESUME = "RESUME"
-    PAUSE = "PAUSE"
-    INTERRUPT = "INTERRUPT"
-    COLLECT = "COLLECT"
 
 @strawberry.enum
 class ReservationStatus(str, Enum):
@@ -324,11 +308,9 @@ class ProvisionStatus(str, Enum):
     CANCELLED = "CANCELLED"
 
 
-@strawberry.enum
+@strawberry.enum(description="The event kind of the assignationevent")
 class AssignationInstructKind(str, Enum):
-    """These are the possible events that are instructed to an Assignation.
-
-    """
+    """These are the possible events that are instructed to an Assignation."""
 
     ASSIGN = "ASSIGN"
     CANCEL = "CANCEL"
@@ -336,8 +318,10 @@ class AssignationInstructKind(str, Enum):
     RESUME = "RESUME"
     PAUSE = "PAUSE"
     INTERRUPT = "INTERRUPT"
+    COLLECT = "COLLECT"
 
-@strawberry.enum
+
+@strawberry.enum(description="The event kind of the assignationevent")
 class AssignationEventKind(str, Enum):
     """These are the possible events that can happen to an Assignation.
 
@@ -438,7 +422,7 @@ class AgentStatus(str, Enum):
 
 
 @strawberry.enum
-class NodeScope(str, Enum):
+class ActionScope(str, Enum):
     GLOBAL = "GLOBAL"
     LOCAL = "LOCAL"
     BRIDGE_GLOBAL_TO_LOCAL = "BRIDGE_GLOBAL_TO_LOCAL"

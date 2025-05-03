@@ -1,12 +1,12 @@
 from typing import List
 from facade import models
 from .models import (
-    NodeNodeModel,
-    InvalidNodeModel,
-    TemplateNodeModel,
+    ActionActionModel,
+    InvalidActionModel,
+    ImplementationActionModel,
     DependencyEdgeModel,
     DependencyGraphModel,
-    NodeModel,
+    ActionModel,
     ImplementationEdgeModel,
     EdgeModel,
 )
@@ -14,95 +14,99 @@ from uuid import uuid4
 
 
 def build_graph_recursive(
-    template: models.Template,
+    implementation: models.Implementation,
     edges: list[EdgeModel],
-    nodes: list[NodeModel],
+    actions: list[ActionModel],
     connect_to=[],
 ) -> None:
-
     try:
-        provision = template.provision
+        provision = implementation.provision
     except Exception as e:
         provision = None
 
-    template_node = TemplateNodeModel(
-        id=template.id,
-        template_id=template.id,
-        interface=template.interface,
-        client_id=template.agent.registry.app.client_id,
+    implementation_action = ImplementationActionModel(
+        id=implementation.id,
+        implementation_id=implementation.id,
+        interface=implementation.interface,
+        client_id=implementation.agent.registry.app.client_id,
     )
 
-    nodes.append(template_node)
+    actions.append(implementation_action)
 
-    for dep in template.dependencies.all():
+    for dep in implementation.dependencies.all():
+        if dep.action is not None:
+            action = ActionActionModel(action_id=dep.action.id, name=dep.action.name)
 
-        if dep.node is not None:
-            node = NodeNodeModel(node_id=dep.node.id, name=dep.node.name)
-
-            for node_template in dep.node.templates.all():
-                build_graph_recursive(node_template, edges, nodes, connect_to=[node.id])
+            for action_implementation in dep.action.implementations.all():
+                build_graph_recursive(
+                    action_implementation, edges, actions, connect_to=[action.id]
+                )
 
         else:
-            node = InvalidNodeModel(initial_hash=dep.initial_hash)
+            action = InvalidActionModel(initial_hash=dep.initial_hash)
 
         dep_edge = DependencyEdgeModel(
-            source=template_node.id,
-            target=node.id,
+            source=implementation_action.id,
+            target=action.id,
             optional=dep.optional,
             dep_id=dep.id,
         )
 
-        nodes.append(node)
+        actions.append(action)
         edges.append(dep_edge)
 
     for i in connect_to:
         edges.append(
-            ImplementationEdgeModel(source=i, target=template_node.id, optional=False)
+            ImplementationEdgeModel(
+                source=i, target=implementation_action.id, optional=False
+            )
         )
 
 
-def build_template_graph(template: models.Template) -> DependencyGraphModel:
-    nodes = []
+def build_implementation_graph(
+    implementation: models.Implementation,
+) -> DependencyGraphModel:
+    actions = []
     edges = []
-    build_graph_recursive(template, edges, nodes)
-    return DependencyGraphModel(nodes=nodes, edges=edges)
+    build_graph_recursive(implementation, edges, actions)
+    return DependencyGraphModel(actions=actions, edges=edges)
 
 
-def build_node_graph(node: models.Node) -> DependencyGraphModel:
-    nodes = []
+def build_action_graph(action: models.Action) -> DependencyGraphModel:
+    actions = []
     edges = []
 
-    node_node = NodeNodeModel(node_id=node.id, name=node.name)
-    nodes.append(node_node)
+    action_action = ActionActionModel(action_id=action.id, name=action.name)
+    actions.append(action_action)
 
-    for template in node.templates.all():
-        build_graph_recursive(template, edges, nodes, connect_to=[node_node.id])
-    return DependencyGraphModel(nodes=nodes, edges=edges)
+    for implementation in action.implementations.all():
+        build_graph_recursive(
+            implementation, edges, actions, connect_to=[action_action.id]
+        )
+    return DependencyGraphModel(actions=actions, edges=edges)
 
 
 def build_reservation_graph_recursive(
     reservation: models.Reservation,
     edges: list[EdgeModel],
-    nodes: list[NodeModel],
+    actions: list[ActionModel],
     connect_to=[],
 ) -> None:
-
-    node_node = NodeNodeModel(
-        node_id=reservation.node.id,
-        name=reservation.node.name,
+    action_action = ActionActionModel(
+        action_id=reservation.action.id,
+        name=reservation.action.name,
         reservation_id=reservation.id,
         status=reservation.status,
     )
-    nodes.append(node_node)
+    actions.append(action_action)
 
-    for temp in reservation.node.templates.all():
-
-        linked = reservation.provisions.filter(template=temp).exists()
+    for temp in reservation.action.implementations.all():
+        linked = reservation.provisions.filter(implementation=temp).exists()
         provision = temp.provision
 
-        template_node = TemplateNodeModel(
+        implementation_action = ImplementationActionModel(
             id=temp.id,
-            template_id=temp.id,
+            implementation_id=temp.id,
             interface=temp.interface,
             provision_id=provision.id,
             client_id=temp.agent.registry.app.client_id,
@@ -111,11 +115,11 @@ def build_reservation_graph_recursive(
             status=provision.status,
             active=provision.active,
         )
-        nodes.append(template_node)
+        actions.append(implementation_action)
         edges.append(
             ImplementationEdgeModel(
-                source=node_node.id,
-                target=template_node.id,
+                source=action_action.id,
+                target=implementation_action.id,
                 optional=False,
                 linked=linked,
             )
@@ -124,17 +128,19 @@ def build_reservation_graph_recursive(
         if linked:
             for reservation in provision.caused_reservations.all():
                 build_reservation_graph_recursive(
-                    reservation, edges, nodes, connect_to=[template_node.id]
+                    reservation, edges, actions, connect_to=[implementation_action.id]
                 )
 
     for i in connect_to:
-        edges.append(DependencyEdgeModel(source=i, target=node_node.id, optional=False))
+        edges.append(
+            DependencyEdgeModel(source=i, target=action_action.id, optional=False)
+        )
 
 
 def build_reservation_graph(reservation: models.Reservation) -> DependencyGraphModel:
-    nodes = []
+    actions = []
     edges = []
 
-    build_reservation_graph_recursive(reservation, edges, nodes)
+    build_reservation_graph_recursive(reservation, edges, actions)
 
-    return DependencyGraphModel(nodes=nodes, edges=edges)
+    return DependencyGraphModel(actions=actions, edges=edges)

@@ -14,22 +14,22 @@ from pydantic import BaseModel, Field
 
 ## Build dependency graph
 
-x = models.Template.objects.get(id=8)
+x = models.Implementation.objects.get(id=8)
 
 
-class InvalidNode(BaseModel):
+class InvalidAction(BaseModel):
     id: int
     initial_hash: str
 
 
-class NodeNode(BaseModel):
+class ActionAction(BaseModel):
     id: int
-    node_id: str
+    action_id: str
 
 
-class TemplateNode(BaseModel):
+class ImplementationAction(BaseModel):
     id: int
-    template_id: str
+    implementation_id: str
 
 
 class DependencyEdge(BaseModel):
@@ -39,52 +39,53 @@ class DependencyEdge(BaseModel):
     optional: bool
 
 
-Node = NodeNode | InvalidNode | TemplateNode
+Action = ActionAction | InvalidAction | ImplementationAction
 
 
 class Graph(BaseModel):
-    nodes: list[Node]
+    actions: list[Action]
     edges: list[DependencyEdge]
 
 
 def build_graph_recursive(
-    template_id: int, edges: list[DependencyEdge], nodes: list[Node]
+    implementation_id: int, edges: list[DependencyEdge], actions: list[Action]
 ) -> None:
+    implementation = models.Implementation.objects.get(id=implementation_id)
+    actions.append(
+        ImplementationAction(id=implementation.id, implementation_id=implementation.id)
+    )
 
-    template = models.Template.objects.get(id=template_id)
-    nodes.append(TemplateNode(id=template.id, template_id=template.id))
-
-    for dep in template.dependencies.all():
-        if dep.node is not None:
-            nodes.append(NodeNode(id=dep.node.id, node_id=dep.node.id))
+    for dep in implementation.dependencies.all():
+        if dep.action is not None:
+            actions.append(ActionAction(id=dep.action.id, action_id=dep.action.id))
             edges.append(
                 DependencyEdge(
                     id=dep.id,
-                    source=dep.node.hash,
-                    target=template.node.hash,
+                    source=dep.action.hash,
+                    target=implementation.action.hash,
                     optional=dep.optional,
                 )
             )
-            for template in dep.node.templates.all():
-                build_graph_recursive(template.id, edges, nodes)
+            for implementation in dep.action.implementations.all():
+                build_graph_recursive(implementation.id, edges, actions)
 
         else:
-            nodes.append(InvalidNode(id=dep.id, initial_hash=dep.initial_hash))
+            actions.append(InvalidAction(id=dep.id, initial_hash=dep.initial_hash))
             edges.append(
                 DependencyEdge(
                     id=dep.id,
                     source=dep.initial_hash,
-                    target=template.node.hash,
+                    target=implementation.action.hash,
                     optional=dep.optional,
                 )
             )
 
 
-def build_graph(template_id: int) -> Graph:
-    nodes = []
+def build_graph(implementation_id: int) -> Graph:
+    actions = []
     edges = []
-    build_graph_recursive(template_id, edges, nodes)
-    return Graph(nodes=nodes, edges=edges)
+    build_graph_recursive(implementation_id, edges, actions)
+    return Graph(actions=actions, edges=edges)
 
 
 x = build_graph(8)

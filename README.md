@@ -6,7 +6,7 @@
 
 
 Rekuest is one of the core services of Arkitekt. It represents a central repository of
-all the connected apps and their provided functionality, their [Nodes](https://arkitekt.live/docs/terminology/nodes).
+all the connected apps and their provided functionality, their [Actions](https://arkitekt.live/docs/terminology/actions).
 It also provides ways of interacting with the apps, by providing a central access point, that
 apps and users can assign tasks to. Rekuest then takes care of routing the requests to the
 appropriate app, which executres the task and returns the result to rekuest, which in turn routes it back
@@ -32,7 +32,7 @@ Rekuest is currently being rewritten to support other message brokers, such as [
 however remain an opt-in feature, and RabbitMQ will remain the default message broker. To learn more about this design decision,
 please refer to the [Why Not?](https://arkitekt.live/docs/design/why-not) section.
 
-You can find the current developmental node of Rekuest [here](https://github.com/arkitektio/rekuest-server-next)
+You can find the current developmental action of Rekuest [here](https://github.com/arkitektio/rekuest-server-next)
 Efforts from this new repository will be merged into this repository once the new version is ready for production.
 
 

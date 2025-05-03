@@ -603,7 +603,7 @@ jsonpointer = ">=1.9"
 [[package]]
 name = "jsonpointer"
 version = "3.0.0"
-description = "Identify specific nodes in a JSON document (RFC 6901)"
+description = "Identify specific actions in a JSON document (RFC 6901)"
 optional = false
 python-versions = ">=3.7"
 files = [

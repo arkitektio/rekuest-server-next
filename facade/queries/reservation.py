@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 def myreservations(
     info: Info,
     instance_id: scalars.InstanceID | None = None,
-) -> types.Node:
+) -> types.Action:
     registry, _ = models.Registry.objects.get_or_create(
         app=info.context.request.app, user=info.context.request.user
     )
@@ -31,7 +31,6 @@ def reservations(
     info: Info,
     instance_id: scalars.InstanceID | None = None,
 ) -> list[types.Reservation]:
-
     registry, _ = models.Registry.objects.get_or_create(
         app=info.context.request.app, user=info.context.request.user
     )

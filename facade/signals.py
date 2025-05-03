@@ -2,13 +2,13 @@ from django.db.models.signals import post_save, pre_delete, post_delete
 from django.dispatch import receiver
 from facade import models
 from facade.channels import (
-    node_created_broadcast,
+    action_created_broadcast,
     agent_updated_broadcast,
     provision_event_broadcast,
     reservation_event_broadcast,
     assignation_broadcast,
     reservation_broadcast,
-    template_broadcast,
+    implementation_broadcast,
 )
 import logging
 from guardian.shortcuts import assign_perm
@@ -18,10 +18,10 @@ logger = logging.getLogger(__name__)
 logger.info("Loading sssignals")
 
 
-@receiver(post_save, sender=models.Node)
-def node_singal(sender, instance=None, **kwargs):
+@receiver(post_save, sender=models.Action)
+def action_singal(sender, instance=None, **kwargs):
     if instance:
-        node_created_broadcast(instance.id, [f"nodes"])
+        action_created_broadcast(instance.id, [f"actions"])
 
 
 @receiver(post_save, sender=models.Reservation)
@@ -29,26 +29,26 @@ def reservation_signal(sender, instance=None, **kwargs):
     logger.info("Reservation received!")
 
 
-@receiver(post_save, sender=models.Template)
-def template_post_save(
-    sender, instance: models.Template = None, created=None, **kwargs
+@receiver(post_save, sender=models.Implementation)
+def implementation_post_save(
+    sender, instance: models.Implementation = None, created=None, **kwargs
 ):
     assign_perm("providable", instance.agent.registry.user, instance)
-    template_broadcast(
+    implementation_broadcast(
         {"id": instance.id, "type": "create" if created else "update"},
         [f"agent_{instance.agent.id}"],
     )
 
 
-
 @receiver(post_save, sender=models.Agent)
 def agent_post_save(sender, instance: models.Agent = None, created=None, **kwargs):
     if instance:
-       print("Agent post save")
-       agent_updated_broadcast(
+        print("Agent post save")
+        agent_updated_broadcast(
             {"id": instance.id, "type": "create" if created else "update"},
             [f"agents_for_{instance.registry.user.id}"],
         )
+
 
 @receiver(post_save, sender=models.Assignation)
 def ass_post_save(sender, instance: models.Assignation = None, created=None, **kwargs):
@@ -75,11 +75,11 @@ def res_post_save(sender, instance: models.Reservation = None, created=None, **k
         # reservation_broadcast(instance.id, [f"res_waiter_{instance.waiter.id}"])
 
 
-@receiver(post_save, sender=models.Template)
-def temp_post_save(sender, instance: models.Template = None, **kwargs):
-    template_broadcast(instance.id, [f"template_{instance.id}"])
+@receiver(post_save, sender=models.Implementation)
+def temp_post_save(sender, instance: models.Implementation = None, **kwargs):
+    implementation_broadcast(instance.id, [f"implementation_{instance.id}"])
 
 
-@receiver(post_delete, sender=models.Template)
-def temp_post_save(sender, instance: models.Template = None, **kwargs):
+@receiver(post_delete, sender=models.Implementation)
+def temp_post_save(sender, instance: models.Implementation = None, **kwargs):
     pass

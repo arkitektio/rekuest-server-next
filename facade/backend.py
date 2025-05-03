@@ -5,33 +5,33 @@ from typing import Protocol
 from facade import enums, inputs, models, types, messages
 from facade.consumers.async_consumer import AgentConsumer
 from kante.types import Info
+import logging
 
 
 class ControllBackend(Protocol):
-    
-    def create_message_id(self) -> str:
-        ...
+    def create_message_id(self) -> str: ...
 
-    def interrupt(self, info: Info, input: inputs.InterruptInputModel) -> types.Assignation:
-        ...
+    def interrupt(
+        self, info: Info, input: inputs.InterruptInputModel
+    ) -> types.Assignation: ...
 
-    def reserve(self, info: Info, input: inputs.ReserveInputModel) -> types.Reservation:
-        ...
+    def reserve(
+        self, info: Info, input: inputs.ReserveInputModel
+    ) -> types.Reservation: ...
 
-    def cancel(self,info: Info, input: inputs.CancelInputModel) -> types.Assignation:
-        ...
+    def cancel(
+        self, info: Info, input: inputs.CancelInputModel
+    ) -> types.Assignation: ...
 
-    def assign(self, info: Info, input: inputs.AssignInputModel) -> types.Assignation:
-        ...
+    def assign(
+        self, info: Info, input: inputs.AssignInputModel
+    ) -> types.Assignation: ...
 
-    def resume(self, info: Info, input: inputs.ResumeInputModel) -> types.Assignation:
-        ...
+    def resume(
+        self, info: Info, input: inputs.ResumeInputModel
+    ) -> types.Assignation: ...
 
-    def pause(self, info: Info, input: inputs.PauseInputModel) -> types.Assignation:
-        ...
-
-
-
+    def pause(self, info: Info, input: inputs.PauseInputModel) -> types.Assignation: ...
 
 
 def get_waiter_for_context(info: Info, instance_id: str) -> None:
@@ -51,61 +51,56 @@ class RedisControllBackend(ControllBackend):
         return str(uuid.uuid4())
 
     def interrupt(self, input: inputs.InterruptInputModel) -> models.Assignation:
-
         parent = models.Assignation.objects.get(id=input.assignation)
         parent.status = enums.AssignationEventKind.INTERUPTED
         parent.save()
 
-        
         AgentConsumer.broadcast(
-            parent.template.agent.id,
+            parent.implementation.agent.id,
             messages.Interrupt(
                 assignation=parent.id,
-            )
+            ),
         )
-        
-        
+
         children = models.Assignation.objects.filter(parent_id=input.assignation).all()
-        
+
         for child in children:
             child.status = enums.AssignationEventKind.INTERUPTED
             child.save()
 
             AgentConsumer.broadcast(
-                child.template.agent.id,
+                child.implementation.agent.id,
                 messages.Interrupt(
                     assignation=child.id,
-                )
+                ),
             )
-        
-        
-        
+
         return parent
 
-    def reserve(self, info: Info, input: inputs.ReserveInputModel) -> models.Reservation:
-        if input.node is None and input.template is None:
-            raise ValueError("Either node or template must be provided")
+    def reserve(
+        self, info: Info, input: inputs.ReserveInputModel
+    ) -> models.Reservation:
+        if input.action is None and input.implementation is None:
+            raise ValueError("Either action or implementation must be provided")
 
-        
-        if input.template:
-            # We provided a template and are creating a reservation with just that
-            # template
-            template = models.Template.objects.get(id=input.template)
-            node = template.node
-            templates = [template]
-        if input.node:
-            # We provided a node and are creating a reservation with all templates
-            # for that node at this time
-            node = models.Node.objects.get(id=input.node)
-            templates = models.Template.objects.filter(node=node).all()
-            if len(templates) == 0:
-                raise ValueError("No templates found for this node. Cannot reserve.")
-            
-            
+        if input.implementation:
+            # We provided a implementation and are creating a reservation with just that
+            # implementation
+            implementation = models.Implementation.objects.get(id=input.implementation)
+            action = implementation.action
+            implementations = [implementation]
+        if input.action:
+            # We provided a action and are creating a reservation with all implementations
+            # for that action at this time
+            action = models.Action.objects.get(id=input.action)
+            implementations = models.Implementation.objects.filter(action=action).all()
+            if len(implementations) == 0:
+                raise ValueError(
+                    "No implementations found for this action. Cannot reserve."
+                )
 
         waiter = get_waiter_for_context(info, input.instance_id)
-        
-        
+
         res, created = models.Reservation.objects.update_or_create(
             reference=input.reference,
             waiter=waiter,
@@ -113,14 +108,14 @@ class RedisControllBackend(ControllBackend):
                 title=input.title,
                 binds=input.binds.dict() if input.binds else None,
                 causing_assignation_id=input.assignation_id,
-                node=node,
+                action=action,
                 strategy=enums.ReservationStrategy.ROUND_ROBIN,
             ),
         )
 
         # TODO: Find really the best fitting provision
 
-        res.templates.set(templates)
+        res.implementations.set(implementations)
 
         # TODO: Cache the reservation in the redis cache and make it available for the assignation
 
@@ -135,7 +130,7 @@ class RedisControllBackend(ControllBackend):
             assignation.agent.id,
             message=messages.Cancel(
                 assignation=assignation.id,
-            )
+            ),
         )
         return assignation
 
@@ -143,8 +138,8 @@ class RedisControllBackend(ControllBackend):
         # TODO: Check if function is cached and was
 
         reservation = None
-        node = None
-        template = None
+        action = None
+        implementation = None
         agent = None
 
         waiter = get_waiter_for_context(info, input.instance_id)
@@ -154,57 +149,60 @@ class RedisControllBackend(ControllBackend):
             reservation = models.Reservation.objects.prefetch_related("provisions").get(
                 id=input.reservation
             )
-            node = reservation.node
-            template = choice(reservation.templates.all())
-            if not template:
-                raise ValueError("No template matchable for this reservation")
-            agent = template.agent
+            action = reservation.action
+            implementation = choice(reservation.implementations.all())
+            if not implementation:
+                raise ValueError("No implementation matchable for this reservation")
+            agent = implementation.agent
 
-        elif input.node:
+        elif input.action:
             reservation = None
-            node = models.Node.objects.get(id=input.node)
-            template = models.Template.objects.filter(node=node, agent__connected=True).first()
-            if not template:
-                raise ValueError("No active template found for this node")
-            
-            agent = template.agent
-            
-        elif input.template:
+            action = models.Action.objects.get(id=input.action)
+            implementation = models.Implementation.objects.filter(
+                action=action, agent__connected=True
+            ).first()
+            if not implementation:
+                raise ValueError("No active implementation found for this action")
+
+            agent = implementation.agent
+
+        elif input.implementation:
             reservation = None
-            template = models.Template.objects.get(id=input.template)
-            node = template.node
-            agent = template.agent
-            
-        elif input.node_hash:
+            implementation = models.Implementation.objects.get(id=input.implementation)
+            action = implementation.action
+            agent = implementation.agent
+
+        elif input.action_hash:
             reservation = None
-            node = models.Node.objects.filter(hash=input.node_hash).first()
-            template = models.Template.objects.filter(node=node, agent__connected=True).first()
-            if not template:
-                raise ValueError("No active template found for this node")
-            agent = template.agent
-            
+            action = models.Action.objects.filter(hash=input.action_hash).first()
+            implementation = models.Implementation.objects.filter(
+                action=action, agent__connected=True
+            ).first()
+            if not implementation:
+                raise ValueError("No active implementation found for this action")
+            agent = implementation.agent
+
         elif input.interface:
             reservation = None
-            template = models.Template.objects.get(id=input.template)
-            node = template.node
-            agent = template.agent
+            implementation = models.Implementation.objects.get(id=input.implementation)
+            action = implementation.action
+            agent = implementation.agent
 
         else:
             raise ValueError(
-                "You need to provide either, node_hash or node_id, to create an assignment for an agent"
+                "You need to provide either, action_hash or action_id, to create an assignment for an agent"
             )
-
 
         reference = input.reference or self.create_message_id()
 
         assignation = models.Assignation.objects.create(
             reservation=reservation,
-            node=node,
+            action=action,
             args=input.args,
             reference=reference,
             parent_id=input.parent,
             agent=agent,
-            template=template,
+            implementation=implementation,
             is_done=False,
             latest_event_kind=enums.AssignationEventKind.ASSIGN,
             latest_instruct_kind=enums.AssignationInstructKind.ASSIGN,
@@ -219,9 +217,9 @@ class RedisControllBackend(ControllBackend):
                 assignation=assignation.id,
                 args=input.args,
                 reference=reference,
-                interface=template.interface,
-                extension=template.extension,
-                node=node.id,
+                interface=implementation.interface,
+                extension=implementation.extension,
+                action=action.id,
             ),
         )
         if input.hooks:
@@ -230,7 +228,7 @@ class RedisControllBackend(ControllBackend):
                     # recursive assign
                     self.assign(
                         inputs.AssignInputModel(
-                            node_hash=hook.hash,
+                            action_hash=hook.hash,
                             parent=assignation.id,
                             args={"assignation": assignation.id},
                             reference="init_hook_0",
@@ -238,7 +236,6 @@ class RedisControllBackend(ControllBackend):
                     )
 
         return assignation
-
 
     def resume(self, info: Info, input: inputs.ResumeInputModel) -> models.Assignation:
         assignation = models.Assignation.objects.get(id=input.assignation)
@@ -249,31 +246,30 @@ class RedisControllBackend(ControllBackend):
             assignation.agent.id,
             message=messages.Cancel(
                 assignation=assignation.id,
-            )
-        )
-        return assignation
-    
-    def collect(self, info: Info,  input: inputs.CollectInputModel) -> models.Assignation:
-        assignation = models.Assignation.objects.get(id=input.assignation)
-        assignation.status = enums.AssignationStatus.RESUME
-        assignation.save()
-        
-        models.AssignationInstruct.objects.create(
-            assignation=assignation,
-            kind=enums.AssignationInstructKind.COLLECT,
-            message="Collect",
-        )
-
-        AgentConsumer.broadcast(
-            assignation.agent.id,
-            message=messages.Cancel(
-                assignation=assignation.id,
-            )
+            ),
         )
         return assignation
 
-   
-    def step(self, info: Info,  input: inputs.StepInputModel) -> models.Assignation:
+    def collect(self, info: Info, input: inputs.CollectInputModel) -> list[str]:
+        agents = {}
+        for i in input.drawers:
+            assert ":" in i, "Invalid drawer format"
+            agent_id, drawer = i.split(":")
+            agents.setdefault(agent_id, set()).add(i)
+
+        for agent_id, drawers in agents.items():
+            agent = models.Agent.objects.get(id=agent_id)
+            logging.info(f"collecting {drawers} from agent {agent_id}")
+            AgentConsumer.broadcast(
+                agent.id,
+                message=messages.Collect(
+                    drawers=list(drawers),
+                ),
+            )
+
+        return input.drawers
+
+    def step(self, info: Info, input: inputs.StepInputModel) -> models.Assignation:
         assignation = models.Assignation.objects.get(id=input.assignation)
         assignation.status = enums.AssignationStatus.STEP
         assignation.save()
@@ -282,7 +278,7 @@ class RedisControllBackend(ControllBackend):
             assignation.agent.id,
             message=messages.Cancel(
                 assignation=assignation.id,
-            )
+            ),
         )
         return assignation
 

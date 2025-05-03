@@ -71,7 +71,7 @@ def list_provisions(agent: models.Agent, **kwargs):
             provision=prov.id,
             guardian=prov.id,
             status=prov.status,
-            template=prov.template.id,
+            implementation=prov.implementation.id,
         )
         for prov in provisions
     ]
@@ -195,7 +195,6 @@ def change_provision(m: ProvisionChangedMessage, agent: models.Agent):
 
         if provision.status == ProvisionStatus.CANCELLED:
             for res in provision.reservations.filter(status=ReservationStatus.ACTIVE):
-
                 if res.provisions.filter(status=ProvisionStatus.ACTIVE).count() == 0:
                     res.status = ReservationStatus.CANCELLED
                     res.save()

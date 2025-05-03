@@ -19,7 +19,7 @@ AnyDefault = strawberry.scalar(
 
 Arg = strawberry.scalar(
     NewType("Arg", object),
-    description="The `Arg` scalar type represents a an Argument in a Node assignment",
+    description="The `Arg` scalar type represents a an Argument in a Action assignment",
     serialize=lambda v: v,
     parse_value=lambda v: v,
 )
@@ -40,8 +40,8 @@ InstanceID = strawberry.scalar(
     parse_value=lambda v: v,
 )
 
-NodeHash = strawberry.scalar(
-    NewType("NodeHash", str),
+ActionHash = strawberry.scalar(
+    NewType("ActionHash", str),
     description="The `ArrayLike` scalar type represents a reference to a store "
     "previously created by the user n a datalayer",
     serialize=lambda v: v,

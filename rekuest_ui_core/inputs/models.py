@@ -13,7 +13,7 @@ class UIChildInputModel(BaseModel):
 
 
 class UITreeInputModel(BaseModel):
-    """A definition for a template"""
+    """A definition for a implementation"""
 
     description: str = "No description provided"
     child: UIChildInputModel

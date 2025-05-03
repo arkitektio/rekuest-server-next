@@ -6,7 +6,6 @@ import uuid
 
 
 def create_panel(info: Info, input: inputs.CreatePanelInput) -> types.Panel:
-
     state = None
     accesors = None
     reservation = None
@@ -39,7 +38,6 @@ def create_panel(info: Info, input: inputs.CreatePanelInput) -> types.Panel:
             accesors = None
 
     elif input.kind == enums.PanelKind.ASSIGN:
-
         if input.interface:
             registry = models.Registry.objects.get(
                 app=info.context.request.app,
@@ -51,17 +49,17 @@ def create_panel(info: Info, input: inputs.CreatePanelInput) -> types.Panel:
                 instance_id=input.instance_id or "default",
             )
 
-            template = models.Template.objects.get(
+            implementation = models.Implementation.objects.get(
                 interface=input.interface, agent=agent
             )
 
             reservation, created = models.Reservation.objects.update_or_create(
                 reference=uuid.uuid4(),
-                node=template.node,
-                template=template,
+                action=implementation.action,
+                implementation=implementation,
                 strategy=(
                     enums.ReservationStrategy.DIRECT
-                    if template
+                    if implementation
                     else enums.ReservationStrategy.ROUND_ROBIN
                 ),
                 waiter=None,

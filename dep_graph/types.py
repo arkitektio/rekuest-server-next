@@ -9,34 +9,34 @@ from strawberry.experimental import pydantic
 
 
 from .models import (
-    NodeNodeModel,
-    InvalidNodeModel,
-    TemplateNodeModel,
+    ActionActionModel,
+    InvalidActionModel,
+    ImplementationActionModel,
     DependencyEdgeModel,
     DependencyGraphModel,
     ImplementationEdgeModel,
 )
 
 
-@pydantic.type(NodeNodeModel)
-class NodeNode:
+@pydantic.type(ActionActionModel)
+class ActionAction:
     id: str
-    node_id: str
+    action_id: str
     name: str
     status: str | None
     reservation_id: str | None
 
 
-@pydantic.type(InvalidNodeModel)
-class InvalidNode:
+@pydantic.type(InvalidActionModel)
+class InvalidAction:
     id: str
     initial_hash: str
 
 
-@pydantic.type(TemplateNodeModel)
-class TemplateNode:
+@pydantic.type(ImplementationActionModel)
+class ImplementationAction:
     id: str
-    template_id: str
+    implementation_id: str
     interface: str
     client_id: str
     status: str | None
@@ -67,5 +67,5 @@ class ImplementationEdge:
 
 @pydantic.type(DependencyGraphModel)
 class DependencyGraph:
-    nodes: list[NodeNode | InvalidNode | TemplateNode]
+    actions: list[ActionAction | InvalidAction | ImplementationAction]
     edges: list[DependencyEdge | ImplementationEdge]

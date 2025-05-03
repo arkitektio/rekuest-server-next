@@ -20,9 +20,9 @@ class Query:
     clients: list[types.App] = strawberry_django.field()
     hardware_records: list[types.HardwareRecord] = strawberry_django.field()
     agents: list[types.Agent] = strawberry_django.field()
-    nodes: list[types.Node] = strawberry_django.field()
+    actions: list[types.Action] = strawberry_django.field()
     protocols: list[types.Protocol] = strawberry_django.field()
-    templates: list[types.Template] = strawberry_django.field()
+    implementations: list[types.Implementation] = strawberry_django.field()
     test_results: list[types.TestResult] = strawberry_django.field()
     test_cases: list[types.TestCase] = strawberry_django.field()
     reservations: list[types.Reservation] = strawberry_django.field()
@@ -34,13 +34,14 @@ class Query:
     )
     shortcuts: list[types.Shortcut] = strawberry_django.field()
     toolboxes: list[types.Toolbox] = strawberry_django.field()
-    
-    
-    node = strawberry_django.field(resolver=queries.node)
+
+    action = strawberry_django.field(resolver=queries.action)
     assignations = strawberry_django.field(resolver=queries.assignations)
     event = strawberry_django.field(resolver=queries.event)
-    template_at = strawberry_django.field(resolver=queries.template_at)
-    my_template_at = strawberry_django.field(resolver=queries.my_template_at)
+    implementation_at = strawberry_django.field(resolver=queries.implementation_at)
+    my_implementation_at = strawberry_django.field(
+        resolver=queries.my_implementation_at
+    )
     dashboards: list[types.Dashboard] = strawberry_django.field()
     states: list[types.State] = strawberry_django.field()
     panels: list[types.Panel] = strawberry_django.field()
@@ -59,11 +60,11 @@ class Query:
     @strawberry_django.field()
     def state_schema(self, info: Info, id: strawberry.ID) -> types.StateSchema:
         return models.StateSchema.objects.get(id=id)
-    
+
     @strawberry_django.field()
     def toolbox(self, info: Info, id: strawberry.ID) -> types.Toolbox:
         return models.Toolbox.objects.get(id=id)
-    
+
     @strawberry_django.field()
     def shortcut(self, info: Info, id: strawberry.ID) -> types.Shortcut:
         return models.Shortcut.objects.get(id=id)
@@ -97,8 +98,8 @@ class Query:
         return models.Reservation.objects.get(id=id)
 
     @strawberry_django.field()
-    def template(self, info: Info, id: strawberry.ID) -> types.Template:
-        return models.Template.objects.get(id=id)
+    def implementation(self, info: Info, id: strawberry.ID) -> types.Implementation:
+        return models.Implementation.objects.get(id=id)
 
     @strawberry_django.field()
     def assignation(self, info: Info, id: strawberry.ID) -> types.Assignation:
@@ -107,14 +108,14 @@ class Query:
 
 @strawberry.type
 class Mutation:
-    create_template: types.Template = strawberry_django.mutation(
-        resolver=mutations.create_template
+    create_implementation: types.Implementation = strawberry_django.mutation(
+        resolver=mutations.create_implementation
     )
-    create_foreign_template: types.Template = strawberry_django.mutation(
-        resolver=mutations.create_foreign_template
+    create_foreign_implementation: types.Implementation = strawberry_django.mutation(
+        resolver=mutations.create_foreign_implementation
     )
-    set_extension_templates: list[types.Template] = strawberry_django.mutation(
-        resolver=mutations.set_extension_templates
+    set_extension_implementations: list[types.Implementation] = (
+        strawberry_django.mutation(resolver=mutations.set_extension_implementations)
     )
     ack: types.Assignation = strawberry_django.mutation(resolver=mutations.ack)
     assign: types.Assignation = strawberry_django.mutation(resolver=mutations.assign)
@@ -128,11 +129,10 @@ class Mutation:
     resume: types.Assignation = strawberry_django.mutation(
         resolver=mutations.resume, description="Resume a assignation"
     )
-    collect: types.Assignation = strawberry_django.mutation(
+    collect = strawberry_django.mutation(
         resolver=mutations.collect, description="Collect data from a assignation"
     )
-    
-    
+
     interrupt: types.Assignation = strawberry_django.mutation(
         resolver=mutations.interrupt
     )
@@ -140,8 +140,8 @@ class Mutation:
     reserve: types.Reservation = strawberry_django.mutation(resolver=mutations.reserve)
     unreserve: str = strawberry_django.mutation(resolver=mutations.unreserve)
 
-    delete_template: str = strawberry_django.mutation(
-        resolver=mutations.delete_template, description="Delete a template"
+    delete_implementation: str = strawberry_django.mutation(
+        resolver=mutations.delete_implementation, description="Delete a implementation"
     )
 
     ensure_agent: types.Agent = strawberry_django.mutation(
@@ -154,7 +154,6 @@ class Mutation:
     create_test_result: types.TestResult = strawberry_django.mutation(
         resolver=mutations.create_test_result
     )
-
 
     create_hardware_record: types.HardwareRecord = strawberry_django.mutation(
         resolver=mutations.create_hardware_record
@@ -184,8 +183,8 @@ class Mutation:
 
     # pins
     pin_agent: types.Agent = strawberry_django.mutation(resolver=mutations.pin_agent)
-    pin_template: types.Template = strawberry_django.mutation(
-        resolver=mutations.pin_template
+    pin_implementation: types.Implementation = strawberry_django.mutation(
+        resolver=mutations.pin_implementation
     )
     delete_agent = strawberry_django.mutation(resolver=mutations.delete_agent)
 
@@ -196,23 +195,26 @@ class Mutation:
     delete_shortcut: str = strawberry_django.mutation(
         resolver=mutations.delete_shortcut
     )
-    
+
     # toolbox
     create_toolbox: types.Toolbox = strawberry_django.mutation(
         resolver=mutations.create_toolbox
     )
 
+
 @strawberry.type
 class Subscription:
-    new_nodes = strawberry.subscription(resolver=subscriptions.new_nodes)
+    new_actions = strawberry.subscription(resolver=subscriptions.new_actions)
     assignations = strawberry.subscription(resolver=subscriptions.assignations)
     reservations = strawberry.subscription(resolver=subscriptions.reservations)
     assignation_events = strawberry.subscription(
         resolver=subscriptions.assignation_events
     )
     agents = strawberry.subscription(resolver=subscriptions.agents)
-    template_change = strawberry.subscription(resolver=subscriptions.template_change)
-    templates = strawberry.subscription(resolver=subscriptions.templates)
+    implementation_change = strawberry.subscription(
+        resolver=subscriptions.implementation_change
+    )
+    implementations = strawberry.subscription(resolver=subscriptions.implementations)
     state_update_events = strawberry.subscription(
         resolver=subscriptions.state_update_events
     )

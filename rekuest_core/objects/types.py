@@ -11,7 +11,6 @@ from rekuest_core.objects import models
 from rekuest_core import enums, scalars
 
 
-
 class ChoiceModel(BaseModel):
     label: str
     value: str
@@ -85,7 +84,6 @@ class ChoiceReturnWidget(ReturnWidget):
     choices: strawberry.auto
 
 
-
 @pydantic.interface(models.EffectModel)
 class Effect:
     kind: enums.EffectKind
@@ -107,7 +105,7 @@ class CustomEffect(Effect):
 
 @pydantic.type(models.BindsModel)
 class Binds:
-    templates: list[strawberry.ID]
+    implementations: list[strawberry.ID]
     clients: list[strawberry.ID]
     desired_instances: int
 
@@ -165,14 +163,14 @@ class Port:
 
 @pydantic.type(models.DefinitionModel)
 class Definition:
-    hash: scalars.NodeHash
+    hash: scalars.ActionHash
     name: str
     stateful: bool
-    kind: enums.NodeKind
+    kind: enums.ActionKind
     description: str | None
     port_groups: list[PortGroup]
     collections: list[str]
-    scope: enums.NodeScope
+    scope: enums.ActionScope
     is_test_for: list[str]
     tests: list[str]
     protocols: list[str]

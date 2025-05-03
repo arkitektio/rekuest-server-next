@@ -1,4 +1,3 @@
-
 import logging
 
 import strawberry
@@ -24,7 +23,6 @@ class UnreserveInput:
 
 
 def unreserve(info: Info, input: UnreserveInput) -> str:
-
     reservation = models.Reservation.objects.get(id=input.reservation)
     reservation.delete()
 
@@ -35,15 +33,11 @@ def assign(info: Info, input: inputs.AssignInput) -> types.Assignation:
     return controll_backend.assign(info, input)
 
 
-
 def pause(info: Info, input: inputs.PauseInput) -> types.Assignation:
     return controll_backend.pause(input)
 
 
 def resume(info: Info, input: inputs.ResumeInput) -> types.Assignation:
-    return controll_backend.resume(input)
-
-def collect(info: Info, input: inputs.CollectInput) -> types.Assignation:
     return controll_backend.resume(input)
 
 
@@ -68,3 +62,5 @@ def interrupt(info: Info, input: inputs.InterruptInput) -> types.Assignation:
     return controll_backend.interrupt(input)
 
 
+def collect(info: Info, input: inputs.CollectInput) -> list[str]:
+    return controll_backend.collect(info, input)

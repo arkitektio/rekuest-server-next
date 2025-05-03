@@ -8,9 +8,9 @@ import strawberry_django
 from authentikate.models import App
 from authentikate.strawberry.types import User
 from dep_graph.functions import (
-    build_node_graph,
+    build_action_graph,
     build_reservation_graph,
-    build_template_graph,
+    build_implementation_graph,
 )
 from dep_graph.types import DependencyGraph
 from django.conf import settings
@@ -50,7 +50,7 @@ class Registry:
 class Collection:
     id: strawberry.ID
     name: str
-    nodes: list["Node"]
+    actions: list["Action"]
 
 
 @strawberry_django.type(
@@ -62,8 +62,7 @@ class Collection:
 class Protocol:
     id: strawberry.ID
     name: str
-    nodes: list["Node"]
-    
+    actions: list["Action"]
 
 
 @strawberry_django.type(
@@ -77,7 +76,7 @@ class Toolbox:
     name: str
     description: str
     shortcuts: list["Shortcut"]
-    
+
 
 @strawberry_django.type(
     models.Shortcut,
@@ -89,13 +88,13 @@ class Shortcut:
     id: strawberry.ID
     name: str
     description: str | None
-    node: "Node" 
-    template: Optional["Template"]
+    action: "Action"
+    implementation: Optional["Implementation"]
     toolboxes: list["Toolbox"]
     saved_args: rscalars.AnyDefault
     allow_quick: bool
     use_returns: bool
-    
+
     @strawberry_django.field()
     def args(self) -> list[rtypes.Port]:
         return [rmodels.PortModel(**i) for i in self.args]
@@ -105,24 +104,25 @@ class Shortcut:
         return [rmodels.PortModel(**i) for i in self.returns]
 
 
-
-
 @strawberry_django.type(
-    models.Node, filters=filters.NodeFilter, pagination=True, order=filters.NodeOrder
+    models.Action,
+    filters=filters.ActionFilter,
+    pagination=True,
+    order=filters.ActionOrder,
 )
-class Node:
+class Action:
     id: strawberry.ID
-    hash: rscalars.NodeHash
+    hash: rscalars.ActionHash
     name: str
-    kind: renums.NodeKind
+    kind: renums.ActionKind
     stateful: bool
     description: str | None
     collections: list["Collection"]
-    templates: list["Template"]
-    scope: enums.NodeScope
-    is_test_for: list["Node"]
+    implementations: list["Implementation"]
+    scope: enums.ActionScope
+    is_test_for: list["Action"]
     is_dev: bool
-    tests: list["Node"]
+    tests: list["Action"]
     interfaces: list[str]
     protocols: list["Protocol"]
     defined_at: datetime.datetime
@@ -132,12 +132,12 @@ class Node:
     @strawberry_django.field()
     def runs(self) -> list[LazyType["Assignation", __name__]] | None:
         return models.Assignation.objects.filter(
-            provision__template__node=self
+            provision__implementation__action=self
         ).order_by("-created_at")
 
     @strawberry_django.field()
     def dependency_graph(self) -> DependencyGraph:
-        return build_node_graph(self)
+        return build_action_graph(self)
 
     @strawberry_django.field()
     def args(self) -> list[rtypes.Port]:
@@ -161,10 +161,10 @@ class Node:
 )
 class Dependency:
     id: strawberry.ID
-    template: "Template"
-    node: Node | None
-    hash: rscalars.NodeHash
-    initial_hash: rscalars.NodeHash
+    implementation: "Implementation"
+    action: Action | None
+    hash: rscalars.ActionHash
+    initial_hash: rscalars.ActionHash
     reference: str | None
     optional: bool = False
 
@@ -174,29 +174,29 @@ class Dependency:
 
     @strawberry_django.field()
     def resolvable(self, info: Info) -> bool:
-        qs = models.Template.objects.filter(
-            node__hash=self.initial_hash,
+        qs = models.Implementation.objects.filter(
+            action__hash=self.initial_hash,
+            agent__connected=True,
         )
-
 
         return qs.exists()
 
 
 @strawberry_django.type(
-    models.Template, filters=filters.TemplateFilter, pagination=True
+    models.Implementation, filters=filters.ImplementationFilter, pagination=True
 )
-class Template:
+class Implementation:
     id: strawberry.ID
     interface: str
     extension: str
     agent: "Agent"
-    node: "Node"
+    action: "Action"
     params: rscalars.AnyDefault
     dependencies: list["Dependency"]
 
     @strawberry_django.field()
     def dependency_graph(self) -> DependencyGraph:
-        return build_template_graph(self)
+        return build_implementation_graph(self)
 
     @strawberry_django.field()
     def name(self) -> str:
@@ -205,6 +205,18 @@ class Template:
     @strawberry_django.field()
     def pinned(self, info: Info) -> bool:
         return self.pinned_by.filter(id=info.context.request.user.id).exists()
+
+    @strawberry_django.field()
+    def my_latest_assignation(self, info: Info) -> Optional["Assignation"]:
+        return (
+            self.assignations.filter(
+                implementation=self.id,
+                is_done=True,
+                waiter__registry__user=info.context.request.user,
+            )
+            .order_by("-created_at")
+            .first()
+        )
 
 
 @strawberry_django.type(
@@ -227,7 +239,7 @@ class Agent:
     instance_id: scalars.InstanceID
     registry: "Registry"
     hardware_records: list[HardwareRecord]
-    templates: list["Template"]
+    implementations: list["Implementation"]
     last_seen: datetime.datetime | None
     connected: bool
     extensions: list[str]
@@ -235,8 +247,8 @@ class Agent:
     states: list["State"]
 
     @strawberry_django.field()
-    def template(self, interface: str) -> Template | None:
-        return self.templates.filter(interface=interface).first()
+    def implementation(self, interface: str) -> Implementation | None:
+        return self.implementations.filter(interface=interface).first()
 
     @strawberry_django.field()
     def active(self) -> bool:
@@ -260,9 +272,6 @@ class Waiter:
     registry: "Registry"
 
 
-
-
-
 @strawberry_django.type(
     models.Reservation, filters=filters.ReservationFilter, pagination=True
 )
@@ -271,22 +280,20 @@ class Reservation:
     name: str
     waiter: "Waiter"
     title: str | None
-    node: "Node"
+    action: "Action"
     updated_at: datetime.datetime
     reference: str
-    templates: list["Template"]
+    implementations: list["Implementation"]
     binds: rtypes.Binds | None
     causing_dependency: Dependency | None
     strategy: enums.ReservationStrategy
     viable: bool
     happy: bool
-    template: Optional["Template"]
+    implementation: Optional["Implementation"]
 
     @strawberry_django.field()
     def dependency_graph(self) -> DependencyGraph:
         return build_reservation_graph(self)
-
-
 
 
 @strawberry_django.type(
@@ -306,11 +313,11 @@ class Assignation:
     reservation: Optional["Reservation"] = strawberry.field(
         description="If this assignation is the result of a reservation, this field will contain the reservation that caused this assignation to be created"
     )
-    node: "Node" = strawberry.field(
-        description="The node that this assignation is assigned to"
+    action: "Action" = strawberry.field(
+        description="The action that this assignation is assigned to"
     )
-    template: Template = strawberry.field(
-        description="The template that this assignation is assigned to"
+    implementation: Implementation = strawberry.field(
+        description="The implementation that this assignation is assigned to"
     )
     latest_event_kind: enums.AssignationEventKind = strawberry.field(
         description="The status of this assignation"
@@ -322,7 +329,7 @@ class Assignation:
     waiter: "Waiter" = strawberry.field(
         description="The Waiter that this assignation was created by"
     )
-    node: "Node"
+    action: "Action"
     created_at: datetime.datetime
     updated_at: datetime.datetime
     ephemeral: bool = strawberry.field(
@@ -336,7 +343,6 @@ class Assignation:
     @strawberry_django.field()
     def instructs(self) -> list["AssignationInstruct"]:
         return self.instructs.order_by("created_at")[:10]
-
 
     @strawberry_django.field()
     def arg(self, key: str) -> scalars.Args | None:
@@ -365,8 +371,8 @@ class AssignationEvent:
     @strawberry_django.field()
     def reference(self) -> str:
         return self.assignation.reference
-    
-    
+
+
 @strawberry_django.type(
     models.AssignationInstruct, filters=filters.AssignationEventFilter, pagination=True
 )
@@ -398,8 +404,8 @@ class AgentEvent:
 )
 class TestCase:
     id: strawberry.ID
-    tester: "Node"
-    node: "Node"
+    tester: "Action"
+    action: "Action"
     is_benchmark: bool
     description: str
     name: str
@@ -411,8 +417,8 @@ class TestCase:
 )
 class TestResult:
     id: strawberry.ID
-    template: "Template"
-    tester: "Template"
+    implementation: "Implementation"
+    tester: "Implementation"
     case: "TestCase"
     passed: bool
     created_at: datetime.datetime

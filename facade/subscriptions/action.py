@@ -3,14 +3,14 @@ import strawberry_django
 import strawberry
 from facade import types, models
 from typing import AsyncGenerator
-from facade.channels import node_created_listen
+from facade.channels import action_created_listen
 
 
-async def new_nodes(
+async def new_actions(
     self,
     info: Info,
     cage: strawberry.ID,
-) -> AsyncGenerator[types.Node, None]:
+) -> AsyncGenerator[types.Action, None]:
     """Join and subscribe to message sent to the given rooms."""
-    async for message in node_created_listen(info, [f"nodes"]):
-        yield await models.Node.objects.aget(id=message)
+    async for message in action_created_listen(info, [f"actions"]):
+        yield await models.Action.objects.aget(id=message)

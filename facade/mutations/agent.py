@@ -19,18 +19,27 @@ from facade.persist_backend import persist_backend
 
 @strawberry.input
 class AgentInput:
-    instance_id: scalars.InstanceID
-    name: str | None = None
-    extensions: list[str] | None = None
+    instance_id: scalars.InstanceID = strawberry.field(
+        description="The instance ID of the agent. This is used to identify the agent in the system."
+    )
+    name: str | None = strawberry.field(
+        default=None,
+        description="The name of the agent. This is used to identify the agent in the system.",
+    )
+    extensions: list[str] | None = strawberry.field(
+        default=None,
+        description="The extensions of the agent. This is used to identify the agent in the system.",
+    )
 
 
 @strawberry.input
 class DeleteAgentInput:
-    id: strawberry.ID
+    id: strawberry.ID = strawberry.field(
+        description="The ID of the agent to delete. This is used to identify the agent in the system."
+    )
 
 
 async def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
-
     # TODO: Hasch this
     registry, _ = await models.Registry.objects.aupdate_or_create(
         app=info.context.request.app,

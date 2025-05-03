@@ -66,7 +66,7 @@ class ProvideHareMessage(HareMessage):
     type: Literal[HareMessageTypes.PROVIDE] = HareMessageTypes.PROVIDE
     provision: str
     reservation: str  # The reservation that initially caused this provision
-    template: str
+    implementation: str
     status: Optional[ProvisionStatus]
 
 

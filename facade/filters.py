@@ -10,7 +10,7 @@ from strawberry import auto
 from strawberry_django.filters import FilterLookup
 
 
-@strawberry.input
+@strawberry.input(description="A way to filter users")
 class SearchFilter:
     search: Optional[str] | None
 
@@ -20,7 +20,7 @@ class SearchFilter:
         return queryset.filter(name__icontains=self.search)
 
 
-@strawberry_django.filter(models.TestCase)
+@strawberry_django.filter(models.TestCase, description="A way to filter test cases")
 class TestCaseFilter:
     name: Optional[FilterLookup[str]]
     ids: list[strawberry.ID] | None
@@ -31,18 +31,43 @@ class TestCaseFilter:
         return queryset.filter(id__in=self.ids)
 
 
-@strawberry_django.filter(models.Agent)
+@strawberry_django.filter(models.Agent, description="A way to filter agents")
 class AgentFilter:
-    client_id: str | None
-    instance_id: str | None
-    ids: list[strawberry.ID] | None
-    extensions: list[str] | None
-    has_templates: list[str] | None
-    has_states: list[str] | None
-    pinned: bool | None
-    search: str | None
+    client_id: str | None = strawberry.field(
+        default=None,
+        description="Filter by client ID of the app the agent is registered to",
+    )
+    instance_id: str | None = strawberry.field(
+        default=None,
+        description="Filter by instance ID of the agent",
+    )
+
+    ids: list[strawberry.ID] | None = strawberry.field(
+        default=None,
+        description="Filter by IDs of the agents",
+    )
+    extensions: list[str] | None = strawberry.field(
+        default=None,
+        description="Filter by extensions of the agents",
+    )
+    has_implementations: list[str] | None = strawberry.field(
+        default=None,
+        description="Filter by implementations of the agents",
+    )
+    has_states: list[str] | None = strawberry.field(
+        default=None,
+        description="Filter by states of the agents",
+    )
+    pinned: bool | None = strawberry.field(
+        default=None,
+        description="Filter by pinned agents",
+    )
+    search: str | None = strawberry.field(
+        default=None,
+        description="Filter by name of the agents",
+    )
     distinct: bool | None
-    
+
     def filter_search(self, queryset, info):
         if self.search is None:
             return queryset
@@ -77,16 +102,17 @@ class AgentFilter:
             return queryset
         return queryset.filter(extensions__contains=self.extensions)
 
-    def filter_has_templates(self, queryset, info):
-        if self.has_templates is None:
+    def filter_has_implementations(self, queryset, info):
+        if self.has_implementations is None:
             return queryset
-        return queryset.filter(templates__node__hash__in=self.has_templates)
+        return queryset.filter(
+            implementations__action__hash__in=self.has_implementations
+        )
 
     def filter_has_states(self, queryset, info):
         if self.has_states is None:
             return queryset
         return queryset.filter(states__state_schema__hash__in=self.has_states)
-    
 
     def filter_distinct(self, queryset, info):
         if self.distinct is None:
@@ -94,7 +120,7 @@ class AgentFilter:
         return queryset.distinct()
 
 
-@strawberry_django.filter(models.Waiter)
+@strawberry_django.filter(models.Waiter, description="A way to filter waiters")
 class WaiterFilter:
     instance_id: scalars.InstanceID
     ids: list[strawberry.ID] | None
@@ -105,7 +131,9 @@ class WaiterFilter:
         return queryset.filter(id__in=self.ids)
 
 
-@strawberry_django.filter(models.Reservation)
+@strawberry_django.filter(
+    models.Reservation, description="A way to filter reservations"
+)
 class ReservationFilter:
     waiter: WaiterFilter | None
     ids: list[strawberry.ID] | None
@@ -120,7 +148,6 @@ class ReservationFilter:
         if self.status is None:
             return queryset
         return queryset.filter(status__in=self.status)
-
 
 
 @strawberry_django.filter(models.Assignation)
@@ -146,7 +173,9 @@ class AssignationFilter:
         return queryset.filter(reservation__waiter__instance_id=self.instance_id)
 
 
-@strawberry_django.filter(models.AssignationEvent)
+@strawberry_django.filter(
+    models.AssignationEvent, description="A way to filter assignation events"
+)
 class AssignationEventFilter:
     kind: list[enums.AssignationEventKind] | None
 
@@ -156,7 +185,7 @@ class AssignationEventFilter:
         return queryset.filter(kind__in=self.kind)
 
 
-@strawberry_django.filter(models.TestResult)
+@strawberry_django.filter(models.TestResult, description="A way to filter test results")
 class TestResultFilter:
     name: Optional[FilterLookup[str]]
     ids: list[strawberry.ID] | None
@@ -177,16 +206,16 @@ class DependencyFilter:
         return queryset.filter(id__in=self.ids)
 
 
-@strawberry_django.order(App)
+@strawberry_django.order(App, description="A way to order apps")
 class AppOrder:
     defined_at: auto
 
 
-@strawberry_django.filter(App)
+@strawberry_django.filter(App, description="A way to filter apps")
 class AppFilter:
     interface: Optional[FilterLookup[str]]
     ids: list[strawberry.ID] | None
-    has_templates_for: list[rscalars.NodeHash] | None
+    has_implementations_for: list[rscalars.ActionHash] | None
     mine: bool | None
 
     def filter_ids(self, queryset, info):
@@ -194,11 +223,11 @@ class AppFilter:
             return queryset
         return queryset.filter(id__in=self.ids)
 
-    def filter_has_templates_for(self, queryset, info):
-        if self.has_templates_for is None:
+    def filter_has_implementations_for(self, queryset, info):
+        if self.has_implementations_for is None:
             return queryset
         return queryset.filter(
-            registry__agents__templates__node__hash__in=self.has_templates_for
+            registry__agents__implementations__action__hash__in=self.has_implementations_for
         ).distinct()
 
     def filter_mine(self, queryset, info):
@@ -212,8 +241,8 @@ class AgentOrder:
     last_seen: auto
 
 
-@strawberry_django.order(models.Node)
-class NodeOrder:
+@strawberry_django.order(models.Action)
+class ActionOrder:
     defined_at: auto
 
 
@@ -225,10 +254,12 @@ class ProtocolOrder:
 @strawberry_django.order(models.Shortcut)
 class ShortcutOrder:
     name: auto
-    
+
+
 @strawberry_django.order(models.Toolbox)
 class ToolboxOrder:
     name: auto
+
 
 @strawberry_django.filter(models.Protocol)
 class ProtocolFilter(SearchFilter):
@@ -250,25 +281,25 @@ class ToolboxFilter(SearchFilter):
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
-    
+
     def filter_mine(self, queryset, info):
         if self.mine is None:
             return queryset
         return queryset.filter(user_id=info.context.user.id)
 
 
-@strawberry_django.filter(models.Node)
-class ShortcutNodeFilter(SearchFilter):
+@strawberry_django.filter(models.Action)
+class ShortcutActionFilter(SearchFilter):
     name: str | None
     ids: list[strawberry.ID] | None
     demands: list[inputs.PortDemandInput] | None
     protocols: list[str] | None
-    kind: Optional[renums.NodeKind] | None
+    kind: Optional[renums.ActionKind] | None
 
     def filter_name(self, queryset, info):
         if self.name is None:
             return queryset
-        return queryset.filter(node__name=self.name)
+        return queryset.filter(action__name=self.name)
 
     def filter_demands(self, queryset, info):
         if self.demands is None:
@@ -277,7 +308,7 @@ class ShortcutNodeFilter(SearchFilter):
         filtered_ids = None
 
         for ports_demand in self.demands:
-            new_ids = managers.get_node_ids_by_demands(
+            new_ids = managers.get_action_ids_by_demands(
                 ports_demand.matches,
                 type=ports_demand.kind,
                 force_length=ports_demand.force_length,
@@ -290,35 +321,36 @@ class ShortcutNodeFilter(SearchFilter):
             else:
                 filtered_ids = filtered_ids.intersection(new_ids)
 
-        return queryset.filter(node__id__in=filtered_ids)
+        return queryset.filter(action__id__in=filtered_ids)
 
     def filter_kind(self, queryset, info):
         if self.kind is None:
             return queryset
-        return queryset.filter(node__kind=self.kind)
+        return queryset.filter(action__kind=self.kind)
 
     def filter_protocols(self, queryset, info):
         if self.protocols is None:
             return queryset
-        return queryset.filter(node__protocols__name__in=self.protocols)
+        return queryset.filter(action__protocols__name__in=self.protocols)
 
     def filter_ids(self, queryset, info):
         if self.ids is None:
             return queryset
-        return queryset.filter(node__id__in=self.ids)
+        return queryset.filter(action__id__in=self.ids)
+
 
 @strawberry_django.filter(models.Shortcut)
 class ShortcutFilter(SearchFilter):
     ids: list[strawberry.ID] | None
     demands: list[inputs.PortDemandInput] | None
     toolbox: strawberry.ID | None
-    
+
     def filter_toolbox(self, queryset, info):
         if self.toolbox is None:
             return queryset
-        
+
         return queryset.filter(toolbox_id=self.toolbox)
-    
+
     def filter_demands(self, queryset, info):
         if self.demands is None:
             return queryset
@@ -326,7 +358,7 @@ class ShortcutFilter(SearchFilter):
         filtered_ids = None
 
         for ports_demand in self.demands:
-            new_ids = managers.get_node_ids_by_demands(
+            new_ids = managers.get_action_ids_by_demands(
                 ports_demand.matches,
                 type=ports_demand.kind,
                 force_length=ports_demand.force_length,
@@ -346,12 +378,13 @@ class ShortcutFilter(SearchFilter):
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
-    
+
     def filter_mine(self, queryset, info):
         if self.mine is None:
             return queryset
-        
+
         return queryset.filter(user_id=info.context.user.id)
+
 
 @strawberry_django.filter(models.HardwareRecord)
 class HardwareRecordFilter:
@@ -370,20 +403,20 @@ class HardwareRecordFilter:
         return queryset.filter(cpu_vendor_name__contains=self.cpu_vendor_name)
 
 
-@strawberry_django.filter(models.Node)
-class NodeFilter(SearchFilter):
+@strawberry_django.filter(models.Action)
+class ActionFilter(SearchFilter):
     name: Optional[FilterLookup[str]]
     ids: list[strawberry.ID] | None
     demands: list[inputs.PortDemandInput] | None
     protocols: list[str] | None
-    kind: Optional[renums.NodeKind] | None
+    kind: Optional[renums.ActionKind] | None
 
     def filter_demands(self, queryset, info):
         if self.demands is None:
             return queryset
 
         for ports_demand in self.demands:
-            queryset = managers.filter_nodes_by_demands(
+            queryset = managers.filter_actions_by_demands(
                 queryset,
                 ports_demand.matches,
                 type=ports_demand.kind,
@@ -411,12 +444,12 @@ class NodeFilter(SearchFilter):
 
 
 @strawberry_django.filter(models.Agent)
-class TemplateAgentFilter:
+class ImplementationAgentFilter:
     client_id: str | None
     instance_id: str | None
     ids: list[strawberry.ID] | None
     extensions: list[str] | None
-    has_templates: list[str] | None
+    has_implementations: list[str] | None
     has_states: list[str] | None
 
     def filter_client_id(self, queryset, info):
@@ -445,18 +478,18 @@ class TemplateAgentFilter:
         return queryset.filter(agent__states__state_schema__hash__in=self.has_states)
 
 
-@strawberry_django.filter(models.Node)
-class TemplateNodeFilter(SearchFilter):
+@strawberry_django.filter(models.Action)
+class ImplementationActionFilter(SearchFilter):
     name: str | None
     ids: list[strawberry.ID] | None
     demands: list[inputs.PortDemandInput] | None
     protocols: list[str] | None
-    kind: Optional[renums.NodeKind] | None
+    kind: Optional[renums.ActionKind] | None
 
     def filter_name(self, queryset, info):
         if self.name is None:
             return queryset
-        return queryset.filter(node__name=self.name)
+        return queryset.filter(action__name=self.name)
 
     def filter_demands(self, queryset, info):
         if self.demands is None:
@@ -465,7 +498,7 @@ class TemplateNodeFilter(SearchFilter):
         filtered_ids = None
 
         for ports_demand in self.demands:
-            new_ids = managers.get_node_ids_by_demands(
+            new_ids = managers.get_action_ids_by_demands(
                 ports_demand.matches,
                 type=ports_demand.kind,
                 force_length=ports_demand.force_length,
@@ -478,22 +511,22 @@ class TemplateNodeFilter(SearchFilter):
             else:
                 filtered_ids = filtered_ids.intersection(new_ids)
 
-        return queryset.filter(node__id__in=filtered_ids)
+        return queryset.filter(action__id__in=filtered_ids)
 
     def filter_kind(self, queryset, info):
         if self.kind is None:
             return queryset
-        return queryset.filter(node__kind=self.kind)
+        return queryset.filter(action__kind=self.kind)
 
     def filter_protocols(self, queryset, info):
         if self.protocols is None:
             return queryset
-        return queryset.filter(node__protocols__name__in=self.protocols)
+        return queryset.filter(action__protocols__name__in=self.protocols)
 
     def filter_ids(self, queryset, info):
         if self.ids is None:
             return queryset
-        return queryset.filter(node__id__in=self.ids)
+        return queryset.filter(action__id__in=self.ids)
 
 
 @strawberry.input
@@ -502,14 +535,14 @@ class ParamPair:
     value: str
 
 
-@strawberry_django.filter(models.Template)
-class TemplateFilter:
+@strawberry_django.filter(models.Implementation)
+class ImplementationFilter:
     interface: Optional[FilterLookup[str]]
     ids: list[strawberry.ID] | None
-    node_hash: rscalars.NodeHash | None
-    node: TemplateNodeFilter | None
+    action_hash: rscalars.ActionHash | None
+    action: ImplementationActionFilter | None
     extension: str | None
-    agent: TemplateAgentFilter | None
+    agent: ImplementationAgentFilter | None
     parameters: list[ParamPair] | None
 
     def filter_ids(self, queryset, info):
@@ -522,10 +555,10 @@ class TemplateFilter:
             return queryset
         return queryset.filter(extension=self.extension)
 
-    def filter_node_hash(self, queryset, info):
-        if self.node_hash is None:
+    def filter_action_hash(self, queryset, info):
+        if self.action_hash is None:
             return queryset
-        return queryset.filter(node__hash=self.node_hash)
+        return queryset.filter(action__hash=self.action_hash)
 
     def filter_parameters(self, queryset, info):
         if self.parameters is None:

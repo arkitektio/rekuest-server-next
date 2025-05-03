@@ -87,7 +87,7 @@ ReturnWidgetModelUnion = Union[CustomReturnWidgetModel, ChoiceReturnWidgetModel]
 class EffectModel(BaseModel):
     dependencies: list[str]
     kind: str
-    function: str 
+    function: str
     message: str | None
 
 
@@ -99,10 +99,12 @@ class MessageEffectModel(EffectModel):
 class HideEffectModel(EffectModel):
     kind: Literal["HIDE"]
 
+
 class CustomEffectModel(EffectModel):
     kind: Literal["CUSTOM"]
     hook: str
     ward: str
+
 
 EffectModelUnion = Union[MessageEffectModel, HideEffectModel, CustomEffectModel]
 
@@ -122,7 +124,7 @@ class ChildPortModel(BaseModel):
 
 
 class BindsModel(BaseModel):
-    templates: Optional[list[str]] = None
+    implementations: Optional[list[str]] = None
     clients: Optional[list[str]] = None
     desired_instances: int = 1
     minimum_instances: int = 1
@@ -134,8 +136,6 @@ class PortGroupModel(BaseModel):
     description: str | None
     effects: list[EffectModelUnion] | None = None
     ports: list[str]
-    
-
 
 
 class ValidatorModel(BaseModel):
@@ -165,11 +165,11 @@ class DefinitionModel(BaseModel):
     id: strawberry.ID
     hash: str
     name: str
-    kind: enums.NodeKind
+    kind: enums.ActionKind
     description: str | None
     port_groups: list[PortGroupModel]
     collections: list[str]
-    scope: enums.NodeScope
+    scope: enums.ActionScope
     is_test_for: list[str]
     tests: list[str]
     protocols: list[str]

@@ -71,7 +71,7 @@ def build_params(
     force_length: t.Optional[int] = None,
     force_non_nullable_length: t.Optional[int] = None,
     force_structure_length: t.Optional[int] = None,
-    model: str = "facade_node",
+    model: str = "facade_action",
 ):
     individual_queries = []
     all_params = {}
@@ -107,16 +107,15 @@ def build_params(
     return full_sql, all_params
 
 
-def filter_nodes_by_demands(
+def filter_actions_by_demands(
     qs: t.Any,
     demands: list[PortMatchInput] = None,
     type: t.Literal["args", "returns"] = "args",
     force_length: t.Optional[int] = None,
     force_non_nullable_length: t.Optional[int] = None,
     force_structure_length: t.Optional[int] = None,
-    model: str = "facade_node",
+    model: str = "facade_action",
 ):
-
     if type not in ["args", "returns"]:
         raise ValueError("Type must be either 'args' or 'returns'")
 
@@ -138,15 +137,14 @@ def filter_nodes_by_demands(
     return qs
 
 
-def get_node_ids_by_demands(
+def get_action_ids_by_demands(
     demands: list[PortMatchInput] = None,
     type: t.Literal["args", "returns"] = "args",
     force_length: t.Optional[int] = None,
     force_non_nullable_length: t.Optional[int] = None,
     force_structure_length: t.Optional[int] = None,
-    model: str = "facade_node",
+    model: str = "facade_action",
 ):
-
     if type not in ["args", "returns"]:
         raise ValueError("Type must be either 'args' or 'returns'")
 

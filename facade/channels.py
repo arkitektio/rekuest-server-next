@@ -1,12 +1,16 @@
 from kante.channel import build_channel
 
-node_created_broadcast, node_created_listen = build_channel("node_created_broadcast")
+action_created_broadcast, action_created_listen = build_channel(
+    "action_created_broadcast"
+)
 
 agent_updated_broadcast, agent_updated_listen = build_channel("agent_updated_broadcast")
 
 assignation_broadcast, assignation_listen = build_channel("assignation_broadcast")
 
-template_broadcast, template_listen = build_channel("template_broadcast")
+implementation_broadcast, implementation_listen = build_channel(
+    "implementation_broadcast"
+)
 
 reservation_broadcast, reservation_listen = build_channel("reservation_broadcast")
 

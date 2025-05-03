@@ -2,25 +2,25 @@ from pydantic import BaseModel, Field
 import uuid
 
 
-class InvalidNodeModel(BaseModel):
-    kind: str = "InvalidNode"
+class InvalidActionModel(BaseModel):
+    kind: str = "InvalidAction"
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     initial_hash: str
 
 
-class NodeNodeModel(BaseModel):
-    kind: str = "NodeNode"
+class ActionActionModel(BaseModel):
+    kind: str = "ActionAction"
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    node_id: str
+    action_id: str
     name: str
     status: str | None
     reservation_id: str | None
 
 
-class TemplateNodeModel(BaseModel):
-    kind: str = "TemplateNode"
+class ImplementationActionModel(BaseModel):
+    kind: str = "ImplementationAction"
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    template_id: str
+    implementation_id: str
     interface: str
     client_id: str
     status: str | None
@@ -50,10 +50,10 @@ class ImplementationEdgeModel(BaseModel):
     linked: bool = False
 
 
-NodeModel = NodeNodeModel | InvalidNodeModel | TemplateNodeModel
+ActionModel = ActionActionModel | InvalidActionModel | ImplementationActionModel
 EdgeModel = DependencyEdgeModel | ImplementationEdgeModel
 
 
 class DependencyGraphModel(BaseModel):
-    nodes: list[NodeModel]
+    actions: list[ActionModel]
     edges: list[EdgeModel]

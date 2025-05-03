@@ -4,7 +4,7 @@ import strawberry
 from facade import types, models, scalars
 from typing import AsyncGenerator
 from facade.channels import (
-    node_created_listen,
+    action_created_listen,
     reservation_event_listen,
     reservation_listen,
 )
@@ -32,8 +32,5 @@ async def reservations(
     )
 
     async for message in reservation_listen(info, [f"res_waiter_{waiter.id}"]):
-
         continue
         yield await models.Reservation.objects.aget(id=message)
-
-

@@ -4,7 +4,7 @@ import strawberry
 from facade import types, models, scalars, enums
 from typing import AsyncGenerator, Optional
 from facade.channels import (
-    node_created_listen,
+    action_created_listen,
     state_update_event_listen,
     assignation_listen,
     new_state_listen,

@@ -2,13 +2,13 @@ import strawberry
 from enum import Enum
 
 
-@strawberry.enum
-class NodeKind(str, Enum):
+@strawberry.enum(description="The kind of action.")
+class ActionKind(str, Enum):
     FUNCTION = "FUNCTION"
     GENERATOR = "GENERATOR"
 
 
-@strawberry.enum
+@strawberry.enum(description="The kind of port.")
 class PortKind(str, Enum):
     INT = "INT"
     STRING = "STRING"
@@ -22,7 +22,7 @@ class PortKind(str, Enum):
     MODEL = "MODEL"
 
 
-@strawberry.enum
+@strawberry.enum(description="The kind of assign widget.")
 class AssignWidgetKind(str, Enum):
     SEARCH = "SEARCH"
     CHOICE = "CHOICE"
@@ -32,27 +32,27 @@ class AssignWidgetKind(str, Enum):
     STATE_CHOICE = "STATE_CHOICE"
 
 
-@strawberry.enum
+@strawberry.enum(description="The kind of return widget.")
 class ReturnWidgetKind(str, Enum):
     CHOICE = "CHOICE"
     CUSTOM = "CUSTOM"
 
 
-@strawberry.enum
+@strawberry.enum(description="The kind of effect.")
 class EffectKind(str, Enum):
     MESSAGE = "MESSAGE"
     HIDE = "HIDE"
     CUSTOM = "CUSTOM"
 
 
-@strawberry.enum
+@strawberry.enum(description="The kind of port")
 class PortScope(str, Enum):
     GLOBAL = "GLOBAL"
     LOCAL = "LOCAL"
 
 
-@strawberry.enum
-class NodeScope(str, Enum):
+@strawberry.enum(description="The kind of action scope.")
+class ActionScope(str, Enum):
     GLOBAL = "GLOBAL"
     LOCAL = "LOCAL"
     BRIDGE_GLOBAL_TO_LOCAL = "BRIDGE_GLOBAL_TO_LOCAL"

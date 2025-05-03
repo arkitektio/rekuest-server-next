@@ -11,27 +11,34 @@ from django.contrib.auth import get_user_model
 
 
 class Collection(models.Model):
-    """ A collection is a group of nodes that are related to each other. 
-    
-    You can put nodes into a collection to group them together, and
-    app developers can specify which collection a node belongs to
+    """A collection is a group of actions that are related to each other.
+
+    You can put actions into a collection to group them together, and
+    app developers can specify which collection a action belongs to
     by default.
-    
+
     Collections should remain domain specific.
-    
+
     Example collections are:
     - Segmentation
     - Classification
     - Image Processing
-    
-    
+
+
     """
+
     name = models.CharField(
         max_length=1000, unique=True, help_text="The name of this Collection"
     )
     description = models.TextField(help_text="A description for the Collection")
-    defined_at = models.DateTimeField(auto_created=True, auto_now_add=True, help_text="Date this Collection was created")
-    updated_at = models.DateTimeField(auto_now=True, help_text="Date this Collection was last updated")
+    defined_at = models.DateTimeField(
+        auto_created=True,
+        auto_now_add=True,
+        help_text="Date this Collection was created",
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True, help_text="Date this Collection was last updated"
+    )
     creator = models.ForeignKey(
         get_user_model(),
         on_delete=models.CASCADE,
@@ -41,14 +48,15 @@ class Collection(models.Model):
 
 
 class Protocol(models.Model):
-    """ Protocols are ways to describe the input and output relations
-    of a node. When a new node is created the
-    interference module will try to infer the protocol of the node
-    and assign it to the node. This is done by looking at the
-    input and output types of the node and matching them to the
+    """Protocols are ways to describe the input and output relations
+    of a action. When a new action is created the
+    interference module will try to infer the protocol of the action
+    and assign it to the action. This is done by looking at the
+    input and output types of the action and matching them to the
     protocols that are defined by your installed inference modules.
-    
+
     """
+
     name = models.CharField(
         max_length=1000, unique=True, help_text="The name of this Protocol"
     )
@@ -59,15 +67,14 @@ class Protocol(models.Model):
 
 
 class Registry(models.Model):
-    """ A registry is an app that is bound to a specific user on the
-    backend. 
-    
+    """A registry is an app that is bound to a specific user on the
+    backend.
+
     It is the root type for all agents and waiters that are
     created by this app.
-    
+
     """
-    
-    
+
     app = models.ForeignKey(
         App, on_delete=models.CASCADE, null=True, help_text="The Associated App"
     )
@@ -91,14 +98,14 @@ class Registry(models.Model):
 
 
 class IconPack(models.Model):
-    """ An IconPack is a collection of icons that are used to
-    represent nodes in the UI. You can create your own icon packs
-    and use them to customize the look of your nodes.
-    
+    """An IconPack is a collection of icons that are used to
+    represent actions in the UI. You can create your own icon packs
+    and use them to customize the look of your actions.
+
     """
+
     name = models.CharField(max_length=1000)
-    
-    
+
 
 class Toolbox(models.Model):
     name = models.CharField(max_length=1000)
@@ -111,18 +118,17 @@ class Toolbox(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
 
 
-class Node(models.Model):
-    """Nodes are abstraction of RPC Tasks. They provide a common API to deal with creating tasks.
+class Action(models.Model):
+    """Actions are abstraction of RPC Tasks. They provide a common API to deal with creating tasks.
 
     See online Documentation"""
 
     collections = models.ManyToManyField(
         Collection,
-        related_name="nodes",
-        help_text="The collections this Node belongs to",
+        related_name="actions",
+        help_text="The collections this Action belongs to",
     )
     pure = models.BooleanField(
         default=False, help_text="Is this function pure. e.g can we cache the result?"
@@ -137,14 +143,14 @@ class Node(models.Model):
     )
     pinned_by = models.ManyToManyField(
         get_user_model(),
-        related_name="pinned_nodes",
+        related_name="pinned_actions",
         blank=True,
-        help_text="The users that pinned this Nodes",
+        help_text="The users that pinned this Actions",
     )
     kind = TextChoicesField(
         max_length=1000,
-        choices_enum=enums.NodeKindChoices,
-        default=enums.NodeKindChoices.FUNCTION.value,
+        choices_enum=enums.ActionKindChoices,
+        default=enums.ActionKindChoices.FUNCTION.value,
         help_text="Function, generator? Will this function generate multiple results?",
     )
     interfaces = models.JSONField(
@@ -154,13 +160,13 @@ class Node(models.Model):
         default=list, help_text="Intercae that we use to interpret the meta data"
     )
     name = models.CharField(
-        max_length=1000, help_text="The cleartext name of this Node"
+        max_length=1000, help_text="The cleartext name of this Action"
     )
-    description = models.TextField(help_text="A description for the Node")
+    description = models.TextField(help_text="A description for the Action")
     scope = models.CharField(
         max_length=1000,
         default="GLOBAL",
-        help_text="The scope of this Node. e.g. does the data it needs or produce live only in the scope of this Node or is it global or does it bridge data?",
+        help_text="The scope of this Action. e.g. does the data it needs or produce live only in the scope of this Action or is it global or does it bridge data?",
     )
     is_test_for = models.ManyToManyField(
         "self",
@@ -171,27 +177,26 @@ class Node(models.Model):
     )
     protocols = models.ManyToManyField(
         Protocol,
-        related_name="nodes",
+        related_name="actions",
         blank=True,
-        help_text="The protocols this Node implements (e.g. Predicate)",
+        help_text="The protocols this Action implements (e.g. Predicate)",
     )
     is_dev = models.BooleanField(
-        default=False, help_text="Is this Node a development Node"
+        default=False, help_text="Is this Action a development Action"
     )
 
     hash = models.CharField(
         max_length=1000,
-        help_text="The hash of the Node (completely unique)",
+        help_text="The hash of the Action (completely unique)",
         unique=True,
     )
     defined_at = models.DateTimeField(auto_created=True, auto_now_add=True)
 
-    args = models.JSONField(default=list, help_text="Inputs for this Node")
-    returns = models.JSONField(default=list, help_text="Outputs for this Node")
+    args = models.JSONField(default=list, help_text="Inputs for this Action")
+    returns = models.JSONField(default=list, help_text="Outputs for this Action")
 
     def __str__(self):
         return f"{self.name}"
-
 
 
 class Shortcut(models.Model):
@@ -200,11 +205,11 @@ class Shortcut(models.Model):
     toolbox = models.ForeignKey(
         Toolbox, on_delete=models.CASCADE, related_name="shortcuts"
     )
-    node = models.ForeignKey(
-        Node, on_delete=models.CASCADE, related_name="shortcuts", null=True
+    action = models.ForeignKey(
+        Action, on_delete=models.CASCADE, related_name="shortcuts", null=True
     )
-    template = models.ForeignKey(
-        "Template", on_delete=models.CASCADE, related_name="shortcuts", null=True
+    implementation = models.ForeignKey(
+        "Implementation", on_delete=models.CASCADE, related_name="shortcuts", null=True
     )
     saved_args = models.JSONField(default=dict)
     creator = models.ForeignKey(
@@ -218,20 +223,21 @@ class Shortcut(models.Model):
     args = models.JSONField(default=list, help_text="Inputs for this Shortcut")
     returns = models.JSONField(default=list, help_text="Outputs for this Shortcut")
     allow_quick = models.BooleanField(
-        default=False, help_text="Allow quick execution of this Shortcut (e.g. run without confirmation)"   
+        default=False,
+        help_text="Allow quick execution of this Shortcut (e.g. run without confirmation)",
     )
     use_returns = models.BooleanField(
-        default=False, help_text="Use the result of this Shortcut (e.g. use the result in the next Shortcut)"
+        default=False,
+        help_text="Use the result of this Shortcut (e.g. use the result in the next Shortcut)",
     )
-
 
 
 class Icon(models.Model):
     pack = models.ForeignKey(IconPack, on_delete=models.CASCADE)
     icon_url = models.CharField(max_length=10000)
     hash = models.CharField(max_length=1000)
-    node = models.ForeignKey(
-        Node, on_delete=models.SET_NULL, null=True, related_name="icons"
+    action = models.ForeignKey(
+        Action, on_delete=models.SET_NULL, null=True, related_name="icons"
     )
 
 
@@ -378,23 +384,23 @@ class Dependency(models.Model):
 
     """
 
-    template = models.ForeignKey(
-        "Template",
+    implementation = models.ForeignKey(
+        "Implementation",
         on_delete=models.CASCADE,
-        help_text="The Template that has this dependency",
+        help_text="The Implementation that has this dependency",
         related_name="dependencies",
     )
-    node = models.ForeignKey(
-        Node,
+    action = models.ForeignKey(
+        Action,
         on_delete=models.CASCADE,
-        help_text="The node this dependency is for",
+        help_text="The action this dependency is for",
         related_name="dependees",
         null=True,
         blank=True,
     )
     initial_hash = models.CharField(
         max_length=1000,
-        help_text="The initial hash of the Node",
+        help_text="The initial hash of the Action",
         null=True,
         blank=True,
     )
@@ -406,75 +412,77 @@ class Dependency(models.Model):
     )
     optional = models.BooleanField(
         default=False,
-        help_text="Is this dependency optional (e.g. can we still use the template if this dependency is not met)",
+        help_text="Is this dependency optional (e.g. can we still use the implementation if this dependency is not met)",
     )
     binds = models.JSONField(
         default=dict,
-        help_text="The binds for this dependency (Determines which templates can be used for this dependency)",
+        help_text="The binds for this dependency (Determines which implementations can be used for this dependency)",
         null=True,
         blank=True,
     )
 
 
-class Template(models.Model):
-    """A Template is a conceptual implementation of A Node. It represents its implementation as well as its performance"""
+class Implementation(models.Model):
+    """A Implementation is a conceptual implementation of A Action. It represents its implementation as well as its performance"""
 
     interface = models.CharField(
         max_length=1000, help_text="Interface (think Function)"
     )
-    node = models.ForeignKey(
-        Node,
+    action = models.ForeignKey(
+        Action,
         on_delete=models.CASCADE,
-        help_text="The node this template is implementatig",
-        related_name="templates",
+        help_text="The action this implementation is implementatig",
+        related_name="implementations",
     )
     agent = models.ForeignKey(
         Agent,
         on_delete=models.CASCADE,
-        help_text="The associated registry for this Template",
-        related_name="templates",
+        help_text="The associated registry for this Implementation",
+        related_name="implementations",
     )
     name = models.CharField(
         max_length=1000,
         default="Unnamed",
-        help_text="A name for this Template",
+        help_text="A name for this Implementation",
     )
     pinned_by = models.ManyToManyField(
         get_user_model(),
-        related_name="pinned_templates",
+        related_name="pinned_implementations",
         blank=True,
         help_text="The users that pinned this Agent",
     )
     extensions = models.JSONField(
         max_length=2000,
         default=list,
-        help_text="The attached extensions for this Template",
+        help_text="The attached extensions for this Implementation",
     )
     extension = models.CharField(
         verbose_name="Extension", max_length=1000, default="global"
     )
 
     policy = models.JSONField(
-        max_length=2000, default=dict, help_text="The attached policy for this template"
+        max_length=2000,
+        default=dict,
+        help_text="The attached policy for this implementation",
     )
-    params = models.JSONField(default=dict, help_text="Params for this Template")
+    params = models.JSONField(default=dict, help_text="Params for this Implementation")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     dynamic: str = models.BooleanField(
-        help_text="Dynamic Templates will be able to create new reservations on runtime"
+        help_text="Dynamic Implementations will be able to create new reservations on runtime"
     )
 
     class Meta:
-        permissions = [("providable", "Can provide this template")]
+        permissions = [("providable", "Can provide this implementation")]
         constraints = [
             models.UniqueConstraint(
                 fields=["interface", "agent"],
-                name="A template has unique versions for every node it trys to implement",
+                name="A implementation has unique versions for every action it trys to implement",
             )
         ]
 
     def __str__(self):
-        return f"{self.node} implemented by {self.agent}"
+        return f"{self.action} implemented by {self.agent}"
 
 
 class Reservation(models.Model):
@@ -484,7 +492,7 @@ class Reservation(models.Model):
 
     Reservations are constant logs of active connections to Arkitekt and are logging the state of the connection to the workers. They are user facing
     and are created by the user, they hold a log of all transactions that have been done since its inception, as well as as of the inputs that it was
-    created by (Node and Template as desired inputs) and the currently active Topics it connects to. It also specifies the routing policy (it case a
+    created by (Action and Implementation as desired inputs) and the currently active Topics it connects to. It also specifies the routing policy (it case a
     connection to a worker/app gets lost). A Reservation creates also a (rabbitmq) Channel that every connected Topic listens to and the specific user assigns to.
     According to its Routing Policy, if a Topic dies another Topic can eithers take over and get the Items stored in this  (rabbitmq) Channel or a specific user  event
     happens with this Assignations.
@@ -551,11 +559,11 @@ class Reservation(models.Model):
         blank=True,
     )
 
-    # 1 Inputs to the the Reservation (it can be either already a template to provision or just a node)
-    node = models.ForeignKey(
-        Node,
+    # 1 Inputs to the the Reservation (it can be either already a implementation to provision or just a action)
+    action = models.ForeignKey(
+        Action,
         on_delete=models.CASCADE,
-        help_text="The node this reservation connects",
+        help_text="The action this reservation connects",
         related_name="reservations",
     )
     title = models.CharField(
@@ -566,9 +574,9 @@ class Reservation(models.Model):
     )
 
     # The connections
-    templates = models.ManyToManyField(
-        Template,
-        help_text="The templates this reservation connects",
+    implementations = models.ManyToManyField(
+        Implementation,
+        help_text="The implementations this reservation connects",
         related_name="reservations",
     )
 
@@ -591,7 +599,7 @@ class Reservation(models.Model):
 
 
 class Assignation(models.Model):
-    """A constant log of a tasks transition through finding a Node, Template and finally Pod , also a store for its results"""
+    """A constant log of a tasks transition through finding a Action, Implementation and finally Pod , also a store for its results"""
 
     waiter = models.ForeignKey(
         Waiter, on_delete=models.CASCADE, help_text="Which Waiter assigned this?"
@@ -604,16 +612,16 @@ class Assignation(models.Model):
         blank=True,
         null=True,
     )
-    template = models.ForeignKey(
-        Template,
+    implementation = models.ForeignKey(
+        Implementation,
         on_delete=models.CASCADE,
-        help_text="Which template is the assignation currently mapped (can be reassigned)?",
+        help_text="Which implementation is the assignation currently mapped (can be reassigned)?",
         related_name="assignations",
         blank=True,
         null=True,
     )
-    node = models.ForeignKey(
-        Node, on_delete=models.CASCADE, help_text="The node this was assigned to"
+    action = models.ForeignKey(
+        Action, on_delete=models.CASCADE, help_text="The action this was assigned to"
     )
     ephemeral = models.BooleanField(
         default=False,
@@ -749,6 +757,7 @@ class AssignationInstruct(models.Model):
         help_text="The event kind",
     )
 
+
 class AgentEvent(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     agent = models.ForeignKey(
@@ -774,17 +783,17 @@ class AgentEvent(models.Model):
 
 
 class TestCase(models.Model):
-    node = models.ForeignKey(
-        Node,
+    action = models.ForeignKey(
+        Action,
         on_delete=models.CASCADE,
         related_name="test_cases",
-        help_text="The node this test belongs to",
+        help_text="The action this test belongs to",
     )
     tester = models.ForeignKey(
-        Node,
+        Action,
         on_delete=models.CASCADE,
         related_name="testing_cases",
-        help_text="The node that is testing this test",
+        help_text="The action that is testing this test",
     )
     name = models.CharField(max_length=2000, null=True, blank=True)
     description = models.CharField(max_length=2000, null=True, blank=True)
@@ -794,22 +803,22 @@ class TestCase(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["node", "tester"],
-                name="No multiple Tests for same Node and Tester allowed",
+                fields=["action", "tester"],
+                name="No multiple Tests for same Action and Tester allowed",
             )
         ]
 
 
 class TestResult(models.Model):
     case = models.ForeignKey(TestCase, on_delete=models.CASCADE, related_name="results")
-    template = models.ForeignKey(
-        Template, on_delete=models.CASCADE, related_name="testresults"
+    implementation = models.ForeignKey(
+        Implementation, on_delete=models.CASCADE, related_name="testresults"
     )
     tester = models.ForeignKey(
-        Template,
+        Implementation,
         on_delete=models.CASCADE,
         related_name="testing_results",
-        help_text="The template that is testing this test",
+        help_text="The implementation that is testing this test",
     )
     passed = models.BooleanField(default=False)
     result = models.JSONField(default=dict, null=True, blank=True)
@@ -819,9 +828,8 @@ class TestResult(models.Model):
 class Structure(models.Model):
     identifier = models.CharField(max_length=2000)
     object = models.CharField(max_length=6000)
-    
-    
-    
+
+
 class Widgets(models.Model):
     name = models.CharField(max_length=2000)
     kind = models.CharField(max_length=2000)
@@ -830,7 +838,6 @@ class Widgets(models.Model):
     )
     hash = models.CharField(max_length=2000, unique=True)
     values = models.JSONField(null=True, blank=True)
-    
 
 
 class Dashboard(models.Model):
@@ -855,8 +862,12 @@ class Panel(models.Model):
         null=True,
         blank=True,
     )
-    template = models.ForeignKey(
-        Template, on_delete=models.CASCADE, related_name="panels", null=True, blank=True
+    implementation = models.ForeignKey(
+        Implementation,
+        on_delete=models.CASCADE,
+        related_name="panels",
+        null=True,
+        blank=True,
     )
     accessors = models.JSONField(null=True, blank=True)
     submit_on_change = models.BooleanField(default=False)
@@ -864,22 +875,19 @@ class Panel(models.Model):
 
 
 class StateSchema(models.Model):
-    """ A state schema is an abstract representation of a state and describes
+    """A state schema is an abstract representation of a state and describes
     the ports (datatypes) that a state can have. States also follow the
     port schema
-    
+
     State schemas do not belong directly to an agent, but are
-    used by agents to describe the states they can have. 
-    
-    The concept is closing linked to the concepot of a "Node", but
+    used by agents to describe the states they can have.
+
+    The concept is closing linked to the concepot of a "Action", but
     representing state, rather than a function.
-    
+
 
     """
-    
-    
-    
-    
+
     name = models.CharField(max_length=2000)
     hash = models.CharField(max_length=2000, unique=True)
     ports = models.JSONField(default=dict)
@@ -887,22 +895,24 @@ class StateSchema(models.Model):
 
 
 class State(models.Model):
-    """ A state is a representation of the current state of a node.
-    
+    """A state is a representation of the current state of a action.
+
     States always follow a schema and represent the current
-    state of a node. States are used to represent the current
-    
+    state of a action. States are used to represent the current
+
     """
-    
-    
-    
+
     state_schema = models.ForeignKey(
         StateSchema, on_delete=models.CASCADE, related_name="states"
     )
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="states")
     value = models.JSONField(default=dict, help_text=" The current value of this state")
-    created_at = models.DateTimeField(auto_now_add=True, help_text="Date this State was first ever written to")
-    updated_at = models.DateTimeField(auto_now=True, help_text="Date this State was last updated")
+    created_at = models.DateTimeField(
+        auto_now_add=True, help_text="Date this State was first ever written to"
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True, help_text="Date this State was last updated"
+    )
 
     class Meta:
         constraints = [
@@ -914,19 +924,22 @@ class State(models.Model):
 
 
 class HistoricalState(models.Model):
-    """ A historical state 
-    
+    """A historical state
+
     A historical state is a frzoen state of an agent at a specific
     point in time. Historical states are used to conserve the
     state of an agent at a specific point in time, for example
     for debugging or for testing purposes.
-    
-    
+
+
     """
+
     state = models.ForeignKey(
         State, on_delete=models.CASCADE, related_name="historical_states"
     )
-    value = models.JSONField(default=dict, help_text=" The  value of this state atht he time of creation")
-    archived_at = models.DateTimeField(auto_now_add=True, help_text="Date this State was archived")
-
-
+    value = models.JSONField(
+        default=dict, help_text=" The  value of this state atht he time of creation"
+    )
+    archived_at = models.DateTimeField(
+        auto_now_add=True, help_text="Date this State was archived"
+    )

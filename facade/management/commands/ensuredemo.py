@@ -2,11 +2,11 @@ from django.core.management.base import BaseCommand
 from django.conf import settings
 from facade.models import Agent, Registry
 from rekuest_core.inputs import models
-from facade.unique import calculate_node_hash, infer_node_scope
-from facade.creation import create_template_from_definition
+from facade.unique import calculate_action_hash, infer_action_scope
+from facade.creation import create_implementation_from_definition
 from authentikate.models import App
 from django.contrib.auth import get_user_model
-from facade.inputs import CreateTemplateInputModel
+from facade.inputs import CreateImplementationInputModel
 from pydantic import BaseModel
 from typing import Optional
 
@@ -725,12 +725,10 @@ apps = [app_one, mikro_app, numpy_app, image_j_app, decided_app, reorder_needed_
 
 
 class Command(BaseCommand):
-    help = "Creates all of the reactive nodes"
+    help = "Creates all of the reactive actions"
 
     def handle(self, *args, **kwargs):
-
         for app in apps:
-
             fake_user = get_user_model().objects.first()
 
             fake_app, _ = App.objects.get_or_create(name=app.name, client_id=app.name)
@@ -749,9 +747,8 @@ class Command(BaseCommand):
             )
 
             for interface, definition in app.definitions.items():
-
-                input = CreateTemplateInputModel(
+                input = CreateImplementationInputModel(
                     interface=interface, definition=definition
                 )
 
-                create_template_from_definition(input, agent)
+                create_implementation_from_definition(input, agent)
