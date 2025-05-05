@@ -46,12 +46,17 @@ class Query:
     states: list[types.State] = strawberry_django.field()
     panels: list[types.Panel] = strawberry_django.field()
     state_schemas: list[types.StateSchema] = strawberry_django.field()
+    memory_shelves: list[types.MemoryShelve] = strawberry_django.field()
 
     state_for = strawberry_django.field(resolver=queries.state_for)
 
     @strawberry_django.field()
     def state(self, info: Info, id: strawberry.ID) -> types.State:
         return models.State.objects.get(id=id)
+
+    @strawberry_django.field()
+    def memory_shelve(self, info: Info, id: strawberry.ID) -> types.MemoryShelve:
+        return models.MemoryShelve.objects.get(id=id)
 
     @strawberry_django.field()
     def panel(self, info: Info, id: strawberry.ID) -> types.Panel:
@@ -155,8 +160,11 @@ class Mutation:
         resolver=mutations.create_test_result
     )
 
-    create_hardware_record: types.HardwareRecord = strawberry_django.mutation(
-        resolver=mutations.create_hardware_record
+    shelve_in_memory_drawer = strawberry_django.mutation(
+        resolver=mutations.shelve_in_memory_drawer
+    )
+    unshelve_memory_drawer: str = strawberry_django.mutation(
+        resolver=mutations.unshelve_memory_drawer
     )
 
     create_dashboard: types.Dashboard = strawberry_django.mutation(

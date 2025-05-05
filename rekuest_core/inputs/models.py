@@ -73,7 +73,6 @@ class ReturnWidgetInputModel(BaseModel):
 class PortInputModel(BaseModel):
     validators: list[ValidatorInputModel] | None
     key: str
-    scope: enums.PortScope
     label: str | None = None
     kind: enums.PortKind
     description: str | None = None
@@ -82,6 +81,7 @@ class PortInputModel(BaseModel):
     effects: list[EffectInputModel] | None
     default: Any | None = None
     children: list["PortInputModel"] | None
+    choices: list[ChoiceInputModel] | None = None
     assign_widget: Optional["AssignWidgetInputModel"] = None
     return_widget: Optional["ReturnWidgetInputModel"] = None
 

@@ -225,9 +225,6 @@ class PortInput:
         default_factory=list, description="The validators for the port"
     )
     key: str = strawberry.field(description="The key of the port")
-    scope: enums.PortScope = strawberry.field(
-        description="The scope of the port. Can be either global or local"
-    )
     label: str | None = strawberry.field(
         default=None,
         description="The label of the port. This is the text that is displayed in the UI",
@@ -249,6 +246,10 @@ class PortInput:
     )
     effects: list[EffectInput] | None = strawberry.field(
         default_factory=list, description="The effects of the port"
+    )
+    choices: list[ChoiceInput] | None = strawberry.field(
+        default_factory=list,
+        description="The options for the port. This is used for dropdowns and text inputs",
     )
     default: scalars.AnyDefault | None = None
     children: list[LazyType["PortInput", __name__]] | None = strawberry.field(

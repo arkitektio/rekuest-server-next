@@ -42,7 +42,7 @@ class SearchAssignWidgetModel(AssignWidgetModel):
     kind: Literal["SEARCH"]
     query: str  # TODO: Validators
     ward: str
-    filters: list["ChildPortModel"] | None = None
+    filters: list["PortModel"] | None = None
     dependencies: list[str] | None = None
 
 
@@ -109,20 +109,6 @@ class CustomEffectModel(EffectModel):
 EffectModelUnion = Union[MessageEffectModel, HideEffectModel, CustomEffectModel]
 
 
-class ChildPortModel(BaseModel):
-    key: str
-    label: str | None
-    scope: str
-    kind: str
-    description: str | None
-    identifier: str | None
-    nullable: bool
-    default: str | None
-    children: list["ChildPortModel"] | None
-    assign_widget: AssignWidgetModelUnion | None
-    return_widget: ReturnWidgetModelUnion | None
-
-
 class BindsModel(BaseModel):
     implementations: Optional[list[str]] = None
     clients: Optional[list[str]] = None
@@ -147,7 +133,6 @@ class ValidatorModel(BaseModel):
 
 class PortModel(BaseModel):
     key: str
-    scope: str
     label: str | None = None
     kind: str
     description: str | None = None
@@ -156,6 +141,7 @@ class PortModel(BaseModel):
     effects: list[EffectModelUnion] | None
     default: Any | None = None
     children: list["PortModel"] | None
+    choices: list[ChoiceModel] | None = None
     assign_widget: AssignWidgetModelUnion | None
     return_widget: ReturnWidgetModelUnion | None
     validators: list[ValidatorModel] | None

@@ -110,23 +110,6 @@ class Binds:
     desired_instances: int
 
 
-@pydantic.type(models.ChildPortModel)
-class ChildPort:
-    key: str
-    label: strawberry.auto
-    identifier: scalars.Identifier | None
-    default: scalars.AnyDefault | None
-    scope: enums.PortScope
-    kind: enums.PortKind
-    description: str | None
-    nullable: bool
-    children: Optional[list[LazyType["ChildPort", __name__]]] = (
-        None  # this took me a while to figure out should be more obvious
-    )
-    assign_widget: AssignWidget | None
-    return_widget: ReturnWidget | None
-
-
 @pydantic.type(models.PortGroupModel)
 class PortGroup:
     key: str
@@ -148,7 +131,6 @@ class Validator:
 class Port:
     identifier: scalars.Identifier | None
     default: scalars.AnyDefault | None
-    scope: enums.PortScope
     kind: enums.PortKind
     key: str
     nullable: bool
@@ -156,6 +138,7 @@ class Port:
     description: str | None
     effects: list[Effect] | None
     children: list[LazyType["Port", __name__]] | None = None
+    choices: list[Choice] | None
     assign_widget: AssignWidget | None
     return_widget: ReturnWidget | None
     validators: list[Validator] | None

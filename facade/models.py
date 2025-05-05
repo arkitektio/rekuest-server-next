@@ -319,6 +319,127 @@ class Agent(models.Model):
         )
 
 
+class FilesystemShelve(models.Model):
+    """A shelve is a collection of shelved items that are
+    related to each other. Shelves are used to group shelved
+    items together and provide a way to access them.
+
+    Shelves are not directly accessible by the user, but are
+    used by the agent to store and manage shelved items.
+
+    """
+
+    name = models.CharField(max_length=1000)
+    description = models.TextField()
+    creator = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.CASCADE,
+        related_name="filesystem_shelves",
+        help_text="The user that created this Shelf",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    resource_id = models.CharField(
+        max_length=1000,
+        default=uuid.uuid4,
+        help_text="The Channel we are listening to",
+    )
+    agents = models.ManyToManyField(
+        "Agent",
+        help_text="The associated agent for this shelved item",
+        related_name="filesystem_shelves",
+    )
+
+
+class FileDrawer(models.Model):
+    """A shelve is a collection of shelved items that are
+    related to each other. Shelves are used to group shelved
+    items together and provide a way to access them.
+
+    Shelves are not directly accessible by the user, but are
+    used by the agent to store and manage shelved items.
+
+    """
+
+    shelve = models.ForeignKey(
+        FilesystemShelve,
+        on_delete=models.CASCADE,
+        help_text="The associated shelve for this drawer",
+        related_name="drawers",
+    )
+    resource_id = models.CharField(
+        max_length=1000,
+        help_text="The resource id of this drawer",
+        null=True,
+        blank=True,
+    )
+    identifier = models.CharField(
+        max_length=1000,
+        help_text="The identifier of this drawer",
+    )
+    label = models.CharField(max_length=1000, null=True)
+    description = models.TextField(null=True)
+
+
+class MemoryShelve(models.Model):
+    """A shelve is a collection of shelved items that are
+    related to each other. Shelves are used to group shelved
+    items together and provide a way to access them.
+
+    Shelves are not directly accessible by the user, but are
+    used by the agent to store and manage shelved items.
+
+    """
+
+    agent = models.OneToOneField(
+        Agent,
+        on_delete=models.CASCADE,
+        help_text="The associated agent for this memory shelve",
+        related_name="memory_shelve",
+    )
+
+    name = models.CharField(max_length=1000)
+    description = models.TextField()
+    creator = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.CASCADE,
+        related_name="shelves",
+        help_text="The user that created this Shelf",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class MemoryDrawer(models.Model):
+    """A shelve is a collection of shelved items that are
+    related to each other. Shelves are used to group shelved
+    items together and provide a way to access them.
+
+    Shelves are not directly accessible by the user, but are
+    used by the agent to store and manage shelved items.
+
+    """
+
+    shelve = models.ForeignKey(
+        MemoryShelve,
+        on_delete=models.CASCADE,
+        help_text="The associated shelve for this drawer",
+        related_name="drawers",
+    )
+    resource_id = models.CharField(
+        max_length=1000,
+        help_text="The resource id of this drawer",
+        null=True,
+        blank=True,
+    )
+    identifier = models.CharField(
+        max_length=1000,
+        help_text="The identifier of this drawer",
+    )
+    label = models.CharField(max_length=1000, null=True)
+    description = models.TextField(null=True)
+
+
 class HardwareRecord(models.Model):
     agent = models.ForeignKey(
         Agent,
@@ -826,16 +947,17 @@ class TestResult(models.Model):
 
 
 class Structure(models.Model):
-    identifier = models.CharField(max_length=2000)
-    object = models.CharField(max_length=6000)
+    identifier = models.CharField(max_length=2000, unique=True)
+    label = models.CharField(max_length=2000)
+    description = models.CharField(max_length=2000)
 
 
-class Widgets(models.Model):
-    name = models.CharField(max_length=2000)
-    kind = models.CharField(max_length=2000)
+class Widget(models.Model):
     structure = models.ForeignKey(
         Structure, on_delete=models.CASCADE, null=True, blank=True
     )
+    name = models.CharField(max_length=2000)
+    kind = models.CharField(max_length=2000)
     hash = models.CharField(max_length=2000, unique=True)
     values = models.JSONField(null=True, blank=True)
 

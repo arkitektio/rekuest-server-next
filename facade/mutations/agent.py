@@ -55,6 +55,19 @@ async def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
         ),
     )
 
+    memory_shelve, _ = await models.MemoryShelve.objects.aget_or_create(
+        agent=agent,
+        defaults=dict(
+            name=f"{str(agent)} memory shelve",
+            creator=info.context.request.user,
+        ),
+    )
+
+    async for drawer in models.MemoryDrawer.objects.filter(
+        shelve=memory_shelve,
+    ):
+        await drawer.adelete()
+
     return agent
 
 

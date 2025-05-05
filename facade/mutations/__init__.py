@@ -3,7 +3,7 @@ from .postman import *
 from .implementation import *
 from .test import *
 from .lifeline import *
-from .hardware_record import *
+from .memory_shelve import *
 from .agent import *
 from .dashboard import *
 from .state_schema import *

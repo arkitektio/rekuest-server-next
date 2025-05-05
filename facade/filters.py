@@ -132,6 +132,61 @@ class WaiterFilter:
 
 
 @strawberry_django.filter(
+    models.FilesystemShelve, description="A way to filter shelved items"
+)
+class FilesystemShelveFilter:
+    ids: list[strawberry.ID] | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+
+
+@strawberry_django.filter(
+    models.MemoryShelve, description="A way to filter shelved items"
+)
+class MemoryShelveFilter:
+    agent: strawberry.ID | None
+    ids: list[strawberry.ID] | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+
+
+@strawberry_django.filter(
+    models.FileDrawer, description="A way to filter shelved items"
+)
+class FileDrawerFilter:
+    shelve: strawberry.ID | None
+    agent: strawberry.ID | None
+    identifier: str | None
+    ids: list[strawberry.ID] | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+
+
+@strawberry_django.filter(
+    models.MemoryDrawer, description="A way to filter shelved items"
+)
+class MemoryDrawerFilter:
+    shelve: strawberry.ID | None
+    agent: strawberry.ID | None
+    identifier: str | None
+    ids: list[strawberry.ID] | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+
+
+@strawberry_django.filter(
     models.Reservation, description="A way to filter reservations"
 )
 class ReservationFilter:
@@ -258,6 +313,11 @@ class ShortcutOrder:
 
 @strawberry_django.order(models.Toolbox)
 class ToolboxOrder:
+    name: auto
+
+
+@strawberry_django.order(models.MemoryShelve)
+class MemoryShelveOrder:
     name: auto
 
 

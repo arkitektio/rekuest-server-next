@@ -232,6 +232,52 @@ class HardwareRecord:
 
 
 @strawberry_django.type(
+    models.MemoryShelve,
+    filters=filters.MemoryShelveFilter,
+    order=filters.MemoryShelveOrder,
+    pagination=True,
+)
+class MemoryShelve:
+    id: strawberry.ID
+    agent: "Agent"
+    name: str
+    description: str | None
+    drawers: list[LazyType["MemoryDrawer", __name__]] = strawberry_django.field()
+
+
+@strawberry_django.type(
+    models.FilesystemShelve, filters=filters.FilesystemShelveFilter, pagination=True
+)
+class FilesystemShelve:
+    id: strawberry.ID
+    drawers: list[LazyType["FileDrawer", __name__]]
+
+
+@strawberry_django.type(
+    models.FileDrawer, filters=filters.FileDrawerFilter, pagination=True
+)
+class FileDrawer:
+    id: strawberry.ID
+    resource_id: str
+    agent: "Agent"
+    identifier: str
+    created_at: datetime.datetime
+
+
+@strawberry_django.type(
+    models.MemoryDrawer, filters=filters.MemoryDrawerFilter, pagination=True
+)
+class MemoryDrawer:
+    id: strawberry.ID
+    resource_id: str
+    shelve: "MemoryShelve"
+    identifier: str
+    label: str | None
+    description: str | None
+    created_at: datetime.datetime
+
+
+@strawberry_django.type(
     models.Agent, filters=filters.AgentFilter, order=filters.AgentOrder, pagination=True
 )
 class Agent:
@@ -240,6 +286,8 @@ class Agent:
     registry: "Registry"
     hardware_records: list[HardwareRecord]
     implementations: list["Implementation"]
+    memory_shelve: Optional["MemoryShelve"]
+    file_system_shelves: list["FilesystemShelve"]
     last_seen: datetime.datetime | None
     connected: bool
     extensions: list[str]

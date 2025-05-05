@@ -19,7 +19,9 @@ class PortKind(str, Enum):
     FLOAT = "FLOAT"
     DATE = "DATE"
     UNION = "UNION"
+    ENUM = "ENUM"
     MODEL = "MODEL"
+    MEMORY_STRUCTURE = "MEMORY_STRUCTURE"
 
 
 @strawberry.enum(description="The kind of assign widget.")
@@ -43,12 +45,6 @@ class EffectKind(str, Enum):
     MESSAGE = "MESSAGE"
     HIDE = "HIDE"
     CUSTOM = "CUSTOM"
-
-
-@strawberry.enum(description="The kind of port")
-class PortScope(str, Enum):
-    GLOBAL = "GLOBAL"
-    LOCAL = "LOCAL"
 
 
 @strawberry.enum(description="The kind of action scope.")

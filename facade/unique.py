@@ -13,18 +13,17 @@ def calculate_action_hash(
     ).hexdigest()
 
 
-def traverse_scope(port: models.PortInputModel, scope=enums.PortScope.LOCAL):
-    if port.kind == enums.PortKind.STRUCTURE:
-        if port.scope == scope:
-            return True
+def traverse_scope(port: models.PortInputModel):
+    if port.kind == enums.PortKind.MEMORY_STRUCTURE:
+        return True
     if port.children:
-        return any(traverse_scope(child, scope) for child in port.children)
+        return any(traverse_scope(child) for child in port.children)
     return False
 
 
 def has_locals(ports: list[models.PortInputModel]):
     for port in ports:
-        if traverse_scope(port, enums.PortScope.LOCAL):
+        if traverse_scope(port):
             return True
     return False
 
