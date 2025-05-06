@@ -75,11 +75,9 @@ class AgentFilter:
         return queryset.filter(name__icontains=self.search)
 
     def filter_pinned(self, queryset, info):
-        
         if self.pinned is None:
             return queryset
-        
-        
+
         user = get_user()
         if self.pinned:
             # Check if the user is in the pinned_by list
@@ -110,9 +108,7 @@ class AgentFilter:
     def filter_has_implementations(self, queryset, info):
         if self.has_implementations is None:
             return queryset
-        return queryset.filter(
-            implementations__action__hash__in=self.has_implementations
-        )
+        return queryset.filter(implementations__action__hash__in=self.has_implementations)
 
     def filter_has_states(self, queryset, info):
         if self.has_states is None:
@@ -136,9 +132,7 @@ class WaiterFilter:
         return queryset.filter(id__in=self.ids)
 
 
-@strawberry_django.filter(
-    models.FilesystemShelve, description="A way to filter shelved items"
-)
+@strawberry_django.filter(models.FilesystemShelve, description="A way to filter shelved items")
 class FilesystemShelveFilter:
     ids: list[strawberry.ID] | None
 
@@ -148,9 +142,7 @@ class FilesystemShelveFilter:
         return queryset.filter(id__in=self.ids)
 
 
-@strawberry_django.filter(
-    models.MemoryShelve, description="A way to filter shelved items"
-)
+@strawberry_django.filter(models.MemoryShelve, description="A way to filter shelved items")
 class MemoryShelveFilter:
     agent: strawberry.ID | None
     ids: list[strawberry.ID] | None
@@ -161,9 +153,7 @@ class MemoryShelveFilter:
         return queryset.filter(id__in=self.ids)
 
 
-@strawberry_django.filter(
-    models.FileDrawer, description="A way to filter shelved items"
-)
+@strawberry_django.filter(models.FileDrawer, description="A way to filter shelved items")
 class FileDrawerFilter:
     shelve: strawberry.ID | None
     agent: strawberry.ID | None
@@ -176,24 +166,37 @@ class FileDrawerFilter:
         return queryset.filter(id__in=self.ids)
 
 
-@strawberry_django.filter(
-    models.MemoryDrawer, description="A way to filter shelved items"
-)
+@strawberry_django.filter(models.MemoryDrawer, description="A way to filter shelved items")
 class MemoryDrawerFilter:
     shelve: strawberry.ID | None
     agent: strawberry.ID | None
+    implementation: strawberry.ID | None
     identifier: str | None
     ids: list[strawberry.ID] | None
+    search: str | None
+
+    def filter_search(self, queryset, info):
+        if self.search is None:
+            return queryset
+        return queryset.filter(label__icontains=self.search)
 
     def filter_ids(self, queryset, info):
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
 
+    def filter_implementation(self, queryset, info):
+        if self.implementation is None:
+            return queryset
+        return queryset.filter(shelve__agent__implementations=self.implementation)
 
-@strawberry_django.filter(
-    models.Reservation, description="A way to filter reservations"
-)
+    def filter_identifier(self, queryset, info):
+        if self.identifier is None:
+            return queryset
+        return queryset.filter(identifier=self.identifier)
+
+
+@strawberry_django.filter(models.Reservation, description="A way to filter reservations")
 class ReservationFilter:
     waiter: WaiterFilter | None
     ids: list[strawberry.ID] | None
@@ -233,9 +236,7 @@ class AssignationFilter:
         return queryset.filter(reservation__waiter__instance_id=self.instance_id)
 
 
-@strawberry_django.filter(
-    models.AssignationEvent, description="A way to filter assignation events"
-)
+@strawberry_django.filter(models.AssignationEvent, description="A way to filter assignation events")
 class AssignationEventFilter:
     kind: list[enums.AssignationEventKind] | None
 
@@ -265,6 +266,7 @@ class DependencyFilter:
             return queryset
         return queryset.filter(id__in=self.ids)
 
+
 @strawberry_django.filter(User)
 class UserFilter:
     ids: list[strawberry.ID] | None
@@ -279,8 +281,8 @@ class UserFilter:
         if self.name is None:
             return queryset
         return queryset.filter(name__icontains=self.name)
-    
-    
+
+
 @strawberry_django.order(User)
 class UserOrder:
     name: auto
@@ -309,9 +311,7 @@ class ClientFilter:
     def filter_has_implementations_for(self, queryset, info):
         if self.has_implementations_for is None:
             return queryset
-        return queryset.filter(
-            registry__agents__implementations__action__hash__in=self.has_implementations_for
-        ).distinct()
+        return queryset.filter(registry__agents__implementations__action__hash__in=self.has_implementations_for).distinct()
 
     def filter_mine(self, queryset, info):
         if self.mine is None:
