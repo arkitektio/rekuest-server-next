@@ -1,5 +1,4 @@
 from facade.models import Protocol
-from rekuest_core.enums import PortKind
 from rekuest_core.inputs.models import DefinitionInputModel
 
 

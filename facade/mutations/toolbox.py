@@ -1,27 +1,28 @@
 from kante.types import Info
-import strawberry_django
-import strawberry
-from facade import types, models, inputs, enums, scalars
-import hashlib
-import json
+from facade import types, models, inputs
 import logging
-from facade.protocol import infer_protocols
-from facade.utils import hash_input
-import uuid
+import strawberry
+from authentikate.vars import get_user
 
 logger = logging.getLogger(__name__)
 
 
 def create_toolbox(info: Info, input: inputs.CreateToolboxInput) -> types.Toolbox:
-
+    user = get_user()
     toolbox, _ = models.Toolbox.objects.update_or_create(
         name=input.name,
-        defaults=dict(description=input.description,
-        creator=info.context.request.user,
-        )
+        defaults=dict(
+            description=input.description,
+            creator=user,
+        ),
     )
-
 
     logger.info(f"Toolbox created: {toolbox}")
 
     return toolbox
+
+
+def delete_toolbox(info: Info, input: inputs.DeleteToolboxInput) -> strawberry.ID:
+    toolbox = models.Toolbox.objects.get(id=input.id)
+    toolbox.delete()
+    return input.id

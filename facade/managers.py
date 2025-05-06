@@ -3,7 +3,7 @@ import typing as t
 
 from django.db import connection
 
-from .inputs import PortDemandInput, PortMatchInput
+from .inputs import PortMatchInput
 
 qt = re.compile(r"@(?P<package>[^\/]*)\/(?P<interface>[^\/]*)")
 
@@ -90,12 +90,12 @@ def build_params(
         individual_queries.append(f"jsonb_array_length({type}) = {force_length}")
 
     if force_non_nullable_length is not None:
-        sql_part = f"item->>'nullable'::text = 'false'"
+        sql_part = "item->>'nullable'::text = 'false'"
         count_condition = f"""(SELECT COUNT(*) FROM jsonb_array_elements({type}) AS j(item) WHERE {sql_part}) = {force_non_nullable_length}"""
         individual_queries.append(count_condition)
 
     if force_structure_length is not None:
-        sql_part = f"item->>'kind' = 'STRUCTURE'"
+        sql_part = "item->>'kind' = 'STRUCTURE'"
         count_condition = f"""(SELECT COUNT(*) FROM jsonb_array_elements({type}) AS j(item) WHERE {sql_part}) = {force_structure_length}"""
         individual_queries.append(count_condition)
 

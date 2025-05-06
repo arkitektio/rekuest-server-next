@@ -1,7 +1,5 @@
-from typing import List
-
 import strawberry
-from facade import filters, models, scalars, types
+from facade import models, types
 from kante.types import Info
 
 
@@ -29,9 +27,11 @@ async def my_implementation_at(
     interface: str | None = None,
 ) -> types.Implementation:
     # TODO: Hasch this
+
     registry, _ = await models.Registry.objects.aget_or_create(
-        app=info.context.request.app,
+        client=info.context.request.client,
         user=info.context.request.user,
+       
     )
 
     agent, _ = await models.Agent.objects.aget_or_create(

@@ -2,7 +2,8 @@ from typing import Optional
 
 import strawberry
 import strawberry_django
-from authentikate.models import App, User
+from authentikate.models import Client, User
+from authentikate.vars import get_user
 from facade import enums, inputs, managers, models, scalars
 from rekuest_core import enums as renums
 from rekuest_core import scalars as rscalars
@@ -74,13 +75,17 @@ class AgentFilter:
         return queryset.filter(name__icontains=self.search)
 
     def filter_pinned(self, queryset, info):
+        
         if self.pinned is None:
             return queryset
+        
+        
+        user = get_user()
         if self.pinned:
             # Check if the user is in the pinned_by list
-            return queryset.filter(pinned_by__id=info.context.request.user.id)
+            return queryset.filter(pinned_by__id=user.id)
         else:
-            return queryset.exclude(pinned_by__id=info.context.request.user.id)
+            return queryset.exclude(pinned_by__id=user.id)
 
     def filter_client_id(self, queryset, info):
         if self.client_id is None:
@@ -260,14 +265,37 @@ class DependencyFilter:
             return queryset
         return queryset.filter(id__in=self.ids)
 
+@strawberry_django.filter(User)
+class UserFilter:
+    ids: list[strawberry.ID] | None
+    name: Optional[FilterLookup[str]]
 
-@strawberry_django.order(App, description="A way to order apps")
-class AppOrder:
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+
+    def filter_name(self, queryset, info):
+        if self.name is None:
+            return queryset
+        return queryset.filter(name__icontains=self.name)
+    
+    
+@strawberry_django.order(User)
+class UserOrder:
+    name: auto
+    email: auto
+    date_joined: auto
+    last_login: auto
+
+
+@strawberry_django.order(Client, description="A way to order apps")
+class ClientOrder:
     defined_at: auto
 
 
-@strawberry_django.filter(App, description="A way to filter apps")
-class AppFilter:
+@strawberry_django.filter(Client, description="A way to filter apps")
+class ClientFilter:
     interface: Optional[FilterLookup[str]]
     ids: list[strawberry.ID] | None
     has_implementations_for: list[rscalars.ActionHash] | None

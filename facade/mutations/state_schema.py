@@ -1,7 +1,6 @@
 from kante.types import Info
-import strawberry_django
 import strawberry
-from facade import types, models, inputs, enums, scalars
+from facade import types, models, inputs
 import hashlib
 import json
 import logging
@@ -26,7 +25,7 @@ def hash_state_schema(definition: inputs.StateSchemaInput) -> str:
 
 def create_state_schema(
     info: Info, input: inputs.CreateStateSchemaInput
-) -> types.Dashboard:
+) -> types.StateSchema:
 
     schema = input.state_schema
 

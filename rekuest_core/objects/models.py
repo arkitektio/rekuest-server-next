@@ -1,7 +1,6 @@
 import strawberry
 from typing import Optional
 from pydantic import BaseModel
-from strawberry.experimental import pydantic
 from typing import Literal, Union
 import datetime
 from rekuest_core import enums
@@ -17,15 +16,15 @@ class ChoiceModel(BaseModel):
 
 class AssignWidgetModel(BaseModel):
     kind: str
-    follow_value: str | None
+    follow_value: str | None = None
 
 
 class SliderAssignWidgetModel(AssignWidgetModel):
     kind: Literal["SLIDER"]
-    min: float | None
-    max: float | None
-    step: float | None
-
+    min: float | None = None
+    max: float | None = None
+    step: float | None = None
+ 
 
 class ChoiceAssignWidgetModel(AssignWidgetModel):
     kind: Literal["CHOICE"]
@@ -34,7 +33,7 @@ class ChoiceAssignWidgetModel(AssignWidgetModel):
 
 class CustomAssignWidgetModel(AssignWidgetModel):
     kind: Literal["CUSTOM"]
-    hook: str
+    hook: str 
     ward: str
 
 

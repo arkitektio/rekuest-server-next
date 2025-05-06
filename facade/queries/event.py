@@ -1,7 +1,6 @@
-from typing import List
 
 import strawberry
-from facade import filters, models, scalars, types
+from facade import models, types
 from kante.types import Info
 
 

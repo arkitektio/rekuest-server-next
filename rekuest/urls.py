@@ -16,11 +16,11 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from .basepath import basepath
+from kante.path import dynamicpath
 
-reload = "fdssss"
+reload = "fdsssss"
 
 
 urlpatterns = [
-    basepath("admin/", admin.site.urls),
+    dynamicpath("admin/", admin.site.urls),
 ]

@@ -1,9 +1,9 @@
 from facade.models import Protocol
-from rekuest_core.enums import PortKind
 from rekuest_core.inputs.models import DefinitionInputModel
 
 
 def is_agent(definition: DefinitionInputModel) -> Protocol:
+    """ Check if the definition is an LLM agent. """
 
     if not definition.args:
         return None

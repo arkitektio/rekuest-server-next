@@ -1,8 +1,6 @@
-from typing import Protocol, List
+from typing import List
 from facade import models, enums, messages
-import uuid
 import datetime
-from django.conf import settings
 import logging
 
 
@@ -18,7 +16,7 @@ class ModelPersistBackend:
         async for ass in models.Assignation.objects.filter(
             implementation__agent=agent, is_done=False
         ).all():
-            created = await models.AssignationEvent.objects.acreate(
+            await models.AssignationEvent.objects.acreate(
                 assignation=ass,
                 kind=enums.AssignationEventKind.DISCONNECTED,
                 message="Agent disconnected. Fate unknown",

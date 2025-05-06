@@ -85,9 +85,12 @@ class Assign(Message):
         default=False,
         description="If we should step (interrupt at the first breakpoint)",
     )
+    
+    
+    
 
     @property
-    def actor_id(self):
+    def actor_id(self) -> str:
         return f"{self.extension}.{self.interface}"
 
 
@@ -244,9 +247,9 @@ class Register(Message):
 
 class Init(Message):
     type: Literal[ToAgentMessageType.INIT] = ToAgentMessageType.INIT
-    instance_id: str = None
-    agent: str = None
-    registry: str = None
+    instance_id: str 
+    agent: str 
+    registry: str 
     inquiries: list[AssignInquiry] = []
 
 

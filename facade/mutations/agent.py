@@ -1,20 +1,9 @@
 from kante.types import Info
-import strawberry_django
 import strawberry
-from facade import types, models, inputs, enums, scalars
-from rekuest_core.inputs import models as rimodels
-import hashlib
-import json
+from facade import types, models, inputs, scalars
 import logging
-from facade.protocol import infer_protocols
-from facade.utils import hash_input
-from facade.consumers.async_consumer import AgentConsumer
 
 logger = logging.getLogger(__name__)
-from facade.connection import redis_pool
-import redis
-from facade.backend import controll_backend
-from facade.persist_backend import persist_backend
 
 
 @strawberry.input
@@ -41,8 +30,11 @@ class DeleteAgentInput:
 
 async def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
     # TODO: Hasch this
+    
+    
+    
     registry, _ = await models.Registry.objects.aupdate_or_create(
-        app=info.context.request.app,
+        client=info.context.request.client,
         user=info.context.request.user,
     )
 
@@ -72,6 +64,7 @@ async def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
 
 
 def pin_agent(info, input: inputs.PinInput) -> types.Agent:
+    
     agent = models.Agent.objects.get(id=input.id)
     if input.pin:
         agent.pinned_by.add(info.context.request.user)

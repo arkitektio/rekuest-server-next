@@ -51,7 +51,6 @@ INSTALLED_APPS = [
     "channels",
     "authentikate",
     "django_probes",
-    "koherent",
     "kante",
     "facade",
 ]
@@ -98,11 +97,15 @@ CHANNEL_LAYERS = {
     },
 }
 
+STRAWBERRY_DJANGO = {
+    "USE_DEPRECATED_FILTERS": True,
+}
+
 
 CSRF_TRUSTED_ORIGINS = conf.get(
     "csrf_trusted_origins", ["http://localhost", "https://localhost"]
 )
-MY_SCRIPT_NAME = conf.get("force_script_name", "")
+MY_SCRIPT_NAME = conf.get("force_script_name", "") 
 
 
 CORS_ALLOW_ALL_ORIGINS = True

@@ -1,7 +1,7 @@
 import datetime
 import uuid
 
-from authentikate.models import App, User
+from authentikate.models import Client, User
 from django.db import models
 from django_choices_field import TextChoicesField
 from facade import enums
@@ -75,26 +75,25 @@ class Registry(models.Model):
 
     """
 
-    app = models.ForeignKey(
-        App, on_delete=models.CASCADE, null=True, help_text="The Associated App"
+    client = models.ForeignKey(
+        Client, on_delete=models.CASCADE, help_text="The Associated Client"
     )
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        null=True,
         help_text="The Associatsed User",
     )
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["app", "user"],
+                fields=["client", "user"],
                 name="No multiple Registries for same App and User allowed",
             )
         ]
 
     def __str__(self) -> str:
-        return f"{self.app} used by {self.user}"
+        return f"{self.client} used by {self.user}"
 
 
 class IconPack(models.Model):
@@ -1065,3 +1064,9 @@ class HistoricalState(models.Model):
     archived_at = models.DateTimeField(
         auto_now_add=True, help_text="Date this State was archived"
     )
+
+
+
+import facade.signals as signals # noqa: E402
+
+__all__ = ["signals"]

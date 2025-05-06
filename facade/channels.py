@@ -1,31 +1,32 @@
 from kante.channel import build_channel
+from .channel_events import StateUpdateEvent, DBEvent, AssignationEventCreatedEvent, ImplementationSignal, AgentSignal
 
-action_created_broadcast, action_created_listen = build_channel(
-    "action_created_broadcast"
+
+action_channel  = build_channel(
+    DBEvent, "action_created_broadcast"
 )
 
-agent_updated_broadcast, agent_updated_listen = build_channel("agent_updated_broadcast")
+agent_updated_channel = build_channel(AgentSignal,"agent_updated_broadcast")
 
-assignation_broadcast, assignation_listen = build_channel("assignation_broadcast")
-
-implementation_broadcast, implementation_listen = build_channel(
-    "implementation_broadcast"
-)
-
-reservation_broadcast, reservation_listen = build_channel("reservation_broadcast")
+assignation_updated_channel = build_channel(DBEvent,"assignation_broadcast")
+assignation_event_channel = build_channel(AssignationEventCreatedEvent)
 
 
-state_update_event_broadcast, state_update_event_listen = build_channel(
-    "state_update_event_broadcast"
-)
 
-provision_event_broadcast, provision_event_listen = build_channel(
-    "provision_event_broadcast"
-)
-
-reservation_event_broadcast, reservation_event_listen = build_channel(
-    "reservation_event_broadcast"
+new_implementation_channel  = build_channel(
+    ImplementationSignal
 )
 
 
-new_state_broadcast, new_state_listen = build_channel("new_state_")
+state_update_channel = build_channel(
+    DBEvent,"state_update_event_broadcast"
+)
+
+
+
+reservation_channel = build_channel(
+    DBEvent,"reservation_event_broadcast"
+)
+
+
+state_update_channel = build_channel(StateUpdateEvent)

@@ -1,27 +1,27 @@
-from django.db.models.signals import post_save, pre_delete, post_delete
+from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
-from facade import models
-from facade.channels import (
-    action_created_broadcast,
-    agent_updated_broadcast,
-    provision_event_broadcast,
-    reservation_event_broadcast,
-    assignation_broadcast,
-    reservation_broadcast,
-    implementation_broadcast,
-)
+from facade import models, channels, channel_events
 import logging
-from guardian.shortcuts import assign_perm
 
 
 logger = logging.getLogger(__name__)
 logger.info("Loading sssignals")
 
 
+@receiver(post_save, sender=models.State)
+def state_post_save(sender, instance: models.State = None, created=None, **kwargs):
+    
+    channels.state_update_channel.broadcast(channel_events.StateUpdateEvent(id=instance.id), [instance.id])
+
+
 @receiver(post_save, sender=models.Action)
-def action_singal(sender, instance=None, **kwargs):
+def action_singal(sender, instance=None, created=None, **kwargs):
     if instance:
-        action_created_broadcast(instance.id, [f"actions"])
+        if created:
+            channels.action_channel.broadcast(channel_events.ActionSignal(create=instance.id), ["actions"])
+        else:
+            channels.action_channel.broadcast(channel_events.ActionSignal(update=instance.id), ["actions"])
+        
 
 
 @receiver(post_save, sender=models.Reservation)
@@ -29,23 +29,12 @@ def reservation_signal(sender, instance=None, **kwargs):
     logger.info("Reservation received!")
 
 
-@receiver(post_save, sender=models.Implementation)
-def implementation_post_save(
-    sender, instance: models.Implementation = None, created=None, **kwargs
-):
-    assign_perm("providable", instance.agent.registry.user, instance)
-    implementation_broadcast(
-        {"id": instance.id, "type": "create" if created else "update"},
-        [f"agent_{instance.agent.id}"],
-    )
-
-
 @receiver(post_save, sender=models.Agent)
 def agent_post_save(sender, instance: models.Agent = None, created=None, **kwargs):
     if instance:
         print("Agent post save")
-        agent_updated_broadcast(
-            {"id": instance.id, "type": "create" if created else "update"},
+        channels.agent_updated_channel.broadcast(
+            channel_events.AgentSignal(create=instance.id) if created else channel_events.AgentSignal(update=instance.id),
             [f"agents_for_{instance.registry.user.id}"],
         )
 
@@ -53,8 +42,9 @@ def agent_post_save(sender, instance: models.Agent = None, created=None, **kwarg
 @receiver(post_save, sender=models.Assignation)
 def ass_post_save(sender, instance: models.Assignation = None, created=None, **kwargs):
     if created:
-        assignation_broadcast(
-            {"id": instance.id, "type": "created"}, [f"ass_waiter_{instance.waiter.id}"]
+        channels.assignation_event_channel.broadcast(
+            channel_events.AssignationEventCreatedEvent(create=str(instance.id)),
+            [f"ass_waiter_{instance.waiter.id}"],
         )
 
 
@@ -62,8 +52,9 @@ def ass_post_save(sender, instance: models.Assignation = None, created=None, **k
 def ass_event_post_save(
     sender, instance: models.AssignationEvent = None, created=None, **kwargs
 ):
-    assignation_broadcast(
-        {"id": instance.id, "type": "event"},
+    logger.info("Assignation Event received")
+    channels.assignation_event_channel.broadcast(
+        channel_events.AssignationEventCreatedEvent(event=instance.id),
         [f"ass_waiter_{instance.assignation.waiter.id}"],
     )
 
@@ -76,10 +67,17 @@ def res_post_save(sender, instance: models.Reservation = None, created=None, **k
 
 
 @receiver(post_save, sender=models.Implementation)
-def temp_post_save(sender, instance: models.Implementation = None, **kwargs):
-    implementation_broadcast(instance.id, [f"implementation_{instance.id}"])
+def implementation_post_save(sender, instance: models.Implementation = None, created=None, **kwargs):
+    if created:
+        channels.new_implementation_channel.broadcast(channel_events.ImplementationSignal(create=instance.id))
+    else:
+        channels.new_implementation_channel.broadcast(channel_events.ImplementationSignal(update=instance.id), [f"implementation_{instance.id}"])
+
 
 
 @receiver(post_delete, sender=models.Implementation)
-def temp_post_save(sender, instance: models.Implementation = None, **kwargs):
-    pass
+def implementation_post_del(sender, instance: models.Implementation = None, **kwargs):
+    
+    if instance:
+        channels.new_implementation_channel.broadcast(channel_events.ImplementationSignal(delete=instance.id), [f"implementation_{instance.id}"])
+    

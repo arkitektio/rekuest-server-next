@@ -435,6 +435,17 @@ class CreateToolboxInput:
     )
 
 
+class DeleteToolboxInputModel(BaseModel):
+    id: str
+    
+@pydantic.input(
+    DeleteToolboxInputModel, description="The input for deleting a toolbox."
+)
+class DeleteToolboxInput:
+    id: strawberry.ID = strawberry.field(
+        description="The toolbox ID to delete. This is used to identify the toolbox in the system."
+    )
+
 class CreateShortcutInputModel(BaseModel):
     name: str
     description: str | None = None

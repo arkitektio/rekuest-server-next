@@ -1,16 +1,11 @@
 import logging
 
+from facade.backend import controll_backend
 import strawberry
-from facade import enums, inputs, models, scalars, types
-from facade.protocol import infer_protocols
-from facade.utils import hash_input
+from facade import inputs, models, types
 from kante.types import Info
-from rekuest_core.inputs import models as rimodels
 
 logger = logging.getLogger(__name__)
-import redis
-from facade.backend import controll_backend
-from facade.connection import redis_pool
 
 
 def reserve(info: Info, input: inputs.ReserveInput) -> types.Reservation:

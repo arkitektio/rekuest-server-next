@@ -1,18 +1,14 @@
 from kante.types import Info
-import strawberry_django
 import strawberry
-from facade import types, models, inputs, enums, scalars
-import hashlib
-import json
+from facade import types, models, inputs
 import logging
-from facade.protocol import infer_protocols
-from facade.utils import hash_input
-import uuid
 
 logger = logging.getLogger(__name__)
 
 
 def create_shortcut(info: Info, input: inputs.CreateShortcutInput) -> types.Shortcut:
+   
+
     toolbox = (
         models.Toolbox.objects.get(id=input.toolbox)
         if input.toolbox
@@ -21,6 +17,7 @@ def create_shortcut(info: Info, input: inputs.CreateShortcutInput) -> types.Shor
             defaults=dict(
                 description="Default toolbox",
                 creator=info.context.request.user,
+                client=info.context.request.client,
             ),
         )[0]
     )

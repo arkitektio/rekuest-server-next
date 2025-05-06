@@ -1,6 +1,4 @@
 from kante.types import Info
-import strawberry_django
-import strawberry
 from facade import types, models, inputs, enums
 import uuid
 

@@ -2,8 +2,7 @@ from typing import Optional
 from strawberry.experimental import pydantic
 from strawberry import LazyType
 from rekuest_ui_core.inputs import models
-import strawberry
-from rekuest_ui_core import enums, scalars
+from rekuest_ui_core import enums
 
 
 @pydantic.input(models.UIChildInputModel)

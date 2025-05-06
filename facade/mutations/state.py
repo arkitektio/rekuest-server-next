@@ -1,8 +1,5 @@
 from kante.types import Info
-import strawberry_django
-import strawberry
-from facade import types, models, inputs, enums, scalars, channels
-from facade.channels import new_state_broadcast
+from facade import types, models, inputs
 import logging
 import jsonpatch
 
@@ -14,10 +11,12 @@ def underscore(s: str) -> str:
 
 
 async def set_state(info: Info, input: inputs.SetStateInput) -> types.State:
+    user = info.context.request.user
+    client = info.context.request.client
 
     registry, _ = await models.Registry.objects.aget_or_create(
-        app=info.context.request.app,
-        user=info.context.request.user,
+        client=client,
+        user=user,
     )
 
     agent, _ = await models.Agent.objects.aget_or_create(
@@ -40,9 +39,10 @@ async def set_state(info: Info, input: inputs.SetStateInput) -> types.State:
 
 
 def update_state(info: Info, input: inputs.UpdateStateInput) -> types.State:
+   
 
     registry, _ = models.Registry.objects.get_or_create(
-        app=info.context.request.app,
+        client=info.context.request.client,
         user=info.context.request.user,
     )
 
@@ -65,20 +65,18 @@ def update_state(info: Info, input: inputs.UpdateStateInput) -> types.State:
     state.value = new_state
 
     state.save()
-    logging.info(f"UPDATING STATE {state.id}")
-    new_state_broadcast(state.id, [f"new_state_stuff{state.id}", "farticarti"])
 
     return state
 
 
-def archive_state(info: Info, input: inputs.ArchiveStateInput) -> types.State:
+async def archive_state(info: Info, input: inputs.ArchiveStateInput) -> types.State:
+    
 
-    registry, _ = models.Registry.objects.aget_or_create(
-        app=info.context.request.app,
+    registry, _ = await models.Registry.objects.aget_or_create(
+        client=info.context.request.client,
         user=info.context.request.user,
     )
-
-    agent, _ = models.Agent.objects.aget_or_create(
+    agent, _ = await models.Agent.objects.aget_or_create(
         registry=registry,
         instance_id=input.instance_id or "default",
         defaults=dict(
@@ -86,9 +84,11 @@ def archive_state(info: Info, input: inputs.ArchiveStateInput) -> types.State:
         ),
     )
 
-    state = models.State.objects.get(state_schema_id=input.state_schema, agent=agent)
+    state = await models.State.objects.aget(
+        state_schema_id=input.state_schema, agent=agent
+    )
 
-    historical_state = models.HistoricalState.objects.create(
+    historical_state = await models.HistoricalState.objects.create(
         state=state,
         value=state.value,
     )

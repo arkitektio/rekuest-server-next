@@ -1,15 +1,18 @@
-from typing import List
-from facade import filters, models, scalars, types
+from facade import models, scalars, types
 from kante.types import Info
+from authentikate.vars import get_user, get_client
 
 
 def assignations(
     info: Info,
     instance_id: scalars.InstanceID | None = None,
 ) -> list[types.Assignation]:
+    
+    user = get_user()
+    client = get_client()
 
     registry, _ = models.Registry.objects.get_or_create(
-        app=info.context.request.app, user=info.context.request.user
+        client=client, user=user
     )
 
     waiter, _ = models.Waiter.objects.get_or_create(

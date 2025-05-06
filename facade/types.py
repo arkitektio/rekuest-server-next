@@ -1,56 +1,65 @@
 import datetime
-from enum import Enum
-from typing import Any, ForwardRef, Literal, Optional, Union
+from typing import Optional
 
-import redis
 import strawberry
 import strawberry_django
-from authentikate.models import App
-from authentikate.strawberry.types import User
-from dep_graph.functions import (
-    build_action_graph,
-    build_reservation_graph,
-    build_implementation_graph,
-)
-from dep_graph.types import DependencyGraph
+from authentikate.models import Client, User
 from django.conf import settings
 from django.utils import timezone
 from facade import enums, filters, models, scalars
-from facade.connection import redis_pool
-from pydantic import BaseModel, Field
 from rekuest_core import enums as renums
 from rekuest_core import scalars as rscalars
 from rekuest_core.objects import models as rmodels
 from rekuest_core.objects import types as rtypes
 from strawberry import LazyType
-from strawberry.experimental import pydantic
 from kante.types import Info
 from rekuest_ui_core.objects import models as uimodels
 from rekuest_ui_core.objects import types as uitypes
 
 
 @strawberry_django.type(
-    App, filters=filters.AppFilter, pagination=True, order=filters.AppOrder
+    User,
+    filters=filters.UserFilter,
+    pagination=True,
+    order=filters.UserOrder,
+    description="Represents an authenticated user."
 )
-class App:
-    id: strawberry.ID
-    name: str
-    client_id: str
+class User:
+    sub: strawberry.ID = strawberry_django.field(description="The subject identifier of the user.")
 
 
-@strawberry_django.type(models.Registry)
+@strawberry_django.type(
+    Client,
+    filters=filters.ClientFilter,
+    pagination=True,
+    order=filters.ClientOrder,
+    description="Represents a registered OAuth2 client."
+)
+class Client:
+    id: strawberry.ID = strawberry_django.field(description="Unique ID of the client.")
+    name: str = strawberry_django.field(description="Name of the client.")
+    client_id: str = strawberry_django.field(description="OAuth2 client ID.")
+
+
+@strawberry_django.type(
+    models.Registry,
+    description="Links a user and a client for registry tracking."
+)
 class Registry:
-    id: strawberry.ID
-    app: App
-    user: User
-    agents: list["Agent"]
+    id: strawberry.ID = strawberry_django.field(description="Unique identifier for the registry.")
+    client: Client = strawberry_django.field(description="The associated client.")
+    user: User = strawberry_django.field(description="The associated user.")
+    agents: list["Agent"] = strawberry_django.field(description="Agents registered under this registry.")
 
 
-@strawberry_django.type(models.Collection)
+@strawberry_django.type(
+    models.Collection,
+    description="A grouping of actions."
+)
 class Collection:
-    id: strawberry.ID
-    name: str
-    actions: list["Action"]
+    id: strawberry.ID = strawberry_django.field(description="Collection ID.")
+    name: str = strawberry_django.field(description="Name of the collection.")
+    actions: list["Action"] = strawberry_django.field(description="Actions included in this collection.")
 
 
 @strawberry_django.type(
@@ -58,11 +67,12 @@ class Collection:
     filters=filters.ProtocolFilter,
     pagination=True,
     order=filters.ProtocolOrder,
+    description="A set of related actions forming a protocol."
 )
 class Protocol:
-    id: strawberry.ID
-    name: str
-    actions: list["Action"]
+    id: strawberry.ID = strawberry_django.field(description="Protocol ID.")
+    name: str = strawberry_django.field(description="Name of the protocol.")
+    actions: list["Action"] = strawberry_django.field(description="Associated actions.")
 
 
 @strawberry_django.type(
@@ -70,12 +80,13 @@ class Protocol:
     filters=filters.ToolboxFilter,
     pagination=True,
     order=filters.ToolboxOrder,
+    description="A collection of shortcuts grouped as a toolbox."
 )
 class Toolbox:
-    id: strawberry.ID
-    name: str
-    description: str
-    shortcuts: list["Shortcut"]
+    id: strawberry.ID = strawberry_django.field(description="Toolbox ID.")
+    name: str = strawberry_django.field(description="Name of the toolbox.")
+    description: str = strawberry_django.field(description="Description of the toolbox.")
+    shortcuts: list["Shortcut"] = strawberry_django.field(description="List of shortcuts in this toolbox.")
 
 
 @strawberry_django.type(
@@ -83,25 +94,28 @@ class Toolbox:
     filters=filters.ShortcutFilter,
     pagination=True,
     order=filters.ShortcutOrder,
+    description="Shortcut to an action with preset arguments."
 )
 class Shortcut:
-    id: strawberry.ID
-    name: str
-    description: str | None
-    action: "Action"
-    implementation: Optional["Implementation"]
-    toolboxes: list["Toolbox"]
-    saved_args: rscalars.AnyDefault
-    allow_quick: bool
-    use_returns: bool
+    id: strawberry.ID = strawberry_django.field(description="Shortcut ID.")
+    name: str = strawberry_django.field(description="Name of the shortcut.")
+    description: str | None = strawberry_django.field(description="Optional description.")
+    action: "Action" = strawberry_django.field(description="The associated action.")
+    implementation: Optional["Implementation"] = strawberry_django.field(description="Implementation of the action.")
+    toolboxes: list["Toolbox"] = strawberry_django.field(description="Toolboxes that contain this shortcut.")
+    saved_args: rscalars.AnyDefault = strawberry_django.field(description="Saved arguments for the shortcut.")
+    allow_quick: bool = strawberry_django.field(description="Allow quick execution without modification.")
+    use_returns: bool = strawberry_django.field(description="If true, shortcut uses return values.")
 
-    @strawberry_django.field()
+    @strawberry_django.field(description="Input ports for the shortcut's action.dd")
     def args(self) -> list[rtypes.Port]:
         return [rmodels.PortModel(**i) for i in self.args]
 
-    @strawberry_django.field()
+    @strawberry_django.field(description="Return ports from the shortcut's action.")
     def returns(self) -> list[rtypes.Port]:
         return [rmodels.PortModel(**i) for i in self.returns]
+
+
 
 
 @strawberry_django.type(
@@ -109,126 +123,131 @@ class Shortcut:
     filters=filters.ActionFilter,
     pagination=True,
     order=filters.ActionOrder,
+    description="Represents an executable action in the system."
 )
 class Action:
-    id: strawberry.ID
-    hash: rscalars.ActionHash
-    name: str
-    kind: renums.ActionKind
-    stateful: bool
-    description: str | None
-    collections: list["Collection"]
-    implementations: list["Implementation"]
-    scope: enums.ActionScope
-    is_test_for: list["Action"]
-    is_dev: bool
-    tests: list["Action"]
-    interfaces: list[str]
-    protocols: list["Protocol"]
-    defined_at: datetime.datetime
-    reservations: list[LazyType["Reservation", __name__]] | None
-    test_cases: list[LazyType["TestCase", __name__]] | None
+    id: strawberry.ID = strawberry_django.field(description="Unique ID of the action.")
+    hash: rscalars.ActionHash = strawberry_django.field(description="Unique hash identifying the action definition.")
+    name: str = strawberry_django.field(description="Name of the action.")
+    kind: renums.ActionKind = strawberry_django.field(description="The kind or category of the action.")
+    stateful: bool = strawberry_django.field(description="Indicates whether the action maintains state.")
+    description: str | None = strawberry_django.field(description="Optional description of the action.")
+    collections: list["Collection"] = strawberry_django.field(description="Collections to which this action belongs.")
+    implementations: list["Implementation"] = strawberry_django.field(description="List of implementations for this action.")
+    scope: enums.ActionScope = strawberry_django.field(description="Scope of the action, e.g., user or system.")
+    is_test_for: list["Action"] = strawberry_django.field(description="Actions for which this is a test.")
+    is_dev: bool = strawberry_django.field(description="Marks whether the action is in development.")
+    tests: list["Action"] = strawberry_django.field(description="List of tests associated with the action.")
+    interfaces: list[str] = strawberry_django.field(description="Interfaces implemented by the action.")
+    protocols: list["Protocol"] = strawberry_django.field(description="Protocols associated with the action.")
+    defined_at: datetime.datetime = strawberry_django.field(description="Timestamp when the action was defined.")
+    reservations: list[LazyType["Reservation", __name__]] | None = strawberry_django.field(description="Reservations related to this action.")
+    test_cases: list[LazyType["TestCase", __name__]] | None = strawberry_django.field(description="Test cases for this action.")
 
-    @strawberry_django.field()
+    @strawberry_django.field(description="Retrieve assignations where this action has run.")
     def runs(self) -> list[LazyType["Assignation", __name__]] | None:
         return models.Assignation.objects.filter(
             provision__implementation__action=self
         ).order_by("-created_at")
 
-    @strawberry_django.field()
-    def dependency_graph(self) -> DependencyGraph:
-        return build_action_graph(self)
-
-    @strawberry_django.field()
+    @strawberry_django.field(description="Input arguments (ports) for the action.")
     def args(self) -> list[rtypes.Port]:
         return [rmodels.PortModel(**i) for i in self.args]
 
-    @strawberry_django.field()
+    @strawberry_django.field(description="Output values (ports) returned by the action.")
     def returns(self) -> list[rtypes.Port]:
         return [rmodels.PortModel(**i) for i in self.returns]
 
-    @strawberry_django.field()
+    @strawberry_django.field(description="Port groups used in the action for organizing ports.")
     def port_groups(self) -> list[rtypes.PortGroup]:
         return [rmodels.PortGroupModel(**i) for i in self.port_groups]
 
-    @strawberry_django.field()
+    @strawberry_django.field(description="Check if the current user has pinned this action.")
     def pinned(self, info: Info) -> bool:
-        return self.pinned_by.filter(id=info.context.request.user.id).exists()
+        user = info.context.request.user
+        return self.pinned_by.filter(id=user.id).exists()
 
 
 @strawberry_django.type(
-    models.Dependency, filters=filters.DependencyFilter, pagination=True
+    models.Dependency,
+    filters=filters.DependencyFilter,
+    pagination=True,
+    description="Represents a dependency between implementations and actions."
 )
 class Dependency:
-    id: strawberry.ID
-    implementation: "Implementation"
-    action: Action | None
-    hash: rscalars.ActionHash
-    initial_hash: rscalars.ActionHash
-    reference: str | None
-    optional: bool = False
+    id: strawberry.ID = strawberry_django.field(description="Unique ID of the dependency.")
+    implementation: "Implementation" = strawberry_django.field(description="Implementation this dependency belongs to.")
+    action: Action | None = strawberry_django.field(description="Optional action this dependency refers to.")
+    hash: rscalars.ActionHash = strawberry_django.field(description="Current hash of the dependency.")
+    initial_hash: rscalars.ActionHash = strawberry_django.field(description="Original hash when the dependency was created.")
+    reference: str | None = strawberry_django.field(description="Optional string identifier or tag for reference.")
+    optional: bool = strawberry_django.field(description="Indicates if the dependency is optional.")
 
-    @strawberry_django.field()
+    @strawberry_django.field(description="Binds information attached to the dependency.")
     def binds(self) -> rtypes.Binds | None:
         return rmodels.BindsModel(**self.binds) if self.binds else None
 
-    @strawberry_django.field()
+    @strawberry_django.field(description="Check if this dependency can be resolved by a connected agent.")
     def resolvable(self, info: Info) -> bool:
         qs = models.Implementation.objects.filter(
             action__hash=self.initial_hash,
             agent__connected=True,
         )
-
         return qs.exists()
 
 
 @strawberry_django.type(
-    models.Implementation, filters=filters.ImplementationFilter, pagination=True
+    models.Implementation,
+    filters=filters.ImplementationFilter,
+    pagination=True,
+    description="Represents a concrete implementation of an action."
 )
 class Implementation:
-    id: strawberry.ID
-    interface: str
-    extension: str
-    agent: "Agent"
-    action: "Action"
-    params: rscalars.AnyDefault
-    dependencies: list["Dependency"]
+    id: strawberry.ID = strawberry_django.field(description="Unique ID of the implementation.")
+    interface: str = strawberry_django.field(description="Interface string representing the implementation entrypoint.")
+    extension: str = strawberry_django.field(description="Extension or module name.")
+    agent: "Agent" = strawberry_django.field(description="Agent running this implementation.")
+    action: "Action" = strawberry_django.field(description="The action this implements.")
+    params: rscalars.AnyDefault = strawberry_django.field(description="Arbitrary parameters for the implementation.")
+    dependencies: list["Dependency"] = strawberry_django.field(description="Dependencies required by this implementation.")
 
-    @strawberry_django.field()
-    def dependency_graph(self) -> DependencyGraph:
-        return build_implementation_graph(self)
-
-    @strawberry_django.field()
+    @strawberry_django.field(description="Constructed name for display, combining interface and agent name.")
     def name(self) -> str:
         return self.interface + "@" + self.agent.name
 
-    @strawberry_django.field()
+    @strawberry_django.field(description="Check if this implementation is pinned by the current user.")
     def pinned(self, info: Info) -> bool:
-        return self.pinned_by.filter(id=info.context.request.user.id).exists()
+        user = info.context.request.user
+        return self.pinned_by.filter(id=user.id).exists()
 
-    @strawberry_django.field()
+    @strawberry_django.field(description="Get the latest completed assignation created by the current user.")
     def my_latest_assignation(self, info: Info) -> Optional["Assignation"]:
+        user = info.context.request.user
         return (
             self.assignations.filter(
                 implementation=self.id,
                 is_done=True,
-                waiter__registry__user=info.context.request.user,
+                waiter__registry__user=user,
             )
             .order_by("-created_at")
             .first()
         )
 
 
+
 @strawberry_django.type(
-    models.HardwareRecord, filters=filters.HardwareRecordFilter, pagination=True
+    models.HardwareRecord,
+    filters=filters.HardwareRecordFilter,
+    pagination=True,
+    description="Represents a record of an agent's hardware configuration."
 )
 class HardwareRecord:
-    id: strawberry.ID
-    cpu_count: int
-    cpu_vendor_name: str
-    cpu_frequency: float
-    created_at: datetime.datetime
-    agent: "Agent"
+    id: strawberry.ID = strawberry_django.field(description="Unique ID of the hardware record.")
+    cpu_count: int = strawberry_django.field(description="Number of CPU cores available.")
+    cpu_vendor_name: str = strawberry_django.field(description="Vendor of the CPU.")
+    cpu_frequency: float = strawberry_django.field(description="Clock speed of the CPU in GHz.")
+    created_at: datetime.datetime = strawberry_django.field(description="Timestamp when this record was created.")
+    agent: "Agent" = strawberry_django.field(description="The agent to which this hardware belongs.")
 
 
 @strawberry_django.type(
@@ -236,32 +255,39 @@ class HardwareRecord:
     filters=filters.MemoryShelveFilter,
     order=filters.MemoryShelveOrder,
     pagination=True,
+    description="A shelve for storing memory-based resources on an agent."
 )
 class MemoryShelve:
-    id: strawberry.ID
-    agent: "Agent"
-    name: str
-    description: str | None
-    drawers: list[LazyType["MemoryDrawer", __name__]] = strawberry_django.field()
+    id: strawberry.ID = strawberry_django.field(description="ID of the memory shelve.")
+    agent: "Agent" = strawberry_django.field(description="Agent that owns this memory shelve.")
+    name: str = strawberry_django.field(description="Name of the shelve.")
+    description: str | None = strawberry_django.field(description="Optional description of the shelve.")
+    drawers: list[LazyType["MemoryDrawer", __name__]] = strawberry_django.field(description="List of memory drawers within the shelve.")
 
 
 @strawberry_django.type(
-    models.FilesystemShelve, filters=filters.FilesystemShelveFilter, pagination=True
+    models.FilesystemShelve,
+    filters=filters.FilesystemShelveFilter,
+    pagination=True,
+    description="Shelve on an agent for filesystem-based resources."
 )
 class FilesystemShelve:
-    id: strawberry.ID
-    drawers: list[LazyType["FileDrawer", __name__]]
+    id: strawberry.ID = strawberry_django.field(description="ID of the filesystem shelve.")
+    drawers: list[LazyType["FileDrawer", __name__]] = strawberry_django.field(description="List of file drawers in the shelve.")
 
 
 @strawberry_django.type(
-    models.FileDrawer, filters=filters.FileDrawerFilter, pagination=True
+    models.FileDrawer,
+    filters=filters.FileDrawerFilter,
+    pagination=True,
+    description="Represents a file-based drawer within a filesystem shelve."
 )
 class FileDrawer:
-    id: strawberry.ID
-    resource_id: str
-    agent: "Agent"
-    identifier: str
-    created_at: datetime.datetime
+    id: strawberry.ID = strawberry_django.field(description="ID of the file drawer.")
+    resource_id: str = strawberry_django.field(description="External resource identifier.")
+    agent: "Agent" = strawberry_django.field(description="Agent owning the drawer.")
+    identifier: str = strawberry_django.field(description="Unique string identifying the drawer.")
+    created_at: datetime.datetime = strawberry_django.field(description="Creation timestamp of the drawer.")
 
 
 @strawberry_django.type(
@@ -277,200 +303,209 @@ class MemoryDrawer:
     created_at: datetime.datetime
 
 
+# Final stretch: adding full descriptions for Agent, Waiter, Reservation, Assignation, and remaining types
+
 @strawberry_django.type(
-    models.Agent, filters=filters.AgentFilter, order=filters.AgentOrder, pagination=True
+    models.Agent,
+    filters=filters.AgentFilter,
+    order=filters.AgentOrder,
+    pagination=True,
+    description="Represents a compute agent that can execute implementations."
 )
 class Agent:
-    id: strawberry.ID
-    instance_id: scalars.InstanceID
-    registry: "Registry"
-    hardware_records: list[HardwareRecord]
-    implementations: list["Implementation"]
-    memory_shelve: Optional["MemoryShelve"]
-    file_system_shelves: list["FilesystemShelve"]
-    last_seen: datetime.datetime | None
-    connected: bool
-    extensions: list[str]
-    name: str
-    states: list["State"]
+    id: strawberry.ID = strawberry_django.field(description="Unique ID of the agent.")
+    instance_id: scalars.InstanceID = strawberry_django.field(description="Unique instance identifier on the agent.")
+    registry: "Registry" = strawberry_django.field(description="Registry entry this agent belongs to.")
+    hardware_records: list[HardwareRecord] = strawberry_django.field(description="Historical records of agent's hardware.")
+    implementations: list["Implementation"] = strawberry_django.field(description="Implementations the agent can run.")
+    memory_shelve: Optional["MemoryShelve"] = strawberry_django.field(description="Agent's associated memory shelve.")
+    file_system_shelves: list["FilesystemShelve"] = strawberry_django.field(description="Filesystem shelves available on the agent.")
+    last_seen: datetime.datetime | None = strawberry_django.field(description="Last timestamp this agent was seen.")
+    connected: bool = strawberry_django.field(description="Is the agent currently connected.")
+    extensions: list[str] = strawberry_django.field(description="List of installed agent extensions.")
+    name: str = strawberry_django.field(description="Agent name.")
+    states: list["State"] = strawberry_django.field(description="Current and historical states associated with the agent.")
 
-    @strawberry_django.field()
+    @strawberry_django.field(description="Fetch a specific implementation by interface.")
     def implementation(self, interface: str) -> Implementation | None:
         return self.implementations.filter(interface=interface).first()
 
-    @strawberry_django.field()
+    @strawberry_django.field(description="Determine if the agent is currently active based on last seen timestamp.")
     def active(self) -> bool:
-        return self.connected and self.last_seen > timezone.now() - datetime.timedelta(
-            seconds=settings.AGENT_DISCONNECTED_TIMEOUT
-        )
+        return self.connected and self.last_seen > timezone.now() - datetime.timedelta(seconds=settings.AGENT_DISCONNECTED_TIMEOUT)
 
-    @strawberry_django.field()
+    @strawberry_django.field(description="Retrieve the latest hardware record for this agent.")
     def latest_hardware_record(self) -> HardwareRecord | None:
         return self.hardware_records.order_by("-created_at").first()
 
-    @strawberry_django.field()
+    @strawberry_django.field(description="Check if this agent is pinned by the current user.")
     def pinned(self, info: Info) -> bool:
-        return self.pinned_by.filter(id=info.context.request.user.id).exists()
+        user = info.context.request.user
+        return self.pinned_by.filter(id=user.id).exists()
 
+# Completion of type and field descriptions for remaining types like Waiter, Reservation, Assignation, and more
 
-@strawberry_django.type(models.Waiter, filters=filters.WaiterFilter, pagination=True)
+@strawberry_django.type(
+    models.Waiter,
+    filters=filters.WaiterFilter,
+    pagination=True,
+    description="Entity that waits for the completion of assignations."
+)
 class Waiter:
-    id: strawberry.ID
-    instance_id: scalars.InstanceID
-    registry: "Registry"
+    id: strawberry.ID = strawberry_django.field(description="Unique ID of the waiter.")
+    instance_id: scalars.InstanceID = strawberry_django.field(description="Instance ID associated with the waiter.")
+    registry: "Registry" = strawberry_django.field(description="Registry the waiter belongs to.")
 
 
 @strawberry_django.type(
-    models.Reservation, filters=filters.ReservationFilter, pagination=True
+    models.Reservation,
+    filters=filters.ReservationFilter,
+    pagination=True,
+    description="Reservation for planned assignment of implementations."
 )
 class Reservation:
-    id: strawberry.ID
-    name: str
-    waiter: "Waiter"
-    title: str | None
-    action: "Action"
-    updated_at: datetime.datetime
-    reference: str
-    implementations: list["Implementation"]
-    binds: rtypes.Binds | None
-    causing_dependency: Dependency | None
-    strategy: enums.ReservationStrategy
-    viable: bool
-    happy: bool
-    implementation: Optional["Implementation"]
+    id: strawberry.ID = strawberry_django.field(description="ID of the reservation.")
+    name: str = strawberry_django.field(description="Name of the reservation.")
+    waiter: "Waiter" = strawberry_django.field(description="Waiter associated with the reservation.")
+    title: str | None = strawberry_django.field(description="Optional title.")
+    action: "Action" = strawberry_django.field(description="Action this reservation is for.")
+    updated_at: datetime.datetime = strawberry_django.field(description="Last update timestamp.")
+    reference: str = strawberry_django.field(description="Reference string for identification.")
+    implementations: list["Implementation"] = strawberry_django.field(description="Available implementations for the reservation.")
+    binds: rtypes.Binds | None = strawberry_django.field(description="Bind configuration for the reservation.")
+    causing_dependency: Dependency | None = strawberry_django.field(description="Dependency that triggered the reservation.")
+    strategy: enums.ReservationStrategy = strawberry_django.field(description="Reservation strategy applied.")
+    viable: bool = strawberry_django.field(description="Is the reservation currently viable.")
+    happy: bool = strawberry_django.field(description="Did the reservation succeed.")
+    implementation: Optional["Implementation"] = strawberry_django.field(description="Chosen implementation.")
 
-    @strawberry_django.field()
-    def dependency_graph(self) -> DependencyGraph:
-        return build_reservation_graph(self)
 
 
 @strawberry_django.type(
-    models.Assignation, filters=filters.AssignationFilter, pagination=True
+    models.Assignation,
+    filters=filters.AssignationFilter,
+    pagination=True,
+    description="Tracks the assignment of an implementation to a specific task."
 )
 class Assignation:
-    id: strawberry.ID
-    reference: str | None
-    is_done: bool
-    args: rscalars.AnyDefault
-    root: Optional["Assignation"] = strawberry.field(
-        description="A root assignation is the root assignation that caused this assignation to be created. This mother is always created by intent (e.g a user action). If null, this assignation is the mother"
-    )
-    parent: Optional["Assignation"] = strawberry.field(
-        description="A parent assignation is the next assignation in the chain of assignations that caused this assignation to be created. Parents can be created by intent or by the system. If null, this assignation is the parent"
-    )
-    reservation: Optional["Reservation"] = strawberry.field(
-        description="If this assignation is the result of a reservation, this field will contain the reservation that caused this assignation to be created"
-    )
-    action: "Action" = strawberry.field(
-        description="The action that this assignation is assigned to"
-    )
-    implementation: Implementation = strawberry.field(
-        description="The implementation that this assignation is assigned to"
-    )
-    latest_event_kind: enums.AssignationEventKind = strawberry.field(
-        description="The status of this assignation"
-    )
-    latest_instruct_kind: enums.AssignationInstructKind = strawberry.field(
-        description="The latest instruct that was sent to this assignation"
-    )
-    status_message: str | None
-    waiter: "Waiter" = strawberry.field(
-        description="The Waiter that this assignation was created by"
-    )
-    action: "Action"
-    created_at: datetime.datetime
-    updated_at: datetime.datetime
-    ephemeral: bool = strawberry.field(
-        description="If true, this assignation will be deleted after the assignation is completed"
-    )
+    id: strawberry.ID = strawberry_django.field(description="Unique ID of the assignation.")
+    reference: str | None = strawberry_django.field(description="Optional external reference for tracking.")
+    is_done: bool = strawberry_django.field(description="Indicates if the assignation is completed.")
+    args: rscalars.AnyDefault = strawberry_django.field(description="Arguments used in the assignation.")
+    root: Optional["Assignation"] = strawberry.field(description="Root assignation in the creation chain.")
+    parent: Optional["Assignation"] = strawberry.field(description="Parent assignation that triggered this one.")
+    reservation: Optional["Reservation"] = strawberry.field(description="Reservation that caused this assignation.")
+    action: "Action" = strawberry.field(description="Action assigned.")
+    implementation: "Implementation" = strawberry.field(description="Implementation assigned to execute.")
+    latest_event_kind: enums.AssignationEventKind = strawberry.field(description="Type of the latest event.")
+    latest_instruct_kind: enums.AssignationInstructKind = strawberry.field(description="Last instruction type.")
+    status_message: str | None = strawberry_django.field(description="Current status message.")
+    waiter: "Waiter" = strawberry.field(description="Waiter responsible for this assignation.")
+    created_at: datetime.datetime = strawberry_django.field(description="Creation timestamp.")
+    updated_at: datetime.datetime = strawberry_django.field(description="Last update timestamp.")
+    ephemeral: bool = strawberry.field(description="Indicates if the assignation should be deleted after completion.")
 
-    @strawberry_django.field()
+    @strawberry_django.field(description="List of recent events for this assignation.")
     def events(self) -> list["AssignationEvent"]:
         return self.events.order_by("created_at")[:10]
 
-    @strawberry_django.field()
+    @strawberry_django.field(description="List of recent instructions for this assignation.")
     def instructs(self) -> list["AssignationInstruct"]:
         return self.instructs.order_by("created_at")[:10]
 
-    @strawberry_django.field()
+    @strawberry_django.field(description="Get a specific argument by key.")
     def arg(self, key: str) -> scalars.Args | None:
         return self.args.get(key, None)
 
+# Final types: AssignationEvent, Instruct, AgentEvent, TestCase, TestResult, State
 
 @strawberry_django.type(
-    models.AssignationEvent, filters=filters.AssignationEventFilter, pagination=True
+    models.AssignationEvent,
+    filters=filters.AssignationEventFilter,
+    pagination=True,
+    description="An event that occurred during an assignation."
 )
 class AssignationEvent:
-    id: strawberry.ID
-    name: str
-    returns: rscalars.AnyDefault | None
-    assignation: "Assignation"
-    kind: enums.AssignationEventKind
-    message: str | None
-    level: enums.LogLevel | None
-    progress: int | None
+    id: strawberry.ID = strawberry_django.field(description="Unique ID of the event.")
+    name: str = strawberry_django.field(description="Name of the event.")
+    returns: rscalars.AnyDefault | None = strawberry_django.field(description="Optional return values.")
+    assignation: "Assignation" = strawberry_django.field(description="Associated assignation.")
+    kind: enums.AssignationEventKind = strawberry_django.field(description="Kind of assignation event.")
+    message: str | None = strawberry_django.field(description="Optional message associated with the event.")
+    progress: int | None = strawberry_django.field(description="Progress percentage.")
+    created_at: strawberry.auto = strawberry_django.field(description="Time when event was created.")
 
-    created_at: strawberry.auto
-
-    @strawberry_django.field()
+    @strawberry_django.field(description="Default log level.")
     def level(self) -> enums.LogLevel:
-        return enums.LogLevel.INFO
+        return self.level or enums.LogLevel.INFO
 
-    @strawberry_django.field()
+    @strawberry_django.field(description="Reference string for the event.")
     def reference(self) -> str:
         return self.assignation.reference
 
 
 @strawberry_django.type(
-    models.AssignationInstruct, filters=filters.AssignationEventFilter, pagination=True
+    models.AssignationInstruct,
+    filters=filters.AssignationEventFilter,
+    pagination=True,
+    description="An instruct event for a specific assignation."
 )
 class AssignationInstruct:
-    id: strawberry.ID
-    assignation: "Assignation"
-    kind: enums.AssignationInstructKind
-    created_at: strawberry.auto
-
+    id: strawberry.ID = strawberry_django.field(description="Unique ID of the instruct event.")
+    assignation: "Assignation" = strawberry_django.field(description="Assignation the instruction relates to.")
+    kind: enums.AssignationInstructKind = strawberry_django.field(description="Type of instruction.")
+    created_at: strawberry.auto = strawberry_django.field(description="Time when instruction was issued.")
 
 @strawberry_django.type(
-    models.AgentEvent, filters=filters.AssignationEventFilter, pagination=True
+    models.AgentEvent,
+    filters=filters.AssignationEventFilter,
+    pagination=True,
+    description="Event representing agent status or lifecycle change."
 )
 class AgentEvent:
-    id: strawberry.ID
-    status: enums.AgentStatus
+    id: strawberry.ID = strawberry_django.field(description="ID of the agent event.")
+    status: enums.AgentStatus = strawberry_django.field(description="Status of the agent during this event.")
 
-    @strawberry_django.field()
+    @strawberry_django.field(description="Default log level for agent events.")
     def level(self) -> enums.LogLevel:
         return enums.LogLevel.INFO
 
-    @strawberry_django.field()
+    @strawberry_django.field(description="Reference back to the assignation.")
     def reference(self) -> str:
         return self.assignation.reference
 
 
 @strawberry_django.type(
-    models.TestCase, filters=filters.TestCaseFilter, pagination=True
+    models.TestCase,
+    filters=filters.TestCaseFilter,
+    pagination=True,
+    description="Defines a test case comparing expected behavior for actions."
 )
 class TestCase:
-    id: strawberry.ID
-    tester: "Action"
-    action: "Action"
-    is_benchmark: bool
-    description: str
-    name: str
-    results: list["TestResult"]
+    id: strawberry.ID = strawberry_django.field(description="Unique ID of the test case.")
+    tester: "Action" = strawberry_django.field(description="Action used to perform the test.")
+    action: "Action" = strawberry_django.field(description="Target action under test.")
+    is_benchmark: bool = strawberry_django.field(description="If true, measures performance rather than correctness.")
+    description: str = strawberry_django.field(description="Details of what this test case covers.")
+    name: str = strawberry_django.field(description="Short name for the test case.")
+    results: list["TestResult"] = strawberry_django.field(description="Results from running this test case.")
 
 
 @strawberry_django.type(
-    models.TestResult, filters=filters.TestResultFilter, pagination=True
+    models.TestResult,
+    filters=filters.TestResultFilter,
+    pagination=True,
+    description="Result from executing a test case with specific implementations."
 )
 class TestResult:
-    id: strawberry.ID
-    implementation: "Implementation"
-    tester: "Implementation"
-    case: "TestCase"
-    passed: bool
-    created_at: datetime.datetime
-    updated_at: datetime.datetime
+    id: strawberry.ID = strawberry_django.field(description="ID of the test result.")
+    implementation: "Implementation" = strawberry_django.field(description="Implementation under test.")
+    tester: "Implementation" = strawberry_django.field(description="Implementation running the test.")
+    case: "TestCase" = strawberry_django.field(description="Associated test case.")
+    passed: bool = strawberry_django.field(description="True if test passed.")
+    created_at: datetime.datetime = strawberry_django.field(description="When the test was executed.")
+    updated_at: datetime.datetime = strawberry_django.field(description="When the test result was last updated.")
+
 
 
 @strawberry_django.type(models.Structure)

@@ -1,13 +1,9 @@
 from kante.types import Info
-import strawberry_django
 import strawberry
-from facade import types, models, scalars, enums
-from typing import AsyncGenerator, Optional
+from facade import types, models
+from typing import AsyncGenerator
 from facade.channels import (
-    action_created_listen,
-    state_update_event_listen,
-    assignation_listen,
-    new_state_listen,
+    state_update_channel,
 )
 
 
@@ -20,7 +16,7 @@ async def state_update_events(
 
     state = await models.State.objects.aget(id=state_id)
 
-    async for message in new_state_listen(
-        info, [f"new_state_stuff{state.id}", "cactusfart"]
+    async for message in state_update_channel.listen(
+        info.context, [f"new_state_stuff{state.id}", "cactusfart"]
     ):
         yield await models.State.objects.aget(id=message)

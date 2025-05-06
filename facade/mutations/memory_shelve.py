@@ -1,9 +1,8 @@
 from kante.types import Info
-import strawberry_django
 import strawberry
 from facade import types, models, scalars
-import logging
 from rekuest_core import scalars as rscalars
+from authentikate.vars import get_user, get_client
 
 
 @strawberry.input
@@ -28,10 +27,8 @@ class ShelveInMemoryDrawerInput:
 def shelve_in_memory_drawer(
     info: Info, input: ShelveInMemoryDrawerInput
 ) -> types.MemoryDrawer:
-    registry, _ = models.Registry.objects.update_or_create(
-        app=info.context.request.app,
-        user=info.context.request.user,
-    )
+
+    registry, _ = models.Registry.objects.update_or_create(client=info.context.request.client, user=info.context.request.user)
 
     agent, _ = models.Agent.objects.update_or_create(
         registry=registry,
@@ -65,9 +62,12 @@ class UnshelveMemoryDrawerInput:
 def unshelve_memory_drawer(
     info: Info, input: UnshelveMemoryDrawerInput
 ) -> strawberry.ID:
+    user = get_user()
+    client = get_client()
+
     registry, _ = models.Registry.objects.update_or_create(
-        app=info.context.request.app,
-        user=info.context.request.user,
+        client=client,
+        user=user,
     )
 
     agent, _ = models.Agent.objects.update_or_create(

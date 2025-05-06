@@ -1,5 +1,4 @@
 from kante.types import Info
-import strawberry_django
 import strawberry
 from facade.persist_backend import persist_backend
 

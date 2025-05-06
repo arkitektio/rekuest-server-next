@@ -1,10 +1,8 @@
 from kante.types import Info
-import strawberry_django
 import strawberry
 from facade import types, models
 from typing import AsyncGenerator
-from facade.channels import agent_updated_listen
-
+from facade.channels import agent_updated_channel
 
 @strawberry.type
 class AgentChangeEvent:
@@ -19,15 +17,17 @@ async def agents(
 ) -> AsyncGenerator[AgentChangeEvent, None]:
     """Join and subscribe to message sent to the given rooms."""
     
-    print("Agent subscription", [f"agents_for_{info.context.request.user.id}"])
+    user = info.context.request.user
 
-    async for message in agent_updated_listen(info, [f"agents_for_{info.context.request.user.id}"]):
+    print("Agent subscription", [f"agents_for_{user.id}"])
+
+    async for message in agent_updated_channel.listen(info.context, [f"agents_for_{user.id}"]):
         print("Message received", message)
-        if message["type"] == "create":
-            yield AgentChangeEvent(create=await models.Agent.objects.aget(id=message["id"]))
-        elif message["type"] == "update":
-            yield AgentChangeEvent(update=await models.Agent.objects.aget(id=message["id"]))
-        elif message["type"] == "delete":
-            yield AgentChangeEvent(delete=message["id"])
+        if message.create:
+            yield AgentChangeEvent(create=await models.Agent.objects.aget(id=message.create))
+        elif message.update:
+            yield AgentChangeEvent(update=await models.Agent.objects.aget(id=message.update))
+        elif message.delete:
+            yield AgentChangeEvent(delete=message.delete)
         else:
             raise ValueError("Unknown message type")

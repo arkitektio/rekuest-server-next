@@ -1,8 +1,7 @@
 from typing import Any, Optional
 from rekuest_core import enums
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
-from strawberry import LazyType
 
 
 class BindsInputModel(BaseModel):
@@ -85,7 +84,7 @@ class PortInputModel(BaseModel):
     assign_widget: Optional["AssignWidgetInputModel"] = None
     return_widget: Optional["ReturnWidgetInputModel"] = None
 
-    @root_validator
+    @model_validator(mode="after")
     def check_children_for_port(cls, values) -> Self:
         kind = values.get("kind")
         children = values.get("children")
@@ -139,4 +138,4 @@ class ImplementationInputModel(BaseModel):
     logo: str | None = None
 
 
-AssignWidgetInputModel.update_forward_refs()
+AssignWidgetInputModel.model_rebuild()

@@ -1,13 +1,8 @@
-import hashlib
-import json
 import logging
 
-import strawberry
-import strawberry_django
-from facade import enums, inputs, models, scalars, types
-from facade.protocol import infer_protocols
-from facade.utils import hash_input
+from facade import models, scalars, types
 from kante.types import Info
+from authentikate.vars import get_user, get_client
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +11,11 @@ def myreservations(
     info: Info,
     instance_id: scalars.InstanceID | None = None,
 ) -> types.Action:
+    user = get_user()
+    client = get_client()
     registry, _ = models.Registry.objects.get_or_create(
-        app=info.context.request.app, user=info.context.request.user
+        client=client,
+        user=user,
     )
 
     waiter, _ = models.Waiter.objects.get_or_create(
@@ -31,8 +29,11 @@ def reservations(
     info: Info,
     instance_id: scalars.InstanceID | None = None,
 ) -> list[types.Reservation]:
+    user = get_user()
+    client = get_client()
     registry, _ = models.Registry.objects.get_or_create(
-        app=info.context.request.app, user=info.context.request.user
+        client=client,
+        user=user,
     )
 
     waiter, _ = models.Waiter.objects.get_or_create(

@@ -3,13 +3,12 @@ import json
 import logging
 
 import strawberry
-import strawberry_django
-from facade import enums, inputs, models, scalars, types
+from facade import inputs, models, types
 from facade.protocol import infer_protocols
 from facade.unique import assert_non_statefullness, infer_action_scope
 from kante.types import Info
 from rekuest_core.inputs.models import DefinitionInputModel, ImplementationInputModel
-
+from authentikate.vars import get_user, get_client
 logger = logging.getLogger(__name__)
 
 
@@ -154,9 +153,13 @@ def _create_implementation(
 def create_implementation(
     info: Info, input: inputs.CreateImplementationInput
 ) -> types.Implementation:
+    user = get_user()
+    client = get_client()
+    
+    
     registry, _ = models.Registry.objects.update_or_create(
-        app=info.context.request.app,
-        user=info.context.request.user,
+        client=client,
+        user=user,
     )
 
     agent, _ = models.Agent.objects.update_or_create(
@@ -193,9 +196,14 @@ def delete_implementation(info: Info, input: inputs.DeleteImplementationInput) -
 def set_extension_implementations(
     info: Info, input: inputs.SetExtensionImplementationsInput
 ) -> list[types.Implementation]:
+    
+    user = get_user()
+    client = get_client()
+    
+    
     registry, _ = models.Registry.objects.update_or_create(
-        app=info.context.request.app,
-        user=info.context.request.user,
+        client=client,
+        user=user,
     )
 
     agent, _ = models.Agent.objects.get_or_create(
@@ -229,10 +237,14 @@ def set_extension_implementations(
 
 
 def pin_implementation(info, input: inputs.PinInput) -> types.Implementation:
+    
+    user = get_user()
+    
+    
     agent = models.Implementation.objects.get(id=input.id)
     if input.pin:
-        agent.pinned_by.add(info.context.request.user)
+        agent.pinned_by.add(user)
     else:
-        agent.pinned_by.remove(info.context.request.user)
+        agent.pinned_by.remove(user)
     agent.save()
     return agent

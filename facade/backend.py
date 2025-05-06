@@ -5,6 +5,7 @@ from typing import Protocol
 from facade import enums, inputs, models, types, messages
 from facade.consumers.async_consumer import AgentConsumer
 from kante.types import Info
+from authentikate.vars import get_user, get_client
 import logging
 
 
@@ -36,9 +37,10 @@ class ControllBackend(Protocol):
 
 def get_waiter_for_context(info: Info, instance_id: str) -> None:
     # TODO: HASH THIS FOR EASIER RETRIEVAL
-    registry, _ = models.Registry.objects.get_or_create(
-        app=info.context.request.app, user=info.context.request.user
-    )
+    user = get_user()
+    client = get_client()
+
+    registry, _ = models.Registry.objects.get_or_create(client=client, user=user)
 
     waiter, _ = models.Waiter.objects.get_or_create(
         registry=registry, instance_id=instance_id, defaults=dict(name="default")
@@ -129,7 +131,7 @@ class RedisControllBackend(ControllBackend):
         AgentConsumer.broadcast(
             assignation.agent.id,
             message=messages.Cancel(
-                assignation=assignation.id,
+                assignation=str(assignation.id),
             ),
         )
         return assignation
@@ -214,12 +216,12 @@ class RedisControllBackend(ControllBackend):
         AgentConsumer.broadcast(
             assignation.agent.id,
             message=messages.Assign(
-                assignation=assignation.id,
+                assignation=str(assignation.id),
                 args=input.args,
                 reference=reference,
                 interface=implementation.interface,
                 extension=implementation.extension,
-                action=action.id,
+                action=str(action.id),
             ),
         )
         if input.hooks:

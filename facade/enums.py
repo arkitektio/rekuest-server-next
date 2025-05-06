@@ -396,13 +396,6 @@ class ReservationEventKind(str, Enum):
     LOG = "LOG"
 
 
-class LogLevelChoices(TextChoices):
-    DEBUG = "DEBUG", "DEBUG Level"
-    INFO = "INFO", "INFO Level"
-    ERROR = "ERROR", "ERROR Level"
-    WARN = "WARN", "WARN Level"
-    CRITICAL = "CRITICAL", "CRITICAL Level"
-
 
 @strawberry.enum
 class LogLevel(str, Enum):
