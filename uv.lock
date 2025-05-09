@@ -64,18 +64,18 @@ wheels = [
 
 [[package]]
 name = "authentikate"
-version = "0.9.0"
+version = "0.14.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
     { name = "django-guardian" },
+    { name = "joserfc" },
     { name = "kante" },
     { name = "pydantic" },
-    { name = "pyjwt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c4/1f/3c2da3318b23f2e6cd6946b48c30db4b8327a6eb8092c99c4b3386c8d34b/authentikate-0.9.0.tar.gz", hash = "sha256:6a1c7bafbda25f25fc56daee4055e60e3d1edc837660bce4ebc2865ce7abe087", size = 11826, upload-time = "2025-05-06T08:15:58.322Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/82/02/a2224437209f87d311ee13128a10cdedb63807bfa64697fc0e378164e425/authentikate-0.14.0.tar.gz", hash = "sha256:68c476246269293c6e589f2b98c099452efb581a41dd536909a53abbfc9a8838", size = 12795, upload-time = "2025-05-09T11:12:00.644Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/60/31/d9a9d3a4704c22bcd2655736fca1a04d31dcfd283fc499b689ba353a5319/authentikate-0.9.0-py3-none-any.whl", hash = "sha256:621497c13f136c9c9eff2492c129dae73a9a1cd1deb824816e2d2a2171fefd23", size = 14675, upload-time = "2025-05-06T08:15:57.046Z" },
+    { url = "https://files.pythonhosted.org/packages/22/a8/8b885c6f3ab9370ba02db03f3e901c5bab82064a697941931f38ec613642/authentikate-0.14.0-py3-none-any.whl", hash = "sha256:4dcdd761b8e6446b207c58a8f66836d8763914faa35a00f9ba5b3b4890ac55d5", size = 16257, upload-time = "2025-05-09T11:11:59.297Z" },
 ]
 
 [[package]]
@@ -298,6 +298,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/86/42/9e87f04fa2cd40e3016f27a4b4572290e95899c6dce317e2cdb580f3ff09/incremental-22.10.0.tar.gz", hash = "sha256:912feeb5e0f7e0188e6f42241d2f450002e11bbc0937c65865045854c24c0bd0", size = 18305, upload-time = "2022-10-15T07:42:04.02Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/77/51/8073577012492fcd15628e811db585f447c500fa407e944ab3a18ec55fb7/incremental-22.10.0-py2.py3-none-any.whl", hash = "sha256:b864a1f30885ee72c5ac2835a761b8fe8aa9c28b9395cacf27286602688d3e51", size = 16361, upload-time = "2022-10-15T07:42:02.39Z" },
+]
+
+[[package]]
+name = "joserfc"
+version = "1.0.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6a/e4/4c649e364bafa7cd2dd44ab5c301a721d3ff4942c43feb562deded60b414/joserfc-1.0.4.tar.gz", hash = "sha256:dc3fc216cfcfc952d4c0d4b06c759a04711af0b667e5973adc47dbb1ba784127", size = 172055, upload-time = "2025-02-28T02:16:09.371Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/57/81/a61b8942d94ca222c9df901d2704d2746f49174727e64eb5cd0a21450f1e/joserfc-1.0.4-py3-none-any.whl", hash = "sha256:ecf3a5999f89d3a663485ab7c4f633541586d6f44e664ee760197299f39ed51b", size = 61070, upload-time = "2025-02-28T02:16:07.25Z" },
 ]
 
 [[package]]
@@ -569,15 +581,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pyjwt"
-version = "2.10.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/e7/46/bd74733ff231675599650d3e47f361794b22ef3e3770998dda30d3b63726/pyjwt-2.10.1.tar.gz", hash = "sha256:3cc5772eb20009233caf06e9d8a0577824723b44e6648ee0a2aedb6cf9381953", size = 87785, upload-time = "2024-11-28T03:43:29.933Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/61/ad/689f02752eeec26aed679477e80e632ef1b682313be70793d798c1d5fc8f/PyJWT-2.10.1-py3-none-any.whl", hash = "sha256:dcdd193e30abefd5debf142f9adfcdd2b58004e644f25406ffaebd50bd98dacb", size = 22997, upload-time = "2024-11-28T03:43:27.893Z" },
-]
-
-[[package]]
 name = "pyopenssl"
 version = "23.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -655,7 +658,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aioredis", specifier = ">=2.0.1,<3" },
-    { name = "authentikate", specifier = "==0.9.0" },
+    { name = "authentikate", specifier = ">=0.14" },
     { name = "channels-redis", specifier = ">=4.1.0,<5" },
     { name = "daphne", specifier = ">=4.0.0,<5" },
     { name = "django", specifier = ">=5.2" },

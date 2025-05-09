@@ -153,13 +153,10 @@ def _create_implementation(
 def create_implementation(
     info: Info, input: inputs.CreateImplementationInput
 ) -> types.Implementation:
-    user = get_user()
-    client = get_client()
     
     
     registry, _ = models.Registry.objects.update_or_create(
-        client=client,
-        user=user,
+        client=info.context.request.client, user=info.context.request.user
     )
 
     agent, _ = models.Agent.objects.update_or_create(
@@ -197,13 +194,10 @@ def set_extension_implementations(
     info: Info, input: inputs.SetExtensionImplementationsInput
 ) -> list[types.Implementation]:
     
-    user = get_user()
-    client = get_client()
     
     
     registry, _ = models.Registry.objects.update_or_create(
-        client=client,
-        user=user,
+        client=info.context.request.client, user=info.context.request.user
     )
 
     agent, _ = models.Agent.objects.get_or_create(
@@ -238,8 +232,8 @@ def set_extension_implementations(
 
 def pin_implementation(info, input: inputs.PinInput) -> types.Implementation:
     
-    user = get_user()
     
+    user = info.context.request.user
     
     agent = models.Implementation.objects.get(id=input.id)
     if input.pin:

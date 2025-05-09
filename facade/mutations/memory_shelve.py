@@ -62,12 +62,9 @@ class UnshelveMemoryDrawerInput:
 def unshelve_memory_drawer(
     info: Info, input: UnshelveMemoryDrawerInput
 ) -> strawberry.ID:
-    user = get_user()
-    client = get_client()
 
     registry, _ = models.Registry.objects.update_or_create(
-        client=client,
-        user=user,
+        client=info.context.request.client, user=info.context.request.user
     )
 
     agent, _ = models.Agent.objects.update_or_create(

@@ -37,10 +37,9 @@ class ControllBackend(Protocol):
 
 def get_waiter_for_context(info: Info, instance_id: str) -> None:
     # TODO: HASH THIS FOR EASIER RETRIEVAL
-    user = get_user()
-    client = get_client()
+    
 
-    registry, _ = models.Registry.objects.get_or_create(client=client, user=user)
+    registry, _ = models.Registry.objects.get_or_create(client=info.context.request.client, user=info.context.request.user)
 
     waiter, _ = models.Waiter.objects.get_or_create(
         registry=registry, instance_id=instance_id, defaults=dict(name="default")

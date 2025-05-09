@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 def create_toolbox(info: Info, input: inputs.CreateToolboxInput) -> types.Toolbox:
-    user = get_user()
+    user = info.context.request.user
     toolbox, _ = models.Toolbox.objects.update_or_create(
         name=input.name,
         defaults=dict(

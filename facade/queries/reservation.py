@@ -11,11 +11,8 @@ def myreservations(
     info: Info,
     instance_id: scalars.InstanceID | None = None,
 ) -> types.Action:
-    user = get_user()
-    client = get_client()
     registry, _ = models.Registry.objects.get_or_create(
-        client=client,
-        user=user,
+        client=info.context.request.client, user=info.context.request.user
     )
 
     waiter, _ = models.Waiter.objects.get_or_create(
@@ -29,11 +26,9 @@ def reservations(
     info: Info,
     instance_id: scalars.InstanceID | None = None,
 ) -> list[types.Reservation]:
-    user = get_user()
-    client = get_client()
+  
     registry, _ = models.Registry.objects.get_or_create(
-        client=client,
-        user=user,
+        client=info.context.request.client, user=info.context.request.user
     )
 
     waiter, _ = models.Waiter.objects.get_or_create(

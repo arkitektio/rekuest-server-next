@@ -60,17 +60,11 @@ INSTALLED_APPS = [
 AUTH_USER_MODEL = "authentikate.User"
 
 AUTHENTIKATE = {
-    "PUBLIC_KEY": conf.lok.get("public_key", None),
-    "PUBLIC_KEY_PEM_FILE": conf.lok.get("public_key_pem_file", None),
-    "KEY_TYPE": conf.lok.get("key_type", "RS256"),
-    "AUTHORIZATION_HEADERS": [
-        "Authorization",
-        "X-Auth-Token",
-        "AUTHORIZATION",
-        "authorization",
-    ],
-    "IMITATE_PERMISSION": "authentikate.imitate",
-    "ALLOW_IMITATE": True,
+    "ISSUERS": [{
+        "iss": "lok",
+        "kind": "rsa",
+        "public_key": conf.lok.get("public_key", None),
+    }]
 }
 
 

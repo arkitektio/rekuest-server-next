@@ -78,7 +78,7 @@ class AgentFilter:
         if self.pinned is None:
             return queryset
 
-        user = get_user()
+        user = info.context.request.user
         if self.pinned:
             # Check if the user is in the pinned_by list
             return queryset.filter(pinned_by__id=user.id)
