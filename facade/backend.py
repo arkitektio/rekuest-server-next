@@ -253,10 +253,15 @@ class RedisControllBackend(ControllBackend):
 
     def collect(self, info: Info, input: inputs.CollectInputModel) -> list[str]:
         agents = {}
-        for i in input.drawers:
-            assert ":" in i, "Invalid drawer format"
-            agent_id, drawer = i.split(":")
-            agents.setdefault(agent_id, set()).add(i)
+            
+            
+        drawers = models.MemoryDrawer.objects.filter(id__in=input.drawers).prefetch_related("shelve__agent").all()
+        
+        for drawer in drawers:
+            if drawer.shelve.agent.id not in agents:
+                agents[drawer.shelve.agent.id] = set()
+            agents[drawer.shelve.agent.id].add(str(drawer.id))
+            
 
         for agent_id, drawers in agents.items():
             agent = models.Agent.objects.get(id=agent_id)

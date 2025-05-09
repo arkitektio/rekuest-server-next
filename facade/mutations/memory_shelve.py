@@ -56,7 +56,7 @@ class UnshelveMemoryDrawerInput:
     instance_id: scalars.InstanceID = strawberry.field(
         description="The instance ID of the agent. This is used to identify the agent in the system."
     )
-    resource_id: str = strawberry.field(description="The resource ID of the drawer.")
+    id: str = strawberry.field(description="The resource ID of the drawer.")
 
 
 def unshelve_memory_drawer(
@@ -76,9 +76,11 @@ def unshelve_memory_drawer(
     )
 
     x = models.MemoryDrawer.objects.get(
-        shelve=agent.memory_shelve,
-        resource_id=input.resource_id,
+        id=input.id,
     )
+    
+    if x.shelve != agent.memory_shelve:
+        raise Exception("This drawer does not belong to this agent.")
 
     id = str(x.id)
 
