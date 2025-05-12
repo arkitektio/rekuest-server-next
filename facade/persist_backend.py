@@ -13,9 +13,7 @@ class ModelPersistBackend:
 
         await agent.asave()
 
-        async for ass in models.Assignation.objects.filter(
-            implementation__agent=agent, is_done=False
-        ).all():
+        async for ass in models.Assignation.objects.filter(implementation__agent=agent, is_done=False).all():
             await models.AssignationEvent.objects.acreate(
                 assignation=ass,
                 kind=enums.AssignationEventKind.DISCONNECTED,
@@ -30,9 +28,7 @@ class ModelPersistBackend:
         await agent.asave()
 
         assignations = []
-        async for i in models.Assignation.objects.filter(
-            agent=agent, is_done=False
-        ).all():
+        async for i in models.Assignation.objects.filter(agent=agent, is_done=False).all():
             assignations.append(i)
 
         return assignations
@@ -75,6 +71,18 @@ class ModelPersistBackend:
         x.is_done = True
         await x.asave()
 
+    async def on_agent_cancelled(self, agent_id: str, message: messages.CancelledEvent) -> None:
+        logging.info(f"Critical Assignation {message}")
+
+        await models.AssignationEvent.objects.acreate(
+            assignation_id=message.assignation,
+            kind=enums.AssignationEventKind.CANCELLED,
+        )
+
+        x = await models.Assignation.objects.aget(id=message.assignation)
+        x.is_done = True
+        await x.asave()
+
     async def on_agent_error(self, agent_id: str, message: messages.ErrorEvent) -> None:
         logging.info(f"Critical Assignation {message}")
 
@@ -88,9 +96,7 @@ class ModelPersistBackend:
         x.is_done = True
         await x.asave()
 
-    async def on_agent_critical(
-        self, agent_id: str, message: messages.CriticalEvent
-    ) -> None:
+    async def on_agent_critical(self, agent_id: str, message: messages.CriticalEvent) -> None:
         logging.info(f"Criticial Assignation {message}")
 
         await models.AssignationEvent.objects.acreate(
@@ -103,9 +109,7 @@ class ModelPersistBackend:
         x.is_done = True
         await x.asave()
 
-    async def on_agent_progress(
-        self, agent_id: str, message: messages.ProgressEvent
-    ) -> None:
+    async def on_agent_progress(self, agent_id: str, message: messages.ProgressEvent) -> None:
         logging.info(f"Progress Assignation {message}")
 
         await models.AssignationEvent.objects.acreate(

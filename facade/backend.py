@@ -12,38 +12,25 @@ import logging
 class ControllBackend(Protocol):
     def create_message_id(self) -> str: ...
 
-    def interrupt(
-        self, info: Info, input: inputs.InterruptInputModel
-    ) -> types.Assignation: ...
+    def interrupt(self, info: Info, input: inputs.InterruptInputModel) -> types.Assignation: ...
 
-    def reserve(
-        self, info: Info, input: inputs.ReserveInputModel
-    ) -> types.Reservation: ...
+    def reserve(self, info: Info, input: inputs.ReserveInputModel) -> types.Reservation: ...
 
-    def cancel(
-        self, info: Info, input: inputs.CancelInputModel
-    ) -> types.Assignation: ...
+    def cancel(self, info: Info, input: inputs.CancelInputModel) -> types.Assignation: ...
 
-    def assign(
-        self, info: Info, input: inputs.AssignInputModel
-    ) -> types.Assignation: ...
+    def assign(self, info: Info, input: inputs.AssignInputModel) -> types.Assignation: ...
 
-    def resume(
-        self, info: Info, input: inputs.ResumeInputModel
-    ) -> types.Assignation: ...
+    def resume(self, info: Info, input: inputs.ResumeInputModel) -> types.Assignation: ...
 
     def pause(self, info: Info, input: inputs.PauseInputModel) -> types.Assignation: ...
 
 
 def get_waiter_for_context(info: Info, instance_id: str) -> None:
     # TODO: HASH THIS FOR EASIER RETRIEVAL
-    
 
     registry, _ = models.Registry.objects.get_or_create(client=info.context.request.client, user=info.context.request.user)
 
-    waiter, _ = models.Waiter.objects.get_or_create(
-        registry=registry, instance_id=instance_id, defaults=dict(name="default")
-    )
+    waiter, _ = models.Waiter.objects.get_or_create(registry=registry, instance_id=instance_id, defaults=dict(name="default"))
     return waiter
 
 
@@ -78,9 +65,7 @@ class RedisControllBackend(ControllBackend):
 
         return parent
 
-    def reserve(
-        self, info: Info, input: inputs.ReserveInputModel
-    ) -> models.Reservation:
+    def reserve(self, info: Info, input: inputs.ReserveInputModel) -> models.Reservation:
         if input.action is None and input.implementation is None:
             raise ValueError("Either action or implementation must be provided")
 
@@ -96,9 +81,7 @@ class RedisControllBackend(ControllBackend):
             action = models.Action.objects.get(id=input.action)
             implementations = models.Implementation.objects.filter(action=action).all()
             if len(implementations) == 0:
-                raise ValueError(
-                    "No implementations found for this action. Cannot reserve."
-                )
+                raise ValueError("No implementations found for this action. Cannot reserve.")
 
         waiter = get_waiter_for_context(info, input.instance_id)
 
@@ -124,7 +107,7 @@ class RedisControllBackend(ControllBackend):
 
     def cancel(self, input: inputs.CancelInputModel) -> models.Assignation:
         assignation = models.Assignation.objects.get(id=input.assignation)
-        assignation.status = enums.AssignationStatus.CANCELLED
+        assignation.latest_event_kind = enums.AssignationStatus.CANCELLED
         assignation.save()
 
         AgentConsumer.broadcast(
@@ -147,9 +130,7 @@ class RedisControllBackend(ControllBackend):
 
         if input.reservation:
             # TODO: Retrieve the reservation in the redis cache wth the provision keys set
-            reservation = models.Reservation.objects.prefetch_related("provisions").get(
-                id=input.reservation
-            )
+            reservation = models.Reservation.objects.prefetch_related("provisions").get(id=input.reservation)
             action = reservation.action
             implementation = choice(reservation.implementations.all())
             if not implementation:
@@ -159,9 +140,7 @@ class RedisControllBackend(ControllBackend):
         elif input.action:
             reservation = None
             action = models.Action.objects.get(id=input.action)
-            implementation = models.Implementation.objects.filter(
-                action=action, agent__connected=True
-            ).first()
+            implementation = models.Implementation.objects.filter(action=action, agent__connected=True).first()
             if not implementation:
                 raise ValueError("No active implementation found for this action")
 
@@ -176,9 +155,7 @@ class RedisControllBackend(ControllBackend):
         elif input.action_hash:
             reservation = None
             action = models.Action.objects.filter(hash=input.action_hash).first()
-            implementation = models.Implementation.objects.filter(
-                action=action, agent__connected=True
-            ).first()
+            implementation = models.Implementation.objects.filter(action=action, agent__connected=True).first()
             if not implementation:
                 raise ValueError("No active implementation found for this action")
             agent = implementation.agent
@@ -190,9 +167,7 @@ class RedisControllBackend(ControllBackend):
             agent = implementation.agent
 
         else:
-            raise ValueError(
-                "You need to provide either, action_hash or action_id, to create an assignment for an agent"
-            )
+            raise ValueError("You need to provide either, action_hash or action_id, to create an assignment for an agent")
 
         reference = input.reference or self.create_message_id()
 
@@ -217,6 +192,8 @@ class RedisControllBackend(ControllBackend):
             message=messages.Assign(
                 assignation=str(assignation.id),
                 args=input.args,
+                user=str(info.context.request.user.id),
+                app=str(info.context.request.client.id),
                 reference=reference,
                 interface=implementation.interface,
                 extension=implementation.extension,
@@ -253,15 +230,13 @@ class RedisControllBackend(ControllBackend):
 
     def collect(self, info: Info, input: inputs.CollectInputModel) -> list[str]:
         agents = {}
-            
-            
+
         drawers = models.MemoryDrawer.objects.filter(id__in=input.drawers).prefetch_related("shelve__agent").all()
-        
+
         for drawer in drawers:
             if drawer.shelve.agent.id not in agents:
                 agents[drawer.shelve.agent.id] = set()
             agents[drawer.shelve.agent.id].add(str(drawer.id))
-            
 
         for agent_id, drawers in agents.items():
             agent = models.Agent.objects.get(id=agent_id)

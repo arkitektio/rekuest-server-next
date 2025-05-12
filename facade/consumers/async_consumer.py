@@ -22,6 +22,7 @@ HEARTBEAT_RESPONSE_TIMEOUT = settings.AGENT_HEARTBEAT_RESPONSE_TIMEOUT
 
 class FromAgentPayload(BaseModel):
     """Pydantic model representing the payload sent by the agent."""
+
     message: messages.FromAgentMessage = Field(discriminator="type")
 
 
@@ -99,17 +100,13 @@ class AgentConsumer(AsyncWebsocketConsumer):
                 instance_id=self.agent.instance_id,
                 agent=str(self.agent.id),
                 registry=str(self.registry.id),
-                inquiries=[
-                    messages.AssignInquiry(assignation=str(a.id)) for a in self.assignations
-                ],
+                inquiries=[messages.AssignInquiry(assignation=str(a.id)) for a in self.assignations],
             )
         )
 
         self.task = asyncio.create_task(self.listen_for_tasks(self.agent.id))
         self.heartbeat_task = asyncio.create_task(self.heartbeat(self.agent.id))
-        self.heartbeat_task.add_done_callback(
-            lambda x: logging.error(f"Done sending heartbeats {x}")
-        )
+        self.heartbeat_task.add_done_callback(lambda x: logging.error(f"Done sending heartbeats {x}"))
 
     async def on_agent_heartbeat(self) -> None:
         """Handle heartbeat message from agent."""
@@ -137,9 +134,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
                 self.heartbeat_future = asyncio.Future()
 
                 try:
-                    await asyncio.wait_for(
-                        self.heartbeat_future, HEARTBEAT_RESPONSE_TIMEOUT
-                    )
+                    await asyncio.wait_for(self.heartbeat_future, HEARTBEAT_RESPONSE_TIMEOUT)
                     print("Received heartbeat")
 
                 except asyncio.TimeoutError:
@@ -157,9 +152,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
         """
         try:
             while True:
-                task = await self.connection.brpoplpush(
-                    f"{agent_id}_my_queue", "processing_queue"
-                )
+                task = await self.connection.brpoplpush(f"{agent_id}_my_queue", "processing_queue")
                 if task:
                     await self.send(text_data=task.decode("utf-8"))
                     await self.connection.lrem("processing_queue", 0, task)
@@ -183,8 +176,15 @@ class AgentConsumer(AsyncWebsocketConsumer):
 
         try:
             payload = FromAgentPayload(message=payload)
-        except Exception:
+        except Exception as e:
             logger.error(f"Error in agent {payload}", exc_info=True)
+
+            await self.send_to_agent_message(
+                messages.ProtocolError(
+                    message=str(e),
+                )
+            )
+
             await self.close(code=codes.FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE)
             return
 
@@ -200,36 +200,26 @@ class AgentConsumer(AsyncWebsocketConsumer):
                         await self.on_register(payload.message)
                     case messages.HeartbeatEvent():
                         await self.on_agent_heartbeat()
+                    case messages.CancelledEvent():
+                        await persist_backend.on_agent_cancelled(self.agent.id, payload.message)
                     case messages.YieldEvent():
-                        await persist_backend.on_agent_yield(
-                            self.agent.id, payload.message
-                        )
+                        await persist_backend.on_agent_yield(self.agent.id, payload.message)
                     case messages.LogEvent():
-                        await persist_backend.on_agent_log(
-                            self.agent.id, payload.message
-                        )
+                        await persist_backend.on_agent_log(self.agent.id, payload.message)
                     case messages.ProgressEvent():
-                        await persist_backend.on_agent_progress(
-                            self.agent.id, payload.message
-                        )
+                        await persist_backend.on_agent_progress(self.agent.id, payload.message)
                     case messages.DoneEvent():
-                        await persist_backend.on_agent_done(
-                            self.agent.id, payload.message
-                        )
+                        await persist_backend.on_agent_done(self.agent.id, payload.message)
                     case messages.ErrorEvent():
-                        await persist_backend.on_agent_error(
-                            self.agent.id, payload.message
-                        )
+                        await persist_backend.on_agent_error(self.agent.id, payload.message)
                     case messages.CriticalEvent():
-                        await persist_backend.on_agent_critical(
-                            self.agent.id, payload.message
-                        )
+                        await persist_backend.on_agent_critical(self.agent.id, payload.message)
                     case _:
-                        logger.error("Error in agent", exc_info=True)
+                        logger.error("Unkwonw message in agent", exc_info=True)
                         await self.close(code=codes.FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE)
                         return
         except Exception:
-            logger.error("Error in consumer", exc_info=True)
+            logger.error("Unkown in consumer", exc_info=True)
             await self.close(code=codes.FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE)
 
     async def disconnect(self, close_code: int) -> None:
