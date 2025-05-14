@@ -531,17 +531,18 @@ class CreateStateSchemaInput:
     state_schema: StateSchemaInput = strawberry.field(
         description="The state schema to create. This is used to identify the state schema in the system."
     )
+    
 
 
 class SetStateInputModel(BaseModel):
-    state_schema: strawberry.ID
+    interface: str
     instance_id: str
     value: Dict[str, Any]
 
 
 @pydantic.input(SetStateInputModel, description="The input for setting a state schema.")
 class SetStateInput:
-    state_schema: strawberry.ID = strawberry.field(
+    interface: str = strawberry.field(
         description="The state schema to set. This is used to identify the state schema in the system."
     )
     instance_id: scalars.InstanceID = strawberry.field(
@@ -552,6 +553,67 @@ class SetStateInput:
     )
 
 
+
+class StateInitInputModel(BaseModel):
+    state_schema: strawberry.ID
+    value: Dict[str, Any]
+    
+    
+@pydantic.input(
+    StateInitInputModel, description="The initializing input for a state schema."
+)
+class StateInitInput:
+    state_schema: strawberry.ID = strawberry.field(
+        description="The state schema to initialize. This is used to identify the state schema in the system."
+    )
+    value: scalars.Args = strawberry.field(
+        description="The value to set the state schema to. This is used to identify the state schema in the system."
+    )
+    
+
+
+class StateImplementationInputModel(BaseModel):
+    interface: str
+    state_schema: StateSchemaInputModel = strawberry.field(
+        description="The state schema to set. This is used to identify the state schema in the system."
+    )
+    initial: Dict[str, Any]
+    
+    
+@pydantic.input(
+    StateImplementationInputModel, description="The input for initializing a state schema."
+)
+class StateImplementationInput:
+    interface: str = strawberry.field(
+        description="The interface of the implementation. Only ussable if you also set agent"
+    )
+    state_schema: StateSchemaInput = strawberry.field(
+        description="The state schema to set. This is used to identify the state schema in the system."
+    )
+    initial: scalars.Args = strawberry.field(
+        description="The value to set the state schema to. This is used to identify the state schema in the system."
+    )
+    
+    
+class SetAgentStatesInputModel(BaseModel):
+    implementations: list[StateImplementationInputModel]
+    instance_id: str
+    
+    
+@pydantic.input(
+    SetAgentStatesInputModel,
+    description="The input for setting a state schema to an agent.",
+)
+class SetAgentStatesInput:
+    implementations: list[StateImplementationInput] = strawberry.field(
+        description="The implementations of the state schemas. This is used to identify the state schemas in the system."
+    )
+    instance_id: scalars.InstanceID = strawberry.field(
+        description="The instance ID of the agent that this state belongs to."
+    )
+
+
+
 class JSONPatchInputModel(BaseModel):
     op: Literal["add", "remove", "replace", "move", "copy", "test"]
     path: str
@@ -559,7 +621,7 @@ class JSONPatchInputModel(BaseModel):
 
 
 class UpdateStateInputModel(BaseModel):
-    state_schema: strawberry.ID
+    interface:  str
     instance_id: str
     patches: list[JSONPatchInputModel]
 
@@ -568,7 +630,7 @@ class UpdateStateInputModel(BaseModel):
     UpdateStateInputModel, description="The input for updating a state schema."
 )
 class UpdateStateInput:
-    state_schema: strawberry.ID = strawberry.field(
+    interface: str = strawberry.field(
         description="The state schema to update. This is used to identify the state schema in the system."
     )
     instance_id: scalars.InstanceID = strawberry.field(

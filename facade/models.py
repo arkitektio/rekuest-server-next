@@ -1026,6 +1026,10 @@ class State(models.Model):
     state_schema = models.ForeignKey(
         StateSchema, on_delete=models.CASCADE, related_name="states"
     )
+    interface = models.CharField(
+        max_length=1000,
+        help_text="The interface this state is for (e.g. Function)",
+    )
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="states")
     value = models.JSONField(default=dict, help_text=" The current value of this state")
     created_at = models.DateTimeField(
@@ -1038,7 +1042,7 @@ class State(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["state_schema", "agent"],
+                fields=["interface", "agent"],
                 name="No multiple States for same Agent and Schema allowed",
             )
         ]

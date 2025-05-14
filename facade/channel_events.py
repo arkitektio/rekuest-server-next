@@ -11,7 +11,7 @@ class DBEvent(BaseModel):
     
 class StateUpdateEvent(BaseModel):
     """A model representing a state update event."""
-    state: str = Field(..., description="The state that was updated.")
+    state: int = Field(..., description="The state that was updated.")
     
     
 class AssignationEventCreatedEvent(BaseModel):

@@ -436,6 +436,7 @@ class State:
     state_schema: StateSchema
     value: scalars.Args
     agent: Agent
+    interface: str
     created_at: datetime.datetime
     updated_at: datetime.datetime
     historical_states: list["HistoricalState"]

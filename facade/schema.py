@@ -131,6 +131,7 @@ class Mutation:
     create_shortcut = strawberry_django.mutation(resolver=mutations.create_shortcut, description="Create a shortcut to an action.")
     delete_shortcut = strawberry_django.mutation(resolver=mutations.delete_shortcut, description="Delete a shortcut.")
     create_toolbox = strawberry_django.mutation(resolver=mutations.create_toolbox, description="Create a new toolbox with shortcuts.")
+    set_agent_states = strawberry_django.mutation(resolver=mutations.set_agent_states, description="Set states for an agent.")
 
 
 @strawberry.type(description="Root subscription type for real-time event streams from the system.")

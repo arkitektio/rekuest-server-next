@@ -11,7 +11,7 @@ logger.info("Loading sssignals")
 @receiver(post_save, sender=models.State)
 def state_post_save(sender, instance: models.State = None, created=None, **kwargs):
     
-    channels.state_update_channel.broadcast(channel_events.StateUpdateEvent(id=instance.id), [instance.id])
+    channels.state_update_channel.broadcast(channel_events.StateUpdateEvent(state=instance.id), [f"state_{instance.id}"])
 
 
 @receiver(post_save, sender=models.Action)

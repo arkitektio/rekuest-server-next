@@ -17,6 +17,6 @@ async def state_update_events(
     state = await models.State.objects.aget(id=state_id)
 
     async for message in state_update_channel.listen(
-        info.context, [f"new_state_stuff{state.id}", "cactusfart"]
+        info.context, [f"state_{state.id}"]
     ):
-        yield await models.State.objects.aget(id=message)
+        yield await models.State.objects.aget(id=message.state)
