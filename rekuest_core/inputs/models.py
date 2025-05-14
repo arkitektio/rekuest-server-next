@@ -29,8 +29,8 @@ class EffectInputModel(BaseModel):
 class ChoiceInputModel(BaseModel):
     value: str
     label: str
-    image: str | None
-    description: str | None
+    image: str | None = None
+    description: str | None = None
 
 
 class ValidatorInputModel(BaseModel):
@@ -70,28 +70,26 @@ class ReturnWidgetInputModel(BaseModel):
 
 
 class PortInputModel(BaseModel):
-    validators: list[ValidatorInputModel] | None
+    validators: list[ValidatorInputModel] | None = None
     key: str
     label: str | None = None
     kind: enums.PortKind
     description: str | None = None
     identifier: str | None = None
     nullable: bool = False
-    effects: list[EffectInputModel] | None
+    effects: list[EffectInputModel] | None = None
     default: Any | None = None
-    children: list["PortInputModel"] | None
+    children: list["PortInputModel"] | None = None
     choices: list[ChoiceInputModel] | None = None
     assign_widget: Optional["AssignWidgetInputModel"] = None
     return_widget: Optional["ReturnWidgetInputModel"] = None
 
     @model_validator(mode="after")
-    def check_children_for_port(cls, values) -> Self:
-        kind = values.get("kind")
-        children = values.get("children")
+    def check_children_for_port(cls, self) -> Self:
 
-        if kind == enums.PortKind.LIST and (children is None or len(children) != 1):
+        if self.kind == enums.PortKind.LIST and (self.children is None or len(self.children) != 1):
             raise ValueError("Port of kind LIST must have exactly on children")
-        return values
+        return self
 
 
 class PortGroupInputModel(BaseModel):

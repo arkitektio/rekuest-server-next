@@ -68,7 +68,7 @@ def _create_implementation(
 
         if definition.collections:
             for collection_name in definition.collections:
-                c, _ = models.Collection.objects.get_or_create(name=collection_name)
+                c, _ = models.Collection.objects.get_or_create(name=collection_name, defaults=dict(creator=agent.registry.user))
                 action.collections.add(c)
 
         logger.info(f"Created {action}")

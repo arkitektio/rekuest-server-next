@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 import uuid
 from random import choice
 from typing import Protocol
@@ -140,7 +141,11 @@ class RedisControllBackend(ControllBackend):
         elif input.action:
             reservation = None
             action = models.Action.objects.get(id=input.action)
-            implementation = models.Implementation.objects.filter(action=action, agent__connected=True).first()
+            implementation = models.Implementation.objects.filter(
+                action=action,
+                agent__connected=True,
+                agent__last_seen__gt=datetime.now() - timedelta(minutes=1)
+            ).first()
             if not implementation:
                 raise ValueError("No active implementation found for this action")
 
@@ -151,6 +156,10 @@ class RedisControllBackend(ControllBackend):
             implementation = models.Implementation.objects.get(id=input.implementation)
             action = implementation.action
             agent = implementation.agent
+            assert agent.connected, "Agent is not connected"
+            assert agent.last_seen > datetime.now(timezone.utc) - timedelta(minutes=1), "Agent is not connected"
+            
+            
 
         elif input.action_hash:
             reservation = None
