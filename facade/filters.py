@@ -42,7 +42,6 @@ class AgentFilter:
         default=None,
         description="Filter by instance ID of the agent",
     )
-
     ids: list[strawberry.ID] | None = strawberry.field(
         default=None,
         description="Filter by IDs of the agents",
@@ -68,6 +67,8 @@ class AgentFilter:
         description="Filter by name of the agents",
     )
     distinct: bool | None
+    action_demands: list[inputs.ActionDemandInput] | None
+    state_demands: list[inputs.SchemaDemandInput] | None
 
     def filter_search(self, queryset, info):
         if self.search is None:
@@ -119,6 +120,50 @@ class AgentFilter:
         if self.distinct is None:
             return queryset
         return queryset.distinct()
+
+    def filter_action_demands(self, queryset, info):
+        if self.action_demands is None:
+            return queryset
+
+        filtered_ids: set[str] = set()
+
+        for ports_demand in self.action_demands:
+            new_ids = managers.get_action_ids_by_action_demand(
+                action_demand=ports_demand,
+            )
+
+            if len(new_ids) == 0:
+                # There are no actions that match the demand
+                return queryset.none()
+
+            for new_id in new_ids:
+                if new_id not in filtered_ids:
+                    filtered_ids.add(new_id)
+
+        return queryset.filter(implementations__action__id__in=filtered_ids)
+
+    def filter_state_demands(self, queryset, info):
+        if self.state_demands is None:
+            return queryset
+
+        filtered_ids = None
+
+        filtered_ids: set[str] = set()
+
+        for state_demand in self.state_demands:
+            fitting_schema_ids = managers.get_state_ids_by_demands(
+                state_demand.matches,
+                model="facade_stateschema",
+            )
+
+            if len(fitting_schema_ids) == 0:
+                return queryset.none()
+
+            for new_id in fitting_schema_ids:
+                if new_id not in filtered_ids:
+                    filtered_ids.add(new_id)
+
+        return queryset.filter(states__state_schema__id__in=list(filtered_ids))
 
 
 @strawberry_django.filter(models.Waiter, description="A way to filter waiters")
