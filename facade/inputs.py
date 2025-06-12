@@ -209,6 +209,37 @@ class AssignInput:
     is_hook: bool | None = strawberry.field(default=False, description="Whether the assignation is a hook")
 
 
+
+
+class PortMatchInputModel(BaseModel):
+    at: int | None = None
+    key: str | None = None
+    kind: renums.PortKind | None = None
+    identifier: str | None = None
+    nullable: bool | None = None
+    children: list["PortMatchInputModel"] | None = None
+
+
+class ActionDemandInputModel(BaseModel):
+    key: str | None = None
+    hash: str | None = None
+    name: str | None = None
+    description: str | None = None
+    arg_matches: list[PortMatchInputModel] | None = None
+    return_matches: list[PortMatchInputModel] | None = None
+    protocols: list[str] | None = None
+    force_arg_length: int | None = None
+    force_return_length: int | None = None
+
+
+class SchemaDemandInputModel(BaseModel):
+    key: str | None = None
+    hash: str | None = None
+    matches: list[PortMatchInputModel] | None = None
+    protocols: list[str] | None = None
+
+
+
 @strawberry.input(description="The input for creating a port match.")
 class PortMatchInput:
     at: int | None = strawberry.field(
@@ -262,9 +293,22 @@ class PortDemandInput:
 
 @strawberry.input(description="The input for creating a action demand.")
 class ActionDemandInput:
+    key: str = strawberry.field(
+        default=None,
+        description="The key of the action. This is used to identify the action in the system.",
+    )
+    
     hash: rscalars.ActionHash | None = strawberry.field(
         default=None,
         description="The hash of the action. This is used to identify the action in the system.",
+    )
+    name: str | None = strawberry.field(
+        default=None,
+        description="The name of the action. This is used to identify the action in the system.",
+    )
+    description: str | None = strawberry.field(
+        default=None,
+        description="The description of the action. This can described the action and its purpose.",
     )
     arg_matches: list[PortMatchInput] | None = strawberry.field(
         default=None,
@@ -290,6 +334,10 @@ class ActionDemandInput:
 
 @strawberry.input(description="The input for creating a action demand.")
 class SchemaDemandInput:
+    key: str  = strawberry.field(
+        default=None,
+        description="The key of the action. This is used to identify the action in the system.",
+    )
     hash: rscalars.ActionHash | None = strawberry.field(
         default=None,
         description="The hash of the state.",
@@ -404,33 +452,38 @@ class CreateDashboardInput:
     panels: list[strawberry.ID] | None = None
 
 
-class CreatePanelInputModel(BaseModel):
+@strawberry.input(description="The input for creating a blok.")
+class CreateBlokInput:
     name: str
-    kind: enums.PanelKind
-    state: str | None = None
-    state_key: str | None = None
-    reservation: str | None = None
-    instance_id: str | None = None
-    state_accessors: list[str] | None = None
-    interface: str | None = None
-    args: dict[str, Any] | None = None
-    submit_on_change: bool = False
-    submit_on_load: bool = False
+    action_demands: list[ActionDemandInput] | None = strawberry.field(
+        default=None,
+        description="The action demands of the blok. This is used to identify the blok in the system.",
+    )
+    state_demands: list[SchemaDemandInput] | None = strawberry.field(
+        default=None,
+        description="The state demands of the blok. This is used to identify the blok in the system.",
+    )
+    description: str | None = strawberry.field(
+        default=None,
+        description="The description of the blok. This can described the blok and its purpose.",
+    )
+    url: str = strawberry.field(
+        default=None,
+        description="The URL of the blok. This can be used to link to the blok in the system.",
+    )
 
-
-@pydantic.input(CreatePanelInputModel)
-class CreatePanelInput:
-    name: str
-    kind: enums.PanelKind
-    state: strawberry.ID | None = None
-    state_key: str | None = None
-    state_accessors: list[str] | None = None
-    reservation: strawberry.ID | None = None
-    instance_id: scalars.InstanceID | None = None
-    interface: str | None = None
-    args: scalars.Args | None = None
-    submit_on_change: bool | None = False
-    submit_on_load: bool | None = False
+@strawberry.input(description="The input for creating a blok.")
+class MaterializeBlokInput:
+    blok: strawberry.ID 
+    dashboard: strawberry.ID | None = strawberry.field(
+        default=None,
+        description="The dashboard ID to materialize the blok in. If not provided, the blok will be materialized in the default dashboard.",
+    )
+    agent: strawberry.ID | None = strawberry.field(
+        default=None,
+        description="The agent ID to materialize the blok in. If not provided, the blok will be materialized in the default agent"
+    )
+    
 
 
 class CreateToolboxInputModel(BaseModel):

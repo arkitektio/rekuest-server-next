@@ -113,6 +113,12 @@ def build_action_demand_params(
     """Build SQL for action demand"""
     individual_queries = []
     all_params = {}
+    
+    
+    if action_demand.name:
+        individual_queries.append(f"name = %(name)s")
+        all_params["name"] = action_demand.name
+        
 
     if action_demand.arg_matches:
         for index, item in enumerate(action_demand.arg_matches):

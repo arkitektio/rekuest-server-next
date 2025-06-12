@@ -13,6 +13,5 @@ def create_dashboard(info: Info, input: inputs.CreateDashboardInput) -> types.Da
         name=input.name,
     )
 
-    dashboard.panels.set([models.Panel.objects.get(id=i) for i in input.panels])
 
     return dashboard

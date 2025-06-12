@@ -37,9 +37,17 @@ def shelve_in_memory_drawer(
             name=f"{str(registry)} on {input.instance_id}",
         ),
     )
+    
+    memory_shelve, _ = models.MemoryShelve.objects.get_or_create(
+        agent=agent,
+        defaults=dict(
+            name=f"{str(agent)} memory shelve",
+            creator=info.context.request.user,
+        ),
+    )
 
     x, _ = models.MemoryDrawer.objects.update_or_create(
-        shelve=agent.memory_shelve,
+        shelve=memory_shelve,
         resource_id=input.resource_id,
         defaults=dict(
             label=input.label,
@@ -74,7 +82,8 @@ def unshelve_memory_drawer(
             name=f"{str(registry)} on {input.instance_id}",
         ),
     )
-
+    
+    
     x = models.MemoryDrawer.objects.get(
         id=input.id,
     )

@@ -30,7 +30,8 @@ class Query:
     my_implementation_at = strawberry_django.field(resolver=queries.my_implementation_at, description="Find your implementation at a specific interface.")
     dashboards: list[types.Dashboard] = strawberry_django.field(description="All dashboards.")
     states: list[types.State] = strawberry_django.field(description="All states from agents.")
-    panels: list[types.Panel] = strawberry_django.field(description="List of UI panels.")
+    bloks: list[types.Blok] = strawberry_django.field(description="List of UI Blok.")
+    materialized_bloks: list[types.MaterializedBlok] = strawberry_django.field(description="List of UI Blok.")
     state_schemas: list[types.StateSchema] = strawberry_django.field(description="Available state schemas.")
     memory_shelves: list[types.MemoryShelve] = strawberry_django.field(description="All memory shelves.")
     memory_drawers: list[types.MemoryDrawer] = strawberry_django.field(description="All memory drawers.")
@@ -39,14 +40,22 @@ class Query:
     @strawberry_django.field(description="Get a specific state by ID.")
     def state(self, info: Info, id: strawberry.ID) -> types.State:
         return cast(types.State, models.State.objects.get(id=id))
+    
+    
+    
+    
 
     @strawberry_django.field(description="Fetch a memory shelve by ID.")
     def memory_shelve(self, info: Info, id: strawberry.ID) -> types.MemoryShelve:
         return cast(types.MemoryShelve, models.MemoryShelve.objects.get(id=id))
 
-    @strawberry_django.field(description="Get a panel by ID.")
-    def panel(self, info: Info, id: strawberry.ID) -> types.Panel:
-        return cast(types.Panel, models.Panel.objects.get(id=id))
+    @strawberry_django.field(description="Get a blok by ID.")
+    def blok(self, info: Info, id: strawberry.ID) -> types.Blok:
+        return cast(types.Blok, models.Blok.objects.get(id=id))
+    
+    @strawberry_django.field(description="Get a materialized blok by ID.")
+    def materialized_blok(self, info: Info, id: strawberry.ID) -> types.MaterializedBlok:
+        return cast(types.MaterializedBlok, models.MaterializedBlok.objects.get(id=id))
 
     @strawberry_django.field(description="Retrieve a state schema by ID.")
     def state_schema(self, info: Info, id: strawberry.ID) -> types.StateSchema:
@@ -121,8 +130,9 @@ class Mutation:
     unshelve_memory_drawer = strawberry_django.mutation(resolver=mutations.unshelve_memory_drawer, description="Unshelve data from a memory drawer.")
     create_dashboard = strawberry_django.mutation(resolver=mutations.create_dashboard, description="Create a dashboard layout.")
     create_state_schema = strawberry_django.mutation(resolver=mutations.create_state_schema, description="Define a new state schema.")
-    create_panel = strawberry_django.mutation(resolver=mutations.create_panel, description="Create a user interface panel.")
+    create_blok = strawberry_django.mutation(resolver=mutations.create_blok, description="Create a user interface panel.")
     set_state = strawberry_django.mutation(resolver=mutations.set_state, description="Set the value of a state object.")
+    materialize_blok = strawberry_django.mutation(resolver=mutations.materialize_blok, description="Materialize a UI blok into a concrete instance on a dashboard.")
     update_state = strawberry_django.mutation(resolver=mutations.update_state, description="Update fields in a state object.")
     archive_state = strawberry_django.mutation(resolver=mutations.archive_state, description="Archive a state schema.")
     pin_agent = strawberry_django.mutation(resolver=mutations.pin_agent, description="Pin an agent to the user.")

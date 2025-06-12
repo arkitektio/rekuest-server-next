@@ -131,6 +131,8 @@ class RedisControllBackend(ControllBackend):
 
         if input.reservation:
             # TODO: Retrieve the reservation in the redis cache wth the provision keys set
+            # this should be done in the redis cache to allow for super fast retrieval, 
+            # especially when using the ephemeral flag
             reservation = models.Reservation.objects.prefetch_related("provisions").get(id=input.reservation)
             action = reservation.action
             implementation = choice(reservation.implementations.all())
@@ -180,6 +182,7 @@ class RedisControllBackend(ControllBackend):
 
         reference = input.reference or self.create_message_id()
 
+        # TODO: if ephemeral is set, we should not store the assignation in the database
         assignation = models.Assignation.objects.create(
             reservation=reservation,
             action=action,

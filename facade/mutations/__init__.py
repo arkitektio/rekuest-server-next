@@ -8,7 +8,8 @@ from .state_schema import create_state_schema
 from .shortcut import create_shortcut, delete_shortcut
 from .toolbox import create_toolbox, delete_toolbox
 from .state import set_state, update_state, archive_state, set_agent_states
-from .panel import create_panel
+from .blok import create_blok
+from .materialized_blok import materialize_blok
 from .lifeline import reinit
 
 __all__ = [
@@ -18,11 +19,12 @@ __all__ = [
     "create_toolbox",
     "reinit",
     "delete_toolbox",
+    "materialize_blok",
     "create_state_schema",
     "delete_implementation",
     "create_dashboard",
     "set_agent_states"
-    "create_panel",
+    "create_blok",
     "pin_implementation",
     "set_state",
     "update_state",

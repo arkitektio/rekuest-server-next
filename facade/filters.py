@@ -134,7 +134,9 @@ class AgentFilter:
 
             if len(new_ids) == 0:
                 # There are no actions that match the demand
-                return queryset.none()
+                raise ValueError(
+                    f"No actions found that match the given action demands {ports_demand}"
+                )
 
             for new_id in new_ids:
                 if new_id not in filtered_ids:

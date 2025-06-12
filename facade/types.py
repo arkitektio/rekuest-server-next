@@ -399,24 +399,207 @@ class Structure:
 class Dashboard:
     id: strawberry.ID
     name: str | None
-    panels: list["Panel"] | None
+    materialized_bloks: list["MaterializedBlok"]
 
     @strawberry_django.field()
     def ui_tree(self) -> uitypes.UITree | None:
         model = uimodels.UITreeModel(**self.ui_tree) if self.ui_tree else None
         return model
+    
 
 
-@strawberry_django.type(models.Panel)
-class Panel:
+@strawberry.type
+class PortMatch:
+    at: int | None = strawberry.field(
+        default=None,
+        description="The index of the port to match. ",
+    )
+    key: str | None = strawberry.field(
+        default=None,
+        description="The key of the port to match.",
+    )
+    kind: renums.PortKind | None = strawberry.field(
+        default=None,
+        description="The kind of the port to match. ",
+    )
+    identifier: str | None = strawberry.field(
+        default=None,
+        description="The identifier of the port to match. ",
+    )
+    nullable: bool | None = strawberry.field(
+        default=None,
+        description="Whether the port is nullable. ",
+    )
+    children: list["PortMatch"] | None = strawberry.field(
+        default=None,
+        description="List of child ports to match. ",
+    )
+
+@strawberry.type
+class ActionDemand:
+    key: str = strawberry.field(
+        description="The key of the action demand. This is used to identify the action in the system.",
+    )
+    hash: rscalars.ActionHash | None = strawberry.field(
+        default=None,
+        description="The hash of the action. This is used to identify the action in the system.",
+    )
+    name: str | None = strawberry.field(
+        default=None,
+        description="The name of the action. This is used to identify the action in the system.",
+    )
+    description: str | None = strawberry.field(
+        default=None,
+        description="The description of the action. This can described the action and its purpose.",
+    )
+    arg_matches: list[PortMatch] | None = strawberry.field(
+        default=None,
+        description="The demands for the action args and returns. This is used to identify the demand in the system.",
+    )
+    return_matches: list[PortMatch] | None = strawberry.field(
+        default=None,
+        description="The demands for the action args and returns. This is used to identify the demand in the system.",
+    )
+    protocols: list[strawberry.ID] | None = strawberry.field(
+        default=None,
+        description="The protocols that the action has to implement. This is used to identify the demand in the system.",
+    )
+    force_arg_length: int | None = strawberry.field(
+        default=None,
+        description="Require that the action has a specific number of args. This is used to identify the demand in the system.",
+    )
+    force_return_length: int | None = strawberry.field(
+        default=None,
+        description="Require that the action has a specific number of returns. This is used to identify the demand in the system.",
+    )
+   
+    
+@strawberry.type(description="The input for creating a action demand.")
+class StateDemand:
+    key: str = strawberry.field(
+        description="The key of the action demand. This is used to identify the action in the system.",
+    )
+    hash: rscalars.ActionHash | None = strawberry.field(
+        default=None,
+        description="The hash of the state.",
+    )
+    matches: list[PortMatch] | None = strawberry.field(
+        default=None,
+        description="The demands for the action args and returns. This is used to identify the demand in the system.",
+    )
+    protocols: list[strawberry.ID] | None = strawberry.field(
+        default=None,
+        description="The protocols that the action has to implement. This is used to identify the demand in the system.",
+    )    
+    
+
+
+@strawberry_django.type(models.Blok)
+class Blok:
     id: strawberry.ID
-    kind: enums.PanelKind
     name: str
-    reservation: Reservation | None
-    state: Optional["State"]
-    accessors: list[str] | None
-    submit_on_load: bool
-    submit_on_change: bool
+    creator: User
+    url: str 
+    materialized_bloks: list["MaterializedBlok"] = strawberry_django.field(
+        description="Materialized bloks that are instances of this blok.",
+    )
+    
+    @strawberry_django.field(
+        description="Get the actions that this blok can run.",
+    )
+    def action_demands(self) -> list[ActionDemand]:
+        return [
+            ActionDemand(
+                **action
+            )
+            for action in self.action_demands
+        ]
+        
+    @strawberry_django.field(
+        description="Get the actions that this blok can run.",
+    )
+    def state_demands(self) -> list[StateDemand]:
+        return [
+            StateDemand(
+                **action
+            )
+            for action in self.state_demands
+        ]
+        
+        
+    @strawberry_django.field(
+        description="Get the agents that this blok can be implemented against.",
+    )
+    def possible_agents(self) -> list[Agent]:
+        from facade import managers
+        from facade.inputs import ActionDemandInputModel, SchemaDemandInputModel
+        
+        queryset = models.Agent.objects
+        
+        filtered_ids: set[str] = set()
+
+        for ports_demand in self.action_demands:
+            new_ids = managers.get_action_ids_by_action_demand(
+                action_demand=ActionDemandInputModel(**ports_demand),
+            )
+
+            if len(new_ids) == 0:
+                # There are no actions that match the demand
+                raise ValueError(
+                    f"No actions found that match the given action demands {ports_demand}"
+                )
+
+            for new_id in new_ids:
+                if new_id not in filtered_ids:
+                    filtered_ids.add(new_id)
+
+        queryset = queryset.filter(implementations__action__id__in=filtered_ids)
+
+        filtered_ids: set[str] = set()
+
+        for state_demand in self.state_demands:
+            fitting_schema_ids = managers.get_state_ids_by_demands(
+               SchemaDemandInputModel(
+                    **state_demand,
+                ).matches,
+                model="facade_stateschema",
+            )
+
+            if len(fitting_schema_ids) == 0:
+                return queryset.none()
+
+            for new_id in fitting_schema_ids:
+                if new_id not in filtered_ids:
+                    filtered_ids.add(new_id)
+
+        return queryset.filter(states__state_schema__id__in=list(filtered_ids)).distinct()
+        
+        
+        
+        
+        
+
+        
+    
+    
+@strawberry_django.type(models.MaterializedBlok)
+class MaterializedBlok:
+    id: strawberry.ID
+    dashboard: Dashboard
+    blok: Blok
+    agent: Agent
+    name: str | None
+    description: str | None
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+    state_mappings: list["StateMapping"] = strawberry_django.field(
+        description="Mappings of states to this materialized blok.",
+    )
+    action_mappings: list["ActionMapping"] = strawberry_django.field(
+        description="Mappings of actions to this materialized blok.",
+    )
+    
+
 
 
 @strawberry_django.type(models.StateSchema)
@@ -461,3 +644,24 @@ class JSONPatch:
 class StateUpdateEvent:
     state_id: str
     patches: list[JSONPatch]
+
+
+
+@strawberry_django.type(models.ActionMapping)
+class ActionMapping:
+    id: strawberry.ID
+    key: str 
+    implementation: Implementation
+    materialized_blok: MaterializedBlok
+    crreated_at: datetime.datetime
+    updated_at: datetime.datetime
+    
+@strawberry_django.type(models.StateMapping)
+class StateMapping:
+    id: strawberry.ID
+    key: str 
+    implementation: Implementation
+    state: State
+    crreated_at: datetime.datetime
+    updated_at: datetime.datetime
+    

@@ -967,32 +967,7 @@ class Dashboard(models.Model):
         Structure, on_delete=models.CASCADE, null=True, blank=True
     )
     ui_tree = models.JSONField(null=True, blank=True)
-    panels = models.ManyToManyField("Panel", related_name="dashboard")
 
-
-class Panel(models.Model):
-    name = models.CharField(max_length=2000, default="Unnamed")
-    kind = models.CharField(max_length=2000)
-    state = models.ForeignKey(
-        "State", on_delete=models.CASCADE, related_name="panels", null=True, blank=True
-    )
-    reservation = models.ForeignKey(
-        Reservation,
-        on_delete=models.CASCADE,
-        related_name="panels",
-        null=True,
-        blank=True,
-    )
-    implementation = models.ForeignKey(
-        Implementation,
-        on_delete=models.CASCADE,
-        related_name="panels",
-        null=True,
-        blank=True,
-    )
-    accessors = models.JSONField(null=True, blank=True)
-    submit_on_change = models.BooleanField(default=False)
-    submit_on_load = models.BooleanField(default=False)
 
 
 class StateSchema(models.Model):
@@ -1046,8 +1021,92 @@ class State(models.Model):
                 name="No multiple States for same Agent and Schema allowed",
             )
         ]
-
-
+        
+        
+        
+        
+        
+        
+        
+class Blok(models.Model):
+    name: str = models.CharField(max_length=1000)
+    description: str = models.TextField(null=True, blank=True)
+    creator: User = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.CASCADE,
+        related_name="bloks",
+        help_text="The user that created this Blok",
+    )
+    action_demands = models.JSONField(
+        default=list,
+        help_text="The action demands of this blok (e.g. the actions that this blok needs to run)",
+    )
+    state_demands = models.JSONField(
+        default=list,
+        help_text="The state demands of this blok (e.g. the states that this blok needs to run)",
+    )
+    url = models.CharField(
+        max_length=1000,
+        help_text="The URL of this Blok (e.g. the URL where this Blok is hosted)",
+        null=True,
+        blank=True,
+    )
+    
+    
+class MaterializedBlok(models.Model):
+    """A Blok Implementation is a specific implementation of a Blok"""
+    dashboard = models.ForeignKey(
+        Dashboard, on_delete=models.CASCADE, related_name="materialized_bloks"
+    )
+    blok = models.ForeignKey(
+        Blok, on_delete=models.CASCADE, related_name="materialized_bloks"
+    )
+    agent = models.ForeignKey(
+        Agent, on_delete=models.CASCADE, related_name="materialized_bloks"
+    )
+    name = models.CharField(max_length=1000, help_text="The name of this Blok Implementation")
+    description = models.TextField(help_text="A description for this Blok Implementation")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    
+class ActionMapping(models.Model):
+    """An Action Mapping is a mapping between an Action and a Blok Implementation"""
+    key = models.CharField(
+        max_length=1000,
+        help_text="The key for this Action Mapping (e.g. the name of the action)",
+    )
+    implementation = models.ForeignKey(
+        Implementation, on_delete=models.CASCADE, related_name="action_mappings"
+    )
+    materialized_blok = models.ForeignKey(
+        MaterializedBlok,
+        on_delete=models.CASCADE,
+        related_name="action_mappings",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+     
+     
+class StateMapping(models.Model):
+    """A State Mapping is a mapping between a State and a Blok Implementation"""
+    key = models.CharField(
+        max_length=1000,
+        help_text="The key for this State Mapping (e.g. the name of the state)",
+    )
+    state = models.ForeignKey(
+        State, on_delete=models.CASCADE, related_name="state_mappings"
+    )
+    materialized_blok = models.ForeignKey(
+        MaterializedBlok,
+        on_delete=models.CASCADE,
+        related_name="state_mappings",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+         
+        
 class HistoricalState(models.Model):
     """A historical state
 
