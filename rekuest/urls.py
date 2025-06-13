@@ -18,7 +18,7 @@ Including another URLconf
 from django.contrib import admin
 from kante.path import dynamicpath
 
-reload = "fdssssss"
+reload = "fdsssssss"
 
 
 urlpatterns = [

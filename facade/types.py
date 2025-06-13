@@ -6,16 +6,18 @@ import strawberry_django
 from authentikate.models import Client, User
 from django.conf import settings
 from django.utils import timezone
-from facade import enums, filters, models, scalars
+from facade import enums, filters, models, scalars, inputs
 from rekuest_core import enums as renums
 from rekuest_core import scalars as rscalars
 from rekuest_core.objects import models as rmodels
 from rekuest_core.objects import types as rtypes
 from strawberry import LazyType
 from kante.types import Info
+from pydantic import BaseModel
+
 from rekuest_ui_core.objects import models as uimodels
 from rekuest_ui_core.objects import types as uitypes
-
+from strawberry.experimental import pydantic
 
 @strawberry_django.type(User, filters=filters.UserFilter, pagination=True, order=filters.UserOrder, description="Represents an authenticated user.")
 class User:
@@ -408,7 +410,17 @@ class Dashboard:
     
 
 
-@strawberry.type
+
+class PortMatchModel(BaseModel):
+    at: Optional[int] = None
+    key: Optional[str] = None
+    kind: Optional[renums.PortKind] = None
+    identifier: Optional[str] = None
+    nullable: Optional[bool] = None
+    children: Optional[list["PortMatchModel"]] = None
+
+
+@pydantic.type(PortMatchModel, description="Port matching in action demands.")
 class PortMatch:
     at: int | None = strawberry.field(
         default=None,
@@ -430,12 +442,33 @@ class PortMatch:
         default=None,
         description="Whether the port is nullable. ",
     )
-    children: list["PortMatch"] | None = strawberry.field(
+    children: list[LazyType["PortMatch", __name__]] | None = strawberry.field(
         default=None,
         description="List of child ports to match. ",
     )
 
-@strawberry.type
+
+
+
+class ActionDemandModel(BaseModel):
+    key: str
+    hash: Optional[str] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    arg_matches: Optional[list[PortMatchModel]] = None
+    return_matches: Optional[list[PortMatchModel]] = None
+    protocols: Optional[list[str]] = None
+    force_arg_length: Optional[int] = None
+    force_return_length: Optional[int] = None
+
+
+
+
+
+
+
+
+@pydantic.type(ActionDemandModel, description="Input model for action demand.")
 class ActionDemand:
     key: str = strawberry.field(
         description="The key of the action demand. This is used to identify the action in the system.",
@@ -473,8 +506,16 @@ class ActionDemand:
         description="Require that the action has a specific number of returns. This is used to identify the demand in the system.",
     )
    
+  
+class StateDemandModel(BaseModel):
+    key: str
+    hash: Optional[str] = None
+    matches: Optional[list[PortMatchModel]] = None
+    protocols: Optional[list[str]] = None  
     
-@strawberry.type(description="The input for creating a action demand.")
+    
+    
+@pydantic.type(StateDemandModel, description="The input for creating a action demand.")
 class StateDemand:
     key: str = strawberry.field(
         description="The key of the action demand. This is used to identify the action in the system.",
@@ -509,7 +550,7 @@ class Blok:
     )
     def action_demands(self) -> list[ActionDemand]:
         return [
-            ActionDemand(
+            ActionDemandModel(
                 **action
             )
             for action in self.action_demands
@@ -520,7 +561,7 @@ class Blok:
     )
     def state_demands(self) -> list[StateDemand]:
         return [
-            StateDemand(
+            StateDemandModel(
                 **action
             )
             for action in self.state_demands
@@ -538,41 +579,47 @@ class Blok:
         
         filtered_ids: set[str] = set()
 
-        for ports_demand in self.action_demands:
-            new_ids = managers.get_action_ids_by_action_demand(
-                action_demand=ActionDemandInputModel(**ports_demand),
-            )
-
-            if len(new_ids) == 0:
-                # There are no actions that match the demand
-                raise ValueError(
-                    f"No actions found that match the given action demands {ports_demand}"
+        
+        if self.action_demands:
+            for ports_demand in self.action_demands:
+                new_ids = managers.get_action_ids_by_action_demand(
+                    action_demand=ActionDemandInputModel(**ports_demand),
                 )
 
-            for new_id in new_ids:
-                if new_id not in filtered_ids:
-                    filtered_ids.add(new_id)
+                if len(new_ids) == 0:
+                    # There are no actions that match the demand
+                    raise ValueError(
+                        f"No actions found that match the given action demands {ports_demand}"
+                    )
 
-        queryset = queryset.filter(implementations__action__id__in=filtered_ids)
+                for new_id in new_ids:
+                    if new_id not in filtered_ids:
+                        filtered_ids.add(new_id)
+                        
+                        
+
+            queryset = queryset.filter(implementations__action__id__in=filtered_ids)
 
         filtered_ids: set[str] = set()
+        if self.state_demands:
+            for state_demand in self.state_demands:
+                fitting_schema_ids = managers.get_state_ids_by_demands(
+                SchemaDemandInputModel(
+                        **state_demand,
+                    ).matches,
+                    model="facade_stateschema",
+                )
 
-        for state_demand in self.state_demands:
-            fitting_schema_ids = managers.get_state_ids_by_demands(
-               SchemaDemandInputModel(
-                    **state_demand,
-                ).matches,
-                model="facade_stateschema",
-            )
+                if len(fitting_schema_ids) == 0:
+                    return queryset.none()
 
-            if len(fitting_schema_ids) == 0:
-                return queryset.none()
+                for new_id in fitting_schema_ids:
+                    if new_id not in filtered_ids:
+                        filtered_ids.add(new_id)
 
-            for new_id in fitting_schema_ids:
-                if new_id not in filtered_ids:
-                    filtered_ids.add(new_id)
-
-        return queryset.filter(states__state_schema__id__in=list(filtered_ids)).distinct()
+            queryset = queryset.filter(states__state_schema__id__in=list(filtered_ids))
+            
+        return queryset.distinct()
         
         
         
