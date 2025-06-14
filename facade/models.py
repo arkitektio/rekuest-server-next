@@ -27,18 +27,14 @@ class Collection(models.Model):
 
     """
 
-    name = models.CharField(
-        max_length=1000, unique=True, help_text="The name of this Collection"
-    )
+    name = models.CharField(max_length=1000, unique=True, help_text="The name of this Collection")
     description = models.TextField(help_text="A description for the Collection")
     defined_at = models.DateTimeField(
         auto_created=True,
         auto_now_add=True,
         help_text="Date this Collection was created",
     )
-    updated_at = models.DateTimeField(
-        auto_now=True, help_text="Date this Collection was last updated"
-    )
+    updated_at = models.DateTimeField(auto_now=True, help_text="Date this Collection was last updated")
     creator = models.ForeignKey(
         get_user_model(),
         on_delete=models.CASCADE,
@@ -57,9 +53,7 @@ class Protocol(models.Model):
 
     """
 
-    name = models.CharField(
-        max_length=1000, unique=True, help_text="The name of this Protocol"
-    )
+    name = models.CharField(max_length=1000, unique=True, help_text="The name of this Protocol")
     description = models.TextField(help_text="A description for the Protocol")
 
     def __str__(self) -> str:
@@ -75,9 +69,7 @@ class Registry(models.Model):
 
     """
 
-    client = models.ForeignKey(
-        Client, on_delete=models.CASCADE, help_text="The Associated Client"
-    )
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, help_text="The Associated Client")
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -115,6 +107,12 @@ class Toolbox(models.Model):
         related_name="toolboxes",
         help_text="The user that created this Shortcut",
     )
+    client = models.ForeignKey(
+        Client,
+        on_delete=models.CASCADE,
+        related_name="toolboxes",
+        help_text="The client this Toolbox belongs to",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -129,9 +127,7 @@ class Action(models.Model):
         related_name="actions",
         help_text="The collections this Action belongs to",
     )
-    pure = models.BooleanField(
-        default=False, help_text="Is this function pure. e.g can we cache the result?"
-    )
+    pure = models.BooleanField(default=False, help_text="Is this function pure. e.g can we cache the result?")
     idempotent = models.BooleanField(
         default=False,
         help_text="Is this function idempotent. e.g can we run it multiple times without changing the data again ?",
@@ -152,15 +148,9 @@ class Action(models.Model):
         default=enums.ActionKindChoices.FUNCTION.value,
         help_text="Function, generator? Will this function generate multiple results?",
     )
-    interfaces = models.JSONField(
-        default=list, help_text="Interfaces that we use to interpret the meta data"
-    )
-    port_groups = models.JSONField(
-        default=list, help_text="Intercae that we use to interpret the meta data"
-    )
-    name = models.CharField(
-        max_length=1000, help_text="The cleartext name of this Action"
-    )
+    interfaces = models.JSONField(default=list, help_text="Interfaces that we use to interpret the meta data")
+    port_groups = models.JSONField(default=list, help_text="Intercae that we use to interpret the meta data")
+    name = models.CharField(max_length=1000, help_text="The cleartext name of this Action")
     description = models.TextField(help_text="A description for the Action")
     scope = models.CharField(
         max_length=1000,
@@ -180,9 +170,7 @@ class Action(models.Model):
         blank=True,
         help_text="The protocols this Action implements (e.g. Predicate)",
     )
-    is_dev = models.BooleanField(
-        default=False, help_text="Is this Action a development Action"
-    )
+    is_dev = models.BooleanField(default=False, help_text="Is this Action a development Action")
 
     hash = models.CharField(
         max_length=1000,
@@ -201,15 +189,9 @@ class Action(models.Model):
 class Shortcut(models.Model):
     name: str = models.CharField(max_length=1000)
     description: str = models.TextField(null=True, blank=True)
-    toolbox = models.ForeignKey(
-        Toolbox, on_delete=models.CASCADE, related_name="shortcuts"
-    )
-    action = models.ForeignKey(
-        Action, on_delete=models.CASCADE, related_name="shortcuts", null=True
-    )
-    implementation = models.ForeignKey(
-        "Implementation", on_delete=models.CASCADE, related_name="shortcuts", null=True
-    )
+    toolbox = models.ForeignKey(Toolbox, on_delete=models.CASCADE, related_name="shortcuts")
+    action = models.ForeignKey(Action, on_delete=models.CASCADE, related_name="shortcuts", null=True)
+    implementation = models.ForeignKey("Implementation", on_delete=models.CASCADE, related_name="shortcuts", null=True)
     saved_args = models.JSONField(default=dict)
     creator = models.ForeignKey(
         get_user_model(),
@@ -235,15 +217,11 @@ class Icon(models.Model):
     pack = models.ForeignKey(IconPack, on_delete=models.CASCADE)
     icon_url = models.CharField(max_length=10000)
     hash = models.CharField(max_length=1000)
-    action = models.ForeignKey(
-        Action, on_delete=models.SET_NULL, null=True, related_name="icons"
-    )
+    action = models.ForeignKey(Action, on_delete=models.SET_NULL, null=True, related_name="icons")
 
 
 class Agent(models.Model):
-    name = models.CharField(
-        max_length=2000, help_text="This providers Name", default="Nana"
-    )
+    name = models.CharField(max_length=2000, help_text="This providers Name", default="Nana")
     extensions = models.JSONField(
         max_length=2000,
         default=list,
@@ -256,9 +234,7 @@ class Agent(models.Model):
     )
     instance_id = models.CharField(default="main", max_length=1000)
     installed_at = models.DateTimeField(auto_created=True, auto_now_add=True)
-    unique = models.CharField(
-        max_length=1000, default=uuid.uuid4, help_text="The Channel we are listening to"
-    )
+    unique = models.CharField(max_length=1000, default=uuid.uuid4, help_text="The Channel we are listening to")
     on_instance = models.CharField(
         max_length=1000,
         help_text="The Instance this Agent is running on",
@@ -270,12 +246,8 @@ class Agent(models.Model):
         default=enums.AgentEventChoices.DISCONNECT,
         help_text="The Status of this Agent",
     )
-    connected = models.BooleanField(
-        default=False, help_text="Is this Agent connected to the backend"
-    )
-    last_seen = models.DateTimeField(
-        help_text="The last time this Agent was seen", null=True
-    )
+    connected = models.BooleanField(default=False, help_text="Is this Agent connected to the backend")
+    last_seen = models.DateTimeField(help_text="The last time this Agent was seen", null=True)
     pinned_by = models.ManyToManyField(
         get_user_model(),
         related_name="pinned_agents",
@@ -312,10 +284,7 @@ class Agent(models.Model):
 
     @property
     def is_active(self):
-        return (
-            self.connected
-            and self.last_seen > datetime.datetime.now() - datetime.timedelta(minutes=5)
-        )
+        return self.connected and self.last_seen > datetime.datetime.now() - datetime.timedelta(minutes=5)
 
 
 class FilesystemShelve(models.Model):
@@ -454,14 +423,10 @@ class HardwareRecord(models.Model):
 
 
 class Waiter(models.Model):
-    name = models.CharField(
-        max_length=2000, help_text="This waiters Name", default="Nana"
-    )
+    name = models.CharField(max_length=2000, help_text="This waiters Name", default="Nana")
     instance_id = models.CharField(default="main", max_length=1000)
     installed_at = models.DateTimeField(auto_created=True, auto_now_add=True)
-    unique = models.CharField(
-        max_length=1000, default=uuid.uuid4, help_text="The Channel we are listening to"
-    )
+    unique = models.CharField(max_length=1000, default=uuid.uuid4, help_text="The Channel we are listening to")
     latest_event = TextChoicesField(
         max_length=1000,
         choices_enum=enums.WaiterStatusChoices,
@@ -545,9 +510,7 @@ class Dependency(models.Model):
 class Implementation(models.Model):
     """A Implementation is a conceptual implementation of A Action. It represents its implementation as well as its performance"""
 
-    interface = models.CharField(
-        max_length=1000, help_text="Interface (think Function)"
-    )
+    interface = models.CharField(max_length=1000, help_text="Interface (think Function)")
     action = models.ForeignKey(
         Action,
         on_delete=models.CASCADE,
@@ -576,9 +539,7 @@ class Implementation(models.Model):
         default=list,
         help_text="The attached extensions for this Implementation",
     )
-    extension = models.CharField(
-        verbose_name="Extension", max_length=1000, default="global"
-    )
+    extension = models.CharField(verbose_name="Extension", max_length=1000, default="global")
 
     policy = models.JSONField(
         max_length=2000,
@@ -588,9 +549,7 @@ class Implementation(models.Model):
     params = models.JSONField(default=dict, help_text="Params for this Implementation")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    dynamic: str = models.BooleanField(
-        help_text="Dynamic Implementations will be able to create new reservations on runtime"
-    )
+    dynamic: str = models.BooleanField(help_text="Dynamic Implementations will be able to create new reservations on runtime")
 
     class Meta:
         permissions = [("providable", "Can provide this implementation")]
@@ -721,9 +680,7 @@ class Reservation(models.Model):
 class Assignation(models.Model):
     """A constant log of a tasks transition through finding a Action, Implementation and finally Pod , also a store for its results"""
 
-    waiter = models.ForeignKey(
-        Waiter, on_delete=models.CASCADE, help_text="Which Waiter assigned this?"
-    )
+    waiter = models.ForeignKey(Waiter, on_delete=models.CASCADE, help_text="Which Waiter assigned this?")
     reservation = models.ForeignKey(
         Reservation,
         on_delete=models.CASCADE,
@@ -740,9 +697,7 @@ class Assignation(models.Model):
         blank=True,
         null=True,
     )
-    action = models.ForeignKey(
-        Action, on_delete=models.CASCADE, help_text="The action this was assigned to"
-    )
+    action = models.ForeignKey(Action, on_delete=models.CASCADE, help_text="The action this was assigned to")
     ephemeral = models.BooleanField(
         default=False,
         help_text="Is this Assignation ephemeral (e.g. should it be deleted after its done or should it be kept for future reference)",
@@ -931,9 +886,7 @@ class TestCase(models.Model):
 
 class TestResult(models.Model):
     case = models.ForeignKey(TestCase, on_delete=models.CASCADE, related_name="results")
-    implementation = models.ForeignKey(
-        Implementation, on_delete=models.CASCADE, related_name="testresults"
-    )
+    implementation = models.ForeignKey(Implementation, on_delete=models.CASCADE, related_name="testresults")
     tester = models.ForeignKey(
         Implementation,
         on_delete=models.CASCADE,
@@ -952,9 +905,7 @@ class Structure(models.Model):
 
 
 class Widget(models.Model):
-    structure = models.ForeignKey(
-        Structure, on_delete=models.CASCADE, null=True, blank=True
-    )
+    structure = models.ForeignKey(Structure, on_delete=models.CASCADE, null=True, blank=True)
     name = models.CharField(max_length=2000)
     kind = models.CharField(max_length=2000)
     hash = models.CharField(max_length=2000, unique=True)
@@ -963,11 +914,8 @@ class Widget(models.Model):
 
 class Dashboard(models.Model):
     name = models.CharField(max_length=2000)
-    structure = models.ForeignKey(
-        Structure, on_delete=models.CASCADE, null=True, blank=True
-    )
+    structure = models.ForeignKey(Structure, on_delete=models.CASCADE, null=True, blank=True)
     ui_tree = models.JSONField(null=True, blank=True)
-
 
 
 class StateSchema(models.Model):
@@ -998,21 +946,15 @@ class State(models.Model):
 
     """
 
-    state_schema = models.ForeignKey(
-        StateSchema, on_delete=models.CASCADE, related_name="states"
-    )
+    state_schema = models.ForeignKey(StateSchema, on_delete=models.CASCADE, related_name="states")
     interface = models.CharField(
         max_length=1000,
         help_text="The interface this state is for (e.g. Function)",
     )
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="states")
     value = models.JSONField(default=dict, help_text=" The current value of this state")
-    created_at = models.DateTimeField(
-        auto_now_add=True, help_text="Date this State was first ever written to"
-    )
-    updated_at = models.DateTimeField(
-        auto_now=True, help_text="Date this State was last updated"
-    )
+    created_at = models.DateTimeField(auto_now_add=True, help_text="Date this State was first ever written to")
+    updated_at = models.DateTimeField(auto_now=True, help_text="Date this State was last updated")
 
     class Meta:
         constraints = [
@@ -1021,13 +963,8 @@ class State(models.Model):
                 name="No multiple States for same Agent and Schema allowed",
             )
         ]
-        
-        
-        
-        
-        
-        
-        
+
+
 class Blok(models.Model):
     name: str = models.CharField(max_length=1000)
     description: str = models.TextField(null=True, blank=True)
@@ -1051,34 +988,28 @@ class Blok(models.Model):
         null=True,
         blank=True,
     )
-    
-    
+
+
 class MaterializedBlok(models.Model):
     """A Blok Implementation is a specific implementation of a Blok"""
-    dashboard = models.ForeignKey(
-        Dashboard, on_delete=models.CASCADE, related_name="materialized_bloks"
-    )
-    blok = models.ForeignKey(
-        Blok, on_delete=models.CASCADE, related_name="materialized_bloks"
-    )
-    agent = models.ForeignKey(
-        Agent, on_delete=models.CASCADE, related_name="materialized_bloks"
-    )
+
+    dashboard = models.ForeignKey(Dashboard, on_delete=models.CASCADE, related_name="materialized_bloks")
+    blok = models.ForeignKey(Blok, on_delete=models.CASCADE, related_name="materialized_bloks")
+    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="materialized_bloks")
     name = models.CharField(max_length=1000, help_text="The name of this Blok Implementation")
     description = models.TextField(help_text="A description for this Blok Implementation")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
-    
+
+
 class ActionMapping(models.Model):
     """An Action Mapping is a mapping between an Action and a Blok Implementation"""
+
     key = models.CharField(
         max_length=1000,
         help_text="The key for this Action Mapping (e.g. the name of the action)",
     )
-    implementation = models.ForeignKey(
-        Implementation, on_delete=models.CASCADE, related_name="action_mappings"
-    )
+    implementation = models.ForeignKey(Implementation, on_delete=models.CASCADE, related_name="action_mappings")
     materialized_blok = models.ForeignKey(
         MaterializedBlok,
         on_delete=models.CASCADE,
@@ -1086,18 +1017,16 @@ class ActionMapping(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
-     
-     
+
+
 class StateMapping(models.Model):
     """A State Mapping is a mapping between a State and a Blok Implementation"""
+
     key = models.CharField(
         max_length=1000,
         help_text="The key for this State Mapping (e.g. the name of the state)",
     )
-    state = models.ForeignKey(
-        State, on_delete=models.CASCADE, related_name="state_mappings"
-    )
+    state = models.ForeignKey(State, on_delete=models.CASCADE, related_name="state_mappings")
     materialized_blok = models.ForeignKey(
         MaterializedBlok,
         on_delete=models.CASCADE,
@@ -1105,8 +1034,8 @@ class StateMapping(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-         
-        
+
+
 class HistoricalState(models.Model):
     """A historical state
 
@@ -1118,18 +1047,11 @@ class HistoricalState(models.Model):
 
     """
 
-    state = models.ForeignKey(
-        State, on_delete=models.CASCADE, related_name="historical_states"
-    )
-    value = models.JSONField(
-        default=dict, help_text=" The  value of this state atht he time of creation"
-    )
-    archived_at = models.DateTimeField(
-        auto_now_add=True, help_text="Date this State was archived"
-    )
+    state = models.ForeignKey(State, on_delete=models.CASCADE, related_name="historical_states")
+    value = models.JSONField(default=dict, help_text=" The  value of this state atht he time of creation")
+    archived_at = models.DateTimeField(auto_now_add=True, help_text="Date this State was archived")
 
 
-
-import facade.signals as signals # noqa: E402
+import facade.signals as signals  # noqa: E402
 
 __all__ = ["signals"]
