@@ -53,6 +53,8 @@ INSTALLED_APPS = [
     "django_probes",
     "kante",
     "facade",
+    'health_check',                             # required
+    'health_check.db',                          # stock Django health checkers
 ]
 
 # Authentikate section

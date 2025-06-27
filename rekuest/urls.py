@@ -17,10 +17,12 @@ Including another URLconf
 
 from django.contrib import admin
 from kante.path import dynamicpath
-
-reload = "fdsssssss"
+from django.urls import include, path
+from health_check.views import MainView
+from django.views.decorators.csrf import csrf_exempt
 
 
 urlpatterns = [
     dynamicpath("admin/", admin.site.urls),
+    dynamicpath("ht",  csrf_exempt(MainView.as_view()), name="health_check"),
 ]

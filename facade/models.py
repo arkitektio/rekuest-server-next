@@ -187,8 +187,8 @@ class Action(models.Model):
 
 
 class Shortcut(models.Model):
-    name: str = models.CharField(max_length=1000)
-    description: str = models.TextField(null=True, blank=True)
+    name = models.CharField(max_length=1000)
+    description = models.TextField(null=True, blank=True)
     toolbox = models.ForeignKey(Toolbox, on_delete=models.CASCADE, related_name="shortcuts")
     action = models.ForeignKey(Action, on_delete=models.CASCADE, related_name="shortcuts", null=True)
     implementation = models.ForeignKey("Implementation", on_delete=models.CASCADE, related_name="shortcuts", null=True)
@@ -234,7 +234,7 @@ class Agent(models.Model):
     )
     instance_id = models.CharField(default="main", max_length=1000)
     installed_at = models.DateTimeField(auto_created=True, auto_now_add=True)
-    unique = models.CharField(max_length=1000, default=uuid.uuid4, help_text="The Channel we are listening to")
+    unique = models.CharField(max_length=1000, default=lambda: str(uuid.uuid4), help_text="The Channel we are listening to")
     on_instance = models.CharField(
         max_length=1000,
         help_text="The Instance this Agent is running on",
