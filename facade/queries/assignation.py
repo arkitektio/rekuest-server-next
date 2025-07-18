@@ -7,18 +7,8 @@ def assignations(
     info: Info,
     instance_id: scalars.InstanceID | None = None,
 ) -> list[types.Assignation]:
-    
+    registry, _ = models.Registry.objects.get_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
 
-    registry, _ = models.Registry.objects.get_or_create(
-        client=info.context.request.client, user=info.context.request.user
-    )
+    waiter, _ = models.Waiter.objects.get_or_create(registry=registry, instance_id=instance_id, defaults=dict(name="default"))
 
-    waiter, _ = models.Waiter.objects.get_or_create(
-        registry=registry, instance_id=instance_id, defaults=dict(name="default")
-    )
-
-    return (
-        models.Assignation.objects.filter(reservation__waiter=waiter)
-        .order_by("created_at")
-        .all()
-    )
+    return models.Assignation.objects.filter(reservation__waiter=waiter).order_by("created_at").all()

@@ -22,8 +22,9 @@ class EffectInputModel(BaseModel):
     dependencies: list[str] | None = []
     message: str | None = None
     kind: enums.EffectKind
-    hook: str | None
-    ward: str | None
+    fade: bool = True
+    hook: str | None = None
+    ward: str | None  = None
 
 
 class ChoiceInputModel(BaseModel):
@@ -90,6 +91,7 @@ class PortInputModel(BaseModel):
         if self.kind == enums.PortKind.LIST and (self.children is None or len(self.children) != 1):
             raise ValueError("Port of kind LIST must have exactly on children")
         return self
+    
 
 
 class PortGroupInputModel(BaseModel):
@@ -115,7 +117,30 @@ class DefinitionInputModel(BaseModel):
     interfaces: list[str] = Field(default_factory=list)
     is_dev: bool = False
     logo: str | None = None
-
+    
+    
+    @model_validator(mode="after")
+    def check_dependencies(cls, self) -> Self:
+        """Ensure that all dependencies in ports are valid."""
+        all_arg_keys = [port.key for port in self.args]
+        all_return_keys = [port.key for port in self.returns]
+        
+        for arg in self.args:
+            print("Checking port:", arg.key)
+            for validator in arg.validators or []:
+                if validator.dependencies:
+                    for dep in validator.dependencies:
+                        if dep not in all_arg_keys and dep not in all_return_keys:
+                            raise ValueError(f"Validator {validator.label} in port {arg.key} has invalid dependency: {dep}")
+                        
+            for effect in arg.effects or []:
+                if effect.dependencies:
+                    for dep in effect.dependencies:
+                        if dep not in all_arg_keys and dep not in all_return_keys:
+                            raise ValueError(f"Effect {effect.function} in port {arg.key} has invalid dependency: {dep}")
+                        
+        return self
+            
 
 class DependencyInputModel(BaseModel):
     action: str

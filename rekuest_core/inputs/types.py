@@ -41,6 +41,10 @@ class EffectInput:
         default=None,
         description="The ward to run when the effect is applied (if it is a custom effect)",
     )
+    fade: bool | None = strawberry.field(
+        default=True,
+        description="Whether to fade out the port when the effect is applied (if it is a hide effect)",
+    )
 
 
 @pydantic.input(

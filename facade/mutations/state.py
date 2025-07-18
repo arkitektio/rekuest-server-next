@@ -19,6 +19,7 @@ async def set_state(info: Info, input: inputs.SetStateInput) -> types.State:
     registry, _ = await models.Registry.objects.aget_or_create(
         client=client,
         user=user,
+        organization=info.context.request.organization,
     )
 
     agent, _ = await models.Agent.objects.aget_or_create(
@@ -41,11 +42,10 @@ async def set_state(info: Info, input: inputs.SetStateInput) -> types.State:
 
 
 def update_state(info: Info, input: inputs.UpdateStateInput) -> types.State:
-   
-
     registry, _ = models.Registry.objects.get_or_create(
         client=info.context.request.client,
         user=info.context.request.user,
+        organization=info.context.request.organization,
     )
 
     agent, _ = models.Agent.objects.get_or_create(
@@ -72,11 +72,10 @@ def update_state(info: Info, input: inputs.UpdateStateInput) -> types.State:
 
 
 async def archive_state(info: Info, input: inputs.ArchiveStateInput) -> types.State:
-    
-
     registry, _ = await models.Registry.objects.aget_or_create(
         client=info.context.request.client,
         user=info.context.request.user,
+        organization=info.context.request.organization,
     )
     agent, _ = await models.Agent.objects.aget_or_create(
         registry=registry,
@@ -86,9 +85,7 @@ async def archive_state(info: Info, input: inputs.ArchiveStateInput) -> types.St
         ),
     )
 
-    state = await models.State.objects.aget(
-        state_schema_id=input.state_schema, agent=agent
-    )
+    state = await models.State.objects.aget(state_schema_id=input.state_schema, agent=agent)
 
     historical_state = await models.HistoricalState.objects.create(
         state=state,
@@ -98,16 +95,14 @@ async def archive_state(info: Info, input: inputs.ArchiveStateInput) -> types.St
     return historical_state.state
 
 
-
-def set_agent_states(
-    info: Info, input: inputs.SetAgentStatesInput
-) -> list[types.State]:
+def set_agent_states(info: Info, input: inputs.SetAgentStatesInput) -> list[types.State]:
     user = info.context.request.user
     client = info.context.request.client
 
     registry, _ = models.Registry.objects.get_or_create(
         client=client,
         user=user,
+        organization=info.context.request.organization,
     )
 
     agent, _ = models.Agent.objects.get_or_create(
@@ -119,14 +114,12 @@ def set_agent_states(
     )
 
     states = []
-    
-    previous_states_id = models.State.objects.filter(
-        agent=agent
-    ).values("id").all()
+
+    previous_states_id = models.State.objects.filter(agent=agent).values("id").all()
 
     new_state_id = []
     created_implementations = []
-    
+
     for inputstate in input.implementations:
         state_schema, _ = models.StateSchema.objects.update_or_create(
             hash=unique.hash_state_schema(inputstate.state_schema),
@@ -137,20 +130,17 @@ def set_agent_states(
             ),
         )
 
-        
         state, _ = models.State.objects.update_or_create(
             interface=inputstate.interface,
             agent=agent,
             defaults=dict(
-                
                 state_schema=state_schema,
                 value=inputstate.initial,
             ),
         )
-        
+
         new_state_id.append(state.id)
         states.append(state)
-
 
     for i in previous_states_id:
         if i["id"] not in new_state_id:

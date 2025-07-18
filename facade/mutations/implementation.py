@@ -9,6 +9,7 @@ from facade.unique import assert_non_statefullness, infer_action_scope
 from kante.types import Info
 from rekuest_core.inputs.models import DefinitionInputModel, ImplementationInputModel
 from authentikate.vars import get_user, get_client
+
 logger = logging.getLogger(__name__)
 
 
@@ -27,14 +28,10 @@ def hash_definition(definition: DefinitionInputModel) -> str:
             "collections",
         ]
     }
-    return hashlib.sha256(
-        json.dumps(hashable_definition, sort_keys=True).encode()
-    ).hexdigest()
+    return hashlib.sha256(json.dumps(hashable_definition, sort_keys=True).encode()).hexdigest()
 
 
-def _create_implementation(
-    input: ImplementationInputModel, agent: models.Agent, extension: str
-) -> models.Implementation:
+def _create_implementation(input: ImplementationInputModel, agent: models.Agent, extension: str) -> models.Implementation:
     definition = input.definition
 
     hash = hash_definition(definition)
@@ -68,7 +65,7 @@ def _create_implementation(
 
         if definition.collections:
             for collection_name in definition.collections:
-                c, _ = models.Collection.objects.get_or_create(name=collection_name, defaults=dict(creator=agent.registry.user))
+                c, _ = models.Collection.objects.get_or_create(name=collection_name, defaults=dict(creator=agent.registry.user, organization=agent.registry.organization))
                 action.collections.add(c)
 
         logger.info(f"Created {action}")
@@ -150,14 +147,8 @@ def _create_implementation(
     return implementation
 
 
-def create_implementation(
-    info: Info, input: inputs.CreateImplementationInput
-) -> types.Implementation:
-    
-    
-    registry, _ = models.Registry.objects.update_or_create(
-        client=info.context.request.client, user=info.context.request.user
-    )
+def create_implementation(info: Info, input: inputs.CreateImplementationInput) -> types.Implementation:
+    registry, _ = models.Registry.objects.update_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
 
     agent, _ = models.Agent.objects.update_or_create(
         registry=registry,
@@ -170,14 +161,10 @@ def create_implementation(
     return _create_implementation(input.implementation, agent, input.extension)
 
 
-def create_foreign_implementation(
-    info: Info, input: inputs.CreateForeignImplementationInput
-) -> types.Implementation:
+def create_foreign_implementation(info: Info, input: inputs.CreateForeignImplementationInput) -> types.Implementation:
     agent = models.Agent.objects.get(id=input.agent)
 
-    assert input.extension in agent.extensions, (
-        f"Extension {input.extension} not supported by agent {agent}"
-    )
+    assert input.extension in agent.extensions, f"Extension {input.extension} not supported by agent {agent}"
 
     return _create_implementation(input.implementation, agent, input.extension)
 
@@ -190,15 +177,8 @@ def delete_implementation(info: Info, input: inputs.DeleteImplementationInput) -
     return input.id
 
 
-def set_extension_implementations(
-    info: Info, input: inputs.SetExtensionImplementationsInput
-) -> list[types.Implementation]:
-    
-    
-    
-    registry, _ = models.Registry.objects.update_or_create(
-        client=info.context.request.client, user=info.context.request.user
-    )
+def set_extension_implementations(info: Info, input: inputs.SetExtensionImplementationsInput) -> list[types.Implementation]:
+    registry, _ = models.Registry.objects.update_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
 
     agent, _ = models.Agent.objects.get_or_create(
         registry=registry,
@@ -208,16 +188,12 @@ def set_extension_implementations(
         ),
     )
 
-    previous_implementations = models.Implementation.objects.filter(
-        agent=agent, extension=input.extension
-    ).all()
+    previous_implementations = models.Implementation.objects.filter(agent=agent, extension=input.extension).all()
 
     created_implementations_id = []
     created_implementations = []
     for implementation in input.implementations:
-        created_implementation = _create_implementation(
-            implementation, agent, input.extension
-        )
+        created_implementation = _create_implementation(implementation, agent, input.extension)
 
         created_implementations_id.append(created_implementation.id)
         created_implementations.append(created_implementation)
@@ -231,10 +207,8 @@ def set_extension_implementations(
 
 
 def pin_implementation(info, input: inputs.PinInput) -> types.Implementation:
-    
-    
     user = info.context.request.user
-    
+
     agent = models.Implementation.objects.get(id=input.id)
     if input.pin:
         agent.pinned_by.add(user)

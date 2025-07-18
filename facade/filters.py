@@ -2,7 +2,7 @@ from typing import Optional
 
 import strawberry
 import strawberry_django
-from authentikate.models import Client, User
+from authentikate.models import Client, User, Organization
 from authentikate.vars import get_user
 from facade import enums, inputs, managers, models, scalars
 from rekuest_core import enums as renums
@@ -134,9 +134,7 @@ class AgentFilter:
 
             if len(new_ids) == 0:
                 # There are no actions that match the demand
-                raise ValueError(
-                    f"No actions found that match the given action demands {ports_demand}"
-                )
+                raise ValueError(f"No actions found that match the given action demands {ports_demand}")
 
             for new_id in new_ids:
                 if new_id not in filtered_ids:
@@ -336,6 +334,27 @@ class UserOrder:
     email: auto
     date_joined: auto
     last_login: auto
+
+
+@strawberry_django.order(Organization, description="A way to order registries")
+class OrganizationOrder:
+    slug: auto
+
+
+@strawberry_django.filter(Organization, description="A way to filter organizations")
+class OrganizationFilter:
+    slug: Optional[FilterLookup[str]]
+    ids: list[strawberry.ID] | None
+
+    def filter_slug(self, queryset, info):
+        if self.slug is None:
+            return queryset
+        return queryset.filter(slug__icontains=self.slug)
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
 
 
 @strawberry_django.order(Client, description="A way to order apps")

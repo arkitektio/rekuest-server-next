@@ -6,7 +6,7 @@ from typing import Optional
 
 import redis
 import redis.asyncio as aredis
-from authentikate.expand import aexpand_user_from_token, aexpand_client_from_token
+from authentikate.expand import aexpand_user_from_token, aexpand_client_from_token, aexpand_organization_from_token
 from authentikate.utils import authenticate_token_or_none
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
@@ -77,10 +77,12 @@ class AgentConsumer(AsyncWebsocketConsumer):
 
         self.user = await aexpand_user_from_token(token)
         self.client = await aexpand_client_from_token(token)
+        self.organization = await aexpand_organization_from_token(token)
 
         self.registry, _ = await models.Registry.objects.aget_or_create(
             client=self.client,
             user=self.user,
+            organization=self.organization,
         )
 
         self.agent, _ = await models.Agent.objects.aget_or_create(

@@ -89,7 +89,6 @@ class Effect:
     kind: enums.EffectKind
     function: scalars.ValidatorFunction
     dependencies: list[str]
-    pass
 
 
 @pydantic.type(models.MessageEffectModel)
@@ -101,6 +100,10 @@ class MessageEffect(Effect):
 class CustomEffect(Effect):
     ward: str
     hook: str
+    
+@pydantic.type(models.HideEffectModel)
+class HideEffect(Effect):
+    fade: bool = True
 
 
 @pydantic.type(models.BindsModel)
@@ -136,12 +139,12 @@ class Port:
     nullable: bool
     label: str | None
     description: str | None
-    effects: list[Effect] | None
+    effects: list[Effect] | None = None
     children: list[LazyType["Port", __name__]] | None = None
-    choices: list[Choice] | None
-    assign_widget: AssignWidget | None
-    return_widget: ReturnWidget | None
-    validators: list[Validator] | None
+    choices: list[Choice] | None = None
+    assign_widget: AssignWidget | None = None
+    return_widget: ReturnWidget | None = None
+    validators: list[Validator] | None = None
 
 
 @pydantic.type(models.DefinitionModel)

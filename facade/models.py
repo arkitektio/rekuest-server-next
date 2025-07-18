@@ -1,7 +1,7 @@
 import datetime
 import uuid
 
-from authentikate.models import Client, User
+from authentikate.models import Client, User, Organization
 from django.db import models
 from django_choices_field import TextChoicesField
 from facade import enums
@@ -41,6 +41,12 @@ class Collection(models.Model):
         related_name="collections",
         help_text="The user that created this Collection",
     )
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="collections",
+        help_text="The Organization this Collection belongs to",
+    )
 
 
 class Protocol(models.Model):
@@ -75,17 +81,22 @@ class Registry(models.Model):
         on_delete=models.CASCADE,
         help_text="The Associatsed User",
     )
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        help_text="The Organization this Registry belongs to",
+    )
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["client", "user"],
-                name="No multiple Registries for same App and User allowed",
+                fields=["client", "user", "organization"],
+                name="No multiple Registries for same App and User in the same organization allowed",
             )
         ]
 
     def __str__(self) -> str:
-        return f"{self.client} used by {self.user}"
+        return f"{self.client} used by {self.user} in {self.organization}"
 
 
 class IconPack(models.Model):
@@ -113,6 +124,13 @@ class Toolbox(models.Model):
         related_name="toolboxes",
         help_text="The client this Toolbox belongs to",
     )
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="toolboxes",
+        help_text="The Organization this Collection belongs to",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -227,14 +245,13 @@ class Agent(models.Model):
         default=list,
         help_text="The extensions for this Agent",
     )
-
     health_check_interval = models.IntegerField(
         default=60 * 5,
         help_text="How often should this agent be checked for its health. Defaults to 5 mins",
     )
     instance_id = models.CharField(default="main", max_length=1000)
     installed_at = models.DateTimeField(auto_created=True, auto_now_add=True)
-    unique = models.CharField(max_length=1000, default=lambda: str(uuid.uuid4), help_text="The Channel we are listening to")
+    unique = models.CharField(max_length=1000, default=uuid.uuid4, help_text="The Channel we are listening to")
     on_instance = models.CharField(
         max_length=1000,
         help_text="The Instance this Agent is running on",
@@ -768,7 +785,7 @@ class Assignation(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.status} for {self.reservation}"
+        return f"{self.latest_event_kind} for {self.reservation}"
 
     class Meta:
         pass

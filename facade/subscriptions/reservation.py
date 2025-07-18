@@ -23,14 +23,10 @@ async def reservations(
     user = info.context.request.user
     client = info.context.request.client
 
-    registry, _ = await models.Registry.objects.aget_or_create(client=client, user=user)
+    registry, _ = await models.Registry.objects.aget_or_create(client=client, user=user, organization=info.context.request.organization)
 
-    waiter, _ = await models.Waiter.objects.aget_or_create(
-        registry=registry, instance_id=instance_id, defaults=dict(name="default")
-    )
+    waiter, _ = await models.Waiter.objects.aget_or_create(registry=registry, instance_id=instance_id, defaults=dict(name="default"))
 
-    async for message in reservation_channel.listen(
-        info.context, [f"res_waiter_{waiter.id}"]
-    ):
+    async for message in reservation_channel.listen(info.context, [f"res_waiter_{waiter.id}"]):
         continue
         yield await models.Reservation.objects.aget(id=message)

@@ -3,7 +3,7 @@ from typing import Optional
 
 import strawberry
 import strawberry_django
-from authentikate.models import Client, User
+from authentikate import models as auth_models
 from django.conf import settings
 from django.utils import timezone
 from facade import enums, filters, models, scalars, inputs
@@ -19,16 +19,22 @@ from rekuest_ui_core.objects import models as uimodels
 from rekuest_ui_core.objects import types as uitypes
 from strawberry.experimental import pydantic
 
-@strawberry_django.type(User, filters=filters.UserFilter, pagination=True, order=filters.UserOrder, description="Represents an authenticated user.")
+
+@strawberry_django.type(auth_models.User, filters=filters.UserFilter, pagination=True, order=filters.UserOrder, description="Represents an authenticated user.")
 class User:
     sub: strawberry.ID = strawberry_django.field(description="The subject identifier of the user.")
 
 
-@strawberry_django.type(Client, filters=filters.ClientFilter, pagination=True, order=filters.ClientOrder, description="Represents a registered OAuth2 client.")
+@strawberry_django.type(auth_models.Client, filters=filters.ClientFilter, pagination=True, order=filters.ClientOrder, description="Represents a registered OAuth2 client.")
 class Client:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the client.")
     name: str = strawberry_django.field(description="Name of the client.")
     client_id: str = strawberry_django.field(description="OAuth2 client ID.")
+
+
+@strawberry_django.type(auth_models.Organization, filters=filters.OrganizationFilter, pagination=True, order=filters.OrganizationOrder, description="Represents an organization in the system.")
+class Organization:
+    slug: str = strawberry_django.field(description="Slug of the organization.")
 
 
 @strawberry_django.type(models.Registry, description="Links a user and a client for registry tracking.")
@@ -36,6 +42,7 @@ class Registry:
     id: strawberry.ID = strawberry_django.field(description="Unique identifier for the registry.")
     client: Client = strawberry_django.field(description="The associated client.")
     user: User = strawberry_django.field(description="The associated user.")
+    organization: Organization = strawberry_django.field(description="The organization this registry belongs to.")
     agents: list["Agent"] = strawberry_django.field(description="Agents registered under this registry.")
 
 
@@ -108,7 +115,10 @@ class Action:
 
     @strawberry_django.field(description="Input arguments (ports) for the action.")
     def args(self) -> list[rtypes.Port]:
-        return [rmodels.PortModel(**i) for i in self.args]
+        
+        x =  [rmodels.PortModel(**i) for i in self.args]
+        print(x)
+        return x
 
     @strawberry_django.field(description="Output values (ports) returned by the action.")
     def returns(self) -> list[rtypes.Port]:
@@ -407,8 +417,6 @@ class Dashboard:
     def ui_tree(self) -> uitypes.UITree | None:
         model = uimodels.UITreeModel(**self.ui_tree) if self.ui_tree else None
         return model
-    
-
 
 
 class PortMatchModel(BaseModel):
@@ -448,8 +456,6 @@ class PortMatch:
     )
 
 
-
-
 class ActionDemandModel(BaseModel):
     key: str
     hash: Optional[str] = None
@@ -460,12 +466,6 @@ class ActionDemandModel(BaseModel):
     protocols: Optional[list[str]] = None
     force_arg_length: Optional[int] = None
     force_return_length: Optional[int] = None
-
-
-
-
-
-
 
 
 @pydantic.type(ActionDemandModel, description="Input model for action demand.")
@@ -505,16 +505,15 @@ class ActionDemand:
         default=None,
         description="Require that the action has a specific number of returns. This is used to identify the demand in the system.",
     )
-   
-  
+
+
 class StateDemandModel(BaseModel):
     key: str
     hash: Optional[str] = None
     matches: Optional[list[PortMatchModel]] = None
-    protocols: Optional[list[str]] = None  
-    
-    
-    
+    protocols: Optional[list[str]] = None
+
+
 @pydantic.type(StateDemandModel, description="The input for creating a action demand.")
 class StateDemand:
     key: str = strawberry.field(
@@ -531,8 +530,7 @@ class StateDemand:
     protocols: list[strawberry.ID] | None = strawberry.field(
         default=None,
         description="The protocols that the action has to implement. This is used to identify the demand in the system.",
-    )    
-    
+    )
 
 
 @strawberry_django.type(models.Blok)
@@ -540,46 +538,34 @@ class Blok:
     id: strawberry.ID
     name: str
     creator: User
-    url: str 
+    url: str
     materialized_bloks: list["MaterializedBlok"] = strawberry_django.field(
         description="Materialized bloks that are instances of this blok.",
     )
-    
+
     @strawberry_django.field(
         description="Get the actions that this blok can run.",
     )
     def action_demands(self) -> list[ActionDemand]:
-        return [
-            ActionDemandModel(
-                **action
-            )
-            for action in self.action_demands
-        ]
-        
+        return [ActionDemandModel(**action) for action in self.action_demands]
+
     @strawberry_django.field(
         description="Get the actions that this blok can run.",
     )
     def state_demands(self) -> list[StateDemand]:
-        return [
-            StateDemandModel(
-                **action
-            )
-            for action in self.state_demands
-        ]
-        
-        
+        return [StateDemandModel(**action) for action in self.state_demands]
+
     @strawberry_django.field(
         description="Get the agents that this blok can be implemented against.",
     )
     def possible_agents(self) -> list[Agent]:
         from facade import managers
         from facade.inputs import ActionDemandInputModel, SchemaDemandInputModel
-        
+
         queryset = models.Agent.objects
-        
+
         filtered_ids: set[str] = set()
 
-        
         if self.action_demands:
             for ports_demand in self.action_demands:
                 new_ids = managers.get_action_ids_by_action_demand(
@@ -588,15 +574,11 @@ class Blok:
 
                 if len(new_ids) == 0:
                     # There are no actions that match the demand
-                    raise ValueError(
-                        f"No actions found that match the given action demands {ports_demand}"
-                    )
+                    raise ValueError(f"No actions found that match the given action demands {ports_demand}")
 
                 for new_id in new_ids:
                     if new_id not in filtered_ids:
                         filtered_ids.add(new_id)
-                        
-                        
 
             queryset = queryset.filter(implementations__action__id__in=filtered_ids)
 
@@ -604,7 +586,7 @@ class Blok:
         if self.state_demands:
             for state_demand in self.state_demands:
                 fitting_schema_ids = managers.get_state_ids_by_demands(
-                SchemaDemandInputModel(
+                    SchemaDemandInputModel(
                         **state_demand,
                     ).matches,
                     model="facade_stateschema",
@@ -618,17 +600,10 @@ class Blok:
                         filtered_ids.add(new_id)
 
             queryset = queryset.filter(states__state_schema__id__in=list(filtered_ids))
-            
-        return queryset.distinct()
-        
-        
-        
-        
-        
 
-        
-    
-    
+        return queryset.distinct()
+
+
 @strawberry_django.type(models.MaterializedBlok)
 class MaterializedBlok:
     id: strawberry.ID
@@ -645,8 +620,6 @@ class MaterializedBlok:
     action_mappings: list["ActionMapping"] = strawberry_django.field(
         description="Mappings of actions to this materialized blok.",
     )
-    
-
 
 
 @strawberry_django.type(models.StateSchema)
@@ -693,22 +666,21 @@ class StateUpdateEvent:
     patches: list[JSONPatch]
 
 
-
 @strawberry_django.type(models.ActionMapping)
 class ActionMapping:
     id: strawberry.ID
-    key: str 
+    key: str
     implementation: Implementation
     materialized_blok: MaterializedBlok
     crreated_at: datetime.datetime
     updated_at: datetime.datetime
-    
+
+
 @strawberry_django.type(models.StateMapping)
 class StateMapping:
     id: strawberry.ID
-    key: str 
+    key: str
     implementation: Implementation
     state: State
     crreated_at: datetime.datetime
     updated_at: datetime.datetime
-    

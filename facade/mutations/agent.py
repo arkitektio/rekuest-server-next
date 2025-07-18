@@ -8,9 +8,7 @@ logger = logging.getLogger(__name__)
 
 @strawberry.input
 class AgentInput:
-    instance_id: scalars.InstanceID = strawberry.field(
-        description="The instance ID of the agent. This is used to identify the agent in the system."
-    )
+    instance_id: scalars.InstanceID = strawberry.field(description="The instance ID of the agent. This is used to identify the agent in the system.")
     name: str | None = strawberry.field(
         default=None,
         description="The name of the agent. This is used to identify the agent in the system.",
@@ -23,19 +21,16 @@ class AgentInput:
 
 @strawberry.input
 class DeleteAgentInput:
-    id: strawberry.ID = strawberry.field(
-        description="The ID of the agent to delete. This is used to identify the agent in the system."
-    )
+    id: strawberry.ID = strawberry.field(description="The ID of the agent to delete. This is used to identify the agent in the system.")
 
 
 async def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
     # TODO: Hasch this
-    
-    
-    
+
     registry, _ = await models.Registry.objects.aupdate_or_create(
         client=info.context.request.client,
         user=info.context.request.user,
+        organization=info.context.request.organization,
     )
 
     agent, _ = await models.Agent.objects.aupdate_or_create(
@@ -64,7 +59,6 @@ async def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
 
 
 def pin_agent(info, input: inputs.PinInput) -> types.Agent:
-    
     agent = models.Agent.objects.get(id=input.id)
     if input.pin:
         agent.pinned_by.add(info.context.request.user)
