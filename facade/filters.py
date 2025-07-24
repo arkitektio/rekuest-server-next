@@ -573,10 +573,11 @@ class ActionFilter(SearchFilter):
             queryset = managers.filter_actions_by_demands(
                 queryset,
                 ports_demand.matches,
-                type=ports_demand.kind,
+                type=ports_demand.kind.value,
                 force_length=ports_demand.force_length,
                 force_non_nullable_length=ports_demand.force_non_nullable_length,
                 force_structure_length=ports_demand.force_structure_length,
+                model= "facade_action",
             )
 
         return queryset
