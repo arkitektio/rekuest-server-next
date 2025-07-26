@@ -183,7 +183,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
 
             await self.send_to_agent_message(
                 messages.ProtocolError(
-                    message=str(e),
+                    error=str(e),
                 )
             )
 
