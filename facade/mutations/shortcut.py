@@ -18,6 +18,7 @@ def create_shortcut(info: Info, input: inputs.CreateShortcutInput) -> types.Shor
                 description="Default toolbox",
                 creator=info.context.request.user,
                 client=info.context.request.client,
+                organization=info.context.request.organization,
             ),
         )[0]
     )

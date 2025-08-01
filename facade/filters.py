@@ -564,6 +564,14 @@ class ActionFilter(SearchFilter):
     demands: list[inputs.PortDemandInput] | None
     protocols: list[str] | None
     kind: Optional[renums.ActionKind] | None
+    in_collection: str | None
+    
+    
+    def filter_in_collection(self, queryset, info):
+        if self.in_collection is None:
+            return queryset
+
+        return queryset.filter(collections__name=self.in_collection)
 
     def filter_demands(self, queryset, info):
         if self.demands is None:
