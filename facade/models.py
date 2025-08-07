@@ -217,6 +217,12 @@ class Shortcut(models.Model):
         related_name="shortcuts",
         help_text="The user that created this Shortcut",
     )
+    bind_number = models.IntegerField(
+        default=0,
+        null=True,
+        blank=True,
+        help_text="Which shortcut should be bound to this Action by default. 0 means no binding",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     args = models.JSONField(default=list, help_text="Inputs for this Shortcut")

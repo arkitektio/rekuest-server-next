@@ -39,6 +39,7 @@ def create_shortcut(info: Info, input: inputs.CreateShortcutInput) -> types.Shor
         returns=returns,
         allow_quick=input.allow_quick,
         use_returns=input.use_returns,
+        bind_number=input.bind_number,
     )
 
     logger.info(f"Shortcut created: {shortcut}")

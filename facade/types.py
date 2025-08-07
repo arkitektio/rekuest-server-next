@@ -79,7 +79,12 @@ class Shortcut:
     saved_args: rscalars.AnyDefault = strawberry_django.field(description="Saved arguments for the shortcut.")
     allow_quick: bool = strawberry_django.field(description="Allow quick execution without modification.")
     use_returns: bool = strawberry_django.field(description="If true, shortcut uses return values.")
-
+    bind_number: int | None = strawberry_django.field(
+        default=None,
+        description="Which shortcut should be bound to this Action by default. 0 means no binding.",
+    )
+    
+    
     @strawberry_django.field(description="Input ports for the shortcut's action.dd")
     def args(self) -> list[rtypes.Port]:
         return [rmodels.PortModel(**i) for i in self.args]

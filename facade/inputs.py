@@ -517,6 +517,7 @@ class CreateShortcutInputModel(BaseModel):
     args: Dict[str, Any]
     allow_quick: bool = False
     use_returns: bool = False
+    bind_number: int | None = None
 
 
 @pydantic.input(CreateShortcutInputModel, description="The input for creating a shortcut.")
@@ -534,6 +535,10 @@ class CreateShortcutInput:
     implementation: strawberry.ID | None = strawberry.field(
         default=None,
         description="The implementation ID to create the shortcut for. If not provided, the shortcut will be created for the action.",
+    )
+    bind_number: int | None = strawberry.field(
+        default=None,
+        description="The bind number of the shortcut. This is used to identify the shortcut in the system.",
     )
     args: scalars.Args = strawberry.field(description="The arguments to pre-pass to the shortcut. This is used to identify the shortcut in the system.")
     allow_quick: bool = strawberry.field(
