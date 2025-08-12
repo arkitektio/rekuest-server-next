@@ -30,13 +30,10 @@ async def set_state(info: Info, input: inputs.SetStateInput) -> types.State:
         ),
     )
 
-    state, _ = await models.State.objects.aupdate_or_create(
-        interface=input.interface,
-        agent=agent,
-        defaults=dict(
-            value=input.value,
-        ),
-    )
+    state = await models.State.objects.aget(interface=input.interface, agent=agent)
+
+    state.value = input.value
+    state.save()
 
     return state
 
