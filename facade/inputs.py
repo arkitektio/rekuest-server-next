@@ -16,6 +16,13 @@ import uuid
 
 
 class PinInputModel(BaseModel):
+    """Base model for pinning input data.
+
+    Attributes:
+        id: The unique identifier of the item to pin
+        pin: Boolean flag indicating whether to pin or unpin
+    """
+
     id: str
     pin: bool
 
@@ -27,6 +34,19 @@ class PinInput:
 
 
 class ReserveInputModel(BaseModel):
+    """Base model for reserving an action.
+
+    Attributes:
+        reference: Unique reference identifier for the reservation
+        instance_id: Instance identifier of the waiter (defaults to "default")
+        action: Optional action ID to reserve
+        implementation: Optional implementation ID for direct implementation reservation
+        title: Optional title for the reservation
+        hash: Optional hash for reservation identification
+        binds: Optional binds configuration for the reservation
+        assignation_id: Optional assignation ID associated with the reservation
+    """
+
     reference: str = Field(default_factory=lambda: str(uuid.uuid4()))
     instance_id: str = Field(default="default")
     action: str | None = None
@@ -68,11 +88,39 @@ class ReserveInput:
 
 
 class HookInputModel(BaseModel):
+    """Base model for hook input data.
+
+    Attributes:
+        kind: The type/kind of hook to be executed
+        hash: Hash identifier for the hook action
+    """
+
     kind: enums.HookKind
     hash: str
 
 
 class AssignInputModel(BaseModel):
+    """Base model for assigning arguments to an action.
+
+    Attributes:
+        instance_id: Instance identifier of the waiter
+        action: Optional action ID to assign to
+        implementation: Optional implementation ID for direct assignment
+        agent: Optional agent ID for direct assignment
+        action_hash: Optional hash of the action for identification
+        reservation: Optional reservation ID to assign to
+        interface: Optional interface of the implementation
+        hooks: Optional list of hooks for the assignation
+        args: Dictionary of arguments/ports and values
+        reference: Unique reference identifier for the assignation
+        parent: Optional parent ID of the assignation
+        cached: Whether the assignation should be cached
+        log: Whether the assignation should be logged
+        ephemeral: Whether the assignation is ephemeral
+        is_hook: Whether the assignation is a hook
+        step: Whether the assignation should step to breakpoints
+    """
+
     instance_id: str
     action: str | None = None
     implementation: str | None = None
@@ -89,6 +137,97 @@ class AssignInputModel(BaseModel):
     ephemeral: bool = False
     is_hook: bool = False
     step: bool = False
+
+
+class CancelInputModel(BaseModel):
+    """Base model for canceling an assignation.
+
+    Attributes:
+        assignation: ID of the assignation to cancel
+    """
+
+    assignation: str
+
+
+@pydantic.input(CancelInputModel, description="The input for canceling an assignation.")
+class CancelInput:
+    assignation: strawberry.ID = strawberry.field(description="The assignation ID to cancel")
+
+
+class PauseInputModel(BaseModel):
+    """Base model for pausing an assignation.
+
+    Attributes:
+        assignation: ID of the assignation to pause
+    """
+
+    assignation: str
+
+
+@pydantic.input(PauseInputModel, description="The input for pausing an assignation.")
+class PauseInput:
+    assignation: strawberry.ID = strawberry.field(description="The assignation ID to pause")
+
+
+class CollectInputModel(BaseModel):
+    """Base model for collecting shelved items from drawers.
+
+    Attributes:
+        drawers: List of drawer IDs to collect from
+    """
+
+    drawers: list[str]
+
+
+@pydantic.input(
+    CollectInputModel,
+    description="The input for collecting a shelved item in a drawer.",
+)
+class CollectInput:
+    drawers: list[strawberry.ID] = strawberry.field(description="The drawer ID to collect")
+
+
+class ResumeInputModel(BaseModel):
+    """Base model for resuming a paused assignation.
+
+    Attributes:
+        assignation: ID of the assignation to resume
+    """
+
+    assignation: str
+
+
+@pydantic.input(ResumeInputModel, description="The input for resuming an assignation.")
+class ResumeInput:
+    assignation: strawberry.ID = strawberry.field(description="The assignation ID to resume")
+
+
+class StepInputModel(BaseModel):
+    """Base model for stepping an assignation through breakpoints.
+
+    Attributes:
+        assignation: ID of the assignation to step
+    """
+
+    assignation: str
+
+
+@pydantic.input(
+    StepInputModel,
+    description="The input for stepping an assignation. Stepping is used to go from one breakpoint to another.",
+)
+class StepInput:
+    assignation: strawberry.ID = strawberry.field(description="The assignation ID to step")
+
+
+class InterruptInputModel(BaseModel):
+    """Base model for interrupting an assignation.
+
+    Attributes:
+        assignation: ID of the assignation to interrupt
+    """
+
+    assignation: str
 
 
 class CancelInputModel(BaseModel):
@@ -209,9 +348,18 @@ class AssignInput:
     is_hook: bool | None = strawberry.field(default=False, description="Whether the assignation is a hook")
 
 
-
-
 class PortMatchInputModel(BaseModel):
+    """Base model for matching ports in action/schema demands.
+
+    Attributes:
+        at: Optional index of the port to match
+        key: Optional key of the port to match
+        kind: Optional kind of the port to match
+        identifier: Optional identifier of the port to match
+        nullable: Optional flag indicating if the port is nullable
+        children: Optional list of child port matches for nested structures
+    """
+
     at: int | None = None
     key: str | None = None
     kind: renums.PortKind | None = None
@@ -221,6 +369,20 @@ class PortMatchInputModel(BaseModel):
 
 
 class ActionDemandInputModel(BaseModel):
+    """Base model for demanding specific actions with criteria.
+
+    Attributes:
+        key: Optional key of the action for identification
+        hash: Optional hash of the action for identification
+        name: Optional name of the action for identification
+        description: Optional description of the action
+        arg_matches: Optional list of argument port matches
+        return_matches: Optional list of return port matches
+        protocols: Optional list of protocols the action must implement
+        force_arg_length: Optional required number of arguments
+        force_return_length: Optional required number of returns
+    """
+
     key: str | None = None
     hash: str | None = None
     name: str | None = None
@@ -233,11 +395,19 @@ class ActionDemandInputModel(BaseModel):
 
 
 class SchemaDemandInputModel(BaseModel):
+    """Base model for demanding specific schemas with criteria.
+
+    Attributes:
+        key: Optional key of the schema for identification
+        hash: Optional hash of the schema for identification
+        matches: Optional list of port matches for the schema
+        protocols: Optional list of protocols the schema must implement
+    """
+
     key: str | None = None
     hash: str | None = None
     matches: list[PortMatchInputModel] | None = None
     protocols: list[str] | None = None
-
 
 
 @strawberry.input(description="The input for creating a port match.")
@@ -297,7 +467,7 @@ class ActionDemandInput:
         default=None,
         description="The key of the action. This is used to identify the action in the system.",
     )
-    
+
     hash: rscalars.ActionHash | None = strawberry.field(
         default=None,
         description="The hash of the action. This is used to identify the action in the system.",
@@ -334,7 +504,7 @@ class ActionDemandInput:
 
 @strawberry.input(description="The input for creating a action demand.")
 class SchemaDemandInput:
-    key: str  = strawberry.field(
+    key: str = strawberry.field(
         default=None,
         description="The key of the action. This is used to identify the action in the system.",
     )
@@ -377,12 +547,28 @@ class StateDemandInput:
 
 
 class CreateImplementationInputModel(BaseModel):
+    """Base model for creating an implementation.
+
+    Attributes:
+        implementation: Implementation configuration data
+        instance_id: Instance ID of the agent this implementation belongs to
+        extension: Extension that manages this implementation
+    """
+
     implementation: rimodels.ImplementationInputModel
     instance_id: str
     extension: str
 
 
 class CreateForeignImplementationInputModel(BaseModel):
+    """Base model for creating an implementation in another agent's extension.
+
+    Attributes:
+        implementation: Implementation configuration data
+        instance_id: Instance ID of the agent to create implementation in
+        extension: Extension that manages this implementation
+    """
+
     implementation: rimodels.ImplementationInputModel
     instance_id: str
     extension: str
@@ -409,6 +595,12 @@ class CreateForeignImplementationInput:
 
 
 class DeleteImplementationInputModel(BaseModel):
+    """Base model for deleting an implementation.
+
+    Attributes:
+        implementation: ID of the implementation to delete
+    """
+
     implementation: str
 
 
@@ -421,6 +613,15 @@ class DeleteImplementationInput:
 
 
 class SetExtensionImplementationsInputModel(BaseModel):
+    """Base model for setting extension implementations.
+
+    Attributes:
+        implementation: Implementation configuration data
+        instance_id: Instance ID of the agent this extension belongs to
+        extension: Extension identifier
+        run_cleanup: Whether to run cleanup after setting implementations
+    """
+
     implementation: rimodels.ImplementationInputModel
     instance_id: str
     extension: str
@@ -472,18 +673,15 @@ class CreateBlokInput:
         description="The URL of the blok. This can be used to link to the blok in the system.",
     )
 
+
 @strawberry.input(description="The input for creating a blok.")
 class MaterializeBlokInput:
-    blok: strawberry.ID 
+    blok: strawberry.ID
     dashboard: strawberry.ID | None = strawberry.field(
         default=None,
         description="The dashboard ID to materialize the blok in. If not provided, the blok will be materialized in the default dashboard.",
     )
-    agent: strawberry.ID | None = strawberry.field(
-        default=None,
-        description="The agent ID to materialize the blok in. If not provided, the blok will be materialized in the default agent"
-    )
-    
+    agent: strawberry.ID | None = strawberry.field(default=None, description="The agent ID to materialize the blok in. If not provided, the blok will be materialized in the default agent")
 
 
 class CreateToolboxInputModel(BaseModel):

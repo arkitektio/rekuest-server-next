@@ -89,29 +89,30 @@ class AgentConsumer(AsyncWebsocketConsumer):
             registry=self.registry,
             instance_id=register.instance_id or "default",
             defaults=dict(
-                name=f"{str(self.registry.id)} on {register.instance_id}",
+                name=f"{str(self.registry.pk)} on {register.instance_id}",
             ),
         )
 
         self.connection = aredis.Redis(host="redis", auto_close_connection_pool=True)
-        self.assignations = await persist_backend.on_agent_connected(self.agent.id)
+        self.assignations = await persist_backend.on_agent_connected(self.agent.pk)
         self.heartbeat_future: Optional[asyncio.Future] = None
 
         await self.send_to_agent_message(
             message=messages.Init(
                 instance_id=self.agent.instance_id,
-                agent=str(self.agent.id),
-                registry=str(self.registry.id),
-                inquiries=[messages.AssignInquiry(assignation=str(a.id)) for a in self.assignations],
+                agent=str(self.agent.pk),
+                inquiries=[messages.AssignInquiry(assignation=str(a.pk)) for a in self.assignations],
             )
         )
 
-        self.task = asyncio.create_task(self.listen_for_tasks(self.agent.id))
-        self.heartbeat_task = asyncio.create_task(self.heartbeat(self.agent.id))
+        self.task = asyncio.create_task(self.listen_for_tasks(self.agent.pk))
+        self.heartbeat_task = asyncio.create_task(self.heartbeat(self.agent.pk))
         self.heartbeat_task.add_done_callback(lambda x: logging.error(f"Done sending heartbeats {x}"))
 
     async def on_agent_heartbeat(self) -> None:
         """Handle heartbeat message from agent."""
+        if not self.agent:
+            raise Exception("Agent not registered")
         self.agent.connected = True
         self.agent.last_seen = datetime.datetime.now()
         await self.agent.asave()

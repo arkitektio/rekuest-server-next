@@ -155,6 +155,7 @@ class RedisControllBackend(ControllBackend):
             action = implementation.action
             agent = implementation.agent
             assert agent.connected, "Agent is not connected"
+            assert agent.last_seen, "Agent last seen time is not set"
             assert agent.last_seen > datetime.now(timezone.utc) - timedelta(minutes=1), "Agent is not connected"
 
         elif input.action_hash:
@@ -193,10 +194,12 @@ class RedisControllBackend(ControllBackend):
             ephemeral=input.ephemeral,
         )
 
+        action = implementation.action
+
         AgentConsumer.broadcast(
-            assignation.agent.id,
+            assignation.agent.pk,
             message=messages.Assign(
-                assignation=str(assignation.id),
+                assignation=str(assignation.pk),
                 args=input.args,
                 user=str(info.context.request.user.sub),
                 app=str(info.context.request.client.client_id),
@@ -204,7 +207,7 @@ class RedisControllBackend(ControllBackend):
                 reference=reference,
                 interface=implementation.interface,
                 extension=implementation.extension,
-                action=str(action.id),
+                action=str(implementation.action.hash),
             ),
         )
         if input.hooks:
@@ -214,8 +217,8 @@ class RedisControllBackend(ControllBackend):
                     self.assign(
                         inputs.AssignInputModel(
                             action_hash=hook.hash,
-                            parent=assignation.id,
-                            args={"assignation": assignation.id},
+                            parent=assignation.pk,
+                            args={"assignation": assignation.pk},
                             reference="init_hook_0",
                         )
                     )
@@ -224,7 +227,7 @@ class RedisControllBackend(ControllBackend):
 
     def resume(self, info: Info, input: inputs.ResumeInputModel) -> models.Assignation:
         assignation = models.Assignation.objects.get(id=input.assignation)
-        assignation.status = enums.AssignationStatus.RESUME
+        assignation.latest_instruct_kind = enums.AssignationInstructKind.RESUME
         assignation.save()
 
         AgentConsumer.broadcast(
@@ -241,15 +244,15 @@ class RedisControllBackend(ControllBackend):
         drawers = models.MemoryDrawer.objects.filter(id__in=input.drawers).prefetch_related("shelve__agent").all()
 
         for drawer in drawers:
-            if drawer.shelve.agent.id not in agents:
-                agents[drawer.shelve.agent.id] = set()
-            agents[drawer.shelve.agent.id].add(str(drawer.id))
+            if drawer.shelve.agent.pk not in agents:
+                agents[drawer.shelve.agent.pk] = set()
+            agents[drawer.shelve.agent.pk].add(str(drawer.pk))
 
         for agent_id, drawers in agents.items():
             agent = models.Agent.objects.get(id=agent_id)
             logging.info(f"collecting {drawers} from agent {agent_id}")
             AgentConsumer.broadcast(
-                agent.id,
+                agent.pk,
                 message=messages.Collect(
                     drawers=list(drawers),
                 ),
@@ -259,13 +262,13 @@ class RedisControllBackend(ControllBackend):
 
     def step(self, info: Info, input: inputs.StepInputModel) -> models.Assignation:
         assignation = models.Assignation.objects.get(id=input.assignation)
-        assignation.status = enums.AssignationStatus.STEP
+        assignation.latest_instruct_kind = enums.AssignationInstructKind.STEP
         assignation.save()
 
         AgentConsumer.broadcast(
-            assignation.agent.id,
+            assignation.agent.pk,
             message=messages.Cancel(
-                assignation=assignation.id,
+                assignation=assignation.pk,
             ),
         )
         return assignation

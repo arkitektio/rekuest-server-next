@@ -38,7 +38,7 @@ async def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
         instance_id=input.instance_id or "default",
         defaults=dict(
             name=input.name or f"{str(registry.id)} on {input.instance_id}",
-            extensions=input.extensions,
+            extensions=input.extensions or [],
         ),
     )
 

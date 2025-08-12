@@ -83,8 +83,7 @@ class Shortcut:
         default=None,
         description="Which shortcut should be bound to this Action by default. 0 means no binding.",
     )
-    
-    
+
     @strawberry_django.field(description="Input ports for the shortcut's action.dd")
     def args(self) -> list[rtypes.Port]:
         return [rmodels.PortModel(**i) for i in self.args]
@@ -120,8 +119,7 @@ class Action:
 
     @strawberry_django.field(description="Input arguments (ports) for the action.")
     def args(self) -> list[rtypes.Port]:
-        
-        x =  [rmodels.PortModel(**i) for i in self.args]
+        x = [rmodels.PortModel(**i) for i in self.args]
         print(x)
         return x
 
@@ -542,6 +540,7 @@ class StateDemand:
 class Blok:
     id: strawberry.ID
     name: str
+    description: str | None
     creator: User
     url: str
     materialized_bloks: list["MaterializedBlok"] = strawberry_django.field(
@@ -641,13 +640,18 @@ class StateSchema:
 @strawberry_django.type(models.State)
 class State:
     id: strawberry.ID
-    state_schema: StateSchema
+    state_schema: StateSchema = strawberry_django.field(deprecation_reason="Use schema instead")
+
     value: scalars.Args
     agent: Agent
     interface: str
     created_at: datetime.datetime
     updated_at: datetime.datetime
     historical_states: list["HistoricalState"]
+
+    @strawberry_django.field(deprecation_reason="Use schema instead")
+    def schema(self) -> StateSchema:
+        return self.state_schema
 
 
 @strawberry_django.type(models.HistoricalState)
