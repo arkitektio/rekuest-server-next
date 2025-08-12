@@ -5,7 +5,29 @@ on:
     branches: [dev]
 
 jobs:
-  docker:
+  test_suit:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [ "3.12"]
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv and set the python version
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "latest"
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Install the project
+        run: uv sync --all-extras --dev
+
+      - name: Run tests
+        run: uv run pytest
+  docker_build:
+    needs: test_suit
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
