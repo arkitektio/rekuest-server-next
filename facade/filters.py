@@ -21,6 +21,33 @@ class SearchFilter:
         return queryset.filter(name__icontains=self.search)
 
 
+@strawberry.input(description="A way to filter by scope")
+class ScopeFilter:
+    public: bool | None = None
+    org: bool | None = None
+    shared: bool | None = None
+    me: bool | None = None
+
+
+@strawberry.input(description="A way to filter by scope")
+class ScopeFilterMixin:
+    scope: ScopeFilter | None = None
+
+    def filter_scope(self, queryset, info):
+        if not self.scope:
+            return queryset
+        if self.scope.public is not None:
+            queryset = queryset.filter(is_public=self.scope.public)
+        if self.scope.org is not None:
+            queryset = queryset.filter(organization=info.context.request.organization)
+        if self.scope.shared is not None:
+            # Shared scope filtering is not implemented
+            raise NotImplementedError("Shared scope filtering not implemented")
+        if self.scope.me is not None:
+            queryset = queryset.filter(creator=info.context.request.user)
+        return queryset
+
+
 @strawberry_django.filter(models.TestCase, description="A way to filter test cases")
 class TestCaseFilter:
     name: Optional[FilterLookup[str]]
@@ -33,7 +60,7 @@ class TestCaseFilter:
 
 
 @strawberry_django.filter(models.Agent, description="A way to filter agents")
-class AgentFilter:
+class AgentFilter(ScopeFilterMixin):
     client_id: str | None = strawberry.field(
         default=None,
         description="Filter by client ID of the app the agent is registered to",
@@ -565,8 +592,7 @@ class ActionFilter(SearchFilter):
     protocols: list[str] | None
     kind: Optional[renums.ActionKind] | None
     in_collection: str | None
-    
-    
+
     def filter_in_collection(self, queryset, info):
         if self.in_collection is None:
             return queryset
@@ -585,7 +611,7 @@ class ActionFilter(SearchFilter):
                 force_length=ports_demand.force_length,
                 force_non_nullable_length=ports_demand.force_non_nullable_length,
                 force_structure_length=ports_demand.force_structure_length,
-                model= "facade_action",
+                model="facade_action",
             )
 
         return queryset

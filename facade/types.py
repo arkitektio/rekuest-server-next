@@ -20,6 +20,14 @@ from rekuest_ui_core.objects import types as uitypes
 from strawberry.experimental import pydantic
 
 
+def build_prescoped_queryset(info, queryset, field="organization"):
+    print(info)
+    if info.variable_values.get("filters", {}).get("scope") is None:
+        queryset = queryset.filter(**{field: info.context.request.organization})
+
+    return queryset
+
+
 @strawberry_django.type(auth_models.User, filters=filters.UserFilter, pagination=True, order=filters.UserOrder, description="Represents an authenticated user.")
 class User:
     sub: strawberry.ID = strawberry_django.field(description="The subject identifier of the user.")
@@ -275,6 +283,10 @@ class Agent:
     def pinned(self, info: Info) -> bool:
         user = info.context.request.user
         return self.pinned_by.filter(id=user.id).exists()
+
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="registry__organization")
 
 
 # Completion of type and field descriptions for remaining types like Waiter, Reservation, Assignation, and more
