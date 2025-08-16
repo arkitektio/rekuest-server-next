@@ -5,7 +5,7 @@ from authentikate.vars import get_user, get_client
 
 def assignations(
     info: Info,
-    instance_id: scalars.InstanceID | None = None,
+    instance_id: scalars.InstanceId | None = None,
 ) -> list[types.Assignation]:
     registry, _ = models.Registry.objects.get_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
 

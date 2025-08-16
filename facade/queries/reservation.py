@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 def myreservations(
     info: Info,
-    instance_id: scalars.InstanceID | None = None,
+    instance_id: scalars.InstanceId | None = None,
 ) -> types.Action:
     registry, _ = models.Registry.objects.get_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
 
@@ -20,7 +20,7 @@ def myreservations(
 
 def reservations(
     info: Info,
-    instance_id: scalars.InstanceID | None = None,
+    instance_id: scalars.InstanceId | None = None,
 ) -> list[types.Reservation]:
     registry, _ = models.Registry.objects.get_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
 

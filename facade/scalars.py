@@ -34,7 +34,7 @@ class SearchQuery(str):
 
 
 @strawberry.scalar(description="The `InstanceID` scalar type represents a unique instance identifier")
-class InstanceID(str):
+class InstanceId(str):
     """Strawberry scalar for InstanceID type representing a unique instance identifier."""
 
     @staticmethod

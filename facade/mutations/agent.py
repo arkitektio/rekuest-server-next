@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 @strawberry.input
 class AgentInput:
-    instance_id: scalars.InstanceID = strawberry.field(description="The instance ID of the agent. This is used to identify the agent in the system.")
+    instance_id: scalars.InstanceId = strawberry.field(description="The instance ID of the agent. This is used to identify the agent in the system.")
     name: str | None = strawberry.field(
         default=None,
         description="The name of the agent. This is used to identify the agent in the system.",

@@ -59,7 +59,7 @@ class ReserveInputModel(BaseModel):
 
 @pydantic.input(ReserveInputModel, description="The input for reserving a action.")
 class ReserveInput:
-    instance_id: scalars.InstanceID = strawberry.field(description="The instance ID of the waiter")
+    instance_id: scalars.InstanceId = strawberry.field(description="The instance ID of the waiter")
     action: strawberry.ID | None = strawberry.field(default=None, description="The action ID to reserve")
     implementation: strawberry.ID | None = strawberry.field(
         default=None,
@@ -301,7 +301,7 @@ class HookInput:
 
 @pydantic.input(AssignInputModel, description="The input for assigning args to a action.")
 class AssignInput:
-    instance_id: scalars.InstanceID = strawberry.field(default="default", description="The instance ID of the waiter")
+    instance_id: scalars.InstanceId = strawberry.field(default="default", description="The instance ID of the waiter")
     action: strawberry.ID | None = strawberry.field(default=None, description="The action ID to assign to")
     implementation: strawberry.ID | None = strawberry.field(
         default=None,
@@ -580,7 +580,7 @@ class CreateForeignImplementationInputModel(BaseModel):
 )
 class CreateImplementationInput:
     implementation: ritypes.ImplementationInput = strawberry.field(description="The implementation to create. This is used to identify the implementation in the system.")
-    instance_id: scalars.InstanceID = strawberry.field(description="The instance ID of the agent that this implementation belongs to.")
+    instance_id: scalars.InstanceId = strawberry.field(description="The instance ID of the agent that this implementation belongs to.")
     extension: str = strawberry.field(description="The extension that manages this implementation")
 
 
@@ -639,7 +639,7 @@ class SetExtensionImplementationsInput:
         default=False,
         description="Whether to run the cleanup process after setting the implementations. If true, all implementations that are not in the list will be deleted.",
     )
-    instance_id: scalars.InstanceID = strawberry.field(description="The instance ID of the agent that this extension belongs to.")
+    instance_id: scalars.InstanceId = strawberry.field(description="The instance ID of the agent that this extension belongs to.")
 
 
 class CreateDashboardInputModel(BaseModel):
@@ -788,7 +788,7 @@ class SetStateInputModel(BaseModel):
 @pydantic.input(SetStateInputModel, description="The input for setting a state schema.")
 class SetStateInput:
     interface: str = strawberry.field(description="The state schema to set. This is used to identify the state schema in the system.")
-    instance_id: scalars.InstanceID = strawberry.field(description="The instance ID of the agent that this state belongs to.")
+    instance_id: scalars.InstanceId = strawberry.field(description="The instance ID of the agent that this state belongs to.")
     value: scalars.Args = strawberry.field(description="The value to set the state schema to. This is used to identify the state schema in the system.")
 
 
@@ -827,7 +827,7 @@ class SetAgentStatesInputModel(BaseModel):
 )
 class SetAgentStatesInput:
     implementations: list[StateImplementationInput] = strawberry.field(description="The implementations of the state schemas. This is used to identify the state schemas in the system.")
-    instance_id: scalars.InstanceID = strawberry.field(description="The instance ID of the agent that this state belongs to.")
+    instance_id: scalars.InstanceId = strawberry.field(description="The instance ID of the agent that this state belongs to.")
 
 
 class JSONPatchInputModel(BaseModel):
@@ -845,7 +845,7 @@ class UpdateStateInputModel(BaseModel):
 @pydantic.input(UpdateStateInputModel, description="The input for updating a state schema.")
 class UpdateStateInput:
     interface: str = strawberry.field(description="The state schema to update. This is used to identify the state schema in the system.")
-    instance_id: scalars.InstanceID = strawberry.field(description="The instance ID of the agent that this state belongs to.")
+    instance_id: scalars.InstanceId = strawberry.field(description="The instance ID of the agent that this state belongs to.")
     patches: list[scalars.Args]
 
 

@@ -255,7 +255,7 @@ class MemoryDrawer:
 @strawberry_django.type(models.Agent, filters=filters.AgentFilter, order=filters.AgentOrder, pagination=True, description="Represents a compute agent that can execute implementations.")
 class Agent:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the agent.")
-    instance_id: scalars.InstanceID = strawberry_django.field(description="Unique instance identifier on the agent.")
+    instance_id: scalars.InstanceId = strawberry_django.field(description="Unique instance identifier on the agent.")
     registry: "Registry" = strawberry_django.field(description="Registry entry this agent belongs to.")
     hardware_records: list[HardwareRecord] = strawberry_django.field(description="Historical records of agent's hardware.")
     implementations: list["Implementation"] = strawberry_django.field(description="Implementations the agent can run.")
@@ -295,7 +295,7 @@ class Agent:
 @strawberry_django.type(models.Waiter, filters=filters.WaiterFilter, pagination=True, description="Entity that waits for the completion of assignations.")
 class Waiter:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the waiter.")
-    instance_id: scalars.InstanceID = strawberry_django.field(description="Instance ID associated with the waiter.")
+    instance_id: scalars.InstanceId = strawberry_django.field(description="Instance ID associated with the waiter.")
     registry: "Registry" = strawberry_django.field(description="Registry the waiter belongs to.")
 
 

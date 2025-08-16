@@ -16,7 +16,7 @@ class ReservationSubscription:
 async def reservations(
     self,
     info: Info,
-    instance_id: scalars.InstanceID,
+    instance_id: scalars.InstanceId,
 ) -> AsyncGenerator[types.Reservation, None]:
     """Join and subscribe to message sent to the given rooms."""
 

@@ -195,7 +195,7 @@ class AgentFilter(ScopeFilterMixin):
 
 @strawberry_django.filter(models.Waiter, description="A way to filter waiters")
 class WaiterFilter:
-    instance_id: scalars.InstanceID
+    instance_id: scalars.InstanceId
     ids: list[strawberry.ID] | None
 
     def filter_ids(self, queryset, info):
@@ -290,7 +290,7 @@ class AssignationFilter:
     reservation: ReservationFilter | None
     ids: list[strawberry.ID] | None
     status: list[enums.AssignationStatus] | None
-    instance_id: scalars.InstanceID | None
+    instance_id: scalars.InstanceId | None
 
     def filter_ids(self, queryset, info):
         if self.ids is None:

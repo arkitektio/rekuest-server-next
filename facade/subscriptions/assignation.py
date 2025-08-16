@@ -8,7 +8,7 @@ from facade.channels import assignation_event_channel
 async def assignation_events(
     self,
     info: Info,
-    instance_id: scalars.InstanceID,
+    instance_id: scalars.InstanceId,
 ) -> AsyncGenerator[types.AssignationEvent, None]:
     """Join and subscribe to message sent to the given rooms."""
 
@@ -29,7 +29,7 @@ class AssignationChangeEvent:
 async def assignations(
     self,
     info: Info,
-    instance_id: scalars.InstanceID,
+    instance_id: scalars.InstanceId,
 ) -> AsyncGenerator[AssignationChangeEvent, None]:
     """Join and subscribe to message sent to the given rooms."""
 
