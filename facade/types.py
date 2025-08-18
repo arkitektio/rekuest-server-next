@@ -266,6 +266,9 @@ class Agent:
     extensions: list[str] = strawberry_django.field(description="List of installed agent extensions.")
     name: str = strawberry_django.field(description="Agent name.")
     states: list["State"] = strawberry_django.field(description="Current and historical states associated with the agent.")
+    kind: enums.AgentKind = strawberry_django.field(description="Kind of the agent.")
+    hook_url: str | None = strawberry_django.field(description="Webhook URL for this Agent (only if webhook)", default=None)
+    hook_url_secret: str | None = strawberry_django.field(description="Webhook URL secret for this Agent (only if webhook)", default=None)
 
     @strawberry_django.field(description="Fetch a specific implementation by interface.")
     def implementation(self, interface: str) -> Implementation | None:

@@ -396,7 +396,6 @@ class ReservationEventKind(str, Enum):
     LOG = "LOG"
 
 
-
 @strawberry.enum
 class LogLevel(str, Enum):
     DEBUG = "DEBUG"
@@ -412,6 +411,12 @@ class AgentStatus(str, Enum):
     KICKED = "KICKED"
     DISCONNECTED = "DISCONNECTED"
     VANILLA = "VANILLA"
+
+
+@strawberry.enum
+class AgentKind(str, Enum):
+    WEBSOCKET = "WEBSOCKET"
+    WEBHOOK = "WEBHOOK"
 
 
 @strawberry.enum

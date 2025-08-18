@@ -263,6 +263,14 @@ class Agent(models.Model):
         help_text="The Instance this Agent is running on",
         default="all",
     )
+    kind = models.CharField(
+        max_length=1000,
+        choices=[(tag, tag.value) for tag in enums.AgentKind],
+        default=enums.AgentKind.WEBSOCKET,
+        help_text="The kind of this Agent",
+    )
+    hook_url = models.CharField(max_length=1000, help_text="The webhook URL for this Agent (only if webhook)", null=True, blank=True)
+    hook_url_secret = models.CharField(max_length=1000, help_text="The webhook URL secret for this Agent (only if webhook)", null=True, blank=True)
     latest_event = TextChoicesField(
         max_length=1000,
         choices_enum=enums.AgentEventChoices,
