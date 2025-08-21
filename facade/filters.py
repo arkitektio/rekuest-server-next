@@ -487,6 +487,7 @@ class ShortcutActionFilter(SearchFilter):
             return queryset
 
         filtered_ids = None
+        
 
         for ports_demand in self.demands:
             new_ids = managers.get_action_ids_by_demands(
@@ -602,19 +603,27 @@ class ActionFilter(SearchFilter):
     def filter_demands(self, queryset, info):
         if self.demands is None:
             return queryset
+        
+        if len(self.demands) == 0:
+            return queryset
+
+        filtered_ids = None
 
         for ports_demand in self.demands:
-            queryset = managers.filter_actions_by_demands(
-                queryset,
+            new_ids = managers.get_action_ids_by_demands(
                 ports_demand.matches,
-                type=ports_demand.kind.value,
+                type=ports_demand.kind,
                 force_length=ports_demand.force_length,
                 force_non_nullable_length=ports_demand.force_non_nullable_length,
                 force_structure_length=ports_demand.force_structure_length,
-                model="facade_action",
             )
 
-        return queryset
+            if filtered_ids is None:
+                filtered_ids = set(new_ids)
+            else:
+                filtered_ids = filtered_ids.intersection(new_ids)
+
+        return queryset.filter(id__in=filtered_ids)
 
     def filter_kind(self, queryset, info):
         if self.kind is None:
