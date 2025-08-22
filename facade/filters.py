@@ -553,6 +553,9 @@ class ShortcutFilter(SearchFilter):
                 filtered_ids = set(new_ids)
             else:
                 filtered_ids = filtered_ids.intersection(new_ids)
+                
+        if filtered_ids is None:
+            return queryset
 
         return queryset.filter(id__in=filtered_ids)
 
@@ -622,6 +625,9 @@ class ActionFilter(SearchFilter):
                 filtered_ids = set(new_ids)
             else:
                 filtered_ids = filtered_ids.intersection(new_ids)
+                
+        if filtered_ids is None:
+            return queryset
 
         return queryset.filter(id__in=filtered_ids)
 
@@ -708,6 +714,9 @@ class ImplementationActionFilter(SearchFilter):
                 filtered_ids = set(new_ids)
             else:
                 filtered_ids = filtered_ids.intersection(new_ids)
+                
+        if filtered_ids is None:
+            return queryset
 
         return queryset.filter(action__id__in=filtered_ids)
 
