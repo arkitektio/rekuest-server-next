@@ -182,6 +182,7 @@ def filter_actions_by_demands(
 ):
     if type not in ["args", "returns"]:
         raise ValueError("Type must be either 'args' or 'returns'")
+    
 
     full_sql, all_params = build_params(
         demands,

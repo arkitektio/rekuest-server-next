@@ -2,8 +2,7 @@ from facade.models import Protocol
 from rekuest_core.inputs.models import DefinitionInputModel
 
 
-def is_hook(definition: DefinitionInputModel) -> Protocol:
-
+def is_hook(definition: DefinitionInputModel) -> Protocol | None:
     if not definition.args:
         return None
 
@@ -11,7 +10,5 @@ def is_hook(definition: DefinitionInputModel) -> Protocol:
         return None
 
     if definition.args[0].identifier == "@rekuest/assignationevent":
-        x, _ = Protocol.objects.update_or_create(
-            name="hook", defaults=dict(description="Is this a hook?")
-        )
+        x, _ = Protocol.objects.update_or_create(name="hook", defaults=dict(description="Is this a hook?"))
         return x

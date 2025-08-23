@@ -2,7 +2,7 @@ from typing import Optional
 
 import strawberry
 import strawberry_django
-from authentikate.models import Client, User
+from authentikate.models import Client, User, Organization
 from authentikate.vars import get_user
 from facade import enums, inputs, managers, models, scalars
 from rekuest_core import enums as renums
@@ -21,6 +21,33 @@ class SearchFilter:
         return queryset.filter(name__icontains=self.search)
 
 
+@strawberry.input(description="A way to filter by scope")
+class ScopeFilter:
+    public: bool | None = None
+    org: bool | None = None
+    shared: bool | None = None
+    me: bool | None = None
+
+
+@strawberry.input(description="A way to filter by scope")
+class ScopeFilterMixin:
+    scope: ScopeFilter | None = None
+
+    def filter_scope(self, queryset, info):
+        if not self.scope:
+            return queryset
+        if self.scope.public is not None:
+            queryset = queryset.filter(is_public=self.scope.public)
+        if self.scope.org is not None:
+            queryset = queryset.filter(organization=info.context.request.organization)
+        if self.scope.shared is not None:
+            # Shared scope filtering is not implemented
+            raise NotImplementedError("Shared scope filtering not implemented")
+        if self.scope.me is not None:
+            queryset = queryset.filter(creator=info.context.request.user)
+        return queryset
+
+
 @strawberry_django.filter(models.TestCase, description="A way to filter test cases")
 class TestCaseFilter:
     name: Optional[FilterLookup[str]]
@@ -33,7 +60,7 @@ class TestCaseFilter:
 
 
 @strawberry_django.filter(models.Agent, description="A way to filter agents")
-class AgentFilter:
+class AgentFilter(ScopeFilterMixin):
     client_id: str | None = strawberry.field(
         default=None,
         description="Filter by client ID of the app the agent is registered to",
@@ -134,9 +161,7 @@ class AgentFilter:
 
             if len(new_ids) == 0:
                 # There are no actions that match the demand
-                raise ValueError(
-                    f"No actions found that match the given action demands {ports_demand}"
-                )
+                raise ValueError(f"No actions found that match the given action demands {ports_demand}")
 
             for new_id in new_ids:
                 if new_id not in filtered_ids:
@@ -170,7 +195,7 @@ class AgentFilter:
 
 @strawberry_django.filter(models.Waiter, description="A way to filter waiters")
 class WaiterFilter:
-    instance_id: scalars.InstanceID
+    instance_id: scalars.InstanceId
     ids: list[strawberry.ID] | None
 
     def filter_ids(self, queryset, info):
@@ -265,7 +290,7 @@ class AssignationFilter:
     reservation: ReservationFilter | None
     ids: list[strawberry.ID] | None
     status: list[enums.AssignationStatus] | None
-    instance_id: scalars.InstanceID | None
+    instance_id: scalars.InstanceId | None
 
     def filter_ids(self, queryset, info):
         if self.ids is None:
@@ -336,6 +361,27 @@ class UserOrder:
     email: auto
     date_joined: auto
     last_login: auto
+
+
+@strawberry_django.order(Organization, description="A way to order registries")
+class OrganizationOrder:
+    slug: auto
+
+
+@strawberry_django.filter(Organization, description="A way to filter organizations")
+class OrganizationFilter:
+    slug: Optional[FilterLookup[str]]
+    ids: list[strawberry.ID] | None
+
+    def filter_slug(self, queryset, info):
+        if self.slug is None:
+            return queryset
+        return queryset.filter(slug__icontains=self.slug)
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
 
 
 @strawberry_django.order(Client, description="A way to order apps")
@@ -445,7 +491,7 @@ class ShortcutActionFilter(SearchFilter):
         for ports_demand in self.demands:
             new_ids = managers.get_action_ids_by_demands(
                 ports_demand.matches,
-                type=ports_demand.kind,
+                type=ports_demand.kind.value,
                 force_length=ports_demand.force_length,
                 force_non_nullable_length=ports_demand.force_non_nullable_length,
                 force_structure_length=ports_demand.force_structure_length,
@@ -495,7 +541,7 @@ class ShortcutFilter(SearchFilter):
         for ports_demand in self.demands:
             new_ids = managers.get_action_ids_by_demands(
                 ports_demand.matches,
-                type=ports_demand.kind,
+                type=ports_demand.kind.value,
                 force_length=ports_demand.force_length,
                 force_non_nullable_length=ports_demand.force_non_nullable_length,
                 force_structure_length=ports_demand.force_structure_length,
@@ -506,6 +552,9 @@ class ShortcutFilter(SearchFilter):
                 filtered_ids = set(new_ids)
             else:
                 filtered_ids = filtered_ids.intersection(new_ids)
+
+        if filtered_ids is None:
+            return queryset
 
         return queryset.filter(id__in=filtered_ids)
 
@@ -545,22 +594,41 @@ class ActionFilter(SearchFilter):
     demands: list[inputs.PortDemandInput] | None
     protocols: list[str] | None
     kind: Optional[renums.ActionKind] | None
+    in_collection: str | None
+
+    def filter_in_collection(self, queryset, info):
+        if self.in_collection is None:
+            return queryset
+
+        return queryset.filter(collections__name=self.in_collection)
 
     def filter_demands(self, queryset, info):
         if self.demands is None:
             return queryset
 
+        if len(self.demands) == 0:
+            return queryset
+
+        filtered_ids = None
+
         for ports_demand in self.demands:
-            queryset = managers.filter_actions_by_demands(
-                queryset,
+            new_ids = managers.get_action_ids_by_demands(
                 ports_demand.matches,
-                type=ports_demand.kind,
+                type=ports_demand.kind.value,
                 force_length=ports_demand.force_length,
                 force_non_nullable_length=ports_demand.force_non_nullable_length,
                 force_structure_length=ports_demand.force_structure_length,
             )
 
-        return queryset
+            if filtered_ids is None:
+                filtered_ids = set(new_ids)
+            else:
+                filtered_ids = filtered_ids.intersection(new_ids)
+
+        if filtered_ids is None:
+            return queryset
+
+        return queryset.filter(id__in=filtered_ids)
 
     def filter_kind(self, queryset, info):
         if self.kind is None:
@@ -635,7 +703,7 @@ class ImplementationActionFilter(SearchFilter):
         for ports_demand in self.demands:
             new_ids = managers.get_action_ids_by_demands(
                 ports_demand.matches,
-                type=ports_demand.kind,
+                type=ports_demand.kind.value,
                 force_length=ports_demand.force_length,
                 force_non_nullable_length=ports_demand.force_non_nullable_length,
                 force_structure_length=ports_demand.force_structure_length,
@@ -645,6 +713,9 @@ class ImplementationActionFilter(SearchFilter):
                 filtered_ids = set(new_ids)
             else:
                 filtered_ids = filtered_ids.intersection(new_ids)
+
+        if filtered_ids is None:
+            return queryset
 
         return queryset.filter(action__id__in=filtered_ids)
 

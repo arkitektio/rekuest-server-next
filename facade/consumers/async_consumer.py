@@ -6,7 +6,7 @@ from typing import Optional
 
 import redis
 import redis.asyncio as aredis
-from authentikate.expand import aexpand_user_from_token, aexpand_client_from_token
+from authentikate.expand import aexpand_user_from_token, aexpand_client_from_token, aexpand_organization_from_token
 from authentikate.utils import authenticate_token_or_none
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
@@ -77,39 +77,42 @@ class AgentConsumer(AsyncWebsocketConsumer):
 
         self.user = await aexpand_user_from_token(token)
         self.client = await aexpand_client_from_token(token)
+        self.organization = await aexpand_organization_from_token(token)
 
         self.registry, _ = await models.Registry.objects.aget_or_create(
             client=self.client,
             user=self.user,
+            organization=self.organization,
         )
 
         self.agent, _ = await models.Agent.objects.aget_or_create(
             registry=self.registry,
             instance_id=register.instance_id or "default",
             defaults=dict(
-                name=f"{str(self.registry.id)} on {register.instance_id}",
+                name=f"{str(self.registry.pk)} on {register.instance_id}",
             ),
         )
 
         self.connection = aredis.Redis(host="redis", auto_close_connection_pool=True)
-        self.assignations = await persist_backend.on_agent_connected(self.agent.id)
+        self.assignations = await persist_backend.on_agent_connected(self.agent.pk)
         self.heartbeat_future: Optional[asyncio.Future] = None
 
         await self.send_to_agent_message(
             message=messages.Init(
                 instance_id=self.agent.instance_id,
-                agent=str(self.agent.id),
-                registry=str(self.registry.id),
-                inquiries=[messages.AssignInquiry(assignation=str(a.id)) for a in self.assignations],
+                agent=str(self.agent.pk),
+                inquiries=[messages.AssignInquiry(assignation=str(a.pk)) for a in self.assignations],
             )
         )
 
-        self.task = asyncio.create_task(self.listen_for_tasks(self.agent.id))
-        self.heartbeat_task = asyncio.create_task(self.heartbeat(self.agent.id))
+        self.task = asyncio.create_task(self.listen_for_tasks(self.agent.pk))
+        self.heartbeat_task = asyncio.create_task(self.heartbeat(self.agent.pk))
         self.heartbeat_task.add_done_callback(lambda x: logging.error(f"Done sending heartbeats {x}"))
 
     async def on_agent_heartbeat(self) -> None:
         """Handle heartbeat message from agent."""
+        if not self.agent:
+            raise Exception("Agent not registered")
         self.agent.connected = True
         self.agent.last_seen = datetime.datetime.now()
         await self.agent.asave()
@@ -181,7 +184,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
 
             await self.send_to_agent_message(
                 messages.ProtocolError(
-                    message=str(e),
+                    error=str(e),
                 )
             )
 

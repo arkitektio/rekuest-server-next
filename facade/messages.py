@@ -104,9 +104,12 @@ class Assign(Message):
     reference: Optional[str] = Field(default=None, description="A reference that the assinger provided")
     args: Dict[str, ShallowJSONSerializable] = Field(description="The arguments that was sendend")
     message: Optional[str] = None
-    user: str = Field(description="The assining user that was sendend")
+    user: str = Field(..., description="The assinging user")
+    org: Optional[str] = Field(default=None, description="The org that the user currently belongs to")
     app: str = Field(description="The assinging app")
-
+    action: str = Field(description="The action that triggered this assignation")
+    
+    
     @property
     def actor_id(self) -> str:
         """The actor id is the id of the actor that will be used to run this assignation"""

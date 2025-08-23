@@ -18,6 +18,7 @@ def create_shortcut(info: Info, input: inputs.CreateShortcutInput) -> types.Shor
                 description="Default toolbox",
                 creator=info.context.request.user,
                 client=info.context.request.client,
+                organization=info.context.request.organization,
             ),
         )[0]
     )
@@ -38,6 +39,7 @@ def create_shortcut(info: Info, input: inputs.CreateShortcutInput) -> types.Shor
         returns=returns,
         allow_quick=input.allow_quick,
         use_returns=input.use_returns,
+        bind_number=input.bind_number,
     )
 
     logger.info(f"Shortcut created: {shortcut}")

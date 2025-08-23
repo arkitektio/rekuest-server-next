@@ -84,19 +84,19 @@ ReturnWidgetModelUnion = Union[CustomReturnWidgetModel, ChoiceReturnWidgetModel]
 
 
 class EffectModel(BaseModel):
-    dependencies: list[str]
     kind: str
     function: str
-    message: str | None
+    dependencies: list[str]
 
 
 class MessageEffectModel(EffectModel):
-    kind: Literal["MESSAGE"]
+    kind: Literal["MESSAGE"] 
     message: str
 
 
 class HideEffectModel(EffectModel):
     kind: Literal["HIDE"]
+    fade: bool = True
 
 
 class CustomEffectModel(EffectModel):
