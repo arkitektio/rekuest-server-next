@@ -5,9 +5,11 @@ from typing import Protocol
 
 from facade import enums, inputs, models, types, messages
 from facade.consumers.async_consumer import AgentConsumer
+from facade.webhook_service import webhook_service
 from kante.types import Info
 from authentikate.vars import get_user, get_client
 import logging
+import asyncio
 
 
 class ControllBackend(Protocol):
@@ -19,7 +21,7 @@ class ControllBackend(Protocol):
 
     def cancel(self, info: Info, input: inputs.CancelInputModel) -> types.Assignation: ...
 
-    def assign(self, info: Info, input: inputs.AssignInputModel) -> types.Assignation: ...
+    async def assign(self, info: Info, input: inputs.AssignInputModel) -> types.Assignation: ...
 
     def resume(self, info: Info, input: inputs.ResumeInputModel) -> types.Assignation: ...
 
@@ -38,6 +40,17 @@ def get_waiter_for_context(info: Info, instance_id: str) -> None:
 class RedisControllBackend(ControllBackend):
     def create_message_id(self) -> str:
         return str(uuid.uuid4())
+
+    async def _send_message_to_agent(self, agent: models.Agent, message: messages.ToAgentMessage) -> None:
+        """Route message to agent based on its kind (websocket or webhook)."""
+        if agent.kind == enums.AgentKind.WEBHOOK.value:
+            # Send via HTTP POST to webhook URL
+            success = await webhook_service.send_message_to_webhook_agent(agent, message)
+            if not success:
+                logging.error(f"Failed to send message to webhook agent {agent.id}")
+        else:
+            # Default to websocket broadcast
+            AgentConsumer.broadcast(agent.pk, message)
 
     def interrupt(self, input: inputs.InterruptInputModel) -> models.Assignation:
         parent = models.Assignation.objects.get(id=input.assignation)
@@ -119,7 +132,7 @@ class RedisControllBackend(ControllBackend):
         )
         return assignation
 
-    def assign(self, info: Info, input: inputs.AssignInputModel) -> models.Assignation:
+    async def assign(self, info: Info, input: inputs.AssignInputModel) -> models.Assignation:
         # TODO: Check if function is cached and was
 
         reservation = None
@@ -196,9 +209,10 @@ class RedisControllBackend(ControllBackend):
 
         action = implementation.action
 
-        AgentConsumer.broadcast(
-            assignation.agent.pk,
-            message=messages.Assign(
+        # Route message based on agent kind
+        await self._send_message_to_agent(
+            assignation.agent, 
+            messages.Assign(
                 assignation=str(assignation.pk),
                 args=input.args,
                 user=str(info.context.request.user.sub),
@@ -208,13 +222,14 @@ class RedisControllBackend(ControllBackend):
                 interface=implementation.interface,
                 extension=implementation.extension,
                 action=str(implementation.action.hash),
-            ),
+            )
         )
         if input.hooks:
             for hook in input.hooks:
                 if hook.kind == enums.HookKind.INIT:
                     # recursive assign
-                    self.assign(
+                    await self.assign(
+                        info,
                         inputs.AssignInputModel(
                             action_hash=hook.hash,
                             parent=assignation.pk,

@@ -1,6 +1,6 @@
 from kante.types import Info
 import strawberry
-from facade import types, models, inputs, scalars
+from facade import types, models, inputs, scalars, enums
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,6 +17,18 @@ class AgentInput:
         default=None,
         description="The extensions of the agent. This is used to identify the agent in the system.",
     )
+    kind: str | None = strawberry.field(
+        default=None,
+        description="The kind of agent (WEBSOCKET or WEBHOOK). Defaults to WEBSOCKET.",
+    )
+    hook_url: str | None = strawberry.field(
+        default=None,
+        description="The webhook URL for this agent (required if kind is WEBHOOK).",
+    )
+    hook_url_secret: str | None = strawberry.field(
+        default=None,
+        description="The webhook URL secret for this agent (required if kind is WEBHOOK).",
+    )
 
 
 @strawberry.input
@@ -25,7 +37,7 @@ class DeleteAgentInput:
 
 
 async def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
-    # TODO: Hasch this
+    # TODO: Hash this
 
     registry, _ = await models.Registry.objects.aupdate_or_create(
         client=info.context.request.client,
@@ -33,13 +45,34 @@ async def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
         organization=info.context.request.organization,
     )
 
+    # Validate webhook agent requirements
+    agent_kind = enums.AgentKind.WEBSOCKET  # Default
+    if input.kind:
+        if input.kind not in [kind.value for kind in enums.AgentKind]:
+            raise ValueError(f"Invalid agent kind: {input.kind}. Must be one of: {[kind.value for kind in enums.AgentKind]}")
+        agent_kind = enums.AgentKind(input.kind)
+        
+    if agent_kind == enums.AgentKind.WEBHOOK:
+        if not input.hook_url:
+            raise ValueError("hook_url is required for WEBHOOK agents")
+        if not input.hook_url_secret:
+            raise ValueError("hook_url_secret is required for WEBHOOK agents")
+
+    agent_defaults = {
+        "name": input.name or f"{str(registry.id)} on {input.instance_id}",
+        "extensions": input.extensions or [],
+        "kind": agent_kind.value,
+    }
+
+    # Add webhook-specific fields if provided
+    if agent_kind == enums.AgentKind.WEBHOOK:
+        agent_defaults["hook_url"] = input.hook_url
+        agent_defaults["hook_url_secret"] = input.hook_url_secret
+
     agent, _ = await models.Agent.objects.aupdate_or_create(
         registry=registry,
         instance_id=input.instance_id or "default",
-        defaults=dict(
-            name=input.name or f"{str(registry.id)} on {input.instance_id}",
-            extensions=input.extensions or [],
-        ),
+        defaults=agent_defaults,
     )
 
     memory_shelve, _ = await models.MemoryShelve.objects.aget_or_create(

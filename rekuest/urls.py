@@ -20,9 +20,11 @@ from kante.path import dynamicpath
 from django.urls import include, path
 from health_check.views import MainView
 from django.views.decorators.csrf import csrf_exempt
+from facade.views import WebhookAgentEventView
 
 
 urlpatterns = [
     dynamicpath("admin/", admin.site.urls),
     dynamicpath("ht",  csrf_exempt(MainView.as_view()), name="health_check"),
+    dynamicpath("webhook/agent/events/", csrf_exempt(WebhookAgentEventView.as_view()), name="webhook_agent_events"),
 ]
