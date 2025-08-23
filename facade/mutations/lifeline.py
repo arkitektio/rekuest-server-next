@@ -5,9 +5,11 @@ from facade.persist_backend import persist_backend
 
 
 
-@strawberry.input
+@strawberry.input(description="Input parameters for reinitializing an agent or assignation")
 class ReInitInput:
-    agent: strawberry.ID | None = None
+    agent: strawberry.ID | None = strawberry.field(
+        default=None, description="Optional agent ID to reinitialize. If not provided, reinitializes all systems."
+    )
 
 
 async def reinit(info: Info, input: ReInitInput) -> str:

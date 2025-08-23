@@ -267,7 +267,7 @@ class AssignationStatus(str, Enum):
     DONE = "DONE"
 
 
-@strawberry.enum
+@strawberry.enum(description="The current status of a reservation")
 class ReservationStatus(str, Enum):
     # LifeCycle States
     ACTIVE = "ACTIVE"
@@ -284,7 +284,7 @@ class ReservationStatus(str, Enum):
     ENDED = "ENDED"
 
 
-@strawberry.enum
+@strawberry.enum(description="The current status of a provision")
 class ProvisionStatus(str, Enum):
     # Start State
     DENIED = "DENIED"
@@ -348,7 +348,7 @@ class AssignationEventKind(str, Enum):
     CRITICAL = "CRITICAL"
 
 
-@strawberry.enum
+@strawberry.enum(description="Event types that can occur during provision lifecycle")
 class ProvisionEventKind(str, Enum):
     CHANGE = "CHANGE"
     UNHAPPY = "UNHAPPY"
@@ -375,7 +375,7 @@ class ProvisionEventKind(str, Enum):
     LOG = "LOG"
 
 
-@strawberry.enum
+@strawberry.enum(description="Event types that can occur during reservation lifecycle")
 class ReservationEventKind(str, Enum):
     PENDING = "PENDING"
     CREATE = "CREATE"
@@ -397,7 +397,7 @@ class ReservationEventKind(str, Enum):
 
 
 
-@strawberry.enum
+@strawberry.enum(description="Logging levels for events and messages")
 class LogLevel(str, Enum):
     DEBUG = "DEBUG"
     INFO = "INFO"
@@ -406,7 +406,7 @@ class LogLevel(str, Enum):
     CRITICAL = "CRITICAL"
 
 
-@strawberry.enum
+@strawberry.enum(description="Connection and availability status of agents")
 class AgentStatus(str, Enum):
     ACTIVE = "ACTIVE"
     KICKED = "KICKED"
@@ -414,7 +414,7 @@ class AgentStatus(str, Enum):
     VANILLA = "VANILLA"
 
 
-@strawberry.enum
+@strawberry.enum(description="Scope and visibility levels for actions")
 class ActionScope(str, Enum):
     GLOBAL = "GLOBAL"
     LOCAL = "LOCAL"
@@ -422,19 +422,19 @@ class ActionScope(str, Enum):
     BRIDGE_LOCAL_TO_GLOBAL = "BRIDGE_LOCAL_TO_GLOBAL"
 
 
-@strawberry.enum
+@strawberry.enum(description="Type of demand being specified (arguments or returns)")
 class DemandKind(str, Enum):
     ARGS = "args"
     RETURNS = "returns"
 
 
-@strawberry.enum
+@strawberry.enum(description="Type of lifecycle hook (initialization or cleanup)")
 class HookKind(str, Enum):
     CLEANUP = "CLEANUP"
     INIT = "INIT"
 
 
-@strawberry.enum
+@strawberry.enum(description="JSON Patch operation types for state updates")
 class JSONPatchOperation(str, Enum):
     add = "add"
     remove = "remove"
@@ -444,7 +444,7 @@ class JSONPatchOperation(str, Enum):
     test = "test"
 
 
-@strawberry.enum
+@strawberry.enum(description="Type of user interface panel")
 class PanelKind(str, Enum):
     STATE = "STATE"
     ASSIGN = "ASSIGN"
