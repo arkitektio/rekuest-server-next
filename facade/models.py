@@ -265,6 +265,23 @@ class Agent(models.Model):
         default=False,
         help_text="If this Agent is blocked, it will not be used for provision, nor will it be able to provide",
     )
+    
+    # Hook Agent Fields for Server-to-Server Communication
+    is_hook_agent = models.BooleanField(
+        default=False,
+        help_text="If true, this is a hook agent that receives tasks via HTTP POST instead of WebSocket",
+    )
+    hook_endpoint = models.URLField(
+        blank=True,
+        null=True,
+        help_text="The HTTP endpoint to send task assignments to for hook agents",
+    )
+    hook_secret_token = models.CharField(
+        max_length=512,
+        blank=True,
+        null=True,
+        help_text="Secret token used to authenticate requests to hook agent endpoint",
+    )
 
     class Meta:
         permissions = [("can_provide_on", "Can provide on this Agent")]

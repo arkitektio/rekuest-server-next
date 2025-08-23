@@ -1,10 +1,12 @@
 from datetime import datetime, timedelta, timezone
 import uuid
+import asyncio
 from random import choice
 from typing import Protocol
 
 from facade import enums, inputs, models, types, messages
 from facade.consumers.async_consumer import AgentConsumer
+from facade.hook_agent_service import hook_agent_service
 from kante.types import Info
 from authentikate.vars import get_user, get_client
 import logging
@@ -44,11 +46,14 @@ class RedisControllBackend(ControllBackend):
         parent.status = enums.AssignationEventKind.INTERUPTED
         parent.save()
 
-        AgentConsumer.broadcast(
-            parent.implementation.agent.id,
-            messages.Interrupt(
-                assignation=parent.id,
-            ),
+        # Send interrupt to parent agent - create task to handle async HTTP call
+        asyncio.create_task(
+            self._send_interrupt_to_agent(
+                agent=parent.implementation.agent,
+                message=messages.Interrupt(
+                    assignation=parent.id,
+                ),
+            )
         )
 
         children = models.Assignation.objects.filter(parent_id=input.assignation).all()
@@ -57,11 +62,14 @@ class RedisControllBackend(ControllBackend):
             child.status = enums.AssignationEventKind.INTERUPTED
             child.save()
 
-            AgentConsumer.broadcast(
-                child.implementation.agent.id,
-                messages.Interrupt(
-                    assignation=child.id,
-                ),
+            # Send interrupt to child agent - create task to handle async HTTP call
+            asyncio.create_task(
+                self._send_interrupt_to_agent(
+                    agent=child.implementation.agent,
+                    message=messages.Interrupt(
+                        assignation=child.id,
+                    ),
+                )
             )
 
         return parent
@@ -111,11 +119,14 @@ class RedisControllBackend(ControllBackend):
         assignation.latest_event_kind = enums.AssignationStatus.CANCELLED
         assignation.save()
 
-        AgentConsumer.broadcast(
-            assignation.agent.id,
-            message=messages.Cancel(
-                assignation=str(assignation.id),
-            ),
+        # Send cancellation to agent - create task to handle async HTTP call without blocking
+        asyncio.create_task(
+            self._send_cancellation_to_agent(
+                agent=assignation.agent,
+                message=messages.Cancel(
+                    assignation=str(assignation.id),
+                ),
+            )
         )
         return assignation
 
@@ -199,18 +210,22 @@ class RedisControllBackend(ControllBackend):
             ephemeral=input.ephemeral,
         )
 
-        AgentConsumer.broadcast(
-            assignation.agent.id,
-            message=messages.Assign(
-                assignation=str(assignation.id),
-                args=input.args,
-                user=str(info.context.request.user.id),
-                app=str(info.context.request.client.id),
-                reference=reference,
-                interface=implementation.interface,
-                extension=implementation.extension,
-                action=str(action.id),
-            ),
+        # Send assignment to agent - check if it's a hook agent or regular WebSocket agent
+        # Create task to handle async HTTP call without blocking
+        asyncio.create_task(
+            self._send_assignment_to_agent(
+                agent=assignation.agent,
+                message=messages.Assign(
+                    assignation=str(assignation.id),
+                    args=input.args,
+                    user=str(info.context.request.user.id),
+                    app=str(info.context.request.client.id),
+                    reference=reference,
+                    interface=implementation.interface,
+                    extension=implementation.extension,
+                    action=str(action.id),
+                ),
+            )
         )
         if input.hooks:
             for hook in input.hooks:
@@ -232,11 +247,14 @@ class RedisControllBackend(ControllBackend):
         assignation.status = enums.AssignationStatus.RESUME
         assignation.save()
 
-        AgentConsumer.broadcast(
-            assignation.agent.id,
-            message=messages.Cancel(
-                assignation=assignation.id,
-            ),
+        # Send cancellation to agent - create task to handle async HTTP call
+        asyncio.create_task(
+            self._send_cancellation_to_agent(
+                agent=assignation.agent,
+                message=messages.Cancel(
+                    assignation=assignation.id,
+                ),
+            )
         )
         return assignation
 
@@ -253,11 +271,14 @@ class RedisControllBackend(ControllBackend):
         for agent_id, drawers in agents.items():
             agent = models.Agent.objects.get(id=agent_id)
             logging.info(f"collecting {drawers} from agent {agent_id}")
-            AgentConsumer.broadcast(
-                agent.id,
-                message=messages.Collect(
-                    drawers=list(drawers),
-                ),
+            # Send collect to agent - create task to handle async HTTP call
+            asyncio.create_task(
+                self._send_collect_to_agent(
+                    agent=agent,
+                    message=messages.Collect(
+                        drawers=list(drawers),
+                    ),
+                )
             )
 
         return input.drawers
@@ -267,13 +288,110 @@ class RedisControllBackend(ControllBackend):
         assignation.status = enums.AssignationStatus.STEP
         assignation.save()
 
-        AgentConsumer.broadcast(
-            assignation.agent.id,
-            message=messages.Cancel(
-                assignation=assignation.id,
-            ),
+        # Send cancellation to agent - create task to handle async HTTP call
+        asyncio.create_task(
+            self._send_cancellation_to_agent(
+                agent=assignation.agent,
+                message=messages.Cancel(
+                    assignation=assignation.id,
+                ),
+            )
         )
         return assignation
+
+    async def _send_assignment_to_agent(self, agent: models.Agent, message: messages.Assign) -> bool:
+        """
+        Send assignment message to agent, routing to WebSocket or HTTP based on agent type.
+        
+        Args:
+            agent: The agent to send the assignment to
+            message: The assignment message to send
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            if agent.is_hook_agent:
+                # Send via HTTP POST to hook agent
+                return await hook_agent_service.send_assignment_to_hook_agent(agent, message)
+            else:
+                # Send via WebSocket broadcast to regular agent
+                AgentConsumer.broadcast(agent.id, message=message)
+                return True
+        except Exception as e:
+            logging.error(f"Failed to send assignment to agent {agent.id}: {e}")
+            return False
+
+    async def _send_cancellation_to_agent(self, agent: models.Agent, message: messages.Cancel) -> bool:
+        """
+        Send cancellation message to agent, routing to WebSocket or HTTP based on agent type.
+        
+        Args:
+            agent: The agent to send the cancellation to
+            message: The cancellation message to send
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            if agent.is_hook_agent:
+                # Send via HTTP POST to hook agent
+                return await hook_agent_service.send_cancellation_to_hook_agent(agent, message)
+            else:
+                # Send via WebSocket broadcast to regular agent
+                AgentConsumer.broadcast(agent.id, message=message)
+                return True
+        except Exception as e:
+            logging.error(f"Failed to send cancellation to agent {agent.id}: {e}")
+            return False
+
+
+    async def _send_interrupt_to_agent(self, agent: models.Agent, message: messages.Interrupt) -> bool:
+        """
+        Send interrupt message to agent, routing to WebSocket or HTTP based on agent type.
+        
+        Args:
+            agent: The agent to send the interrupt to
+            message: The interrupt message to send
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            if agent.is_hook_agent:
+                # Send via HTTP POST to hook agent
+                return await hook_agent_service.send_interrupt_to_hook_agent(agent, message)
+            else:
+                # Send via WebSocket broadcast to regular agent
+                AgentConsumer.broadcast(agent.id, message=message)
+                return True
+        except Exception as e:
+            logging.error(f"Failed to send interrupt to agent {agent.id}: {e}")
+            return False
+
+
+    async def _send_collect_to_agent(self, agent: models.Agent, message: messages.Collect) -> bool:
+        """
+        Send collect message to agent, routing to WebSocket or HTTP based on agent type.
+        
+        Args:
+            agent: The agent to send the collect to
+            message: The collect message to send
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            if agent.is_hook_agent:
+                # Send via HTTP POST to hook agent
+                return await hook_agent_service.send_collect_to_hook_agent(agent, message)
+            else:
+                # Send via WebSocket broadcast to regular agent
+                AgentConsumer.broadcast(agent.id, message=message)
+                return True
+        except Exception as e:
+            logging.error(f"Failed to send collect to agent {agent.id}: {e}")
+            return False
 
 
 controll_backend = RedisControllBackend()

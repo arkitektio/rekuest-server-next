@@ -25,4 +25,5 @@ from django.views.decorators.csrf import csrf_exempt
 urlpatterns = [
     dynamicpath("admin/", admin.site.urls),
     dynamicpath("ht",  csrf_exempt(MainView.as_view()), name="health_check"),
+    path("api/", include("facade.urls")),
 ]
