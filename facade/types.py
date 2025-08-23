@@ -6,7 +6,7 @@ import strawberry_django
 from authentikate.models import Client, User
 from django.conf import settings
 from django.utils import timezone
-from facade import enums, filters, models, scalars, inputs
+from facade import enums, filters, models, scalars
 from rekuest_core import enums as renums
 from rekuest_core import scalars as rscalars
 from rekuest_core.objects import models as rmodels
@@ -73,7 +73,7 @@ class Shortcut:
     allow_quick: bool = strawberry_django.field(description="Allow quick execution without modification.")
     use_returns: bool = strawberry_django.field(description="If true, shortcut uses return values.")
 
-    @strawberry_django.field(description="Input ports for the shortcut's action.dd")
+    @strawberry_django.field(description="Input ports for the shortcut's action.")
     def args(self) -> list[rtypes.Port]:
         return [rmodels.PortModel(**i) for i in self.args]
 
@@ -214,14 +214,14 @@ class FileDrawer:
     created_at: datetime.datetime = strawberry_django.field(description="Creation timestamp of the drawer.")
 
 
-@strawberry_django.type(models.MemoryDrawer, filters=filters.MemoryDrawerFilter, pagination=True)
+@strawberry_django.type(models.MemoryDrawer, filters=filters.MemoryDrawerFilter, pagination=True, description="Represents a memory-based drawer for storing data within a memory shelve.")
 class MemoryDrawer:
-    id: strawberry.ID
-    resource_id: str
-    shelve: "MemoryShelve"
-    identifier: str
-    description: str | None
-    created_at: datetime.datetime
+    id: strawberry.ID = strawberry_django.field(description="ID of the memory drawer.")
+    resource_id: str = strawberry_django.field(description="External resource identifier.")
+    shelve: "MemoryShelve" = strawberry_django.field(description="Memory shelve containing this drawer.")
+    identifier: str = strawberry_django.field(description="Unique string identifying the drawer.")
+    description: str | None = strawberry_django.field(description="Optional description of the drawer contents.")
+    created_at: datetime.datetime = strawberry_django.field(description="Creation timestamp of the drawer.")
 
     @strawberry_django.field(description="Get the latest value stored in this drawer.")
     def label(self) -> str:
@@ -391,16 +391,16 @@ class TestResult:
     updated_at: datetime.datetime = strawberry_django.field(description="When the test result was last updated.")
 
 
-@strawberry_django.type(models.Structure)
+@strawberry_django.type(models.Structure, description="Represents a data structure definition used in the system.")
 class Structure:
-    identifier: strawberry.ID
-    object: strawberry.ID
+    identifier: strawberry.ID = strawberry_django.field(description="Unique identifier for the structure.")
+    object: strawberry.ID = strawberry_django.field(description="Associated object reference.")
 
 
-@strawberry_django.type(models.Dashboard)
+@strawberry_django.type(models.Dashboard, description="User interface dashboard for organizing and displaying bloks.")
 class Dashboard:
-    id: strawberry.ID
-    name: str | None
+    id: strawberry.ID = strawberry_django.field(description="Unique identifier for the dashboard.")
+    name: str | None = strawberry_django.field(description="Name of the dashboard.")
     materialized_bloks: list["MaterializedBlok"]
 
     @strawberry_django.field()
@@ -535,12 +535,12 @@ class StateDemand:
     
 
 
-@strawberry_django.type(models.Blok)
+@strawberry_django.type(models.Blok, description="User interface component definition that can be materialized and deployed on agents.")
 class Blok:
-    id: strawberry.ID
-    name: str
-    creator: User
-    url: str 
+    id: strawberry.ID = strawberry_django.field(description="Unique identifier for the blok.")
+    name: str = strawberry_django.field(description="Name of the blok.")
+    creator: User = strawberry_django.field(description="User who created this blok.")
+    url: str = strawberry_django.field(description="URL or reference to the blok implementation.") 
     materialized_bloks: list["MaterializedBlok"] = strawberry_django.field(
         description="Materialized bloks that are instances of this blok.",
     )
@@ -629,16 +629,16 @@ class Blok:
         
     
     
-@strawberry_django.type(models.MaterializedBlok)
+@strawberry_django.type(models.MaterializedBlok, description="Instance of a blok deployed and running on a specific agent.")
 class MaterializedBlok:
-    id: strawberry.ID
-    dashboard: Dashboard
-    blok: Blok
-    agent: Agent
-    name: str | None
-    description: str | None
-    created_at: datetime.datetime
-    updated_at: datetime.datetime
+    id: strawberry.ID = strawberry_django.field(description="Unique identifier for the materialized blok.")
+    dashboard: Dashboard = strawberry_django.field(description="Dashboard containing this materialized blok.")
+    blok: Blok = strawberry_django.field(description="The original blok definition.")
+    agent: Agent = strawberry_django.field(description="Agent where this blok is materialized.")
+    name: str | None = strawberry_django.field(description="Override name for this materialized instance.")
+    description: str | None = strawberry_django.field(description="Description of this materialized instance.")
+    created_at: datetime.datetime = strawberry_django.field(description="When this blok was materialized.")
+    updated_at: datetime.datetime = strawberry_django.field(description="Last update timestamp.")
     state_mappings: list["StateMapping"] = strawberry_django.field(
         description="Mappings of states to this materialized blok.",
     )
@@ -649,66 +649,66 @@ class MaterializedBlok:
 
 
 
-@strawberry_django.type(models.StateSchema)
+@strawberry_django.type(models.StateSchema, description="Schema definition for agent state, defining structure and types of state values.")
 class StateSchema:
-    id: strawberry.ID
-    hash: str
-    name: str
+    id: strawberry.ID = strawberry_django.field(description="Unique identifier for the state schema.")
+    hash: str = strawberry_django.field(description="Hash identifying the schema definition.")
+    name: str = strawberry_django.field(description="Name of the state schema.")
 
-    @strawberry_django.field()
+    @strawberry_django.field(description="Port definitions for the state schema structure.")
     def ports(self) -> list[rtypes.Port]:
         return [rmodels.PortModel(**i) for i in self.ports]
 
 
-@strawberry_django.type(models.State)
+@strawberry_django.type(models.State, description="State instance representing current or historical state data for an agent.")
 class State:
-    id: strawberry.ID
-    state_schema: StateSchema
-    value: scalars.Args
-    agent: Agent
-    interface: str
-    created_at: datetime.datetime
+    id: strawberry.ID = strawberry_django.field(description="Unique identifier for the state instance.")
+    state_schema: StateSchema = strawberry_django.field(description="Schema defining the structure of this state.")
+    value: scalars.Args = strawberry_django.field(description="Current value data of the state.")
+    agent: Agent = strawberry_django.field(description="Agent that owns this state.")
+    interface: str = strawberry_django.field(description="Interface or context this state belongs to.")
+    created_at: datetime.datetime = strawberry_django.field(description="Timestamp when this state was created.")
     updated_at: datetime.datetime
     historical_states: list["HistoricalState"]
 
 
-@strawberry_django.type(models.HistoricalState)
+@strawberry_django.type(models.HistoricalState, description="Historical snapshot of a previous state value.")
 class HistoricalState:
-    id: strawberry.ID
-    state: State
-    value: scalars.Args
-    archived_at: datetime.datetime
+    id: strawberry.ID = strawberry_django.field(description="Unique identifier for the historical state.")
+    state: State = strawberry_django.field(description="The original state this is a snapshot of.")
+    value: scalars.Args = strawberry_django.field(description="The archived value of the state.")
+    archived_at: datetime.datetime = strawberry_django.field(description="When this state was archived.")
 
 
-@strawberry.type
+@strawberry.type(description="JSON patch operation for updating state values.")
 class JSONPatch:
-    op: enums.JSONPatchOperation
-    path: str
-    value: scalars.Args
+    op: enums.JSONPatchOperation = strawberry.field(description="The patch operation type.")
+    path: str = strawberry.field(description="JSON path to the value being modified.")
+    value: scalars.Args = strawberry.field(description="The new or comparison value.")
 
 
-@strawberry.type
+@strawberry.type(description="Event representing a state update with JSON patches.")
 class StateUpdateEvent:
-    state_id: str
-    patches: list[JSONPatch]
+    state_id: str = strawberry.field(description="ID of the state being updated.")
+    patches: list[JSONPatch] = strawberry.field(description="List of JSON patch operations.")
 
 
 
-@strawberry_django.type(models.ActionMapping)
+@strawberry_django.type(models.ActionMapping, description="Maps an action to a materialized blok implementation.")
 class ActionMapping:
-    id: strawberry.ID
-    key: str 
-    implementation: Implementation
-    materialized_blok: MaterializedBlok
-    crreated_at: datetime.datetime
-    updated_at: datetime.datetime
+    id: strawberry.ID = strawberry_django.field(description="Unique identifier for the action mapping.")
+    key: str = strawberry_django.field(description="Key identifying the mapped action.")
+    implementation: Implementation = strawberry_django.field(description="Implementation providing the action.")
+    materialized_blok: MaterializedBlok = strawberry_django.field(description="Materialized blok containing this mapping.")
+    created_at: datetime.datetime = strawberry_django.field(description="When this mapping was created.")
+    updated_at: datetime.datetime = strawberry_django.field(description="Last update timestamp.")
     
-@strawberry_django.type(models.StateMapping)
+@strawberry_django.type(models.StateMapping, description="Maps a state to a materialized blok.")
 class StateMapping:
-    id: strawberry.ID
-    key: str 
-    implementation: Implementation
-    state: State
-    crreated_at: datetime.datetime
-    updated_at: datetime.datetime
+    id: strawberry.ID = strawberry_django.field(description="Unique identifier for the state mapping.")
+    key: str = strawberry_django.field(description="Key identifying the mapped state.")
+    implementation: Implementation = strawberry_django.field(description="Implementation associated with this mapping.")
+    state: State = strawberry_django.field(description="State being mapped.")
+    created_at: datetime.datetime = strawberry_django.field(description="When this mapping was created.")
+    updated_at: datetime.datetime = strawberry_django.field(description="Last update timestamp.")
     
