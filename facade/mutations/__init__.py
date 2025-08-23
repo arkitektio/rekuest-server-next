@@ -11,6 +11,14 @@ from .state import set_state, update_state, archive_state, set_agent_states
 from .blok import create_blok
 from .materialized_blok import materialize_blok
 from .lifeline import reinit
+from .webhook import (
+    webhook_assignation_progress,
+    webhook_assignation_log,
+    webhook_assignation_yield,
+    webhook_assignation_done,
+    webhook_assignation_error,
+    webhook_assignation_cancelled
+)
 
 __all__ = [
     "create_foreign_implementation",
@@ -48,4 +56,10 @@ __all__ = [
     "ensure_agent",
     "pin_agent",
     "delete_agent",
+    "webhook_assignation_progress",
+    "webhook_assignation_log", 
+    "webhook_assignation_yield",
+    "webhook_assignation_done",
+    "webhook_assignation_error",
+    "webhook_assignation_cancelled",
 ]

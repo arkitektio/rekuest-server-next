@@ -169,6 +169,14 @@ class Mutation:
     delete_shortcut = mutation(resolver=mutations.delete_shortcut, description="Delete a shortcut.")
     create_toolbox = mutation(resolver=mutations.create_toolbox, description="Create a new toolbox with shortcuts.")
     set_agent_states = mutation(resolver=mutations.set_agent_states, description="Set states for an agent.")
+    
+    # Webhook agent mutations
+    webhook_assignation_progress = mutation(resolver=mutations.webhook_assignation_progress, description="Report assignation progress from webhook agent.")
+    webhook_assignation_log = mutation(resolver=mutations.webhook_assignation_log, description="Report assignation log from webhook agent.")
+    webhook_assignation_yield = mutation(resolver=mutations.webhook_assignation_yield, description="Yield assignation results from webhook agent.")
+    webhook_assignation_done = mutation(resolver=mutations.webhook_assignation_done, description="Mark assignation as done from webhook agent.")
+    webhook_assignation_error = mutation(resolver=mutations.webhook_assignation_error, description="Report assignation error from webhook agent.")
+    webhook_assignation_cancelled = mutation(resolver=mutations.webhook_assignation_cancelled, description="Mark assignation as cancelled from webhook agent.")
 
 
 @strawberry.type(description="Root subscription type for real-time event streams from the system.")

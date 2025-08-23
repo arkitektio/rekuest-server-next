@@ -22,6 +22,39 @@ Agents are computational entities that can execute tasks. They register with Rek
 - **Instance ID**: Unique identifier for the agent instance
 - **Extensions**: List of capabilities/plugins the agent supports
 - **States**: Current status and configuration of the agent
+- **Agent Types**:
+  - **WebSocket Agents**: Connect via WebSocket for real-time communication
+  - **Webhook Agents**: Receive tasks via HTTP POST requests to their webhook URL
+
+#### Webhook Agent Integration
+
+Webhook agents enable server-to-server task assignment without maintaining persistent connections:
+
+1. **Registration**: Register with `kind: "WEBHOOK"`, providing `hookUrl` and `hookUrlSecret`
+2. **Task Assignment**: Server sends HTTP POST to webhook URL with task details and agent secret
+3. **Status Updates**: Agent uses GraphQL mutations or REST endpoints to report progress
+4. **Authentication**: All requests authenticated using the webhook secret token
+
+**Webhook Payload Format:**
+```json
+{
+  "message": {
+    "type": "ASSIGN", 
+    "assignation": "uuid",
+    "args": {...},
+    "user": "user_id",
+    "app": "app_id", 
+    "interface": "interface_name",
+    "action": "action_hash"
+  },
+  "agent_id": "agent_uuid"
+}
+```
+
+**Headers:**
+- `Content-Type: application/json`
+- `Authorization: Bearer {webhook_secret}`
+- `X-Agent-Secret: {webhook_secret}`
 
 ### Actions
 Actions are abstract representations of computational tasks that agents can perform.
@@ -133,14 +166,27 @@ query GetStatesForAgent($instanceId: String!) {
 
 #### Agent Management
 ```graphql
-# Register or update an agent
+# Register or update an agent (supports webhook agents)
 mutation EnsureAgent($input: AgentInput!) {
   ensureAgent(input: $input) {
     id
     instanceId
     name
     extensions
+    kind
+    hookUrl
+    hookUrlSecret
   }
+}
+
+# Agent input supports webhook fields
+input AgentInput {
+  instanceId: String!
+  name: String
+  extensions: [String!]
+  kind: String # "WEBSOCKET" or "WEBHOOK" 
+  hookUrl: String # Required for WEBHOOK agents
+  hookUrlSecret: String # Required for WEBHOOK agents  
 }
 
 # Delete an agent
@@ -175,6 +221,41 @@ mutation Cancel($input: CancelInput!) {
     id
     status
   }
+}
+```
+
+#### Webhook Agent Events
+Webhook agents can use these mutations to update assignment status:
+
+```graphql
+# Report progress on an assignation
+mutation WebhookAssignationProgress($input: WebhookProgressInput!) {
+  webhookAssignationProgress(input: $input)
+}
+
+# Log messages from assignation
+mutation WebhookAssignationLog($input: WebhookLogInput!) {
+  webhookAssignationLog(input: $input)  
+}
+
+# Yield results from assignation
+mutation WebhookAssignationYield($input: WebhookYieldInput!) {
+  webhookAssignationYield(input: $input)
+}
+
+# Mark assignation as completed
+mutation WebhookAssignationDone($input: WebhookAssignationEventInput!) {
+  webhookAssignationDone(input: $input)
+}
+
+# Report error in assignation  
+mutation WebhookAssignationError($input: WebhookErrorInput!) {
+  webhookAssignationError(input: $input)
+}
+
+# Mark assignation as cancelled
+mutation WebhookAssignationCancelled($input: WebhookAssignationEventInput!) {
+  webhookAssignationCancelled(input: $input)
 }
 ```
 
@@ -393,6 +474,37 @@ docker-compose up -d
 - Implement health checks via `/health/` endpoint
 - Monitor GraphQL query performance
 - Track agent connectivity and task completion rates
+
+## Webhook Integration
+
+### Webhook Event Endpoint
+
+**URL:** `POST /webhook/agent/events/`
+
+Webhook agents can post events to this endpoint as an alternative to GraphQL mutations.
+
+**Request Format:**
+```json
+{
+  "agent_id": "uuid",
+  "message": {
+    "type": "PROGRESS|LOG|YIELD|DONE|ERROR|CANCELLED",
+    "assignation": "assignation_uuid",
+    // ... message-specific fields
+  }
+}
+```
+
+**Authentication:**
+- `Authorization: Bearer {webhook_secret}` OR
+- `X-Agent-Secret: {webhook_secret}`
+
+**Response:**
+- `200 OK`: Event processed successfully
+- `400 Bad Request`: Invalid request format
+- `401 Unauthorized`: Invalid or missing authentication
+- `404 Not Found`: Agent not found
+- `500 Internal Server Error`: Processing error
 
 ## Security
 
