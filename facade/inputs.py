@@ -410,32 +410,6 @@ class SchemaDemandInputModel(BaseModel):
     protocols: list[str] | None = None
 
 
-@strawberry.input(description="The input for creating a port match.")
-class PortMatchInput:
-    at: int | None = strawberry.field(
-        default=None,
-        description="The index of the port to match. ",
-    )
-    key: str | None = strawberry.field(
-        default=None,
-        description="The key of the port to match.",
-    )
-    kind: renums.PortKind | None = strawberry.field(
-        default=None,
-        description="The kind of the port to match. ",
-    )
-    identifier: str | None = strawberry.field(
-        default=None,
-        description="The identifier of the port to match. ",
-    )
-    nullable: bool | None = strawberry.field(
-        default=None,
-        description="Whether the port is nullable. ",
-    )
-    children: Optional[list[LazyType["PortMatchInput", __name__]]] = strawberry.field(
-        default=None,
-        description="The matches for the children of the port to match. ",
-    )
 
 
 @strawberry.input(description="The input for creating a port demand.")
@@ -443,7 +417,7 @@ class PortDemandInput:
     kind: enums.DemandKind = strawberry.field(
         description="The kind of the demand. You can ask for args or returns",
     )
-    matches: list[PortMatchInput] | None = strawberry.field(
+    matches: list[ritypes.PortMatchInput] | None = strawberry.field(
         default=None,
         description="The matches of the demand. ",
     )
@@ -467,7 +441,6 @@ class ActionDemandInput:
         default=None,
         description="The key of the action. This is used to identify the action in the system.",
     )
-
     hash: rscalars.ActionHash | None = strawberry.field(
         default=None,
         description="The hash of the action. This is used to identify the action in the system.",
@@ -480,11 +453,11 @@ class ActionDemandInput:
         default=None,
         description="The description of the action. This can described the action and its purpose.",
     )
-    arg_matches: list[PortMatchInput] | None = strawberry.field(
+    arg_matches: list[ritypes.PortMatchInput] | None = strawberry.field(
         default=None,
         description="The demands for the action args and returns. This is used to identify the demand in the system.",
     )
-    return_matches: list[PortMatchInput] | None = strawberry.field(
+    return_matches: list[ritypes.PortMatchInput] | None = strawberry.field(
         default=None,
         description="The demands for the action args and returns. This is used to identify the demand in the system.",
     )
@@ -512,7 +485,7 @@ class SchemaDemandInput:
         default=None,
         description="The hash of the state.",
     )
-    matches: list[PortMatchInput] | None = strawberry.field(
+    matches: list[ritypes.PortMatchInput] | None = strawberry.field(
         default=None,
         description="The demands for the action args and returns. This is used to identify the demand in the system.",
     )

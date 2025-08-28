@@ -506,32 +506,32 @@ class Dependency(models.Model):
         help_text="The Implementation that has this dependency",
         related_name="dependencies",
     )
-    action = models.ForeignKey(
-        Action,
-        on_delete=models.CASCADE,
-        help_text="The action this dependency is for",
-        related_name="dependees",
-        null=True,
-        blank=True,
-    )
-    initial_hash = models.CharField(
+    action_hash = models.CharField(
         max_length=1000,
         help_text="The initial hash of the Action",
         null=True,
         blank=True,
     )
-    reference = models.CharField(
+    key = models.CharField(
         max_length=2000,
         help_text="A reference for this dependency",
-        null=True,
-        blank=True,
+    )
+    protocols = models.JSONField(
+        default=list,
+        help_text="The protocols this dependency needs to match",
     )
     optional = models.BooleanField(
         default=False,
         help_text="Is this dependency optional (e.g. can we still use the implementation if this dependency is not met)",
     )
-    binds = models.JSONField(
-        default=dict,
+    arg_matches = models.JSONField(
+        default=list,
+        help_text="The binds for this dependency (Determines which implementations can be used for this dependency)",
+        null=True,
+        blank=True,
+    )
+    return_matches = models.JSONField(
+        default=list,
         help_text="The binds for this dependency (Determines which implementations can be used for this dependency)",
         null=True,
         blank=True,
@@ -812,6 +812,14 @@ class AssignationEvent(models.Model):
         help_text="The reservation this log item belongs to",
         related_name="events",
         on_delete=models.CASCADE,
+    )
+    delegated_to = models.ForeignKey(
+        Assignation,
+        help_text="If this event was delegated to another assignation, which one?",
+        related_name="delegated_events",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
     )
     returns = models.JSONField(
         help_text="The returns of the events (true for yield events)",

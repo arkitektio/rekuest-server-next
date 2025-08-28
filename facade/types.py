@@ -1,5 +1,5 @@
 import datetime
-from typing import Optional
+from typing import List, Optional
 
 import strawberry
 import strawberry_django
@@ -149,15 +149,17 @@ class Action:
 class Dependency:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the dependency.")
     implementation: "Implementation" = strawberry_django.field(description="Implementation this dependency belongs to.")
-    action: Action | None = strawberry_django.field(description="Optional action this dependency refers to.")
-    hash: rscalars.ActionHash = strawberry_django.field(description="Current hash of the dependency.")
-    initial_hash: rscalars.ActionHash = strawberry_django.field(description="Original hash when the dependency was created.")
-    reference: str | None = strawberry_django.field(description="Optional string identifier or tag for reference.")
+    action_hash: rscalars.ActionHash | None = strawberry_django.field(description="Original hash when the dependency was created.")
+    key: str  = strawberry_django.field(description="Optional string identifier or tag for reference.")
     optional: bool = strawberry_django.field(description="Indicates if the dependency is optional.")
 
-    @strawberry_django.field(description="Binds information attached to the dependency.")
-    def binds(self) -> rtypes.Binds | None:
-        return rmodels.BindsModel(**self.binds) if self.binds else None
+    @strawberry_django.field(description="Protocols that this dependency needs to match.")
+    def return_matches(self) -> list[rtypes.PortMatch] | None:
+        return [rmodels.PortMatchModel(**i) for i in self.return_matches] if self.return_matches else None
+
+    @strawberry_django.field(description="Protocols that this dependency needs to match.")
+    def arg_matches(self) -> list[rtypes.PortMatch] | None:
+        return [rmodels.PortMatchModel(**i) for i in self.arg_matches] if self.arg_matches else None
 
     @strawberry_django.field(description="Check if this dependency can be resolved by a connected agent.")
     def resolvable(self, info: Info) -> bool:
@@ -338,6 +340,7 @@ class Assignation:
     created_at: datetime.datetime = strawberry_django.field(description="Creation timestamp.")
     updated_at: datetime.datetime = strawberry_django.field(description="Last update timestamp.")
     ephemeral: bool = strawberry.field(description="Indicates if the assignation should be deleted after completion.")
+    children: List["Assignation"] = strawberry.field(description="Child assignations spawned from this one.")
 
     @strawberry_django.field(description="List of recent events for this assignation.")
     def events(self) -> list["AssignationEvent"]:
@@ -365,7 +368,9 @@ class AssignationEvent:
     message: str | None = strawberry_django.field(description="Optional message associated with the event.")
     progress: int | None = strawberry_django.field(description="Progress percentage.")
     created_at: strawberry.auto = strawberry_django.field(description="Time when event was created.")
-
+    delegated_to: Optional["Assignation"] = strawberry_django.field(description="If this event was delegated, the assignation it was delegated to.")
+    
+    
     @strawberry_django.field(description="Default log level.")
     def level(self) -> enums.LogLevel:
         return self.level or enums.LogLevel.INFO
@@ -437,41 +442,6 @@ class Dashboard:
         return model
 
 
-class PortMatchModel(BaseModel):
-    at: Optional[int] = None
-    key: Optional[str] = None
-    kind: Optional[renums.PortKind] = None
-    identifier: Optional[str] = None
-    nullable: Optional[bool] = None
-    children: Optional[list["PortMatchModel"]] = None
-
-
-@pydantic.type(PortMatchModel, description="Port matching in action demands.")
-class PortMatch:
-    at: int | None = strawberry.field(
-        default=None,
-        description="The index of the port to match. ",
-    )
-    key: str | None = strawberry.field(
-        default=None,
-        description="The key of the port to match.",
-    )
-    kind: renums.PortKind | None = strawberry.field(
-        default=None,
-        description="The kind of the port to match. ",
-    )
-    identifier: str | None = strawberry.field(
-        default=None,
-        description="The identifier of the port to match. ",
-    )
-    nullable: bool | None = strawberry.field(
-        default=None,
-        description="Whether the port is nullable. ",
-    )
-    children: list[LazyType["PortMatch", __name__]] | None = strawberry.field(
-        default=None,
-        description="List of child ports to match. ",
-    )
 
 
 class ActionDemandModel(BaseModel):
@@ -479,8 +449,8 @@ class ActionDemandModel(BaseModel):
     hash: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
-    arg_matches: Optional[list[PortMatchModel]] = None
-    return_matches: Optional[list[PortMatchModel]] = None
+    arg_matches: Optional[list[rmodels.PortMatchModel]] = None
+    return_matches: Optional[list[rmodels.PortMatchModel]] = None
     protocols: Optional[list[str]] = None
     force_arg_length: Optional[int] = None
     force_return_length: Optional[int] = None
@@ -503,11 +473,11 @@ class ActionDemand:
         default=None,
         description="The description of the action. This can described the action and its purpose.",
     )
-    arg_matches: list[PortMatch] | None = strawberry.field(
+    arg_matches: list[rtypes.PortMatch] | None = strawberry.field(
         default=None,
         description="The demands for the action args and returns. This is used to identify the demand in the system.",
     )
-    return_matches: list[PortMatch] | None = strawberry.field(
+    return_matches: list[rtypes.PortMatch] | None = strawberry.field(
         default=None,
         description="The demands for the action args and returns. This is used to identify the demand in the system.",
     )
@@ -528,7 +498,7 @@ class ActionDemand:
 class StateDemandModel(BaseModel):
     key: str
     hash: Optional[str] = None
-    matches: Optional[list[PortMatchModel]] = None
+    matches: Optional[list[rmodels.PortMatchModel]] = None
     protocols: Optional[list[str]] = None
 
 
@@ -541,7 +511,7 @@ class StateDemand:
         default=None,
         description="The hash of the state.",
     )
-    matches: list[PortMatch] | None = strawberry.field(
+    matches: list[rtypes.PortMatch] | None = strawberry.field(
         default=None,
         description="The demands for the action args and returns. This is used to identify the demand in the system.",
     )

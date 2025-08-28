@@ -102,6 +102,31 @@ class PortGroupInputModel(BaseModel):
     ports: list[str]
 
 
+
+
+class PortMatchInputModel(BaseModel):
+    at: int | None = None
+    key: str | None = None
+    kind: enums.PortKind | None = None
+    identifier: str | None = None
+    nullable: bool | None = None
+    children: Optional[list["PortMatchInputModel"]] = None
+
+
+class ActionDependencyInputModel(BaseModel):
+    key: str 
+    hash: str | None = None
+    name: str | None = None
+    description: str | None = None
+    arg_matches: list[PortMatchInputModel] | None = None
+    return_matches: list[PortMatchInputModel] | None = None
+    protocols: list[str] | None = None
+    force_arg_length: int | None = None
+    force_return_length: int | None = None
+    optional: bool = False
+
+
+
 class DefinitionInputModel(BaseModel):
     """A definition for a implementation"""
 
@@ -153,7 +178,7 @@ class DependencyInputModel(BaseModel):
 
 class ImplementationInputModel(BaseModel):
     definition: DefinitionInputModel
-    dependencies: list[DependencyInputModel]
+    dependencies: list[ActionDependencyInputModel]
     interface: str
     params: dict[str, Any] | None = None
     instance_id: str | None = None

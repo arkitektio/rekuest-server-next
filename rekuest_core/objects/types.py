@@ -47,6 +47,7 @@ class CustomAssignWidget(AssignWidget):
     ward: str
 
 
+
 @pydantic.type(models.SearchAssignWidgetModel)
 class SearchAssignWidget(AssignWidget):
     query: str
@@ -113,6 +114,35 @@ class Binds:
     desired_instances: int
 
 
+@pydantic.type(models.PortMatchModel)
+class PortMatch:
+    at: int | None = strawberry.field(
+        default=None,
+        description="The index of the port to match. ",
+    )
+    key: str | None = strawberry.field(
+        default=None,
+        description="The key of the port to match.",
+    )
+    kind: enums.PortKind | None = strawberry.field(
+        default=None,
+        description="The kind of the port to match. ",
+    )
+    identifier: str | None = strawberry.field(
+        default=None,
+        description="The identifier of the port to match. ",
+    )
+    nullable: bool | None = strawberry.field(
+        default=None,
+        description="Whether the port is nullable. ",
+    )
+    children: list[LazyType["PortMatch", __name__]] | None = strawberry.field(
+        default=None,
+        description="Child ports to match. ",
+    )
+    
+    
+    
 @pydantic.type(models.PortGroupModel)
 class PortGroup:
     key: str

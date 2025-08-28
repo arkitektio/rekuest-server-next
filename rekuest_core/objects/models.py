@@ -130,6 +130,15 @@ class ValidatorModel(BaseModel):
     error_message: str | None = None
 
 
+class PortMatchModel(BaseModel):
+    at: int | None = None
+    key: str | None = None
+    kind: str | None = None
+    identifier: str | None = None
+    children: list["PortMatchModel"] | None = None
+
+
+
 class PortModel(BaseModel):
     key: str
     label: str | None = None

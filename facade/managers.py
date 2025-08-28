@@ -3,7 +3,8 @@ import typing as t
 
 from django.db import connection
 
-from .inputs import PortMatchInput, ActionDemandInput
+from rekuest_core.inputs.types import PortMatchInput
+from .inputs import ActionDemandInput
 
 qt = re.compile(r"@(?P<package>[^\/]*)\/(?P<interface>[^\/]*)")
 

@@ -101,6 +101,10 @@ class Assign(Message):
         description="The direct parent of this assignation, None if this is this is the mother",
     )
     """ The parent s"""
+    dependencies: Dict[str, str] | None = Field(
+        default=None,
+        description="The dependencies that were provided (should map reference to template)",
+    )
     reference: Optional[str] = Field(default=None, description="A reference that the assinger provided")
     args: Dict[str, ShallowJSONSerializable] = Field(description="The arguments that was sendend")
     message: Optional[str] = None

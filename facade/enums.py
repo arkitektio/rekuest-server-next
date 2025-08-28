@@ -127,6 +127,7 @@ class AssignationEventChoices(TextChoices):
     CANCELLED = "CANCELLED", "Unassign (Assignation was unassigned from an Agent)"
     INTERUPTING = "INTERUPTING", "Interupting (Assignation was interupted)"
     INTERUPTED = "INTERUPTED", "Interupted (Assignation was interupted)"
+    DELEGATE = "DELEGATE", "Delegate (Assignation was delegated to another Assignation)"
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"
     DISCONNECTED = "DISCONNECTED"
@@ -332,6 +333,7 @@ class AssignationEventKind(str, Enum):
     QUEUED = "QUEUED"
     ASSIGN = "ASSIGN"
     PROGRESS = "PROGRESS"
+    DELEGATE = "DELEGATE"
 
     DISCONNECTED = "DISCONNECTED"
 

@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import uuid
 from random import choice
-from typing import Protocol
+from typing import Dict, Protocol
 
 from facade import enums, inputs, models, types, messages
 from facade.consumers.async_consumer import AgentConsumer
@@ -24,6 +24,37 @@ class ControllBackend(Protocol):
     def resume(self, info: Info, input: inputs.ResumeInputModel) -> types.Assignation: ...
 
     def pause(self, info: Info, input: inputs.PauseInputModel) -> types.Assignation: ...
+
+
+
+
+
+
+
+
+def build_dependency_dict(implementation: models.Implementation) -> Dict[str, str]:
+    dependencies = models.Dependency.objects.filter(implementation=implementation).all()
+    
+    dep_kwargs = {}
+    
+    for dep in dependencies:
+        if not dep.action_hash:
+            raise ValueError(f"Dependency {dep.key} has no action hash. This is not implemented yet for dynamic resolution.")
+        
+        try:
+            action = models.Action.objects.get(hash=dep.action_hash)
+        except models.Action.DoesNotExist:
+            raise ValueError(f"Dependency {dep.key} references action hash {dep.action_hash} which does not exist.")
+        implementation = models.Implementation.objects.filter(action=action, agent__connected=True, agent__last_seen__gt=datetime.now() - timedelta(minutes=1)).first()
+        if not implementation:
+            raise ValueError(f"No active implementation found for this depdendency {dep.key}")
+        
+        dep_kwargs[dep.key] = str(implementation.id)
+        
+        
+    return dep_kwargs
+
+
 
 
 def get_waiter_for_context(info: Info, instance_id: str) -> None:
@@ -176,6 +207,7 @@ class RedisControllBackend(ControllBackend):
             raise ValueError("You need to provide either, action_hash or action_id, to create an assignment for an agent")
 
         reference = input.reference or self.create_message_id()
+        
 
         # TODO: if ephemeral is set, we should not store the assignation in the database
         assignation = models.Assignation.objects.create(
@@ -195,6 +227,13 @@ class RedisControllBackend(ControllBackend):
         )
 
         action = implementation.action
+        
+        
+        
+        dependencies = build_dependency_dict(implementation)
+        
+        print("Dependencies for implementation", implementation, "are", dependencies)
+        
 
         AgentConsumer.broadcast(
             assignation.agent.pk,
@@ -207,6 +246,7 @@ class RedisControllBackend(ControllBackend):
                 reference=reference,
                 interface=implementation.interface,
                 extension=implementation.extension,
+                dependencies=dependencies,
                 action=str(implementation.action.hash),
             ),
         )
@@ -222,6 +262,15 @@ class RedisControllBackend(ControllBackend):
                             reference="init_hook_0",
                         )
                     )
+                    
+                    
+        if assignation.parent:
+            
+            models.AssignationEvent.objects.create(
+                assignation=assignation.parent,
+                kind=enums.AssignationEventKind.DELEGATE,
+                delegated_to=assignation,
+            )
 
         return assignation
 

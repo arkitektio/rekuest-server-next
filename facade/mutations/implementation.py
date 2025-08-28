@@ -78,7 +78,14 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
         )
 
         new_deps = []
+        
+        
+        
 
+        for dep in implementation.dependencies.all():
+            if dep not in new_deps:
+                dep.delete()
+                
         if input.dependencies:
             for i in input.dependencies:
                 try:
@@ -88,19 +95,15 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
 
                 dep, _ = models.Dependency.objects.update_or_create(
                     implementation=implementation,
-                    reference=i.reference,
+                    key=i.key,
                     defaults=dict(
-                        action=depending_action,
-                        initial_hash=i.hash,
+                        action_hash=i.hash,
                         optional=i.optional,
-                        binds=i.binds.dict() if i.binds else None,
+                        arg_matches=[strawberry.asdict(x) for x in i.arg_matches] if i.arg_matches else [],
+                        return_matches=[strawberry.asdict(x) for x in i.return_matches] if i.return_matches else [],
                     ),
                 )
                 new_deps.append(dep)
-
-        for dep in implementation.dependencies.all():
-            if dep not in new_deps:
-                dep.delete()
 
         if implementation.action.hash != hash:
             if implementation.action.implementations.count() == 1:
@@ -134,12 +137,12 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
 
                 dep, _ = models.Dependency.objects.update_or_create(
                     implementation=implementation,
-                    reference=i.reference,
+                    key=i.key,
                     defaults=dict(
-                        action=depending_action,
-                        initial_hash=i.hash,
+                        action_hash=i.hash,
                         optional=i.optional,
-                        binds=i.binds.dict() if i.binds else None,
+                        arg_matches=[strawberry.asdict(x) for x in i.arg_matches] if i.arg_matches else [],
+                        return_matches=[strawberry.asdict(x) for x in i.return_matches] if i.return_matches else [],
                     ),
                 )
                 new_deps.append(dep)

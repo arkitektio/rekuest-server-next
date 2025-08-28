@@ -374,6 +374,94 @@ class DependencyInput:
         description="Whether the dependency is optional or not. If the dependency is optional, it can be used to create a action without the dependency. If the dependency is not optional, it cannot be used to create a action without the dependency",
     )
     viable_instances: int | None = None
+    
+    
+    
+    
+    
+@pydantic.input(
+    models.PortMatchInputModel,
+    description="""A dependency for a implementation. By defining dependencies, you can
+    create a dependency graph for your implementations and actions""",
+)
+class PortMatchInput:
+    at: int | None = strawberry.field(
+        default=None,
+        description="The index of the port to match. ",
+    )
+    key: str | None = strawberry.field(
+        default=None,
+        description="The key of the port to match.",
+    )
+    kind: enums.PortKind | None = strawberry.field(
+        default=None,
+        description="The kind of the port to match. ",
+    )
+    identifier: str | None = strawberry.field(
+        default=None,
+        description="The identifier of the port to match. ",
+    )
+    nullable: bool | None = strawberry.field(
+        default=None,
+        description="Whether the port is nullable. ",
+    )
+    children: Optional[list[LazyType["PortMatchInput", __name__]]] = strawberry.field(
+        default=None,
+        description="The matches for the children of the port to match. ",
+    )    
+    
+    
+@pydantic.input(
+    models.ActionDependencyInputModel,
+    description="""A dependency for a implementation. By defining dependencies, you can
+    create a dependency graph for your implementations and actions""",
+)
+class ActionDependencyInput:
+    key: str = strawberry.field(
+        description="The key of the action. This is used to identify the action in the system.",
+    )
+    hash: scalars.ActionHash | None = strawberry.field(
+        default=None,
+        description="The hash of the action. This is used to identify the action in the system.",
+    )
+    name: str | None = strawberry.field(
+        default=None,
+        description="The name of the action. This is used to identify the action in the system.",
+    )
+    description: str | None = strawberry.field(
+        default=None,
+        description="The description of the action. This can described the action and its purpose.",
+    )
+    arg_matches: list[PortMatchInput] | None = strawberry.field(
+        default=None,
+        description="The demands for the action args and returns. This is used to identify the demand in the system.",
+    )
+    return_matches: list[PortMatchInput] | None = strawberry.field(
+        default=None,
+        description="The demands for the action args and returns. This is used to identify the demand in the system.",
+    )
+    protocols: list[strawberry.ID] | None = strawberry.field(
+        default=None,
+        description="The protocols that the action has to implement. This is used to identify the demand in the system.",
+    )
+    force_arg_length: int | None = strawberry.field(
+        default=None,
+        description="Require that the action has a specific number of args. This is used to identify the demand in the system.",
+    )
+    force_return_length: int | None = strawberry.field(
+        default=None,
+        description="Require that the action has a specific number of returns. This is used to identify the demand in the system.",
+    )
+    optional: bool = strawberry.field(
+        default=False,
+        description="Whether the dependency is optional or not. If the dependency is optional, users can choose to not provide it")
+    
+    
+    
+    
+    
+    
+    
 
 
 @pydantic.input(
@@ -384,7 +472,7 @@ class ImplementationInput:
     definition: DefinitionInput = strawberry.field(
         description="The definition of the implementation. This is used to uniquely identify the implementation",
     )
-    dependencies: list[DependencyInput] = strawberry.field(
+    dependencies: list[ActionDependencyInput] = strawberry.field(
         default_factory=list,
         description="The dependencies of the implementation. This is used to create a dependency graph for the implementation",
     )
