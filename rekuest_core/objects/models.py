@@ -136,6 +136,7 @@ class PortMatchModel(BaseModel):
     kind: str | None = None
     identifier: str | None = None
     children: list["PortMatchModel"] | None = None
+    nullable: bool | None = False
 
 
 
