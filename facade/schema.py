@@ -62,6 +62,17 @@ class Query:
     state_schemas: list[types.StateSchema] = field(description="Available state schemas.")
     memory_shelves: list[types.MemoryShelve] = field(description="All memory shelves.")
     memory_drawers: list[types.MemoryDrawer] = field(description="All memory drawers.")
+    structures: list[types.Structure] = field(description="All registered structures.")
+    structure_packages: list[types.StructurePackage] = field(description="All registered structure packages.")
+    interfaces: list[types.Interface] = field(description="All registered interfaces.")
+    
+    
+    
+    
+    
+    
+    
+    
     state_for = field(resolver=queries.state_for, description="Retrieve state for a specific context.")
 
     @field(description="Get a specific state by ID.")
@@ -69,8 +80,17 @@ class Query:
         return cast(types.State, models.State.objects.get(id=id))
     
     
+    @field(description="Fetch a client by ID.")
+    def structure_package(self, info: Info, id: strawberry.ID) -> types.StructurePackage:
+        return cast(types.StructurePackage, models.StructurePackage.objects.get(id=id))
     
+    @field(description="Fetch an interface by ID.")
+    def interface(self, info: Info, id: strawberry.ID) -> types.Interface:
+        return cast(types.Interface, models.Interface.objects.get(id=id))
     
+    @field(description="Fetch a structure by ID.")
+    def structure(self, info: Info, id: strawberry.ID) -> types.Structure:
+        return cast(types.Structure, models.Structure.objects.get(id=id))
 
     @field(description="Fetch a memory shelve by ID.")
     def memory_shelve(self, info: Info, id: strawberry.ID) -> types.MemoryShelve:

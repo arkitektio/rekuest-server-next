@@ -24,7 +24,7 @@ class SliderAssignWidgetModel(AssignWidgetModel):
     min: float | None = None
     max: float | None = None
     step: float | None = None
- 
+
 
 class ChoiceAssignWidgetModel(AssignWidgetModel):
     kind: Literal["CHOICE"]
@@ -33,7 +33,7 @@ class ChoiceAssignWidgetModel(AssignWidgetModel):
 
 class CustomAssignWidgetModel(AssignWidgetModel):
     kind: Literal["CUSTOM"]
-    hook: str 
+    hook: str
     ward: str
 
 
@@ -90,7 +90,7 @@ class EffectModel(BaseModel):
 
 
 class MessageEffectModel(EffectModel):
-    kind: Literal["MESSAGE"] 
+    kind: Literal["MESSAGE"]
     message: str
 
 
@@ -130,6 +130,12 @@ class ValidatorModel(BaseModel):
     error_message: str | None = None
 
 
+class DescriptorMatchModel(BaseModel):
+    key: str | None = None
+    operator: enums.DescriptorOperator
+    value: Any | None = None
+
+
 class PortMatchModel(BaseModel):
     at: int | None = None
     key: str | None = None
@@ -137,7 +143,12 @@ class PortMatchModel(BaseModel):
     identifier: str | None = None
     children: list["PortMatchModel"] | None = None
     nullable: bool | None = False
+    descriptors: list[DescriptorMatchModel] | None = None
 
+
+class DescriptorModel(BaseModel):
+    key: str
+    value: Any
 
 
 class PortModel(BaseModel):
@@ -154,6 +165,7 @@ class PortModel(BaseModel):
     assign_widget: AssignWidgetModelUnion | None
     return_widget: ReturnWidgetModelUnion | None
     validators: list[ValidatorModel] | None
+    descriptors: list[DescriptorModel] | None = None
 
 
 class DefinitionModel(BaseModel):

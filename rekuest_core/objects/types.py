@@ -47,7 +47,6 @@ class CustomAssignWidget(AssignWidget):
     ward: str
 
 
-
 @pydantic.type(models.SearchAssignWidgetModel)
 class SearchAssignWidget(AssignWidget):
     query: str
@@ -101,7 +100,8 @@ class MessageEffect(Effect):
 class CustomEffect(Effect):
     ward: str
     hook: str
-    
+
+
 @pydantic.type(models.HideEffectModel)
 class HideEffect(Effect):
     fade: bool = True
@@ -112,6 +112,22 @@ class Binds:
     implementations: list[strawberry.ID]
     clients: list[strawberry.ID]
     desired_instances: int
+
+
+@pydantic.type(models.DescriptorMatchModel)
+class DescriptorMatch:
+    key: str | None = strawberry.field(
+        default=None,
+        description="The key of the descriptor to match. ",
+    )
+    value: str | None = strawberry.field(
+        default=None,
+        description="The value of the descriptor to match. ",
+    )
+    operator: enums.DescriptorOperator | None = strawberry.field(
+        default=None,
+        description="The operator to use for matching. ",
+    )
 
 
 @pydantic.type(models.PortMatchModel)
@@ -140,9 +156,12 @@ class PortMatch:
         default=None,
         description="Child ports to match. ",
     )
-    
-    
-    
+    descriptors: list[DescriptorMatch] | None = strawberry.field(
+        default=None,
+        description="Descriptors to match. ",
+    )
+
+
 @pydantic.type(models.PortGroupModel)
 class PortGroup:
     key: str
@@ -160,9 +179,18 @@ class Validator:
     error_message: str | None = None
 
 
+@pydantic.type(models.DescriptorModel)
+class Descriptor:
+    key: str = strawberry.field(description="The key of the descriptor. This is used to uniquely identify the descriptor")
+    value: scalars.Arg = strawberry.field(description="The value of the descriptor. This can be any JSON serializable value")
+
+
 @pydantic.type(models.PortModel)
 class Port:
-    identifier: scalars.Identifier | None
+    identifier: scalars.Identifier | None = strawberry.field(
+        default=None,
+        description="The identifier of the port. Identifier are used to give meaning to structure ports",
+    )
     default: scalars.AnyDefault | None
     kind: enums.PortKind
     key: str
@@ -175,6 +203,7 @@ class Port:
     assign_widget: AssignWidget | None = None
     return_widget: ReturnWidget | None = None
     validators: list[Validator] | None = None
+    descriptors: list[Descriptor] | None = None
 
 
 @pydantic.type(models.DefinitionModel)

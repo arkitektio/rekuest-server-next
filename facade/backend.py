@@ -32,7 +32,7 @@ class ControllBackend(Protocol):
 
 
 
-def build_dependency_dict(implementation: models.Implementation) -> Dict[str, str]:
+def build_dependency_dict(implementation: models.Implementation, info: Info) -> Dict[str, str]:
     dependencies = models.Dependency.objects.filter(implementation=implementation).all()
     
     dep_kwargs = {}
@@ -42,7 +42,7 @@ def build_dependency_dict(implementation: models.Implementation) -> Dict[str, st
             raise ValueError(f"Dependency {dep.key} has no action hash. This is not implemented yet for dynamic resolution.")
         
         try:
-            action = models.Action.objects.get(hash=dep.action_hash)
+            action = models.Action.objects.get(hash=dep.action_hash, organization=info.context.request.organization)
         except models.Action.DoesNotExist:
             raise ValueError(f"Dependency {dep.key} references action hash {dep.action_hash} which does not exist.")
         implementation = models.Implementation.objects.filter(action=action, agent__connected=True, agent__last_seen__gt=datetime.now() - timedelta(minutes=1)).first()
@@ -191,7 +191,7 @@ class RedisControllBackend(ControllBackend):
 
         elif input.action_hash:
             reservation = None
-            action = models.Action.objects.filter(hash=input.action_hash).first()
+            action = models.Action.objects.get(hash=input.action_hash, organization=info.context.request.organization)
             implementation = models.Implementation.objects.filter(action=action, agent__connected=True).first()
             if not implementation:
                 raise ValueError("No active implementation found for this action")
@@ -230,7 +230,7 @@ class RedisControllBackend(ControllBackend):
         
         
         
-        dependencies = build_dependency_dict(implementation)
+        dependencies = build_dependency_dict(implementation, info)
         
         print("Dependencies for implementation", implementation, "are", dependencies)
         

@@ -226,3 +226,6 @@ LOGGING = {
         },
     },
 }
+
+
+PACKAGES = conf.get("packages", [])

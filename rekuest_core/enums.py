@@ -22,6 +22,7 @@ class PortKind(str, Enum):
     ENUM = "ENUM"
     MODEL = "MODEL"
     MEMORY_STRUCTURE = "MEMORY_STRUCTURE"
+    INTERFACE = "INTERFACE"
 
 
 @strawberry.enum(description="The kind of assign widget.")
@@ -53,3 +54,15 @@ class ActionScope(str, Enum):
     LOCAL = "LOCAL"
     BRIDGE_GLOBAL_TO_LOCAL = "BRIDGE_GLOBAL_TO_LOCAL"
     BRIDGE_LOCAL_TO_GLOBAL = "BRIDGE_LOCAL_TO_GLOBAL"
+
+
+@strawberry.enum(description="The operator for matching descriptors.")
+class DescriptorOperator(str, Enum):
+    LTE = "LTE"
+    GTE = "GTE"
+    EQUALS = "EQUALS"
+    CONTAINS = "CONTAINS"
+    NOT_EQUALS = "NOT_EQUALS"
+    IN = "IN"
+    NOT_IN = "NOT_IN"
+    EXISTS = "EXISTS"

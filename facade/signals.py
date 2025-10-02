@@ -18,10 +18,10 @@ def state_post_save(sender, instance: models.State = None, created=None, **kwarg
 def action_singal(sender, instance=None, created=None, **kwargs):
     if instance:
         if created:
-            channels.action_channel.broadcast(channel_events.ActionSignal(create=instance.id), ["actions"])
+            channels.action_channel.broadcast(channel_events.ActionSignal(create=instance.id), [f"actions_{instance.organization.id}"])
         else:
-            channels.action_channel.broadcast(channel_events.ActionSignal(update=instance.id), ["actions"])
-        
+            channels.action_channel.broadcast(channel_events.ActionSignal(update=instance.id), [f"actions_{instance.organization.id}"])
+
 
 
 @receiver(post_save, sender=models.Reservation)

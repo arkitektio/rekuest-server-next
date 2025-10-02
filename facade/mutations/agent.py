@@ -1,6 +1,8 @@
 from kante.types import Info
 import strawberry
 from facade import types, models, inputs, scalars
+from rekuest_core.inputs.types import StructureInput, InterfaceInput
+
 import logging
 
 logger = logging.getLogger(__name__)
