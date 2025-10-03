@@ -141,7 +141,7 @@ class Command(BaseCommand):
     help = "Parse GraphQL SDL files in ./schemas into StructurePackageInputModel(s) and upsert them."
 
     def handle(self, *args, **options):
-        schema_dir = Path("./schemas")
+        schema_dir = Path("./type_schemas")
         if not schema_dir.exists():
             self.stderr.write(self.style.ERROR(f"No ./schemas directory found"))
             sys.exit(1)
