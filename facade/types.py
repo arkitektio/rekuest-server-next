@@ -210,6 +210,11 @@ class Implementation:
             .order_by("-created_at")
             .first()
         )
+        
+    
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="action__organization")
 
 
 @strawberry_django.type(models.HardwareRecord, filters=filters.HardwareRecordFilter, pagination=True, description="Represents a record of an agent's hardware configuration.")
