@@ -24,9 +24,12 @@ def build_prescoped_queryset(info, queryset, field="organization"):
     print(info)
     if info.variable_values.get("filters", {}).get("scope") is None:
         queryset = queryset.filter(**{field: info.context.request.organization})
+        return queryset
+    
+    else:
+        raise Exception("Custom scopes not implemented yet")
 
-    return queryset
-
+  
 
 @strawberry_django.type(auth_models.User, filters=filters.UserFilter, pagination=True, order=filters.UserOrder, description="Represents an authenticated user.")
 class User:
