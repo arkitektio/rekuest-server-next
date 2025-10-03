@@ -27,7 +27,7 @@ def action(
         return models.Implementation.objects.get(id=implementation).action
 
     if hash:
-        return models.Action.objects.get(hash=hash)
+        return models.Action.objects.get(hash=hash, organization=info.context.request.organization)
 
     if agent:
         if interface:

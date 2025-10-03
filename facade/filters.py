@@ -587,6 +587,123 @@ class HardwareRecordFilter:
         return queryset.filter(cpu_vendor_name__contains=self.cpu_vendor_name)
 
 
+
+@strawberry_django.filter(models.StructurePackage)
+class StructurePackageFilter:
+    ids: list[strawberry.ID] | None
+    search: str | None
+    
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+    
+    def filter_search(self, queryset, info):
+        if self.search is None:
+            return queryset
+        return queryset.filter(key__icontains=self.search) | queryset.filter(description__icontains=self.search)
+    
+@strawberry_django.filter(models.Structure)
+class StructureFilter:
+    ids: list[strawberry.ID] | None
+    search: str | None
+    
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+    
+    def filter_search(self, queryset, info):
+        if self.search is None:
+            return queryset
+        return queryset.filter(key__icontains=self.search) | queryset.filter(description__icontains=self.search)
+    
+
+@strawberry_django.filter(models.Interface)
+class InterfaceFilter:
+    ids: list[strawberry.ID] | None
+    search: str | None
+    
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+    
+    def filter_search(self, queryset, info):
+        if self.search is None:
+            return queryset
+        return queryset.filter(key__icontains=self.search) | queryset.filter(description__icontains=self.search)    
+
+
+@strawberry_django.filter(models.InputInterfaceUsage)
+class InputInterfaceUsageFilter:
+    ids: list[strawberry.ID] | None
+    interface: strawberry.ID | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+
+    def filter_interface(self, queryset, info):
+        if self.interface is None:
+            return queryset
+        return queryset.filter(interface__id=self.interface)
+    
+    
+@strawberry_django.filter(models.OutputInterfaceUsage)
+class OutputInterfaceUsageFilter:
+    ids: list[strawberry.ID] | None
+    interface: strawberry.ID | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+
+    def filter_interface(self, queryset, info):
+        if self.interface is None:
+            return queryset
+        return queryset.filter(interface__id=self.interface)
+
+   
+@strawberry_django.filter(models.InputStructureUsage)
+class InputStructureUsageFilter:
+    ids: list[strawberry.ID] | None
+    structure: strawberry.ID | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+
+    def filter_structure(self, queryset, info):
+        if self.structure is None:
+            return queryset
+        return queryset.filter(structure__id=self.structure)
+
+
+@strawberry_django.filter(models.OutputStructureUsage)
+class OutputStructureUsageFilter:
+    ids: list[strawberry.ID] | None
+    structure: strawberry.ID | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+
+    def filter_structure(self, queryset, info):
+        if self.structure is None:
+            return queryset
+        return queryset.filter(structure__id=self.structure)
+
+
+
+
+
+
+
 @strawberry_django.filter(models.Action)
 class ActionFilter(SearchFilter):
     name: Optional[FilterLookup[str]]

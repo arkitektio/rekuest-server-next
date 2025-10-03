@@ -24,9 +24,12 @@ def build_prescoped_queryset(info, queryset, field="organization"):
     print(info)
     if info.variable_values.get("filters", {}).get("scope") is None:
         queryset = queryset.filter(**{field: info.context.request.organization})
+        return queryset
+    
+    else:
+        raise Exception("Custom scopes not implemented yet")
 
-    return queryset
-
+  
 
 @strawberry_django.type(auth_models.User, filters=filters.UserFilter, pagination=True, order=filters.UserOrder, description="Represents an authenticated user.")
 class User:
@@ -120,6 +123,7 @@ class Action:
     defined_at: datetime.datetime = strawberry_django.field(description="Timestamp when the action was defined.")
     reservations: list[LazyType["Reservation", __name__]] | None = strawberry_django.field(description="Reservations related to this action.")
     test_cases: list[LazyType["TestCase", __name__]] | None = strawberry_django.field(description="Test cases for this action.")
+    organization: "Organization" = strawberry_django.field(description="The organization that owns this action.")
 
     @strawberry_django.field(description="Retrieve assignations where this action has run.")
     def runs(self) -> list[LazyType["Assignation", __name__]] | None:
@@ -143,6 +147,11 @@ class Action:
     def pinned(self, info: Info) -> bool:
         user = info.context.request.user
         return self.pinned_by.filter(id=user.id).exists()
+    
+    
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="organization")
 
 
 @strawberry_django.type(models.Dependency, filters=filters.DependencyFilter, pagination=True, description="Represents a dependency between implementations and actions.")
@@ -424,11 +433,6 @@ class TestResult:
     updated_at: datetime.datetime = strawberry_django.field(description="When the test result was last updated.")
 
 
-@strawberry_django.type(models.Structure)
-class Structure:
-    identifier: strawberry.ID
-    object: strawberry.ID
-
 
 @strawberry_django.type(models.Dashboard)
 class Dashboard:
@@ -666,7 +670,7 @@ class ActionMapping:
     key: str
     implementation: Implementation
     materialized_blok: MaterializedBlok
-    crreated_at: datetime.datetime
+    created_at: datetime.datetime
     updated_at: datetime.datetime
 
 
@@ -678,3 +682,105 @@ class StateMapping:
     state: State
     crreated_at: datetime.datetime
     updated_at: datetime.datetime
+
+
+@strawberry_django.type(models.StructurePackage, filters=filters.StructurePackageFilter, pagination=True, description="A package of structures.")
+class StructurePackage:
+    id: strawberry.ID
+    key: str
+    description: str | None
+    version: str
+    structures: list["Structure"] = strawberry_django.field(
+        description="Structures that are part of this package.",
+    )
+    interfaces: list["Interface"] = strawberry_django.field(
+        description="Interfaces that are part of this package.",
+    )
+
+
+    
+@strawberry_django.type(models.Interface, filters=filters.InterfaceFilter, pagination=True, description="If this structure is the default in its package.")
+class Interface:
+    id: strawberry.ID
+    key: str
+    description: str | None
+    package: StructurePackage
+    implementations: list[Implementation] = strawberry_django.field(
+        description="Implementations that implement this interface."
+    )
+    output_usages: list["OutputInterfaceUsage"] = strawberry_django.field(
+        description="Usages of this interface as an output in actions.",
+    )
+    input_usages: list["InputInterfaceUsage"] = strawberry_django.field(
+        description="Usages of this interface as an input in actions.",
+    )
+   
+   
+
+
+
+@strawberry_django.type(models.Structure, filters=filters.StructureFilter, pagination=True, description="A strucssture representing a data schema or type.")
+class Structure:
+    id: strawberry.ID
+    key: strawberry.ID
+    package: StructurePackage
+    description: str | None
+    implements: list[Interface] = strawberry_django.field(
+        description="Interfaces that this structure implements.",
+    )
+    output_usages: list["OutputStructureUsage"] = strawberry_django.field(
+        description="Usages of this structure as an output in actions.",
+    )
+    input_usages: list["InputStructureUsage"] = strawberry_django.field(
+        description="Usages of this structure as an input in actions.",
+    )
+    
+    @strawberry_django.field(description="The object ID that this structure represents.")
+    def identifier(self) -> strawberry.ID:
+        return f"@{self.package.key}/{self.key}"
+    
+    
+
+@strawberry_django.type(models.InputStructureUsage, filters=filters.InputStructureUsageFilter, pagination=True, description="Usage of an input structure in an action.")
+class InputStructureUsage:
+    id: strawberry.ID
+    structure: Structure
+    action: Action
+    port_index: int
+    port_key: str
+    modifiers: list[str]
+    
+    
+
+@strawberry_django.type(models.OutputStructureUsage, filters=filters.OutputStructureUsageFilter, pagination=True, description="Usage of an output structure in an action.")
+class OutputStructureUsage:
+    id: strawberry.ID
+    structure: Structure
+    action: Action
+    port_index: int
+    port_key: str
+    modifiers: list[str]
+    
+    
+
+
+@strawberry_django.type(models.InputInterfaceUsage, filters=filters.InputInterfaceUsageFilter, pagination=True, description="Usage of an input interface in an action.")
+class InputInterfaceUsage:
+    id: strawberry.ID
+    interface: Interface
+    action: Action
+    port_index: int
+    port_key: str
+    modifiers: list[str]
+
+
+@strawberry_django.type(models.OutputInterfaceUsage, filters=filters.OutputInterfaceUsageFilter, pagination=True, description="Usage of an output interface in an action.")
+class OutputInterfaceUsage:
+    id: strawberry.ID
+    interface: Interface
+    action: Action
+    port_index: int
+    port_key: str
+    modifiers: list[str]
+    
+
