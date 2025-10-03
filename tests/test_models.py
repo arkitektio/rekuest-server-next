@@ -34,6 +34,7 @@ class TestModels:
             instance_id="test-instance",
             registry=registry,
             extensions=["ext1", "ext2"]
+            
         )
 
         assert agent.name == "Test Agent"
@@ -109,10 +110,14 @@ class TestModels:
 
     def test_action_creation(self):
         """Test creating an Action model instance."""
+        org = Organization.objects.create(slug="test-org-3")
+        
+        
         action = Action.objects.create(
             name="Test Action",
             description="A test action",
-            hash="test-hash-123"
+            hash="test-hash-123",
+            organization=org
         )
 
         assert action.name == "Test Action"
@@ -225,17 +230,21 @@ class TestModels:
             name="Relationship Test Protocol",
             description="Testing protocol-action relationship"
         )
+        
+        org = Organization.objects.create(slug="test-org-3")
 
         # Create multiple actions and associate them with the protocol
         action1 = Action.objects.create(
             name="Action 1",
-            hash="action1-hash"
+            hash="action1-hash",
+            organization=org
         )
         action1.protocols.add(protocol)
         
         action2 = Action.objects.create(
             name="Action 2",
-            hash="action2-hash"
+            hash="action2-hash",
+            organization=org
         )
         action2.protocols.add(protocol)
 
