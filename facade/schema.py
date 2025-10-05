@@ -10,7 +10,7 @@ from typing import cast
 
 
 def field(permission_classes=None, **kwargs):
-    " A wrapper for field that adds default permission classes and extensions."
+    "A wrapper for field that adds default permission classes and extensions."
     if permission_classes:
         pass
     else:
@@ -19,21 +19,14 @@ def field(permission_classes=None, **kwargs):
 
 
 def mutation(**kwargs):
-    """ A wrapper for mutation that adds default permission classes and extensions."""
-    
-    return strawberry_django.mutation(
-        extensions=[AuthExtension()],
-        **kwargs
-    )
-    
-    
-def subscription(**kwargs) -> strawberry.subscription:
-    """ A wrapper for subscription that adds default permission classes and extensions."""
-    return strawberry.subscription(
-        extensions=[AuthSubscribeExtension()],
-        **kwargs
-    )
+    """A wrapper for mutation that adds default permission classes and extensions."""
 
+    return strawberry_django.mutation(extensions=[AuthExtension()], **kwargs)
+
+
+def subscription(**kwargs) -> strawberry.subscription:
+    """A wrapper for subscription that adds default permission classes and extensions."""
+    return strawberry.subscription(extensions=[AuthSubscribeExtension()], **kwargs)
 
 
 @strawberry.type(description="Root query type for fetching entities in the system.")
@@ -65,29 +58,25 @@ class Query:
     structures: list[types.Structure] = field(description="All registered structures.")
     structure_packages: list[types.StructurePackage] = field(description="All registered structure packages.")
     interfaces: list[types.Interface] = field(description="All registered interfaces.")
-    
-    
-    
-    
-    
-    
-    
-    
+
+    # Stats
+    actionStats: types.ActionStats = field(resolver=types.ActionStatsResolver, description="Statistics about actions and their implementations.")
+    assignationStats: types.AssignationStats = field(resolver=types.AssignationStatsResolver, description="Statistics about assignations and their states.")
+
     state_for = field(resolver=queries.state_for, description="Retrieve state for a specific context.")
 
     @field(description="Get a specific state by ID.")
     def state(self, info: Info, id: strawberry.ID) -> types.State:
         return cast(types.State, models.State.objects.get(id=id))
-    
-    
+
     @field(description="Fetch a client by ID.")
     def structure_package(self, info: Info, id: strawberry.ID) -> types.StructurePackage:
         return cast(types.StructurePackage, models.StructurePackage.objects.get(id=id))
-    
+
     @field(description="Fetch an interface by ID.")
     def interface(self, info: Info, id: strawberry.ID) -> types.Interface:
         return cast(types.Interface, models.Interface.objects.get(id=id))
-    
+
     @field(description="Fetch a structure by ID.")
     def structure(self, info: Info, id: strawberry.ID) -> types.Structure:
         return cast(types.Structure, models.Structure.objects.get(id=id))
@@ -99,7 +88,7 @@ class Query:
     @field(description="Get a blok by ID.")
     def blok(self, info: Info, id: strawberry.ID) -> types.Blok:
         return cast(types.Blok, models.Blok.objects.get(id=id))
-    
+
     @field(description="Get a materialized blok by ID.")
     def materialized_blok(self, info: Info, id: strawberry.ID) -> types.MaterializedBlok:
         return cast(types.MaterializedBlok, models.MaterializedBlok.objects.get(id=id))

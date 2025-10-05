@@ -14,7 +14,7 @@ from rekuest_core.objects import types as rtypes
 from strawberry import LazyType
 from kante.types import Info
 from pydantic import BaseModel
-
+from .type_gen import create_stats_type
 from rekuest_ui_core.objects import models as uimodels
 from rekuest_ui_core.objects import types as uitypes
 from strawberry.experimental import pydantic
@@ -25,11 +25,17 @@ def build_prescoped_queryset(info, queryset, field="organization"):
     if info.variable_values.get("filters", {}).get("scope") is None:
         queryset = queryset.filter(**{field: info.context.request.organization})
         return queryset
-    
+
     else:
         raise Exception("Custom scopes not implemented yet")
 
-  
+
+def build_prescoper(field="organization"):
+    def prescoper(queryset, info):
+        return build_prescoped_queryset(info, queryset, field=field)
+
+    return prescoper
+
 
 @strawberry_django.type(auth_models.User, filters=filters.UserFilter, pagination=True, order=filters.UserOrder, description="Represents an authenticated user.")
 class User:
@@ -147,11 +153,21 @@ class Action:
     def pinned(self, info: Info) -> bool:
         user = info.context.request.user
         return self.pinned_by.filter(id=user.id).exists()
-    
-    
+
     @classmethod
     def get_queryset(cls, queryset, info, **kwargs):
         return build_prescoped_queryset(info, queryset, field="organization")
+
+
+ActionStats, ActionStatsResolver = create_stats_type(
+    models.Action,
+    filters=filters.ActionFilter,
+    allowed_fields={
+        "created_at": "created_at",
+    },
+    allowed_datetime_fields={"created_at": "created_at"},
+    prescope=build_prescoper(field="organization"),
+)
 
 
 @strawberry_django.type(models.Dependency, filters=filters.DependencyFilter, pagination=True, description="Represents a dependency between implementations and actions.")
@@ -159,7 +175,7 @@ class Dependency:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the dependency.")
     implementation: "Implementation" = strawberry_django.field(description="Implementation this dependency belongs to.")
     action_hash: rscalars.ActionHash | None = strawberry_django.field(description="Original hash when the dependency was created.")
-    key: str  = strawberry_django.field(description="Optional string identifier or tag for reference.")
+    key: str = strawberry_django.field(description="Optional string identifier or tag for reference.")
     optional: bool = strawberry_django.field(description="Indicates if the dependency is optional.")
 
     @strawberry_django.field(description="Protocols that this dependency needs to match.")
@@ -210,8 +226,7 @@ class Implementation:
             .order_by("-created_at")
             .first()
         )
-        
-    
+
     @classmethod
     def get_queryset(cls, queryset, info, **kwargs):
         return build_prescoped_queryset(info, queryset, field="action__organization")
@@ -370,6 +385,15 @@ class Assignation:
 
 
 # Final types: AssignationEvent, Instruct, AgentEvent, TestCase, TestResult, State
+AssignationStats, AssignationStatsResolver = create_stats_type(
+    models.Assignation,
+    filters=filters.AssignationFilter,
+    allowed_fields={
+        "created_at": "created_at",
+    },
+    allowed_datetime_fields={"created_at": "created_at"},
+    prescope=build_prescoper(field="agent__registry__organization"),
+)
 
 
 @strawberry_django.type(models.AssignationEvent, filters=filters.AssignationEventFilter, pagination=True, description="An event that occurred during an assignation.")
@@ -383,8 +407,7 @@ class AssignationEvent:
     progress: int | None = strawberry_django.field(description="Progress percentage.")
     created_at: strawberry.auto = strawberry_django.field(description="Time when event was created.")
     delegated_to: Optional["Assignation"] = strawberry_django.field(description="If this event was delegated, the assignation it was delegated to.")
-    
-    
+
     @strawberry_django.field(description="Default log level.")
     def level(self) -> enums.LogLevel:
         return self.level or enums.LogLevel.INFO
@@ -438,7 +461,6 @@ class TestResult:
     updated_at: datetime.datetime = strawberry_django.field(description="When the test result was last updated.")
 
 
-
 @strawberry_django.type(models.Dashboard)
 class Dashboard:
     id: strawberry.ID
@@ -449,8 +471,6 @@ class Dashboard:
     def ui_tree(self) -> uitypes.UITree | None:
         model = uimodels.UITreeModel(**self.ui_tree) if self.ui_tree else None
         return model
-
-
 
 
 class ActionDemandModel(BaseModel):
@@ -703,25 +723,19 @@ class StructurePackage:
     )
 
 
-    
 @strawberry_django.type(models.Interface, filters=filters.InterfaceFilter, pagination=True, description="If this structure is the default in its package.")
 class Interface:
     id: strawberry.ID
     key: str
     description: str | None
     package: StructurePackage
-    implementations: list[Implementation] = strawberry_django.field(
-        description="Implementations that implement this interface."
-    )
+    implementations: list[Implementation] = strawberry_django.field(description="Implementations that implement this interface.")
     output_usages: list["OutputInterfaceUsage"] = strawberry_django.field(
         description="Usages of this interface as an output in actions.",
     )
     input_usages: list["InputInterfaceUsage"] = strawberry_django.field(
         description="Usages of this interface as an input in actions.",
     )
-   
-   
-
 
 
 @strawberry_django.type(models.Structure, filters=filters.StructureFilter, pagination=True, description="A strucssture representing a data schema or type.")
@@ -739,12 +753,11 @@ class Structure:
     input_usages: list["InputStructureUsage"] = strawberry_django.field(
         description="Usages of this structure as an input in actions.",
     )
-    
+
     @strawberry_django.field(description="The object ID that this structure represents.")
     def identifier(self) -> strawberry.ID:
         return f"@{self.package.key}/{self.key}"
-    
-    
+
 
 @strawberry_django.type(models.InputStructureUsage, filters=filters.InputStructureUsageFilter, pagination=True, description="Usage of an input structure in an action.")
 class InputStructureUsage:
@@ -754,8 +767,7 @@ class InputStructureUsage:
     port_index: int
     port_key: str
     modifiers: list[str]
-    
-    
+
 
 @strawberry_django.type(models.OutputStructureUsage, filters=filters.OutputStructureUsageFilter, pagination=True, description="Usage of an output structure in an action.")
 class OutputStructureUsage:
@@ -765,8 +777,6 @@ class OutputStructureUsage:
     port_index: int
     port_key: str
     modifiers: list[str]
-    
-    
 
 
 @strawberry_django.type(models.InputInterfaceUsage, filters=filters.InputInterfaceUsageFilter, pagination=True, description="Usage of an input interface in an action.")
@@ -787,5 +797,3 @@ class OutputInterfaceUsage:
     port_index: int
     port_key: str
     modifiers: list[str]
-    
-
