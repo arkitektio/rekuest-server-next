@@ -135,6 +135,7 @@ class AssignInputModel(BaseModel):
     cached: bool = False
     log: bool = False
     ephemeral: bool = False
+    dependencies: dict[str, str] | None = None
     is_hook: bool = False
     step: bool = False
 
@@ -342,6 +343,10 @@ class AssignInput:
         default=False,
         description="Whether the assignation should step. Ie. go to the next breakpoint",
     )
+    dependencies: scalars.Args | None = strawberry.field(
+        default=None,
+        description="The dependencies of the assignation. This maps dependency keys to implementation IDs.",
+    )
     cached: bool = False
     ephemeral: bool = False
     log: bool = False
@@ -408,8 +413,6 @@ class SchemaDemandInputModel(BaseModel):
     hash: str | None = None
     matches: list[PortMatchInputModel] | None = None
     protocols: list[str] | None = None
-
-
 
 
 @strawberry.input(description="The input for creating a port demand.")

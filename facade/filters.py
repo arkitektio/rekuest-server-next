@@ -6,6 +6,7 @@ from authentikate.models import Client, User, Organization
 from authentikate.vars import get_user
 from facade import enums, inputs, managers, models, scalars
 from rekuest_core import enums as renums
+from rekuest_core.inputs import models as rimodels
 from rekuest_core import scalars as rscalars
 from strawberry import auto
 from strawberry_django.filters import FilterLookup
@@ -587,52 +588,52 @@ class HardwareRecordFilter:
         return queryset.filter(cpu_vendor_name__contains=self.cpu_vendor_name)
 
 
-
 @strawberry_django.filter(models.StructurePackage)
 class StructurePackageFilter:
     ids: list[strawberry.ID] | None
     search: str | None
-    
+
     def filter_ids(self, queryset, info):
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
-    
+
     def filter_search(self, queryset, info):
         if self.search is None:
             return queryset
         return queryset.filter(key__icontains=self.search) | queryset.filter(description__icontains=self.search)
-    
+
+
 @strawberry_django.filter(models.Structure)
 class StructureFilter:
     ids: list[strawberry.ID] | None
     search: str | None
-    
+
     def filter_ids(self, queryset, info):
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
-    
+
     def filter_search(self, queryset, info):
         if self.search is None:
             return queryset
         return queryset.filter(key__icontains=self.search) | queryset.filter(description__icontains=self.search)
-    
+
 
 @strawberry_django.filter(models.Interface)
 class InterfaceFilter:
     ids: list[strawberry.ID] | None
     search: str | None
-    
+
     def filter_ids(self, queryset, info):
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
-    
+
     def filter_search(self, queryset, info):
         if self.search is None:
             return queryset
-        return queryset.filter(key__icontains=self.search) | queryset.filter(description__icontains=self.search)    
+        return queryset.filter(key__icontains=self.search) | queryset.filter(description__icontains=self.search)
 
 
 @strawberry_django.filter(models.InputInterfaceUsage)
@@ -649,8 +650,8 @@ class InputInterfaceUsageFilter:
         if self.interface is None:
             return queryset
         return queryset.filter(interface__id=self.interface)
-    
-    
+
+
 @strawberry_django.filter(models.OutputInterfaceUsage)
 class OutputInterfaceUsageFilter:
     ids: list[strawberry.ID] | None
@@ -666,7 +667,7 @@ class OutputInterfaceUsageFilter:
             return queryset
         return queryset.filter(interface__id=self.interface)
 
-   
+
 @strawberry_django.filter(models.InputStructureUsage)
 class InputStructureUsageFilter:
     ids: list[strawberry.ID] | None
@@ -697,11 +698,6 @@ class OutputStructureUsageFilter:
         if self.structure is None:
             return queryset
         return queryset.filter(structure__id=self.structure)
-
-
-
-
-
 
 
 @strawberry_django.filter(models.Action)
@@ -867,6 +863,36 @@ class ImplementationFilter:
     extension: str | None
     agent: ImplementationAgentFilter | None
     parameters: list[ParamPair] | None
+    resolvable_for: strawberry.ID | None
+    search: str | None
+
+    def filter_search(self, queryset, info):
+        if self.search is None:
+            return queryset
+        return queryset.filter(name__icontains=self.search)
+
+    def filter_resolvable_for(self, queryset, info):
+        if self.resolvable_for is None:
+            return queryset
+
+        dependency = models.Dependency.objects.get(id=self.resolvable_for)
+
+        arg_demands = [rimodels.PortMatchInputModel(**d) for d in dependency.arg_matches] if dependency.arg_matches else None
+        return_demands = [rimodels.PortMatchInputModel(**d) for d in dependency.return_matches] if dependency.return_matches else None
+
+        demand = rimodels.ActionDependencyInputModel(
+            key=dependency.key,
+            hash=dependency.action_hash,
+            arg_matches=arg_demands,
+            return_matches=return_demands,
+            protocols=dependency.protocols,
+        )
+        new_ids = managers.get_action_ids_by_action_demand(
+            demand,
+            model="facade_action",
+        )
+
+        return queryset.filter(action__id__in=new_ids)
 
     def filter_ids(self, queryset, info):
         if self.ids is None:

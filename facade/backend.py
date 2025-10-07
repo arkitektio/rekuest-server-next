@@ -26,21 +26,15 @@ class ControllBackend(Protocol):
     def pause(self, info: Info, input: inputs.PauseInputModel) -> types.Assignation: ...
 
 
-
-
-
-
-
-
 def build_dependency_dict(implementation: models.Implementation, info: Info) -> Dict[str, str]:
     dependencies = models.Dependency.objects.filter(implementation=implementation).all()
-    
+
     dep_kwargs = {}
-    
+
     for dep in dependencies:
         if not dep.action_hash:
             raise ValueError(f"Dependency {dep.key} has no action hash. This is not implemented yet for dynamic resolution.")
-        
+
         try:
             action = models.Action.objects.get(hash=dep.action_hash, organization=info.context.request.organization)
         except models.Action.DoesNotExist:
@@ -48,13 +42,10 @@ def build_dependency_dict(implementation: models.Implementation, info: Info) -> 
         implementation = models.Implementation.objects.filter(action=action, agent__connected=True, agent__last_seen__gt=datetime.now() - timedelta(minutes=1)).first()
         if not implementation:
             raise ValueError(f"No active implementation found for this depdendency {dep.key}")
-        
+
         dep_kwargs[dep.key] = str(implementation.id)
-        
-        
+
     return dep_kwargs
-
-
 
 
 def get_waiter_for_context(info: Info, instance_id: str) -> None:
@@ -207,7 +198,6 @@ class RedisControllBackend(ControllBackend):
             raise ValueError("You need to provide either, action_hash or action_id, to create an assignment for an agent")
 
         reference = input.reference or self.create_message_id()
-        
 
         # TODO: if ephemeral is set, we should not store the assignation in the database
         assignation = models.Assignation.objects.create(
@@ -227,13 +217,21 @@ class RedisControllBackend(ControllBackend):
         )
 
         action = implementation.action
-        
-        
-        
-        dependencies = build_dependency_dict(implementation, info)
-        
+
+        if input.dependencies:  # We provided explicit dependencies
+            dependencies = input.dependencies
+
+            for key, impl_id in dependencies.items():
+                try:
+                    dep_impl = models.Implementation.objects.get(id=impl_id)
+                    assert dep_impl.agent.registry.organization == info.context.request.organization, f"Dependency implementation {dep_impl.key} organization does not match request organization"
+                except models.Implementation.DoesNotExist:
+                    raise ValueError(f"Dependency implementation {impl_id} for key {key} does not exist.")
+
+        else:  # We need to resolve dependencies from the implementation
+            dependencies = build_dependency_dict(implementation, info)
+
         print("Dependencies for implementation", implementation, "are", dependencies)
-        
 
         AgentConsumer.broadcast(
             assignation.agent.pk,
@@ -262,10 +260,8 @@ class RedisControllBackend(ControllBackend):
                             reference="init_hook_0",
                         )
                     )
-                    
-                    
+
         if assignation.parent:
-            
             models.AssignationEvent.objects.create(
                 assignation=assignation.parent,
                 kind=enums.AssignationEventKind.DELEGATE,

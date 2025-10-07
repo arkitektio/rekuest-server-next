@@ -133,14 +133,13 @@ class Toolbox(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-  
-  
-  
+
+
 class StructurePackage(models.Model):
-    key: str = models.CharField(max_length=2000, unique=True)  
+    key: str = models.CharField(max_length=2000, unique=True)
     description: str = models.CharField(max_length=2000, blank=True, null=True)
-    
-    
+
+
 class Interface(models.Model):
     package = models.ForeignKey(StructurePackage, on_delete=models.CASCADE, related_name="interfaces")
     key = models.CharField(max_length=2000)
@@ -148,7 +147,7 @@ class Interface(models.Model):
     default_widget = models.JSONField(blank=True, null=True)
     default_return_widget = models.JSONField(blank=True, null=True)
     protocols = models.ManyToManyField(Protocol, blank=True)
-    
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -156,14 +155,13 @@ class Interface(models.Model):
                 name="No multiple Interfaces with same key in the same package allowed",
             )
         ]
-    
-    
-    
+
+
 class Descriptor(models.Model):
     package = models.ForeignKey(StructurePackage, on_delete=models.CASCADE, related_name="descriptors")
     key: str = models.CharField(max_length=2000)
     description: str = models.CharField(max_length=2000, blank=True, null=True)
-    
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -171,20 +169,20 @@ class Descriptor(models.Model):
                 name="No multiple Descriptors with same key in the same package allowed",
             )
         ]
-    
 
 
 class Structure(models.Model):
-    """ A Structure is a way to describe a data structure that can be used"""
+    """A Structure is a way to describe a data structure that can be used"""
+
     package = models.ForeignKey(StructurePackage, on_delete=models.CASCADE, related_name="structures")
-    key = models.CharField(max_length=2000,help_text="A unique identifier for this structure")
+    key = models.CharField(max_length=2000, help_text="A unique identifier for this structure")
     label = models.CharField(max_length=2000, blank=True, null=True)
     description = models.CharField(max_length=2000, blank=True, null=True)
     default_widget = models.JSONField(blank=True, null=True)
     default_return_widget = models.JSONField(blank=True, null=True)
     implements = models.ManyToManyField(Interface, blank=True)
     descriptors = models.ManyToManyField(Descriptor, blank=True)
-    
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -192,8 +190,6 @@ class Structure(models.Model):
                 name="No multiple Structures with same key in the same package allowed",
             )
         ]
-    
-
 
 
 class Action(models.Model):
@@ -268,16 +264,16 @@ class Action(models.Model):
 
     def __str__(self):
         return f"{self.name}"
-    
-    
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
                 fields=["organization", "hash"],
                 name="No multiple Actions with same hash in the same organization allowed",
             )
-
         ]
+
+
 class InputStructureUsage(models.Model):
     action = models.ForeignKey(
         Action,
@@ -294,8 +290,8 @@ class InputStructureUsage(models.Model):
     port_index = models.IntegerField(help_text="The index of the port this structure is used for")
     port_key = models.CharField(max_length=2000, help_text="The key of the port this structure is used for")
     modifiers = models.JSONField(default=list)
-    
-    
+
+
 class InputInterfaceUsage(models.Model):
     action = models.ForeignKey(
         Action,
@@ -312,8 +308,8 @@ class InputInterfaceUsage(models.Model):
     port_index = models.IntegerField(help_text="The index of the port this structure is used for")
     port_key = models.CharField(max_length=2000, help_text="The key of the port this structure is used for")
     modifiers = models.JSONField(default=list)
-    
-    
+
+
 class OutputStructureUsage(models.Model):
     action = models.ForeignKey(
         Action,
@@ -330,10 +326,8 @@ class OutputStructureUsage(models.Model):
     port_index = models.IntegerField(help_text="The index of the port this structure is used for")
     port_key = models.CharField(max_length=2000, help_text="The key of the port this structure is used for")
     modifiers = models.JSONField(default=list)
-    
-    
-      
-  
+
+
 class OutputInterfaceUsage(models.Model):
     action = models.ForeignKey(
         Action,
@@ -350,9 +344,6 @@ class OutputInterfaceUsage(models.Model):
     port_index = models.IntegerField(help_text="The index of the port this structure is used for")
     port_key = models.CharField(max_length=2000, help_text="The key of the port this structure is used for")
     modifiers = models.JSONField(default=list)
-    
-    
-
 
 
 class Shortcut(models.Model):
@@ -666,6 +657,11 @@ class Dependency(models.Model):
     key = models.CharField(
         max_length=2000,
         help_text="A reference for this dependency",
+    )
+    description = models.TextField(
+        null=True,
+        blank=True,
+        help_text="An optional description for this dependency",
     )
     protocols = models.JSONField(
         default=list,
@@ -1086,7 +1082,6 @@ class TestResult(models.Model):
     passed = models.BooleanField(default=False)
     result = models.JSONField(default=dict, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-
 
 
 class Widget(models.Model):

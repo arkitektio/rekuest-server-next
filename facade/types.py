@@ -177,6 +177,7 @@ class Dependency:
     action_hash: rscalars.ActionHash | None = strawberry_django.field(description="Original hash when the dependency was created.")
     key: str = strawberry_django.field(description="Optional string identifier or tag for reference.")
     optional: bool = strawberry_django.field(description="Indicates if the dependency is optional.")
+    description: str | None = strawberry_django.field(description="Optional description of the dependency.")
 
     @strawberry_django.field(description="Protocols that this dependency needs to match.")
     def return_matches(self) -> list[rtypes.PortMatch] | None:
