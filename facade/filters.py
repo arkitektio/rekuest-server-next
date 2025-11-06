@@ -877,13 +877,15 @@ class ImplementationFilter:
 
         dependency = models.Dependency.objects.get(id=self.resolvable_for)
 
-        arg_demands = [rimodels.PortMatchInputModel(**d) for d in dependency.arg_matches] if dependency.arg_matches else None
-        return_demands = [rimodels.PortMatchInputModel(**d) for d in dependency.return_matches] if dependency.return_matches else None
+        arg_demands = [rimodels.PortMatchInputModel(**d) for d in dependency.arg_matches] if dependency.arg_matches is not None else None
+        return_demands = [rimodels.PortMatchInputModel(**d) for d in dependency.return_matches] if dependency.return_matches is not None else None
 
         demand = rimodels.ActionDependencyInputModel(
             key=dependency.key,
             hash=dependency.action_hash,
             arg_matches=arg_demands,
+            force_arg_length=len(arg_demands) if arg_demands is not None else None,
+            force_return_length=len(return_demands) if return_demands is not None else None,
             return_matches=return_demands,
             protocols=dependency.protocols,
         )
