@@ -199,25 +199,6 @@ class RedisControllBackend(ControllBackend):
 
         reference = input.reference or self.create_message_id()
 
-        # TODO: if ephemeral is set, we should not store the assignation in the database
-        assignation = models.Assignation.objects.create(
-            reservation=reservation,
-            action=action,
-            args=input.args,
-            reference=reference,
-            parent_id=input.parent,
-            agent=agent,
-            implementation=implementation,
-            is_done=False,
-            latest_event_kind=enums.AssignationEventKind.ASSIGN,
-            latest_instruct_kind=enums.AssignationInstructKind.ASSIGN,
-            hooks=input.hooks or [],
-            waiter=waiter,
-            ephemeral=input.ephemeral,
-        )
-
-        action = implementation.action
-
         if input.dependencies:  # We provided explicit dependencies
             dependencies = input.dependencies
 
@@ -230,6 +211,26 @@ class RedisControllBackend(ControllBackend):
 
         else:  # We need to resolve dependencies from the implementation
             dependencies = build_dependency_dict(implementation, info)
+
+        # TODO: if ephemeral is set, we should not store the assignation in the database
+        assignation = models.Assignation.objects.create(
+            reservation=reservation,
+            action=action,
+            args=input.args,
+            reference=reference,
+            parent_id=input.parent,
+            agent=agent,
+            implementation=implementation,
+            dependencies=dependencies,
+            is_done=False,
+            latest_event_kind=enums.AssignationEventKind.ASSIGN,
+            latest_instruct_kind=enums.AssignationInstructKind.ASSIGN,
+            hooks=input.hooks or [],
+            waiter=waiter,
+            ephemeral=input.ephemeral,
+        )
+
+        action = implementation.action
 
         print("Dependencies for implementation", implementation, "are", dependencies)
 

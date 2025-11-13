@@ -906,6 +906,7 @@ class Assignation(models.Model):
         related_name="all_children",
     )
     args = models.JSONField(blank=True, null=True, help_text="The Args", default=dict)
+    dependencies = models.JSONField(blank=True, null=True, help_text="The Args", default=dict)
     waiter = models.ForeignKey(
         Waiter,
         on_delete=models.CASCADE,

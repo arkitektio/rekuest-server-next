@@ -358,6 +358,7 @@ class Assignation:
     reference: str | None = strawberry_django.field(description="Optional external reference for tracking.")
     is_done: bool = strawberry_django.field(description="Indicates if the assignation is completed.")
     args: rscalars.AnyDefault = strawberry_django.field(description="Arguments used in the assignation.")
+    dependencies: rscalars.AnyDefault = strawberry_django.field(description="The used dependencies for this assignemnet")
     root: Optional["Assignation"] = strawberry.field(description="Root assignation in the creation chain.")
     parent: Optional["Assignation"] = strawberry.field(description="Parent assignation that triggered this one.")
     reservation: Optional["Reservation"] = strawberry.field(description="Reservation that caused this assignation.")
