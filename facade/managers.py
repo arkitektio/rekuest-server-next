@@ -114,33 +114,35 @@ def build_action_demand_params(
     """Build SQL for action demand"""
     individual_queries = []
     all_params = {}
-    
-    
-    if action_demand.name:
-        individual_queries.append(f"name = %(name)s")
-        all_params["name"] = action_demand.name
-        
 
-    if action_demand.arg_matches:
-        for index, item in enumerate(action_demand.arg_matches):
-            sql_part, params = build_sql_for_item_recursive(item, index, at_value=item.at, prefix="arg")
-            subquery = f"EXISTS (SELECT 1 FROM jsonb_array_elements(args) WITH ORDINALITY AS j(item, idx) WHERE {sql_part})"
+    if action_demand.hash:
+        individual_queries.append(f"hash = %(hash)s")
+        all_params["hash"] = action_demand.hash
+    else:
+        if action_demand.name:
+            individual_queries.append(f"name = %(name)s")
+            all_params["name"] = action_demand.name
 
-            individual_queries.append(subquery)
-            all_params.update(params)
+        if action_demand.arg_matches:
+            for index, item in enumerate(action_demand.arg_matches):
+                sql_part, params = build_sql_for_item_recursive(item, index, at_value=item.at, prefix="arg")
+                subquery = f"EXISTS (SELECT 1 FROM jsonb_array_elements(args) WITH ORDINALITY AS j(item, idx) WHERE {sql_part})"
 
-    if action_demand.return_matches:
-        for index, item in enumerate(action_demand.return_matches):
-            sql_part, params = build_sql_for_item_recursive(item, index, at_value=item.at, prefix="return")
-            subquery = f"EXISTS (SELECT 1 FROM jsonb_array_elements(returns) WITH ORDINALITY AS j(item, idx) WHERE {sql_part})"
+                individual_queries.append(subquery)
+                all_params.update(params)
 
-            individual_queries.append(subquery)
-            all_params.update(params)
+        if action_demand.return_matches:
+            for index, item in enumerate(action_demand.return_matches):
+                sql_part, params = build_sql_for_item_recursive(item, index, at_value=item.at, prefix="return")
+                subquery = f"EXISTS (SELECT 1 FROM jsonb_array_elements(returns) WITH ORDINALITY AS j(item, idx) WHERE {sql_part})"
 
-    if action_demand.force_arg_length is not None:
-        individual_queries.append(f"jsonb_array_length(args) = {action_demand.force_arg_length}")
-    if action_demand.force_return_length is not None:
-        individual_queries.append(f"jsonb_array_length(returns) = {action_demand.force_return_length}")
+                individual_queries.append(subquery)
+                all_params.update(params)
+
+        if action_demand.force_arg_length is not None:
+            individual_queries.append(f"jsonb_array_length(args) = {action_demand.force_arg_length}")
+        if action_demand.force_return_length is not None:
+            individual_queries.append(f"jsonb_array_length(returns) = {action_demand.force_return_length}")
 
     if not individual_queries:
         raise ValueError("No search params provided")
@@ -183,7 +185,6 @@ def filter_actions_by_demands(
 ):
     if type not in ["args", "returns"]:
         raise ValueError("Type must be either 'args' or 'returns'")
-    
 
     full_sql, all_params = build_params(
         demands,

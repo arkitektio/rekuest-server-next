@@ -74,9 +74,11 @@ class DescriptorInputModel(BaseModel):
     key: str
     value: Any
 
+
 class DescriptorSchemaInputModel(BaseModel):
     key: str
     description: str | None = None
+
 
 class PortInputModel(BaseModel):
     validators: list[ValidatorInputModel] | None = None
@@ -129,6 +131,7 @@ class ActionDependencyInputModel(BaseModel):
     force_arg_length: int | None = None
     force_return_length: int | None = None
     optional: bool = False
+    allow_inactive: bool = True
 
 
 class DefinitionInputModel(BaseModel):
@@ -189,7 +192,6 @@ class ImplementationInputModel(BaseModel):
     logo: str | None = None
 
 
-
 class InterfaceInputModel(BaseModel):
     key: str
     description: str | None = None
@@ -197,10 +199,9 @@ class InterfaceInputModel(BaseModel):
     default_return_widget: Optional[ReturnWidgetInputModel] = None
 
 
-
 class StructureInputModel(BaseModel):
     key: str
-    description: str | None  = None
+    description: str | None = None
     implements: list[str] = None
     descriptors: list[str] = None
     default_widget: Optional[AssignWidgetInputModel] = None
@@ -208,21 +209,12 @@ class StructureInputModel(BaseModel):
 
 
 class StructurePackageInputModel(BaseModel):
-    key: str 
+    key: str
     version: str = "0.1.0"
     description: str | None = None
     interfaces: list[InterfaceInputModel] | None = None
-    structures: list[StructureInputModel] | None  = None
+    structures: list[StructureInputModel] | None = None
     descriptors: list[DescriptorSchemaInputModel] | None = None
-
-
-
-
-
-
-
-
-
 
 
 AssignWidgetInputModel.model_rebuild()

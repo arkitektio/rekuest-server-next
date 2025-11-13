@@ -398,6 +398,7 @@ class ActionDependencyInput:
         default=None,
         description="The hash of the action. This is used to identify the action in the system.",
     )
+    allow_inactive: bool | None = strawberry.field(default=None, description="Allow inactive nodes, defaults to true")
     name: str | None = strawberry.field(
         default=None,
         description="The name of the action. This is used to identify the action in the system.",
@@ -459,41 +460,34 @@ class ImplementationInput:
     )
 
 
-
 @pydantic.input(
     models.StructureInputModel,
     description="Which structures does the agent act upon in general",
 )
 class StructureInput:
-    key: str 
+    key: str
     description: str | None = strawberry.field(default=None, description="Describe the structure a bit")
     default_assign_widget: Optional["AssignWidgetInput"] = strawberry.field(default=None, description="Describe the structure a bit")
     default_return_widget: Optional["ReturnWidgetInput"] = strawberry.field(default=None, description="Describe the structure a bit")
-    
-    
-    
-    
+
+
 @pydantic.input(
     models.InterfaceInputModel,
     description="Which interfaces does the agent declare",
 )
 class InterfaceInput:
-    key: str 
+    key: str
     description: str | None = strawberry.field(default=None, description="Describe the structure a bit")
     default_assign_widget: Optional["AssignWidgetInput"] = strawberry.field(default=None, description="Describe the structure a bit")
     default_return_widget: Optional["ReturnWidgetInput"] = strawberry.field(default=None, description="Describe the structure a bit")
-    
-    
-   
-   
+
+
 @pydantic.input(models.DescriptorSchemaInputModel, description="A descriptor model")
 class DescriptorSchemaInput:
     key: str = strawberry.field(description="The key of the descriptor. This is used to uniquely identify the descriptor")
     description: str | None = strawberry.field(default=None, description="Describe the descriptor a bit")
-    
 
-    
-    
+
 @pydantic.input(
     models.StructurePackageInputModel,
     description="A structure schema model",
