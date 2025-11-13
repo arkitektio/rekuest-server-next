@@ -58,6 +58,7 @@ class Query:
     structures: list[types.Structure] = field(description="All registered structures.")
     structure_packages: list[types.StructurePackage] = field(description="All registered structure packages.")
     interfaces: list[types.Interface] = field(description="All registered interfaces.")
+    tasks: list[types.Assignation] = field(description="All tasks.")
 
     # Stats
     actionStats: types.ActionStats = field(resolver=types.ActionStatsResolver, description="Statistics about actions and their implementations.")

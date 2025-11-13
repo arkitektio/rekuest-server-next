@@ -286,6 +286,14 @@ class ReservationFilter:
         return queryset.filter(status__in=self.status)
 
 
+@strawberry_django.order(models.Assignation)
+class AssignationOrder:
+    created_at: auto
+    started_at: auto
+    finished_at: auto
+    status: auto
+
+
 @strawberry_django.filter(models.Assignation)
 class AssignationFilter:
     reservation: ReservationFilter | None
@@ -852,6 +860,14 @@ class ImplementationActionFilter(SearchFilter):
 class ParamPair:
     key: str
     value: str
+
+
+@strawberry_django.order(models.Implementation)
+class ImplementationOrder:
+    created_at: auto
+    started_at: auto
+    finished_at: auto
+    status: auto
 
 
 @strawberry_django.filter(models.Implementation)

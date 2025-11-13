@@ -201,7 +201,6 @@ class RedisControllBackend(ControllBackend):
 
         if input.dependencies:  # We provided explicit dependencies
             dependencies = input.dependencies
-
             for key, impl_id in dependencies.items():
                 try:
                     dep_impl = models.Implementation.objects.get(id=impl_id)

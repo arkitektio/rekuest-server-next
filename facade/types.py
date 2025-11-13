@@ -196,7 +196,7 @@ class Dependency:
         return qs.exists()
 
 
-@strawberry_django.type(models.Implementation, filters=filters.ImplementationFilter, pagination=True, description="Represents a concrete implementation of an action.")
+@strawberry_django.type(models.Implementation, filters=filters.ImplementationFilter, order=filters.ImplementationOrder, pagination=True, description="Represents a concrete implementation of an action.")
 class Implementation:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the implementation.")
     interface: str = strawberry_django.field(description="Interface string representing the implementation entrypoint.")
@@ -352,7 +352,7 @@ class Reservation:
     implementation: Optional["Implementation"] = strawberry_django.field(description="Chosen implementation.")
 
 
-@strawberry_django.type(models.Assignation, filters=filters.AssignationFilter, pagination=True, description="Tracks the assignment of an implementation to a specific task.")
+@strawberry_django.type(models.Assignation, filters=filters.AssignationFilter, order=filters.AssignationOrder, pagination=True, description="Tracks the assignment of an implementation to a specific task.")
 class Assignation:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the assignation.")
     reference: str | None = strawberry_django.field(description="Optional external reference for tracking.")
@@ -384,6 +384,10 @@ class Assignation:
     @strawberry_django.field(description="Get a specific argument by key.")
     def arg(self, key: str) -> scalars.Args | None:
         return self.args.get(key, None)
+
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="implementation__action__organization")
 
 
 # Final types: AssignationEvent, Instruct, AgentEvent, TestCase, TestResult, State
