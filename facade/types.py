@@ -372,6 +372,7 @@ class Assignation:
     updated_at: datetime.datetime = strawberry_django.field(description="Last update timestamp.")
     ephemeral: bool = strawberry.field(description="Indicates if the assignation should be deleted after completion.")
     children: List["Assignation"] = strawberry.field(description="Child assignations spawned from this one.")
+    agent: Agent | None = strawberry.field(description="Agent responsible for this assignation.")
 
     @strawberry_django.field(description="List of recent events for this assignation.")
     def events(self) -> list["AssignationEvent"]:
