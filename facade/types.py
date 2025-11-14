@@ -764,6 +764,14 @@ class Structure:
     def identifier(self) -> strawberry.ID:
         return f"@{self.package.key}/{self.key}"
 
+    @strawberry_django.field(description="Get the query to retrieve data for this structure.")
+    def get_query(self) -> str | None:
+        return self.get_query
+
+    @strawberry_django.field(description="Get the query to describe the schema of this structure.")
+    def describe_query(self) -> str | None:
+        return self.describe_query
+
 
 @strawberry_django.type(models.InputStructureUsage, filters=filters.InputStructureUsageFilter, pagination=True, description="Usage of an input structure in an action.")
 class InputStructureUsage:

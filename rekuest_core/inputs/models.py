@@ -206,6 +206,8 @@ class StructureInputModel(BaseModel):
     descriptors: list[str] = None
     default_widget: Optional[AssignWidgetInputModel] = None
     default_return_widget: Optional[ReturnWidgetInputModel] = None
+    qet_query: str | None = None
+    describe_query: str | None = None
 
 
 class StructurePackageInputModel(BaseModel):

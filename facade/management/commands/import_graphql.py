@@ -26,9 +26,8 @@ from rekuest_core.inputs.models import (
 
 # ---- SDL → Pydantic model ---------------------------------------------------
 
-def sdl_to_package_model(
-    sdl: str, *, package_key: str, version: str
-) -> StructurePackageInputModel:
+
+def sdl_to_package_model(sdl: str, *, package_key: str, version: str) -> StructurePackageInputModel:
     doc: DocumentNode = parse(sdl)
 
     interfaces = []
@@ -48,6 +47,7 @@ def sdl_to_package_model(
             name = defn.name.value
             if name in {"Query", "Mutation", "Subscription"}:
                 continue
+
             structures.append(
                 {
                     "key": name,
@@ -66,17 +66,15 @@ def sdl_to_package_model(
 
 # ---- DB upsert --------------------------------------------------------------
 
+
 def upsert_from_models(packages: List[StructurePackageInputModel]) -> None:
-    
-    
-    
     with transaction.atomic():
         for package in packages:
             pack, _ = models.StructurePackage.objects.update_or_create(
                 key=package.key.lower(),
                 defaults=dict(description=getattr(package, "description", None)),
             )
-            
+
             print("Upserting package", package.key)
 
             # Interfaces
@@ -86,18 +84,11 @@ def upsert_from_models(packages: List[StructurePackageInputModel]) -> None:
                     key=interface.key.lower(),
                     defaults=dict(
                         description=getattr(interface, "description", None),
-                        default_widget=(
-                            interface.default_widget and interface.default_widget.model_dump_json()
-                        )
-                        or None,
-                        default_return_widget=(
-                            interface.default_return_widget
-                            and interface.default_return_widget.model_dump_json()
-                        )
-                        or None,
+                        default_widget=(interface.default_widget and interface.default_widget.model_dump_json()) or None,
+                        default_return_widget=(interface.default_return_widget and interface.default_return_widget.model_dump_json()) or None,
                     ),
                 )
-                
+
                 print("  Upserting interface", interface.key)
 
             # Structures
@@ -107,35 +98,21 @@ def upsert_from_models(packages: List[StructurePackageInputModel]) -> None:
                     key=structure.key.lower(),
                     defaults=dict(
                         description=getattr(structure, "description", None),
-                        default_widget=(
-                            structure.default_widget and structure.default_widget.model_dump_json()
-                        )
-                        or None,
-                        default_return_widget=(
-                            structure.default_return_widget
-                            and structure.default_return_widget.model_dump_json()
-                        )
-                        or None,
+                        default_widget=(structure.default_widget and structure.default_widget.model_dump_json()) or None,
+                        default_return_widget=(structure.default_return_widget and structure.default_return_widget.model_dump_json()) or None,
                     ),
                 )
-                
+
                 print("  Upserting structure", structure.key)
 
-                struc.implements.set(
-                    models.Interface.objects.filter(
-                        package=pack, key__in=(i.lower() for i in structure.implements or [])
-                    )
-                )
+                struc.implements.set(models.Interface.objects.filter(package=pack, key__in=(i.lower() for i in structure.implements or [])))
                 print("    Setting implements:", structure.implements or [])
-                struc.descriptors.set(
-                    models.Descriptor.objects.filter(
-                        package=pack, key__in=(i.lower() for i in structure.descriptors or [])
-                    )
-                )
+                struc.descriptors.set(models.Descriptor.objects.filter(package=pack, key__in=(i.lower() for i in structure.descriptors or [])))
                 print("    Setting descriptors:", structure.descriptors or [])
 
 
 # ---- Management command -----------------------------------------------------
+
 
 class Command(BaseCommand):
     help = "Parse GraphQL SDL files in ./schemas into StructurePackageInputModel(s) and upsert them."
@@ -179,6 +156,4 @@ class Command(BaseCommand):
 
         upsert_from_models(pkg_models)
 
-        self.stdout.write(
-            self.style.SUCCESS(f"Upserted {len(pkg_models)} package(s) from ./schemas/*.graphql")
-        )
+        self.stdout.write(self.style.SUCCESS(f"Upserted {len(pkg_models)} package(s) from ./schemas/*.graphql"))

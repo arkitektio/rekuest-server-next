@@ -63,7 +63,7 @@ class RedisControllBackend(ControllBackend):
 
     def interrupt(self, input: inputs.InterruptInputModel) -> models.Assignation:
         parent = models.Assignation.objects.get(id=input.assignation)
-        parent.status = enums.AssignationEventKind.INTERUPTED
+        parent.latest_instruct_kind = enums.AssignationInstructKind.INTERRUPT
         parent.save()
 
         AgentConsumer.broadcast(
@@ -76,7 +76,7 @@ class RedisControllBackend(ControllBackend):
         children = models.Assignation.objects.filter(parent_id=input.assignation).all()
 
         for child in children:
-            child.status = enums.AssignationEventKind.INTERUPTED
+            child.latest_instruct_kind = enums.AssignationInstructKind.INTERRUPT
             child.save()
 
             AgentConsumer.broadcast(

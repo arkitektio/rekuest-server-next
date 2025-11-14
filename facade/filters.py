@@ -300,6 +300,8 @@ class AssignationFilter:
     ids: list[strawberry.ID] | None
     status: list[enums.AssignationStatus] | None
     instance_id: scalars.InstanceId | None
+    client_id: strawberry.ID | None
+    state: list[enums.AssignationEventKind] | None
 
     def filter_ids(self, queryset, info):
         if self.ids is None:
@@ -315,6 +317,16 @@ class AssignationFilter:
         if self.instance_id is None:
             return queryset
         return queryset.filter(reservation__waiter__instance_id=self.instance_id)
+
+    def filter_client_id(self, queryset, info):
+        if self.client_id is None:
+            return queryset
+        return queryset.filter(agent__registry__client__client_id=self.client_id)
+
+    def filter_state(self, queryset, info):
+        if self.state is None:
+            return queryset
+        return queryset.filter(latest_event_kind__in=self.state).distinct()
 
 
 @strawberry_django.filter(models.AssignationEvent, description="A way to filter assignation events")

@@ -69,6 +69,7 @@ class ModelPersistBackend:
 
         x = await models.Assignation.objects.aget(id=message.assignation)
         x.is_done = True
+        x.latest_event_kind = enums.AssignationEventKind.DONE
         await x.asave()
 
     async def on_agent_cancelled(self, agent_id: str, message: messages.CancelledEvent) -> None:
@@ -81,6 +82,7 @@ class ModelPersistBackend:
 
         x = await models.Assignation.objects.aget(id=message.assignation)
         x.is_done = True
+        x.latest_event_kind = enums.AssignationEventKind.CANCELLED
         await x.asave()
 
     async def on_agent_error(self, agent_id: str, message: messages.ErrorEvent) -> None:
@@ -94,6 +96,7 @@ class ModelPersistBackend:
 
         x = await models.Assignation.objects.aget(id=message.assignation)
         x.is_done = True
+        x.latest_event_kind = enums.AssignationEventKind.ERROR
         await x.asave()
 
     async def on_agent_critical(self, agent_id: str, message: messages.CriticalEvent) -> None:
@@ -107,6 +110,7 @@ class ModelPersistBackend:
 
         x = await models.Assignation.objects.aget(id=message.assignation)
         x.is_done = True
+        x.latest_event_kind = enums.AssignationEventKind.CRITICAL
         await x.asave()
 
     async def on_agent_progress(self, agent_id: str, message: messages.ProgressEvent) -> None:
