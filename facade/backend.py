@@ -219,6 +219,7 @@ class RedisControllBackend(ControllBackend):
             reference=reference,
             parent_id=input.parent,
             agent=agent,
+            capture=input.capture,
             implementation=implementation,
             dependencies=dependencies,
             is_done=False,
@@ -242,6 +243,7 @@ class RedisControllBackend(ControllBackend):
                 app=str(info.context.request.client.client_id),
                 org=str(info.context.request.organization.slug) if info.context.request.organization else None,
                 reference=reference,
+                capture=input.capture,
                 interface=implementation.interface,
                 extension=implementation.extension,
                 dependencies=dependencies,
@@ -253,12 +255,13 @@ class RedisControllBackend(ControllBackend):
                 if hook.kind == enums.HookKind.INIT:
                     # recursive assign
                     self.assign(
+                        info,
                         inputs.AssignInputModel(
                             action_hash=hook.hash,
                             parent=assignation.pk,
                             args={"assignation": assignation.pk},
                             reference="init_hook_0",
-                        )
+                        ),
                     )
 
         if assignation.parent:

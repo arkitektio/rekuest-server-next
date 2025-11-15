@@ -105,6 +105,7 @@ class Assign(Message):
         default=None,
         description="The dependencies that were provided (should map reference to template)",
     )
+    capture: bool = Field(default=False, description="Whether to run in debug mode")
     reference: Optional[str] = Field(default=None, description="A reference that the assinger provided")
     args: Dict[str, ShallowJSONSerializable] = Field(description="The arguments that was sendend")
     message: Optional[str] = None
@@ -112,8 +113,7 @@ class Assign(Message):
     org: Optional[str] = Field(default=None, description="The org that the user currently belongs to")
     app: str = Field(description="The assinging app")
     action: str = Field(description="The action that triggered this assignation")
-    
-    
+
     @property
     def actor_id(self) -> str:
         """The actor id is the id of the actor that will be used to run this assignation"""

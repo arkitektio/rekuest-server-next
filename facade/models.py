@@ -891,6 +891,10 @@ class Assignation(models.Model):
         default=uuid.uuid4,
         help_text="The Unique identifier of this Assignation considering its parent",
     )
+    capture = models.BooleanField(
+        default=False,
+        help_text="Should we capture the logs and events of this Assignation (e.g. for debugging or auditing purposes)?",
+    )
     parent = models.ForeignKey(
         "self",
         on_delete=models.CASCADE,

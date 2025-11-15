@@ -363,6 +363,7 @@ class Assignation:
     parent: Optional["Assignation"] = strawberry.field(description="Parent assignation that triggered this one.")
     reservation: Optional["Reservation"] = strawberry.field(description="Reservation that caused this assignation.")
     action: "Action" = strawberry.field(description="Action assigned.")
+    capture: bool = strawberry.field(description="Indicates if the assignation is being captured for logging or debugging.")
     implementation: "Implementation" = strawberry.field(description="Implementation assigned to execute.")
     latest_event_kind: enums.AssignationEventKind = strawberry.field(description="Type of the latest event.")
     latest_instruct_kind: enums.AssignationInstructKind = strawberry.field(description="Last instruction type.")

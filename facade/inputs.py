@@ -134,6 +134,7 @@ class AssignInputModel(BaseModel):
     parent: str | None = None
     cached: bool = False
     log: bool = False
+    capture: bool = False
     ephemeral: bool = False
     dependencies: dict[str, str] | None = None
     is_hook: bool = False
@@ -327,6 +328,10 @@ class AssignInput:
     reservation: strawberry.ID | None = strawberry.field(
         default=None,
         description="The reservation ID to assign to. This is used to identify the reservation in the system.",
+    )
+    capture: bool = strawberry.field(
+        default=False,
+        description="Whether to capture the assignation.",
     )
     args: scalars.Args = strawberry.field(
         description="The args of the assignation. Its a dictionary of ports and values",
