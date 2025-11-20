@@ -920,6 +920,7 @@ class ImplementationFilter:
         new_ids = managers.get_action_ids_by_action_demand(
             demand,
             model="facade_action",
+            organization_id=info.context.request.organization.id,
         )
 
         return queryset.filter(action__id__in=new_ids)

@@ -110,14 +110,20 @@ def build_params(
 def build_action_demand_params(
     action_demand: ActionDemandInput,
     model: str = "facade_action",
+    organization_id: str | None = None,
 ) -> tuple[str, dict[str, t.Any]]:
     """Build SQL for action demand"""
     individual_queries = []
     all_params = {}
 
+    if organization_id:
+        individual_queries.append(f"organization_id = %(organization)s")
+        all_params["organization"] = organization_id
+
     if action_demand.hash:
         individual_queries.append(f"hash = %(hash)s")
         all_params["hash"] = action_demand.hash
+
     else:
         if action_demand.name:
             individual_queries.append(f"name = %(name)s")
@@ -234,10 +240,12 @@ def get_action_ids_by_demands(
 def get_action_ids_by_action_demand(
     action_demand: ActionDemandInput,
     model: str = "facade_action",
+    organization_id: str | None = None,
 ):
     full_sql, all_params = build_action_demand_params(
         action_demand,
         model=model,
+        organization_id=organization_id,
     )
 
     with connection.cursor() as cursor:
