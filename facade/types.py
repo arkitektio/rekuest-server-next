@@ -377,11 +377,11 @@ class Assignation:
 
     @strawberry_django.field(description="List of recent events for this assignation.")
     def events(self) -> list["AssignationEvent"]:
-        return self.events.order_by("created_at")[:10]
+        return self.events.order_by("-created_at")[:10]
 
     @strawberry_django.field(description="List of recent instructions for this assignation.")
     def instructs(self) -> list["AssignationInstruct"]:
-        return self.instructs.order_by("created_at")[:10]
+        return self.instructs.order_by("-created_at")[:10]
 
     @strawberry_django.field(description="Get a specific argument by key.")
     def arg(self, key: str) -> scalars.Args | None:
