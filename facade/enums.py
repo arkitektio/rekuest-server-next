@@ -455,3 +455,11 @@ class JSONPatchOperation(str, Enum):
 class PanelKind(str, Enum):
     STATE = "STATE"
     ASSIGN = "ASSIGN"
+
+
+@strawberry.enum
+class AssignPolicy(str, Enum):
+    AUTOMATIC = "AUTOMATIC"
+    ROUND_ROBIN = "ROUND_ROBIN"
+    LEAST_BUSY = "LEAST_BUSY"
+    FASTEST_RESPONSE = "FASTEST_RESPONSE"

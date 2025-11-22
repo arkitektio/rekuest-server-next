@@ -352,6 +352,10 @@ class AssignInput:
         default=None,
         description="The dependencies of the assignation. This maps dependency keys to implementation IDs.",
     )
+    policy: enums.AssignPolicy | None = strawberry.field(
+        default=None,
+        description="The policy for the assignation. This defines how the assignation should be handled.",
+    )
     cached: bool = False
     ephemeral: bool = False
     log: bool = False
