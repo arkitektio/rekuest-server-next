@@ -324,6 +324,10 @@ class Agent:
     def get_queryset(cls, queryset, info, **kwargs):
         return build_prescoped_queryset(info, queryset, field="registry__organization")
 
+    @strawberry_django.field(description="Get the count of implementations available on this agent.")
+    def blocked(self) -> bool:
+        return self.blocked
+
 
 # Completion of type and field descriptions for remaining types like Waiter, Reservation, Assignation, and more
 

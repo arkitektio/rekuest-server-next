@@ -93,6 +93,11 @@ class AgentConsumer(AsyncWebsocketConsumer):
             ),
         )
 
+        if self.agent.blocked:
+            await self.close(code=codes.AGENT_IS_BLOCKED_CODE)
+            print("Agent is blocked")
+            return
+
         self.connection = aredis.Redis(host="redis", auto_close_connection_pool=True)
         self.assignations = await persist_backend.on_agent_connected(self.agent.pk)
         self.heartbeat_future: Optional[asyncio.Future] = None

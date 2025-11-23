@@ -59,3 +59,19 @@ def interrupt(info: Info, input: inputs.InterruptInput) -> types.Assignation:
 
 def collect(info: Info, input: inputs.CollectInput) -> list[str]:
     return controll_backend.collect(info, input)
+
+
+def bounce(info: Info, input: inputs.BounceInput) -> types.Agent:
+    return controll_backend.bounce(info, input)
+
+
+def kick(info: Info, input: inputs.KickInput) -> types.Agent:
+    return controll_backend.kick(info, input)
+
+
+def block(info: Info, input: inputs.BlockInput) -> types.Agent:
+    return controll_backend.block(info, input)
+
+
+def unblock(info: Info, input: inputs.UnblockInput) -> types.Agent:
+    return controll_backend.unblock(info, input)

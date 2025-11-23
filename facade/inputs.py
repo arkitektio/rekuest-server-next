@@ -33,6 +33,74 @@ class PinInput:
     pin: bool
 
 
+class BounceInputModel(BaseModel):
+    """Base model for bouncing an agent.
+
+    Attributes:
+        agent: ID of the agent to bounce
+    """
+
+    agent: str
+    duration: int | None = None
+
+
+@pydantic.input(BounceInputModel, description="The input for bouncing an agent.")
+class BounceInput:
+    agent: strawberry.ID = strawberry.field(description="The agent ID to bounce.")
+    duration: int | None = strawberry.field(default=None, description="The duration to bounce the agent for.")
+
+
+class KickInputModel(BaseModel):
+    """Base model for bouncing an agent.
+
+    Attributes:
+        agent: ID of the agent to bounce
+    """
+
+    agent: str
+    reason: str | None = None
+
+
+@pydantic.input(KickInputModel, description="The input for bouncing an agent.")
+class KickInput:
+    agent: strawberry.ID = strawberry.field(description="The agent ID to bounce.")
+    reason: str | None = strawberry.field(default=None, description="The reason for kicking the agent.")
+
+
+class BlockInputModel(BaseModel):
+    """Base model for bouncing an agent.
+
+    Attributes:
+        agent: ID of the agent to bounce
+    """
+
+    agent: str
+    reason: str | None = None
+
+
+@pydantic.input(BlockInputModel, description="The input for bouncing an agent.")
+class BlockInput:
+    agent: strawberry.ID = strawberry.field(description="The agent ID to bounce.")
+    reason: str | None = strawberry.field(default=None, description="The reason for kicking the agent.")
+
+
+class UnblockInputModel(BaseModel):
+    """Base model for bouncing an agent.
+
+    Attributes:
+        agent: ID of the agent to bounce
+    """
+
+    agent: str
+    reason: str | None = None
+
+
+@pydantic.input(UnblockInputModel, description="The input for bouncing an agent.")
+class UnblockInput:
+    agent: strawberry.ID = strawberry.field(description="The agent ID to unblock.")
+    reason: str | None = strawberry.field(default=None, description="The reason for unblocking the agent.")
+
+
 class ReserveInputModel(BaseModel):
     """Base model for reserving an action.
 

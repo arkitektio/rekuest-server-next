@@ -45,6 +45,8 @@ class ToAgentMessageType(str, Enum):
     UNPROVIDE = "UNPROVIDE"
     INIT = "INIT"
     HEARTBEAT = "HEARTBEAT"
+    BOUNCE = "BOUNCE"
+    KICK = "KICK"
 
 
 class FromAgentMessageType(str, Enum):
@@ -129,6 +131,28 @@ class Step(Message):
 
     type: Literal[ToAgentMessageType.STEP] = ToAgentMessageType.STEP
     assignation: str
+
+
+class Bounce(Message):
+    """A step call
+    A step call tells the agent to step the assignation
+    and all its children assignation until a resume is received
+    Its on the actor to decide what to do with the children assignations
+    """
+
+    type: Literal[ToAgentMessageType.BOUNCE] = ToAgentMessageType.BOUNCE
+    duration: int | None = None
+
+
+class Kick(Message):
+    """A step call
+    A step call tells the agent to step the assignation
+    and all its children assignation until a resume is received
+    Its on the actor to decide what to do with the children assignations
+    """
+
+    type: Literal[ToAgentMessageType.KICK] = ToAgentMessageType.KICK
+    reason: str | None = None
 
 
 class Heartbeat(Message):

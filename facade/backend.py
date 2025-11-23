@@ -286,6 +286,49 @@ class RedisControllBackend(ControllBackend):
         )
         return assignation
 
+    def bounce(self, info: Info, input: inputs.BounceInputModel) -> models.Agent:
+        agent = models.Agent.objects.get(id=input.agent)
+
+        AgentConsumer.broadcast(
+            agent.id,
+            message=messages.Bounce(
+                agent=agent.id,
+            ),
+        )
+        return agent
+
+    def block(self, info: Info, input: inputs.BlockInputModel) -> models.Agent:
+        agent = models.Agent.objects.get(id=input.agent)
+        agent.blocked = True
+        agent.save()
+
+        AgentConsumer.broadcast(
+            agent.id,
+            message=messages.Kick(
+                agent=agent.id,
+                reason=input.reason,
+            ),
+        )
+        return agent
+
+    def unblock(self, info: Info, input: inputs.UnblockInputModel) -> models.Agent:
+        agent = models.Agent.objects.get(id=input.agent)
+        agent.blocked = False
+        agent.save()
+
+        return agent
+
+    def kick(self, info: Info, input: inputs.KickInputModel) -> models.Agent:
+        agent = models.Agent.objects.get(id=input.agent)
+
+        AgentConsumer.broadcast(
+            agent.id,
+            message=messages.Kick(
+                agent=agent.id,
+            ),
+        )
+        return agent
+
     def collect(self, info: Info, input: inputs.CollectInputModel) -> list[str]:
         agents = {}
 
