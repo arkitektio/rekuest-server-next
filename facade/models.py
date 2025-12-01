@@ -6,7 +6,7 @@ from django.db import models
 from django_choices_field import TextChoicesField
 from facade import enums
 from django.contrib.auth import get_user_model
-
+from django.contrib.postgres.fields import ArrayField
 # Create your models here.
 
 
@@ -869,6 +869,7 @@ class Assignation(models.Model):
         blank=True,
         null=True,
     )
+    acted_on = ArrayField(base_field=models.CharField(max_length=1000), help_text="Which structures were acted on in this assignation", default=list)
     implementation = models.ForeignKey(
         Implementation,
         on_delete=models.CASCADE,
@@ -948,8 +949,8 @@ class Assignation(models.Model):
         default=False,
         help_text="Is this Assignation done (e.g. has it been completed and resulted in an error?)",
     )
-
     created_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):

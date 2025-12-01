@@ -302,6 +302,18 @@ class AssignationFilter:
     instance_id: scalars.InstanceId | None
     client_id: strawberry.ID | None
     state: list[enums.AssignationEventKind] | None
+    implementation: strawberry.ID | None
+    acted_on: list[str] | None
+
+    def filter_implementation(self, queryset, info):
+        if self.implementation is None:
+            return queryset
+        return queryset.filter(implementation_id=self.implementation)
+
+    def filter_acted_on(self, queryset, info):
+        if self.acted_on is None:
+            return queryset
+        return queryset.filter(acted_on__overlap=self.acted_on)
 
     def filter_ids(self, queryset, info):
         if self.ids is None:

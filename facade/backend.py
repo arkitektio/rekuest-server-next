@@ -57,6 +57,18 @@ def get_waiter_for_context(info: Info, instance_id: str) -> None:
     return waiter
 
 
+def acted_on_from_args(args: dict, action: models.Action) -> list[str]:
+    acted_on = []
+    for port in action.args:
+        if port["kind"] == "STRUCTURE":
+            identifier = port.get("identifier")
+            key = port.get("key")
+            if identifier and key in args:
+                acted_on.append(f"{identifier}:{args[key]}")
+
+    return acted_on
+
+
 class RedisControllBackend(ControllBackend):
     def create_message_id(self) -> str:
         return str(uuid.uuid4())
@@ -197,6 +209,8 @@ class RedisControllBackend(ControllBackend):
         else:
             raise ValueError("You need to provide either, action_hash or action_id, to create an assignment for an agent")
 
+        acted_on = acted_on_from_args(input.args, action)
+
         reference = input.reference or self.create_message_id()
 
         if input.dependencies:  # We provided explicit dependencies
@@ -219,6 +233,7 @@ class RedisControllBackend(ControllBackend):
             reference=reference,
             parent_id=input.parent,
             agent=agent,
+            acted_on=acted_on,
             capture=input.capture,
             implementation=implementation,
             dependencies=dependencies,

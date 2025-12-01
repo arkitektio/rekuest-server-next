@@ -377,6 +377,8 @@ class Assignation:
     waiter: "Waiter" = strawberry.field(description="Waiter responsible for this assignation.")
     created_at: datetime.datetime = strawberry_django.field(description="Creation timestamp.")
     updated_at: datetime.datetime = strawberry_django.field(description="Last update timestamp.")
+    finished_at: datetime.datetime | None = strawberry.field(description="Timestamp when the assignation was finished.")
+    acted_on: List[str] = strawberry.field(description="List of resources or entities this assignation acted upon.")
     ephemeral: bool = strawberry.field(description="Indicates if the assignation should be deleted after completion.")
     children: List["Assignation"] = strawberry.field(description="Child assignations spawned from this one.")
     agent: Agent | None = strawberry.field(description="Agent responsible for this assignation.")

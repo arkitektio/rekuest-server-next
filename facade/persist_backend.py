@@ -69,6 +69,7 @@ class ModelPersistBackend:
 
         x = await models.Assignation.objects.aget(id=message.assignation)
         x.is_done = True
+        x.finished_at = datetime.datetime.now()
         x.latest_event_kind = enums.AssignationEventKind.DONE
         await x.asave()
 
@@ -82,6 +83,7 @@ class ModelPersistBackend:
 
         x = await models.Assignation.objects.aget(id=message.assignation)
         x.is_done = True
+        x.finished_at = datetime.datetime.now()
         x.latest_event_kind = enums.AssignationEventKind.CANCELLED
         await x.asave()
 
@@ -96,6 +98,7 @@ class ModelPersistBackend:
 
         x = await models.Assignation.objects.aget(id=message.assignation)
         x.is_done = True
+        x.finished_at = datetime.datetime.now()
         x.latest_event_kind = enums.AssignationEventKind.ERROR
         await x.asave()
 
@@ -110,6 +113,7 @@ class ModelPersistBackend:
 
         x = await models.Assignation.objects.aget(id=message.assignation)
         x.is_done = True
+        x.finished_at = datetime.datetime.now()
         x.latest_event_kind = enums.AssignationEventKind.CRITICAL
         await x.asave()
 
