@@ -1,3 +1,4 @@
+import datetime
 from typing import Optional
 
 import strawberry
@@ -304,6 +305,18 @@ class AssignationFilter:
     state: list[enums.AssignationEventKind] | None
     implementation: strawberry.ID | None
     acted_on: list[str] | None
+    created_before: datetime.datetime | None
+    created_after: datetime.datetime | None
+
+    def filter_created_before(self, queryset, info):
+        if self.created_before is None:
+            return queryset
+        return queryset.filter(created_at__lt=self.created_before)
+
+    def filter_created_after(self, queryset, info):
+        if self.created_after is None:
+            return queryset
+        return queryset.filter(created_at__gt=self.created_after)
 
     def filter_implementation(self, queryset, info):
         if self.implementation is None:
