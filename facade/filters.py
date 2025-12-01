@@ -307,6 +307,12 @@ class AssignationFilter:
     acted_on: list[str] | None
     created_before: datetime.datetime | None
     created_after: datetime.datetime | None
+    agent: strawberry.ID | None
+
+    def filter_agent(self, queryset, info):
+        if self.agent is None:
+            return queryset
+        return queryset.filter(agent_id=self.agent)
 
     def filter_created_before(self, queryset, info):
         if self.created_before is None:
