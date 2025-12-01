@@ -877,7 +877,7 @@ class Assignation(models.Model):
         blank=True,
         null=True,
     )
-    action = models.ForeignKey(Action, on_delete=models.CASCADE, help_text="The action this was assigned to")
+    action = models.ForeignKey(Action, on_delete=models.CASCADE, help_text="The action this was assigned to", related_name="assignations")
     ephemeral = models.BooleanField(
         default=False,
         help_text="Is this Assignation ephemeral (e.g. should it be deleted after its done or should it be kept for future reference)",

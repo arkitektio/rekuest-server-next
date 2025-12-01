@@ -130,10 +130,11 @@ class Action:
     reservations: list[LazyType["Reservation", __name__]] | None = strawberry_django.field(description="Reservations related to this action.")
     test_cases: list[LazyType["TestCase", __name__]] | None = strawberry_django.field(description="Test cases for this action.")
     organization: "Organization" = strawberry_django.field(description="The organization that owns this action.")
+    assignations: list[LazyType["Assignation", __name__]] = strawberry_django.field(description="Assignations created for this action.")
 
     @strawberry_django.field(description="Retrieve assignations where this action has run.")
     def runs(self) -> list[LazyType["Assignation", __name__]] | None:
-        return models.Assignation.objects.filter(provision__implementation__action=self).order_by("-created_at")
+        return models.Assignation.objects.filter(action=self).order_by("-created_at")
 
     @strawberry_django.field(description="Input arguments (ports) for the action.")
     def args(self) -> list[rtypes.Port]:
