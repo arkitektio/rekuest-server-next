@@ -11,6 +11,7 @@ from rekuest_core.inputs import models as rimodels
 from rekuest_core import scalars as rscalars
 from strawberry import auto
 from strawberry_django.filters import FilterLookup
+from django.db.models import Max
 
 
 @strawberry.input(description="A way to filter users")
@@ -472,6 +473,12 @@ class AgentOrder:
 @strawberry_django.order(models.Action)
 class ActionOrder:
     defined_at: auto
+    used_at: auto
+
+    def filter_used_at(self, queryset, info):
+        if self.used_at is None:
+            return queryset
+        return queryset.annotate(latest_assignation_time=Max("assignation__created_at")).order_by("-latest_assignation_time")
 
 
 @strawberry_django.order(models.Protocol)
@@ -759,6 +766,18 @@ class ActionFilter(SearchFilter):
     protocols: list[str] | None
     kind: Optional[renums.ActionKind] | None
     in_collection: str | None
+    used_before: datetime.datetime | None
+    used_after: datetime.datetime | None
+
+    def filter_used_before(self, queryset, info):
+        if self.used_before is None:
+            return queryset
+        return queryset.filter(assignations__created_at__lt=self.used_before)
+
+    def filter_used_after(self, queryset, info):
+        if self.used_after is None:
+            return queryset
+        return queryset.filter(assignations__created_at__gt=self.used_after)
 
     def filter_in_collection(self, queryset, info):
         if self.in_collection is None:
