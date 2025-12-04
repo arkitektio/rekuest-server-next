@@ -99,6 +99,15 @@ class AgentFilter(ScopeFilterMixin):
     distinct: bool | None
     action_demands: list[inputs.ActionDemandInput] | None
     state_demands: list[inputs.SchemaDemandInput] | None
+    user: strawberry.ID | None = strawberry.field(
+        default=None,
+        description="Filter by user ID",
+    )
+
+    def filter_user(self, queryset, info):
+        if self.user is None:
+            return queryset
+        return queryset.filter(registry__user__sub=self.user)
 
     def filter_search(self, queryset, info):
         if self.search is None:
