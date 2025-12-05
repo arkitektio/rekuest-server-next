@@ -11,6 +11,7 @@ from .state import set_state, update_state, archive_state, set_agent_states
 from .blok import create_blok
 from .materialized_blok import materialize_blok
 from .lifeline import reinit
+from .action import cleanup_actions
 
 __all__ = [
     "create_foreign_implementation",

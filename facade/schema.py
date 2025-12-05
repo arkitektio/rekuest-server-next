@@ -183,6 +183,7 @@ class Mutation:
     delete_shortcut = mutation(resolver=mutations.delete_shortcut, description="Delete a shortcut.")
     create_toolbox = mutation(resolver=mutations.create_toolbox, description="Create a new toolbox with shortcuts.")
     set_agent_states = mutation(resolver=mutations.set_agent_states, description="Set states for an agent.")
+    cleanup_actions = mutation(resolver=mutations.cleanup_actions, description="Delete unreferenced actions from the system.")
 
 
 @strawberry.type(description="Root subscription type for real-time event streams from the system.")
