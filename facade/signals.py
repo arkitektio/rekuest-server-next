@@ -10,7 +10,6 @@ logger.info("Loading sssignals")
 
 @receiver(post_save, sender=models.State)
 def state_post_save(sender, instance: models.State = None, created=None, **kwargs):
-    
     channels.state_update_channel.broadcast(channel_events.StateUpdateEvent(state=instance.id), [f"state_{instance.id}"])
 
 
@@ -23,7 +22,6 @@ def action_singal(sender, instance=None, created=None, **kwargs):
             channels.action_channel.broadcast(channel_events.ActionSignal(update=instance.id), [f"actions_{instance.organization.id}"])
 
 
-
 @receiver(post_save, sender=models.Reservation)
 def reservation_signal(sender, instance=None, **kwargs):
     logger.info("Reservation received!")
@@ -32,7 +30,6 @@ def reservation_signal(sender, instance=None, **kwargs):
 @receiver(post_save, sender=models.Agent)
 def agent_post_save(sender, instance: models.Agent = None, created=None, **kwargs):
     if instance:
-        print("Agent post save")
         channels.agent_updated_channel.broadcast(
             channel_events.AgentSignal(create=instance.id) if created else channel_events.AgentSignal(update=instance.id),
             [f"agents_for_{instance.registry.user.id}"],
@@ -49,9 +46,7 @@ def ass_post_save(sender, instance: models.Assignation = None, created=None, **k
 
 
 @receiver(post_save, sender=models.AssignationEvent)
-def ass_event_post_save(
-    sender, instance: models.AssignationEvent = None, created=None, **kwargs
-):
+def ass_event_post_save(sender, instance: models.AssignationEvent = None, created=None, **kwargs):
     logger.info("Assignation Event received")
     channels.assignation_event_channel.broadcast(
         channel_events.AssignationEventCreatedEvent(event=instance.id),
@@ -74,10 +69,7 @@ def implementation_post_save(sender, instance: models.Implementation = None, cre
         channels.new_implementation_channel.broadcast(channel_events.ImplementationSignal(update=instance.id), [f"implementation_{instance.id}"])
 
 
-
 @receiver(post_delete, sender=models.Implementation)
 def implementation_post_del(sender, instance: models.Implementation = None, **kwargs):
-    
     if instance:
         channels.new_implementation_channel.broadcast(channel_events.ImplementationSignal(delete=instance.id), [f"implementation_{instance.id}"])
-    
