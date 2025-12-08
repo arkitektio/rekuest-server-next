@@ -388,6 +388,11 @@ class AssignationFilter:
         return queryset.filter(latest_event_kind__in=self.state).distinct()
 
 
+@strawberry_django.order(models.AssignationEvent)
+class AssignationEventOrder:
+    created_at: auto
+
+
 @strawberry_django.filter(models.AssignationEvent, description="A way to filter assignation events")
 class AssignationEventFilter:
     kind: list[enums.AssignationEventKind] | None

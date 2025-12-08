@@ -406,10 +406,7 @@ class Assignation:
     ephemeral: bool = strawberry.field(description="Indicates if the assignation should be deleted after completion.")
     children: List["Assignation"] = strawberry.field(description="Child assignations spawned from this one.")
     agent: Agent | None = strawberry.field(description="Agent responsible for this assignation.")
-
-    @strawberry_django.field(description="List of recent events for this assignation.")
-    def events(self) -> list["AssignationEvent"]:
-        return self.events.order_by("-created_at")[:10]
+    events: list["AssignationEvent"] = strawberry_django.field(description="The events")
 
     @strawberry_django.field(description="List of recent instructions for this assignation.")
     def instructs(self) -> list["AssignationInstruct"]:
@@ -436,7 +433,7 @@ AssignationStats, AssignationStatsResolver = create_stats_type(
 )
 
 
-@strawberry_django.type(models.AssignationEvent, filters=filters.AssignationEventFilter, pagination=True, description="An event that occurred during an assignation.")
+@strawberry_django.type(models.AssignationEvent, filters=filters.AssignationEventFilter, order=filters.AssignationEventOrder, pagination=True, description="An event that occurred during an assignation.")
 class AssignationEvent:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the event.")
     name: str = strawberry_django.field(description="Name of the event.")

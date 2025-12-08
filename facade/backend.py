@@ -279,13 +279,6 @@ class RedisControllBackend(ControllBackend):
                         ),
                     )
 
-        if assignation.parent:
-            models.AssignationEvent.objects.create(
-                assignation=assignation.parent,
-                kind=enums.AssignationEventKind.DELEGATE,
-                delegated_to=assignation,
-            )
-
         return assignation
 
     def resume(self, info: Info, input: inputs.ResumeInputModel) -> models.Assignation:
