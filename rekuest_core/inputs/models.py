@@ -145,6 +145,7 @@ class DefinitionInputModel(BaseModel):
     args: list[PortInputModel] = Field(default_factory=list)
     returns: list[PortInputModel] = Field(default_factory=list)
     kind: enums.ActionKind
+    tests: ActionDependencyInputModel | None = Field(default=None)
     is_test_for: list["str"] = Field(default_factory=list)
     interfaces: list[str] = Field(default_factory=list)
     is_dev: bool = False

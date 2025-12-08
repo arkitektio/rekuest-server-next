@@ -236,6 +236,10 @@ class Implementation:
         user = info.context.request.user
         return self.pinned_by.filter(id=user.id).exists()
 
+    @strawberry_django.field(description="Tests")
+    def tests(self, info: Info) -> list["Implementation"]:
+        return []
+
     @strawberry_django.field(description="Get the latest completed assignation created by the current user.")
     def my_latest_assignation(self, info: Info) -> Optional["Assignation"]:
         user = info.context.request.user

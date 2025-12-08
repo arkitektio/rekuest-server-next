@@ -2,7 +2,7 @@ from kante.types import Info
 import strawberry
 from facade import types, models, scalars
 from typing import AsyncGenerator
-from facade.channels import assignation_event_channel
+from facade.channels import assignation_event_channel, child_assignation_channel
 
 
 async def assignation_events(
@@ -47,3 +47,30 @@ async def assignations(
         elif message.event:
             event = await models.AssignationEvent.objects.aget(id=message.event)
             yield AssignationChangeEvent(event=event, create=None)
+
+
+@strawberry.type
+class ChildAssignationEvent:
+    create: types.Assignation | None
+    update: types.Assignation | None
+
+
+async def child_assignations(
+    self,
+    info: Info,
+    id: strawberry.ID,
+) -> AsyncGenerator[ChildAssignationEvent, None]:
+    """Join and subscribe to message sent to the given rooms."""
+
+    user = info.context.request.user
+    client = info.context.request.client
+
+    assignation = await models.Assignation.objects.aget(id=id)
+
+    async for message in child_assignation_channel.listen(info.context, [f"child_assignations_{assignation.id}"]):
+        if message.create:
+            ass = await models.Assignation.objects.aget(id=message.create)
+            yield ChildAssignationEvent(create=ass, update=None)
+        elif message.update:
+            update = await models.Assignation.objects.aget(id=message.update)
+            yield ChildAssignationEvent(update=update, create=None)

@@ -266,68 +266,6 @@ class BindsInput:
     desired_instances: int = 1
 
 
-@strawberry.input(
-    description="""A definition
-
-    Definitions are the building implementation for Actions and provide the
-    information needed to create a action. They are primarly composed of a name,
-    a description, and a list of ports.
-
-    Definitions provide a protocol of input and output, and do not contain
-    any information about the actual implementation of the action ( this is handled
-    by a implementation that implements a action).
-
-
-
-
-    """,
-)
-class DefinitionInput:
-    description: str | None = strawberry.field(
-        default=None,
-        description="The description of the definition. This is the text that is displayed in the UI",
-    )
-    collections: list[str] = strawberry.field(
-        default_factory=list,
-        description="The collections of the definition. This is used to group definitions together in the UI",
-    )
-    name: str = strawberry.field(description="The name of the actions. This is used to uniquely identify the definition")
-    stateful: bool = strawberry.field(
-        default=False,
-        description="Whether the definition is stateful or not. If the definition is stateful, it can be used to create a stateful action. If the definition is not stateful, it cannot be used to create a stateful action",
-    )
-    port_groups: list[PortGroupInput] = strawberry.field(
-        default_factory=list,
-        description="The port groups of the definition. This is used to group ports together in the UI",
-    )
-    args: list[PortInput] = strawberry.field(
-        default_factory=list,
-        description="The args of the definition. This is the input ports of the definition",
-    )
-    returns: list[PortInput] = strawberry.field(
-        default_factory=list,
-        description="The returns of the definition. This is the output ports of the definition",
-    )
-    kind: enums.ActionKind = strawberry.field(description="The kind of the definition. This is the type of the definition. Can be either a function or a generator")
-    is_test_for: list["str"] = strawberry.field(
-        default_factory=list,
-        description="The tests for the definition. This is used to group definitions together in the UI",
-    )
-
-    interfaces: list[str] = strawberry.field(
-        default_factory=list,
-        description="""The interfaces of the definition. This is used to group definitions together in the UI""",
-    )
-    is_dev: bool = strawberry.field(
-        default=False,
-        description="Whether the definition is a dev definition or not. If the definition is a dev definition, it can be used to create a dev action. If the definition is not a dev definition, it cannot be used to create a dev action",
-    )
-    logo: str | None = strawberry.field(
-        default=None,
-        description="The logo of the definition. This is used to display the logo in the UI",
-    )
-
-
 @pydantic.input(
     models.DependencyInputModel,
     description="""A dependency for a implementation. By defining dependencies, you can
@@ -428,6 +366,70 @@ class ActionDependencyInput:
         description="Require that the action has a specific number of returns. This is used to identify the demand in the system.",
     )
     optional: bool = strawberry.field(default=False, description="Whether the dependency is optional or not. If the dependency is optional, users can choose to not provide it")
+
+
+@strawberry.input(
+    description="""A definition
+
+    Definitions are the building implementation for Actions and provide the
+    information needed to create a action. They are primarly composed of a name,
+    a description, and a list of ports.
+
+    Definitions provide a protocol of input and output, and do not contain
+    any information about the actual implementation of the action ( this is handled
+    by a implementation that implements a action).
+
+
+
+
+    """,
+)
+class DefinitionInput:
+    description: str | None = strawberry.field(
+        default=None,
+        description="The description of the definition. This is the text that is displayed in the UI",
+    )
+    collections: list[str] = strawberry.field(
+        default_factory=list,
+        description="The collections of the definition. This is used to group definitions together in the UI",
+    )
+    name: str = strawberry.field(description="The name of the actions. This is used to uniquely identify the definition")
+    stateful: bool = strawberry.field(
+        default=False,
+        description="Whether the definition is stateful or not. If the definition is stateful, it can be used to create a stateful action. If the definition is not stateful, it cannot be used to create a stateful action",
+    )
+    port_groups: list[PortGroupInput] = strawberry.field(
+        default_factory=list,
+        description="The port groups of the definition. This is used to group ports together in the UI",
+    )
+    args: list[PortInput] = strawberry.field(
+        default_factory=list,
+        description="The args of the definition. This is the input ports of the definition",
+    )
+    returns: list[PortInput] = strawberry.field(
+        default_factory=list,
+        description="The returns of the definition. This is the output ports of the definition",
+    )
+    tests: ActionDependencyInput | None = strawberry.field(default=None)
+
+    kind: enums.ActionKind = strawberry.field(description="The kind of the definition. This is the type of the definition. Can be either a function or a generator")
+    is_test_for: list["str"] = strawberry.field(
+        default_factory=list,
+        description="The tests for the definition. This is used to group definitions together in the UI",
+    )
+
+    interfaces: list[str] = strawberry.field(
+        default_factory=list,
+        description="""The interfaces of the definition. This is used to group definitions together in the UI""",
+    )
+    is_dev: bool = strawberry.field(
+        default=False,
+        description="Whether the definition is a dev definition or not. If the definition is a dev definition, it can be used to create a dev action. If the definition is not a dev definition, it cannot be used to create a dev action",
+    )
+    logo: str | None = strawberry.field(
+        default=None,
+        description="The logo of the definition. This is used to display the logo in the UI",
+    )
 
 
 @pydantic.input(

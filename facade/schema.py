@@ -196,6 +196,7 @@ class Subscription:
     implementation_change = subscription(resolver=subscriptions.implementation_change, description="Subscribe to changes in implementations.")
     implementations = subscription(resolver=subscriptions.implementations, description="Subscribe to creation or updates of implementations.")
     state_update_events = subscription(resolver=subscriptions.state_update_events, description="Subscribe to updates of state values and patches.")
+    child_assignations = subscription(resolver=subscriptions.child_assignations, description="Subscribe to child assignation events.")
 
 
 schema = strawberry.Schema(

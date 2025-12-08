@@ -44,6 +44,18 @@ def ass_post_save(sender, instance: models.Assignation = None, created=None, **k
             [f"ass_waiter_{instance.waiter.id}"],
         )
 
+    if instance.parent:
+        if created:
+            channels.child_assignation_channel.broadcast(
+                channel_events.ChildAssignationEvent(create=str(instance.id)),
+                [f"child_assignations_{instance.parent.id}"],
+            )
+        else:
+            channels.child_assignation_channel.broadcast(
+                channel_events.ChildAssignationEvent(update=str(instance.id)),
+                [f"child_assignations_{instance.parent.id}"],
+            )
+
 
 @receiver(post_save, sender=models.AssignationEvent)
 def ass_event_post_save(sender, instance: models.AssignationEvent = None, created=None, **kwargs):
