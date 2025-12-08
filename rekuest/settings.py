@@ -38,6 +38,8 @@ AGENT_HEARTBEAT_RESPONSE_TIMEOUT = 5
 AGENT_HEARTBEAT_NOT_RESPONDED_CODE = 3001
 
 # Application definition
+USE_X_FORWARDED_HOST = conf.django.get("use_x_forwarded_host", True)
+
 
 INSTALLED_APPS = [
     "daphne",
@@ -53,8 +55,8 @@ INSTALLED_APPS = [
     "django_probes",
     "kante",
     "facade",
-    'health_check',                             # required
-    'health_check.db',                          # stock Django health checkers
+    "health_check",  # required
+    "health_check.db",  # stock Django health checkers
 ]
 
 # Authentikate section
@@ -62,11 +64,13 @@ INSTALLED_APPS = [
 AUTH_USER_MODEL = "authentikate.User"
 
 AUTHENTIKATE = {
-    "ISSUERS": [{
-        "iss": "lok",
-        "kind": "rsa",
-        "public_key": conf.lok.get("public_key", None),
-    }],
+    "ISSUERS": [
+        {
+            "iss": "lok",
+            "kind": "rsa",
+            "public_key": conf.lok.get("public_key", None),
+        }
+    ],
     "STATIC_TOKENS": conf.lok.get("static_tokens", {}),
 }
 
@@ -99,10 +103,8 @@ STRAWBERRY_DJANGO = {
 }
 
 
-CSRF_TRUSTED_ORIGINS = conf.get(
-    "csrf_trusted_origins", ["http://localhost", "https://localhost"]
-)
-MY_SCRIPT_NAME = conf.get("force_script_name", "") 
+CSRF_TRUSTED_ORIGINS = conf.get("csrf_trusted_origins", ["http://localhost", "https://localhost"])
+MY_SCRIPT_NAME = conf.get("force_script_name", "")
 
 
 CORS_ALLOW_ALL_ORIGINS = True
