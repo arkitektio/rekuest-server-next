@@ -11,7 +11,7 @@ from rekuest_core.inputs import models as rimodels
 from rekuest_core import scalars as rscalars
 from strawberry import auto
 from strawberry_django.filters import FilterLookup
-from django.db.models import Max
+from django.db.models import Max, Q
 
 
 @strawberry.input(description="A way to filter users")
@@ -974,7 +974,8 @@ class ImplementationFilter:
     def filter_search(self, queryset, info):
         if self.search is None:
             return queryset
-        return queryset.filter(name__icontains=self.search)
+
+        return queryset.filter(Q(action__name__icontains=self.search) | Q(agent__name__icontains=self.search) | Q(interface__icontains=self.search))
 
     def filter_resolvable_for(self, queryset, info):
         if self.resolvable_for is None:
