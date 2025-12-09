@@ -146,7 +146,7 @@ class AgentFilter(ScopeFilterMixin):
     def filter_client_id(self, queryset, info):
         if self.client_id is None:
             return queryset
-        return queryset.filter(registry__app__client_id=self.client_id)
+        return queryset.filter(registry__client__client_id=self.client_id)
 
     def filter_ids(self, queryset, info):
         if self.ids is None:
