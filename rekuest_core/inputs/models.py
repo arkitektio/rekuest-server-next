@@ -134,6 +134,17 @@ class ActionDependencyInputModel(BaseModel):
     allow_inactive: bool = True
 
 
+class AgentDependencyInputModel(BaseModel):
+    key: str
+    name: str | None = None
+    description: str | None = None
+    optional: bool = False
+    action_demands: list[ActionDependencyInputModel] | None = None
+    min_viable_instances: int | None = None
+    prefered_instances: int | None = None
+    assign_policy: enums.AssignPolicy = enums.AssignPolicy.BALANCED
+
+
 class DefinitionInputModel(BaseModel):
     """A definition for a implementation"""
 
@@ -184,7 +195,7 @@ class DependencyInputModel(BaseModel):
 
 class ImplementationInputModel(BaseModel):
     definition: DefinitionInputModel
-    dependencies: list[ActionDependencyInputModel]
+    dependencies: list[AgentDependencyInputModel] = Field(default_factory=list)
     interface: str
     params: dict[str, Any] | None = None
     instance_id: str | None = None

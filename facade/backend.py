@@ -163,6 +163,26 @@ class RedisControllBackend(ControllBackend):
 
         waiter = get_waiter_for_context(info, input.instance_id)
 
+        resolution = input.resolution
+
+        if input.dependency:
+            assert input.parent, "Dependency assignments must have a parent assignation"
+
+            core_depedency = input.dependency.split(":")[0]
+            key = input.dependency.split(":")[1]
+
+            parent = models.Assignation.objects.get(id=input.parent)
+            resolved = models.ResolvedDependency.objects.filter(resolution=parent.resolution, dependency__key=core_depedency, key=input.dependency).all()
+            if not resolved:
+                raise ValueError(f"No resolved dependency found for key {input.dependency} in parent assignation {input.parent}")
+            if len(resolved) > 1:
+                # TODO: Implement selecting logic here
+                pass
+
+            implementation = resolved[0].implementation
+            agent = implementation.agent
+            resolution = resolved[0].down_stream_resolution
+
         if input.reservation:
             # TODO: Retrieve the reservation in the redis cache wth the provision keys set
             # this should be done in the redis cache to allow for super fast retrieval,
@@ -179,7 +199,7 @@ class RedisControllBackend(ControllBackend):
             action = models.Action.objects.get(id=input.action)
             implementation = models.Implementation.objects.filter(action=action, agent__connected=True, agent__last_seen__gt=datetime.now() - timedelta(minutes=1)).first()
             if not implementation:
-                raise ValueError("No active implementation found for this action")
+                raise ValueError(f"No active implementation found for action {action.name}")
 
             agent = implementation.agent
 
@@ -197,7 +217,7 @@ class RedisControllBackend(ControllBackend):
             action = models.Action.objects.get(hash=input.action_hash, organization=info.context.request.organization)
             implementation = models.Implementation.objects.filter(action=action, agent__connected=True).first()
             if not implementation:
-                raise ValueError("No active implementation found for this action")
+                raise ValueError(f"No active implementation found for action {action.name}")
             agent = implementation.agent
 
         elif input.interface:
@@ -213,17 +233,8 @@ class RedisControllBackend(ControllBackend):
 
         reference = input.reference or self.create_message_id()
 
-        if input.dependencies:  # We provided explicit dependencies
-            dependencies = input.dependencies
-            for key, impl_id in dependencies.items():
-                try:
-                    dep_impl = models.Implementation.objects.get(id=impl_id)
-                    assert dep_impl.agent.registry.organization == info.context.request.organization, f"Dependency implementation {dep_impl.key} organization does not match request organization"
-                except models.Implementation.DoesNotExist:
-                    raise ValueError(f"Dependency implementation {impl_id} for key {key} does not exist.")
-
-        else:  # We need to resolve dependencies from the implementation
-            dependencies = build_dependency_dict(implementation, info)
+        if implementation.dependencies.exists():
+            assert resolution is not None, "Assignments to implementations with dependencies must provide a resolution"
 
         # TODO: if ephemeral is set, we should not store the assignation in the database
         assignation = models.Assignation.objects.create(
@@ -236,7 +247,7 @@ class RedisControllBackend(ControllBackend):
             acted_on=acted_on,
             capture=input.capture,
             implementation=implementation,
-            dependencies=dependencies,
+            resolution=resolution,
             is_done=False,
             latest_event_kind=enums.AssignationEventKind.ASSIGN,
             latest_instruct_kind=enums.AssignationInstructKind.ASSIGN,
@@ -246,8 +257,6 @@ class RedisControllBackend(ControllBackend):
         )
 
         action = implementation.action
-
-        print("Dependencies for implementation", implementation, "are", dependencies)
 
         AgentConsumer.broadcast(
             assignation.agent.pk,
@@ -261,7 +270,6 @@ class RedisControllBackend(ControllBackend):
                 capture=input.capture,
                 interface=implementation.interface,
                 extension=implementation.extension,
-                dependencies=dependencies,
                 action=str(implementation.action.hash),
             ),
         )

@@ -151,7 +151,7 @@ def build_action_demand_params(
             individual_queries.append(f"jsonb_array_length(returns) = {action_demand.force_return_length}")
 
     if not individual_queries:
-        raise ValueError("No search params provided")
+        raise ValueError(f"No search params provided {action_demand}")
 
     full_sql = f"SELECT id FROM {model} WHERE " + " AND ".join(individual_queries)
 
@@ -216,6 +216,34 @@ def get_action_ids_by_demands(
     force_length: t.Optional[int] = None,
     force_non_nullable_length: t.Optional[int] = None,
     force_structure_length: t.Optional[int] = None,
+    model: str = "facade_action",
+):
+    if type not in ["args", "returns"]:
+        raise ValueError("Type must be either 'args' or 'returns'")
+
+    full_sql, all_params = build_params(
+        demands,
+        type=type,
+        force_length=force_length,
+        force_non_nullable_length=force_non_nullable_length,
+        force_structure_length=force_structure_length,
+        model=model,
+    )
+
+    with connection.cursor() as cursor:
+        cursor.execute(full_sql, all_params)
+        rows = cursor.fetchall()
+        ids = [row[0] for row in rows]
+        return ids
+
+
+def get_implementation_ids_by_demands(
+    demands: list[PortMatchInput] = None,
+    type: t.Literal["args", "returns"] = "args",
+    force_length: t.Optional[int] = None,
+    force_non_nullable_length: t.Optional[int] = None,
+    force_structure_length: t.Optional[int] = None,
+    agent: str | None = None,
     model: str = "facade_action",
 ):
     if type not in ["args", "returns"]:

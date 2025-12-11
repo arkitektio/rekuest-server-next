@@ -268,6 +268,22 @@ class HardwareRecord:
     agent: "Agent" = strawberry_django.field(description="The agent to which this hardware belongs.")
 
 
+@strawberry_django.type(models.ResolvedDependency, filters=filters.ResolvedDependencyFilter, pagination=True, description="Represents a dependency that has been resolved to a specific implementation.")
+class ResolvedDependency:
+    id: strawberry.ID = strawberry_django.field(description="Unique ID of the resolved dependency.")
+    key: str = strawberry_django.field(description="The key of the resolved dependency.")
+    dependency: "Dependency" = strawberry_django.field(description="The original dependency.")
+    implementation: "Implementation" = strawberry_django.field(description="The implementation that resolves the dependency.")
+    down_stream_resolution: LazyType["Resolution", __name__] | None = strawberry_django.field(description="Resolution for streaming data down to this dependency.")
+
+
+@strawberry_django.type(models.Resolution, filters=filters.ResolutionFilter, pagination=True, description="Represents a resolution for a blok.")
+class Resolution:
+    id: strawberry.ID = strawberry_django.field(description="Unique ID of the resolution.")
+    name: str = strawberry_django.field(description="Name of the resolution.")
+    resolved_dependencies: list["ResolvedDependency"] = strawberry_django.field(description="List of resolved dependencies for this resolution.")
+
+
 @strawberry_django.type(models.MemoryShelve, filters=filters.MemoryShelveFilter, order=filters.MemoryShelveOrder, pagination=True, description="A shelve for storing memory-based resources on an agent.")
 class MemoryShelve:
     id: strawberry.ID = strawberry_django.field(description="ID of the memory shelve.")
@@ -389,6 +405,7 @@ class Assignation:
     is_done: bool = strawberry_django.field(description="Indicates if the assignation is completed.")
     args: rscalars.AnyDefault = strawberry_django.field(description="Arguments used in the assignation.")
     dependencies: rscalars.AnyDefault = strawberry_django.field(description="The used dependencies for this assignemnet")
+    resolution: "Resolution" = strawberry.field(description="Resolution used to resolve dependencies for this assignation.")
     root: Optional["Assignation"] = strawberry.field(description="Root assignation in the creation chain.")
     parent: Optional["Assignation"] = strawberry.field(description="Parent assignation that triggered this one.")
     reservation: Optional["Reservation"] = strawberry.field(description="Reservation that caused this assignation.")

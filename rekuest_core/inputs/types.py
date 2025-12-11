@@ -368,6 +368,42 @@ class ActionDependencyInput:
     optional: bool = strawberry.field(default=False, description="Whether the dependency is optional or not. If the dependency is optional, users can choose to not provide it")
 
 
+@pydantic.input(
+    models.AgentDependencyInputModel,
+    description="""A dependency for a implementation. By defining dependencies, you can
+    create a dependency graph for your implementations and actions""",
+)
+class AgentDependencyInput:
+    key: str = strawberry.field(
+        description="The key of the agent. This is used to identify the agent in the system.",
+    )
+    identifier: str | None = strawberry.field(
+        default=None,
+        description="The identifier of the agent. This is used to identify the agent in the system.",
+    )
+    name: str | None = strawberry.field(
+        default=None,
+        description="The name of the agent. This is used to identify the agent in the system.",
+    )
+    description: str | None = strawberry.field(
+        default=None,
+        description="The description of the agent. This can described the agent and its purpose.",
+    )
+    optional: bool = strawberry.field(default=False, description="Whether the dependency is optional or not. If the dependency is optional, users can choose to not provide it")
+    action_demands: list[ActionDependencyInput] | None = strawberry.field(
+        default=None,
+        description="The action demands of the agent. This is used to identify the demand in the system.",
+    )
+    min_viable_instances: int | None = strawberry.field(
+        default=None,
+        description="The minimum amount of viable instances for the agent. This is used to identify the demand in the system.",
+    )
+    prefered_instances: int | None = strawberry.field(
+        default=None,
+        description="The prefered amount of instances for the agent. This is used to identify the demand in the system.",
+    )
+
+
 @strawberry.input(
     description="""A definition
 
@@ -440,7 +476,7 @@ class ImplementationInput:
     definition: DefinitionInput = strawberry.field(
         description="The definition of the implementation. This is used to uniquely identify the implementation",
     )
-    dependencies: list[ActionDependencyInput] = strawberry.field(
+    dependencies: list[AgentDependencyInput] = strawberry.field(
         default_factory=list,
         description="The dependencies of the implementation. This is used to create a dependency graph for the implementation",
     )

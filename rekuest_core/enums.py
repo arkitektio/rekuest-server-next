@@ -66,3 +66,12 @@ class DescriptorOperator(str, Enum):
     IN = "IN"
     NOT_IN = "NOT_IN"
     EXISTS = "EXISTS"
+
+
+@strawberry.enum
+class AssignPolicy(str, Enum):
+    AUTOMATIC = "AUTOMATIC"
+    BALANCED = "BALANCED"
+    ROUND_ROBIN = "ROUND_ROBIN"
+    LEAST_BUSY = "LEAST_BUSY"
+    FASTEST_RESPONSE = "FASTEST_RESPONSE"
