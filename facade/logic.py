@@ -4,8 +4,12 @@ from dataclasses import dataclass
 import uuid
 
 
-def auto_resolve(info: Info, implementation: models.Implementation, resolution: models.Resolution) -> None:
+def auto_resolve(info: Info, implementation: models.Implementation, resolution: models.Resolution, visited_implementations: set[str] | None = None) -> None:
+    if not visited_implementations:
+        visited_implementations = set()
+
     for dependency in implementation.dependencies.all():
+        print(f"Resolving, {dependency}")
         agentsqs = models.Agent.objects.filter(registry__organization=info.context.request.organization)
 
         matched_ids: dict[str, list[int]] = {}
@@ -38,30 +42,37 @@ def auto_resolve(info: Info, implementation: models.Implementation, resolution: 
             count = 0
 
             for impl in implementations:
-                if impl.dependencies.exists():
-                    sresolution = models.Resolution.objects.create(
-                        name=f"Auto-resolve for {dependency}{key} on {implementation}",
-                        implementation=impl,
-                        creator=info.context.request.user,
-                        organization=info.context.request.organization,
-                    )
-                    auto_resolve(info, impl, sresolution)
-
-                    models.ResolvedDependency.objects.create(
-                        key=key,
-                        resolution=resolution,
-                        dependency=dependency,
-                        implementation=impl,
-                        down_stream_resolution=sresolution,
-                    )
+                if impl.id in visited_implementations:
+                    continue
                 else:
-                    models.ResolvedDependency.objects.create(
-                        key=key,
-                        resolution=resolution,
-                        dependency=dependency,
-                        implementation=impl,
-                    )
+                    if impl.dependencies.exists():
+                        visited_implementations.add(impl.id)
+                        sresolution = models.Resolution.objects.create(
+                            name=f"Auto-resolve for {dependency}{key} on {implementation}",
+                            implementation=impl,
+                            creator=info.context.request.user,
+                            organization=info.context.request.organization,
+                        )
+                        auto_resolve(info, impl, sresolution, visited_implementations=visited_implementations)
+
+                        models.ResolvedDependency.objects.create(
+                            key=key,
+                            resolution=resolution,
+                            dependency=dependency,
+                            resolution_key=str(uuid.uuid4()),
+                            implementation=impl,
+                            down_stream_resolution=sresolution,
+                        )
+                    else:
+                        models.ResolvedDependency.objects.create(
+                            key=key,
+                            resolution=resolution,
+                            dependency=dependency,
+                            resolution_key=str(uuid.uuid4()),
+                            implementation=impl,
+                        )
+                        visited_implementations.add(impl.id)
 
                 count += 1
                 if count >= dependency.prefered_instances:
-                    continue
+                    break

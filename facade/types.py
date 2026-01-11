@@ -226,6 +226,7 @@ class Implementation:
     action: "Action" = strawberry_django.field(description="The action this implements.")
     params: rscalars.AnyDefault = strawberry_django.field(description="Arbitrary parameters for the implementation.")
     dependencies: list["Dependency"] = strawberry_django.field(description="Dependencies required by this implementation.")
+    resolutions: list["Resolution"] = strawberry_django.field(description="The resolved dependencies")
 
     @strawberry_django.field(description="Constructed name for display, combining interface and agent name.")
     def name(self) -> str:
@@ -272,9 +273,22 @@ class HardwareRecord:
 class ResolvedDependency:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the resolved dependency.")
     key: str = strawberry_django.field(description="The key of the resolved dependency.")
+    resolution_key: str = strawberry_django.field(description="The resolution key associated with this resolved dependency.")
     dependency: "Dependency" = strawberry_django.field(description="The original dependency.")
     implementation: "Implementation" = strawberry_django.field(description="The implementation that resolves the dependency.")
     down_stream_resolution: LazyType["Resolution", __name__] | None = strawberry_django.field(description="Resolution for streaming data down to this dependency.")
+
+
+@strawberry.type
+class MethodMatch:
+    implementation: "Implementation"
+    down_stream_resolution: LazyType["Resolution", __name__] | None = strawberry_django.field(description="Resolution for streaming data down to this dependency.")
+
+
+@strawberry.type
+class DependencyMatch:
+    dependency: "Dependency"
+    methods: list["MethodMatch"]
 
 
 @strawberry_django.type(models.Resolution, filters=filters.ResolutionFilter, pagination=True, description="Represents a resolution for a blok.")
@@ -282,6 +296,10 @@ class Resolution:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the resolution.")
     name: str = strawberry_django.field(description="Name of the resolution.")
     resolved_dependencies: list["ResolvedDependency"] = strawberry_django.field(description="List of resolved dependencies for this resolution.")
+    implementation: "Implementation"
+    resolved_at: datetime.datetime = strawberry_django.field(description="Timestamp when the resolution was created.")
+    creator: User = strawberry_django.field(description="User who created the resolution.")
+    organization: Organization = strawberry_django.field(description="Organization that owns this resolution.")
 
 
 @strawberry_django.type(models.MemoryShelve, filters=filters.MemoryShelveFilter, order=filters.MemoryShelveOrder, pagination=True, description="A shelve for storing memory-based resources on an agent.")
@@ -405,7 +423,7 @@ class Assignation:
     is_done: bool = strawberry_django.field(description="Indicates if the assignation is completed.")
     args: rscalars.AnyDefault = strawberry_django.field(description="Arguments used in the assignation.")
     dependencies: rscalars.AnyDefault = strawberry_django.field(description="The used dependencies for this assignemnet")
-    resolution: "Resolution" = strawberry.field(description="Resolution used to resolve dependencies for this assignation.")
+    resolution: Optional["Resolution"] = strawberry.field(description="Resolution used to resolve dependencies for this assignation.")
     root: Optional["Assignation"] = strawberry.field(description="Root assignation in the creation chain.")
     parent: Optional["Assignation"] = strawberry.field(description="Parent assignation that triggered this one.")
     reservation: Optional["Reservation"] = strawberry.field(description="Reservation that caused this assignation.")

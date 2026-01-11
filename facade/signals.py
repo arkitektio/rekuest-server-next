@@ -1,11 +1,19 @@
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from facade import models, channels, channel_events
+from authentikate.models import Organization
+
 import logging
 
 
 logger = logging.getLogger(__name__)
 logger.info("Loading sssignals")
+
+
+@receiver
+def organization_post_save(sender, instance: Organization = None, created=None, **kwargs):
+    if created:
+        print("Creating all the agents for organization:", instance.name)
 
 
 @receiver(post_save, sender=models.State)

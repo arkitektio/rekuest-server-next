@@ -47,3 +47,18 @@ async def my_implementation_at(
         return await models.Implementation.objects.aget(agent=agent, interface=interface)
 
     raise ValueError("Either action_id or interface must be provided")
+
+
+def resolved_implementations(
+    info: Info,
+    resolution: strawberry.ID,
+    dependency_key: str | None = None,
+    method_key: str | None = None,
+) -> list[types.Implementation]:
+    resolved_dependencies = models.ResolvedDependency.objects.filter(
+        resolution_id=resolution,
+        dependency__key=dependency_key,
+        key=method_key,
+    ).all()
+
+    return [rd.implementation for rd in resolved_dependencies]

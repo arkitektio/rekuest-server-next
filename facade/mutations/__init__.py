@@ -12,7 +12,7 @@ from .blok import create_blok
 from .materialized_blok import materialize_blok
 from .lifeline import reinit
 from .action import cleanup_actions
-from .resolution import auto_resolve, create_resolution
+from .resolution import auto_resolve, create_resolution, update_resolution, delete_resolution
 
 __all__ = [
     "create_foreign_implementation",

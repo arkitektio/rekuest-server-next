@@ -159,31 +159,37 @@ class RedisControllBackend(ControllBackend):
         reservation = None
         action = None
         implementation = None
+        resolution = None
         agent = None
 
         waiter = get_waiter_for_context(info, input.instance_id)
 
-        resolution = input.resolution
+        if input.resolution:
+            resolution = models.Resolution.objects.get(id=input.resolution)
 
         if input.dependency:
+            assert input.method, "Method key must be provided when assigning to a dependency"
             assert input.parent, "Dependency assignments must have a parent assignation"
 
-            core_depedency = input.dependency.split(":")[0]
-            key = input.dependency.split(":")[1]
-
             parent = models.Assignation.objects.get(id=input.parent)
-            resolved = models.ResolvedDependency.objects.filter(resolution=parent.resolution, dependency__key=core_depedency, key=input.dependency).all()
+            resolved = models.ResolvedDependency.objects.filter(resolution=parent.resolution, dependency__key=input.dependency, key=input.method).all()
             if not resolved:
-                raise ValueError(f"No resolved dependency found for key {input.dependency} in parent assignation {input.parent}")
+                raise ValueError(f"No resolved dependency found for key {input.dependency} {input.method} in parent assignation {input.parent}")
+
+            active_resolved = [r for r in resolved if r.implementation.agent.connected and r.implementation.agent.last_seen and r.implementation.agent.last_seen > datetime.now(timezone.utc) - timedelta(minutes=1)]
+            if not active_resolved:
+                raise ValueError(f"No active implementation found for resolved dependency {input.dependency} {input.method} in parent assignation {input.parent}")
+
             if len(resolved) > 1:
                 # TODO: Implement selecting logic here
                 pass
 
-            implementation = resolved[0].implementation
+            implementation = active_resolved[0].implementation
+            action = implementation.action
             agent = implementation.agent
-            resolution = resolved[0].down_stream_resolution
+            resolution = active_resolved[0].down_stream_resolution
 
-        if input.reservation:
+        elif input.reservation:
             # TODO: Retrieve the reservation in the redis cache wth the provision keys set
             # this should be done in the redis cache to allow for super fast retrieval,
             # especially when using the ephemeral flag
@@ -268,6 +274,7 @@ class RedisControllBackend(ControllBackend):
                 org=str(info.context.request.organization.slug) if info.context.request.organization else None,
                 reference=reference,
                 capture=input.capture,
+                resolution=str(resolution.pk) if resolution else None,
                 interface=implementation.interface,
                 extension=implementation.extension,
                 action=str(implementation.action.hash),

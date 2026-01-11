@@ -60,6 +60,7 @@ class Query:
     structure_packages: list[types.StructurePackage] = field(description="All registered structure packages.")
     interfaces: list[types.Interface] = field(description="All registered interfaces.")
     tasks: list[types.Assignation] = field(description="All tasks.")
+    resolved_implementations = field(resolver=queries.resolved_implementations, description="Fetch resolved dependencies for a resolution.")
 
     # Stats
     actionStats: types.ActionStats = field(resolver=types.ActionStatsResolver, description="Statistics about actions and their implementations.")
@@ -191,6 +192,8 @@ class Mutation:
     cleanup_actions = mutation(resolver=mutations.cleanup_actions, description="Delete unreferenced actions from the system.")
     auto_resolve = mutation(resolver=mutations.auto_resolve, description="Automatically resolve dependencies for an implementation.")
     create_resolution = mutation(resolver=mutations.create_resolution, description="Create sa resolution from")
+    update_resolution = mutation(resolver=mutations.update_resolution, description="Update an existing resolution.")
+    delete_resolution = mutation(resolver=mutations.delete_resolution, description="Delete a resolution by ID.")
 
 
 @strawberry.type(description="Root subscription type for real-time event streams from the system.")

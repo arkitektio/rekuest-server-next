@@ -705,11 +705,13 @@ class Resolution(models.Model):
 
 class ResolvedDependency(models.Model):
     # The Parent Scope
+
     resolution = models.ForeignKey(Resolution, on_delete=models.CASCADE, related_name="resolved_dependencies", help_text="The resolution scope this choice belongs to")
     dependency = models.ForeignKey(Dependency, on_delete=models.SET_NULL, null=True, blank=True, help_text="The dependency this choice is fulfilling")
 
     # The Requirement & The Choice
     key = models.CharField(max_length=2000)  # Matches Dependency.key
+    resolution_key = models.CharField(max_length=2000, null=True, blank=True, help_text="An optional key to identify this resolution in the context of its parent resolution")
     implementation = models.ForeignKey(
         "Implementation",
         on_delete=models.PROTECT,  # Don't delete history if a tool is removed

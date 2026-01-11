@@ -24,6 +24,7 @@ class ResolvedDependencyInputModel(BaseModel):
     """
 
     dependency: str
+    resolution_key: str | None = None
     key: str
     implementation: str
     down_stream_resolution: str | None = None
@@ -35,6 +36,10 @@ class ResolvedDependencyInputModel(BaseModel):
 )
 class ResolvedDependencyInput:
     dependency: strawberry.ID = strawberry.field(description="The dependency ID to map.")
+    resolution_key: str | None = strawberry.field(
+        default=None,
+        description="An optional key to identify this resolution in the context of its parent resolution.",
+    )
     key: str = strawberry.field(description="The key of the dependency to map.")
     implementation: strawberry.ID = strawberry.field(description="The implementation ID to map to the dependency.")
     down_stream_resolution: strawberry.ID | None = strawberry.field(
@@ -59,6 +64,50 @@ class CreateResolutionInputModel(BaseModel):
         url: URL associated with the resolution
     """
 
+    name: str
+    resolved_dependencies: list[ResolvedDependencyInputModel] | None = None
+
+
+class UpdateResolutionInputModel(BaseModel):
+    """Base model for creating a resolution.
+
+    Attributes:
+        name: Name of the resolution
+        action_demands: List of action demands for the resolution
+        state_demands: List of state demands for the resolution
+        description: Description of the resolution
+        url: URL associated with the resolution
+    """
+
+    id: str
+    name: str
+    resolved_dependencies: list[ResolvedDependencyInputModel] | None = None
+
+
+@pydantic.input(
+    UpdateResolutionInputModel,
+    description="The input for creating a resolution.",
+)
+class UpdateResolutionInput:
+    id: strawberry.ID = strawberry.field(description="The ID of the resolution. This is used to identify the resolution in the system.")
+    name: str = strawberry.field(description="The name of the resolution. This is used to identify the resolution in the system.")
+    resolved_dependencies: list[ResolvedDependencyInput] | None = strawberry.field(
+        default=None,
+        description="The resolved dependencies of the resolution. All other fields will be replaced.",
+    )
+
+
+class CreateResolutionInputModel(BaseModel):
+    """Base model for creating a resolution.
+
+    Attributes:
+        name: Name of the resolution
+        action_demands: List of action demands for the resolution
+        state_demands: List of state demands for the resolution
+        description: Description of the resolution
+        url: URL associated with the resolution
+    """
+
     key: str
     name: str
     resolved_dependencies: list[ResolvedDependencyInputModel] | None = None
@@ -70,11 +119,30 @@ class CreateResolutionInputModel(BaseModel):
 )
 class CreateResolutionInput:
     key: str = strawberry.field(description="The key of the resolution. This is used to identify the resolution in the system.")
+    implementation: strawberry.ID = strawberry.field(description="The implementation ID of the resolution. This is used to identify the resolution in the system.")
     name: str = strawberry.field(description="The name of the resolution. This is used to identify the resolution in the system.")
     resolved_dependencies: list[ResolvedDependencyInput] | None = strawberry.field(
         default=None,
         description="The resolved dependencies of the resolution. This is used to identify the resolution in the system.",
     )
+
+
+class DeleteResolutionInputModel(BaseModel):
+    """Base model for deleting a resolution.
+
+    Attributes:
+        id: The unique identifier of the resolution to delete
+    """
+
+    id: str
+
+
+@pydantic.input(
+    DeleteResolutionInputModel,
+    description="The input for deleting a resolution.",
+)
+class DeleteResolutionInput:
+    id: strawberry.ID = strawberry.field(description="The ID of the resolution to delete.")
 
 
 class PinInputModel(BaseModel):
@@ -258,6 +326,7 @@ class AssignInputModel(BaseModel):
     implementation: str | None = None
     agent: str | None = None
     action_hash: str | None = None
+    method: str | None = None
     reservation: str | None = None
     interface: str | None = None
     hooks: list[HookInputModel] | None = None
@@ -449,9 +518,15 @@ class AssignInput:
         default=None,
         description="The hash of the action. This is used to identify the action in the system.",
     )
+    dependency: str | None = strawberry.field(default=None, description="The dependency key.method to assign when running inside a resolved assignation")
+    method: str | None = strawberry.field(default=None, description="The method key to assign when running inside a resolved assignation")
     interface: str | None = strawberry.field(
         default=None,
         description="The interface of the implementation. Only ussable if you also set agent",
+    )
+    resolution: strawberry.ID | None = strawberry.field(
+        default=None,
+        description="The resolution ID to assign to when assining to a implementation with dependencies",
     )
     hooks: list[HookInput] | None = strawberry.field(
         default_factory=list,
