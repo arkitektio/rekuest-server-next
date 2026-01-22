@@ -7,7 +7,9 @@ from django_choices_field import TextChoicesField
 from facade import enums
 from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields import ArrayField
+
 # Create your models here.
+from rekuest_core.inputs.models import ActionDependencyInputModel
 
 
 class Collection(models.Model):
@@ -650,41 +652,75 @@ class Dependency(models.Model):
         help_text="The Implementation that has this dependency",
         related_name="dependencies",
     )
-    action_hash = models.CharField(
-        max_length=1000,
-        help_text="The initial hash of the Action",
-        null=True,
-        blank=True,
-    )
     key = models.CharField(
         max_length=2000,
         help_text="A reference for this dependency",
     )
-    description = models.TextField(
-        null=True,
-        blank=True,
-        help_text="An optional description for this dependency",
-    )
-    protocols = models.JSONField(
+    action_demands = models.JSONField(
         default=list,
-        help_text="The protocols this dependency needs to match",
+        help_text="The action demands this dependency has to meet",
     )
-    optional = models.BooleanField(
-        default=False,
-        help_text="Is this dependency optional (e.g. can we still use the implementation if this dependency is not met)",
+    optional = models.BooleanField(default=False, help_text="Is this dependency optional")
+    description = models.TextField(null=True, blank=True, help_text="A description for this dependency")
+    created_at = models.DateTimeField(auto_created=True, auto_now_add=True)
+    minimal_viable_instances = models.IntegerField(
+        default=1,
+        help_text="The minimal viable instance count for this dependency",
     )
-    arg_matches = models.JSONField(
-        default=list,
-        help_text="The binds for this dependency (Determines which implementations can be used for this dependency)",
-        null=True,
-        blank=True,
+    prefered_instances = models.IntegerField(
+        default=1,
+        help_text="The prefered instance count for this dependency",
     )
-    return_matches = models.JSONField(
-        default=list,
-        help_text="The binds for this dependency (Determines which implementations can be used for this dependency)",
-        null=True,
-        blank=True,
+    assign_policy = models.CharField(
+        max_length=1000,
+        choices=[(tag, tag.value) for tag in enums.AssignPolicy],
+        default=enums.AssignPolicy.AUTOMATIC,
+        help_text="The assign policy for this dependency",
     )
+
+    def get_action_demands(self):
+        return [ActionDependencyInputModel(**demand) for demand in self.action_demands]
+
+
+class Resolution(models.Model):
+    resolved_at = models.DateTimeField(auto_created=True, auto_now_add=True)
+    # Preset Logic
+    name = models.CharField(max_length=200, null=True, blank=True, help_text="If set, this is a named preset (e.g. 'Standard Zeiss Config')")
+    is_template = models.BooleanField(default=False, help_text="If True, this resolution appears in search results for other users to reuse.")
+
+    implementation = models.ForeignKey("Implementation", on_delete=models.CASCADE, related_name="resolutions", help_text="The specific Implementation that this tree is configuring dependencies for.")
+    creator = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.CASCADE,
+        related_name="created_resolutions",
+        help_text="The user that created this Resolution",
+    )
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="resolutions",
+        help_text="The organization this Resolution belongs to",
+    )
+
+
+class ResolvedDependency(models.Model):
+    # The Parent Scope
+
+    resolution = models.ForeignKey(Resolution, on_delete=models.CASCADE, related_name="resolved_dependencies", help_text="The resolution scope this choice belongs to")
+    dependency = models.ForeignKey(Dependency, on_delete=models.SET_NULL, null=True, blank=True, help_text="The dependency this choice is fulfilling")
+
+    # The Requirement & The Choice
+    key = models.CharField(max_length=2000)  # Matches Dependency.key
+    resolution_key = models.CharField(max_length=2000, null=True, blank=True, help_text="An optional key to identify this resolution in the context of its parent resolution")
+    implementation = models.ForeignKey(
+        "Implementation",
+        on_delete=models.PROTECT,  # Don't delete history if a tool is removed
+        help_text="The tool chosen to fulfill the dependency",
+    )
+
+    # The Recursive Link (The Sub-Tree)
+    # If the chosen implementation has dependencies itself, this is where they are configured and stored
+    down_stream_resolution = models.ForeignKey(Resolution, on_delete=models.CASCADE, null=True, blank=True, related_name="upstream_dependencies", help_text="The configuration tree for THIS implementation's dependencies")
 
 
 class Implementation(models.Model):
@@ -874,6 +910,14 @@ class Assignation(models.Model):
         Implementation,
         on_delete=models.CASCADE,
         help_text="Which implementation is the assignation currently mapped (can be reassigned)?",
+        related_name="assignations",
+        blank=True,
+        null=True,
+    )
+    resolution = models.ForeignKey(
+        Resolution,
+        on_delete=models.CASCADE,
+        help_text="The resolution used for this assignation",
         related_name="assignations",
         blank=True,
         null=True,

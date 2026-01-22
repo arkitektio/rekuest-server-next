@@ -62,6 +62,27 @@ class TestCaseFilter:
         return queryset.filter(id__in=self.ids)
 
 
+@strawberry_django.filter(models.Resolution, description="A way to filter test cases")
+class ResolutionFilter:
+    name: Optional[FilterLookup[str]]
+    ids: list[strawberry.ID] | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+
+
+@strawberry_django.filter(models.ResolvedDependency, description="A way to filter resolved dependencies")
+class ResolvedDependencyFilter:
+    ids: list[strawberry.ID] | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+
+
 @strawberry_django.filter(models.Agent, description="A way to filter agents")
 class AgentFilter(ScopeFilterMixin):
     client_id: str | None = strawberry.field(
@@ -96,6 +117,7 @@ class AgentFilter(ScopeFilterMixin):
         default=None,
         description="Filter by name of the agents",
     )
+    dependency: str | None = None
     distinct: bool | None
     action_demands: list[inputs.ActionDemandInput] | None
     state_demands: list[inputs.SchemaDemandInput] | None
@@ -128,7 +150,7 @@ class AgentFilter(ScopeFilterMixin):
         return queryset.filter(registry__user__sub=self.user)
 
     def filter_search(self, queryset, info):
-        if self.search is None:
+        if self.search is None or self.search == "":
             return queryset
         return queryset.filter(name__icontains=self.search)
 
@@ -182,22 +204,43 @@ class AgentFilter(ScopeFilterMixin):
         if self.action_demands is None:
             return queryset
 
-        filtered_ids: set[str] = set()
-
-        for ports_demand in self.action_demands:
+        for ports_demand in self:
             new_ids = managers.get_action_ids_by_action_demand(
                 action_demand=ports_demand,
+                organization_id=info.context.request.organization.id,
             )
 
             if len(new_ids) == 0:
                 # There are no actions that match the demand
                 raise ValueError(f"No actions found that match the given action demands {ports_demand}")
 
-            for new_id in new_ids:
-                if new_id not in filtered_ids:
-                    filtered_ids.add(new_id)
+            queryset = queryset.filter(implementations__action__id__in=new_ids)
 
-        return queryset.filter(implementations__action__id__in=filtered_ids)
+        return queryset
+
+    def filter_dependency(self, queryset, info):
+        if self.dependency is None:
+            return queryset
+
+        filtered_ids: set[str] = set()
+
+        dependency = models.Dependency.objects.get(id=self.dependency)
+
+        for ports_demand in dependency.get_action_demands():
+            print(ports_demand)
+            new_ids = managers.get_action_ids_by_action_demand(
+                action_demand=ports_demand,
+            )
+            print(new_ids)
+
+            if len(new_ids) == 0:
+                # There are no actions that match the demand
+                raise ValueError(f"No actions found that match the given action demands {ports_demand}")
+
+            queryset = queryset.filter(implementations__action__id__in=new_ids)
+            print(queryset.count())
+
+        return queryset
 
     def filter_state_demands(self, queryset, info):
         if self.state_demands is None:
@@ -975,6 +1018,18 @@ class ImplementationFilter:
     parameters: list[ParamPair] | None
     resolvable_for: strawberry.ID | None
     search: str | None
+    action_demand: inputs.ActionDemandInput | None
+
+    def filter_action_demand(self, queryset, info):
+        if self.action_demand is None:
+            return queryset
+
+        new_ids = managers.get_action_ids_by_action_demand(
+            action_demand=self.action_demand,
+            organization_id=info.context.request.organization.id,
+        )
+
+        return queryset.filter(action__id__in=new_ids)
 
     def filter_search(self, queryset, info):
         if self.search is None:

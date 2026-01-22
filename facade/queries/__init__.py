@@ -2,7 +2,7 @@ from .assignation import assignations
 from .event import event
 from .action import action
 from .reservation import myreservations, reservations
-from .implementation import implementation_at, my_implementation_at
+from .implementation import implementation_at, my_implementation_at, resolved_implementations
 from .state import state_for
 
 
@@ -17,5 +17,6 @@ __all__ = [
     "implementation_at",
     "my_implementation_at",
     "reservations",
+    "resolved_dependencies",
     "state_for",
 ]

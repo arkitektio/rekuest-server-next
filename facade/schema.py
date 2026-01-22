@@ -51,6 +51,7 @@ class Query:
     dashboards: list[types.Dashboard] = field(description="All dashboards.")
     states: list[types.State] = field(description="All states from agents.")
     bloks: list[types.Blok] = field(description="List of UI Blok.")
+    resolutions: list[types.Resolution] = field(description="All resolutions.")
     materialized_bloks: list[types.MaterializedBlok] = field(description="List of UI Blok.")
     state_schemas: list[types.StateSchema] = field(description="Available state schemas.")
     memory_shelves: list[types.MemoryShelve] = field(description="All memory shelves.")
@@ -59,12 +60,17 @@ class Query:
     structure_packages: list[types.StructurePackage] = field(description="All registered structure packages.")
     interfaces: list[types.Interface] = field(description="All registered interfaces.")
     tasks: list[types.Assignation] = field(description="All tasks.")
+    resolved_implementations = field(resolver=queries.resolved_implementations, description="Fetch resolved dependencies for a resolution.")
 
     # Stats
     actionStats: types.ActionStats = field(resolver=types.ActionStatsResolver, description="Statistics about actions and their implementations.")
     assignationStats: types.AssignationStats = field(resolver=types.AssignationStatsResolver, description="Statistics about assignations and their states.")
 
     state_for = field(resolver=queries.state_for, description="Retrieve state for a specific context.")
+
+    @field(description="Fetch a client by ID.")
+    def resolution(self, info: Info, id: strawberry.ID) -> types.Resolution:
+        return cast(types.Resolution, models.Resolution.objects.get(id=id))
 
     @field(description="Get a specific state by ID.")
     def state(self, info: Info, id: strawberry.ID) -> types.State:
@@ -184,6 +190,10 @@ class Mutation:
     create_toolbox = mutation(resolver=mutations.create_toolbox, description="Create a new toolbox with shortcuts.")
     set_agent_states = mutation(resolver=mutations.set_agent_states, description="Set states for an agent.")
     cleanup_actions = mutation(resolver=mutations.cleanup_actions, description="Delete unreferenced actions from the system.")
+    auto_resolve = mutation(resolver=mutations.auto_resolve, description="Automatically resolve dependencies for an implementation.")
+    create_resolution = mutation(resolver=mutations.create_resolution, description="Create sa resolution from")
+    update_resolution = mutation(resolver=mutations.update_resolution, description="Update an existing resolution.")
+    delete_resolution = mutation(resolver=mutations.delete_resolution, description="Delete a resolution by ID.")
 
 
 @strawberry.type(description="Root subscription type for real-time event streams from the system.")

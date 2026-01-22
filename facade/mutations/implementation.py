@@ -229,11 +229,7 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
                     implementation=implementation,
                     key=i.key,
                     defaults=dict(
-                        action_hash=i.hash,
-                        optional=i.optional,
-                        description=i.description,
-                        arg_matches=[strawberry.asdict(x) for x in i.arg_matches] if i.arg_matches else [],
-                        return_matches=[strawberry.asdict(x) for x in i.return_matches] if i.return_matches else [],
+                        action_demands=[strawberry.asdict(x) for x in i.action_demands] if i.action_demands else [],
                     ),
                 )
                 new_deps.append(dep)
@@ -271,11 +267,7 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
                     implementation=implementation,
                     key=i.key,
                     defaults=dict(
-                        action_hash=i.hash,
-                        optional=i.optional,
-                        description=i.description,
-                        arg_matches=[strawberry.asdict(x) for x in i.arg_matches] if i.arg_matches else [],
-                        return_matches=[strawberry.asdict(x) for x in i.return_matches] if i.return_matches else [],
+                        action_demands=[strawberry.asdict(x) for x in i.action_demands] if i.action_demands else [],
                     ),
                 )
                 new_deps.append(dep)

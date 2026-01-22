@@ -18,9 +18,7 @@ async def implementations(
     agent: strawberry.ID,
 ) -> AsyncGenerator[ImplementationUpdate, None]:
     """Join and subscribe to message sent to the given rooms."""
-    async for message in new_implementation_channel.listen(
-        info.context, [f"agent_{agent}"]
-    ):
+    async for message in new_implementation_channel.listen(info.context, [f"agent_{agent}"]):
         if message["type"] == "create":
             yield await models.Implementation.objects.aget(id=message["id"])
         elif message["type"] == "update":
@@ -37,7 +35,5 @@ async def implementation_change(
     """Join and subscribe to message sent to the given rooms."""
     x = await models.Implementation.objects.aget(id=implementation)
 
-    async for message in new_implementation_channel.listen(
-        info, [f"implementation_{x.id}"]
-    ):
+    async for message in new_implementation_channel.listen(info.context, [f"implementation_{x.id}"]):
         yield await models.Implementation.objects.aget(id=message)
