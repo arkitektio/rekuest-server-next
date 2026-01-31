@@ -1,7 +1,7 @@
 from kante.types import Info
 import strawberry
 from facade import types, models, inputs, scalars
-from rekuest_core.inputs.types import StructureInput, InterfaceInput
+from rekuest_core.inputs.types import StructureInput, InterfaceInput, LockSchemaInput
 
 import logging
 
@@ -18,6 +18,10 @@ class AgentInput:
     extensions: list[str] | None = strawberry.field(
         default=None,
         description="The extensions of the agent. This is used to identify the agent in the system.",
+    )
+    locks: list[LockSchemaInput] | None = strawberry.field(
+        default=None,
+        description="The locks of the agent. This is used to specify which resources the agent needs to run",
     )
 
 

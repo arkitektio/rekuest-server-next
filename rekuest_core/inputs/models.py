@@ -201,6 +201,12 @@ class ImplementationInputModel(BaseModel):
     instance_id: str | None = None
     dynamic: bool = False
     logo: str | None = None
+    locks: list[str] | None = None
+
+
+class LockSchemaInputModel(BaseModel):
+    key: str
+    description: str | None = None
 
 
 class InterfaceInputModel(BaseModel):

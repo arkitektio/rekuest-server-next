@@ -496,6 +496,19 @@ class ImplementationInput:
         default=None,
         description="The logo of the implementation. This is used to display the logo in the UI",
     )
+    locks: list[str] | None = strawberry.field(
+        default=None,
+        description="The locks of the implementation. This is used to specify which resources the implementation needs to run",
+    )
+
+
+@pydantic.input(
+    models.LockSchemaInputModel,
+    description="Which locks does the agent provide in general",
+)
+class LockSchemaInput:
+    key: str
+    description: str | None = strawberry.field(default=None, description="Describe the structure a bit")
 
 
 @pydantic.input(
