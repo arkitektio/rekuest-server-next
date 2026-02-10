@@ -187,6 +187,20 @@ class ValidatorInput:
     error_message: str | None = strawberry.field(description="The error message to display when the validation fails")
 
 
+@pydantic.input(
+    models.OptimisticInputModel,
+    description=""" An optimistic is used to optimistically set state values when the action is assigned. This is used to provide a better user experience by optimistically setting state values when the action is assigned, instead of waiting for the action to be executed and the state to be updated. This will only ever happen on the frontend.
+
+""",
+)
+class OptimisticInput:
+    state: str = strawberry.field(description="The state to optimistically set when the action is is assigned")
+    path: str = strawberry.field(
+        description="The path to the state.value to optimistically set the value, always traverse from top to bottom level. i.e state.x for state.x and state.x.y for state.x.y. YOu can also use an arrow function to specify a dynamic path based on the other arguments, e.g. (args) => state[args.foo]",
+    )
+    accessor: str | None = strawberry.field(default=None, description="The accessor to get the value to optimistically set. This is used when the value to optimistically set is not the same as the value of the port")
+
+
 @pydantic.input(models.DescriptorInputModel)
 class DescriptorInput:
     key: str = strawberry.field(description="The key of the descriptor. This is used to uniquely identify the descriptor")
@@ -499,6 +513,10 @@ class ImplementationInput:
     locks: list[str] | None = strawberry.field(
         default=None,
         description="The locks of the implementation. This is used to specify which resources the implementation needs to run",
+    )
+    optimistics: list[OptimisticInput] | None = strawberry.field(
+        default=None,
+        description="The optimistics of the definition. This is used to optimistically set state values when the action is assigned. This is used to provide a better user experience by optimistically setting state",
     )
 
 

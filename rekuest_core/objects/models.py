@@ -151,6 +151,12 @@ class DescriptorModel(BaseModel):
     value: Any
 
 
+class OptimisticModel(BaseModel):
+    state: str
+    path: str
+    accessor: str | None = None
+
+
 class PortModel(BaseModel):
     key: str
     label: str | None = None
@@ -184,6 +190,7 @@ class DefinitionModel(BaseModel):
     is_dev: bool = False
     args: list[PortModel]
     returns: list[PortModel]
+    optimistics: list[OptimisticModel] | None = None
 
 
 SearchAssignWidgetModel.update_forward_refs()

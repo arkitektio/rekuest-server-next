@@ -206,6 +206,16 @@ class Port:
     descriptors: list[Descriptor] | None = None
 
 
+# TODO: Should be saved and made accessible
+@pydantic.type(models.OptimisticModel)
+class Optimistic:
+    """An optimistic is used to optimistically set state values when the action is assigned. This is used to provide a better user experience by optimistically setting state values when the action is assigned, instead of waiting for the action to be executed and the state to be updated. This will only ever happen on the frontend."""
+
+    state: str
+    path: str
+    accessor: str | None = None
+
+
 @pydantic.type(models.DefinitionModel)
 class Definition:
     hash: scalars.ActionHash

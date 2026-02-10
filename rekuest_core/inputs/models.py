@@ -80,6 +80,12 @@ class DescriptorSchemaInputModel(BaseModel):
     description: str | None = None
 
 
+class OptimisticInputModel(BaseModel):
+    state: str
+    path: str
+    accessor: str | None = None
+
+
 class PortInputModel(BaseModel):
     validators: list[ValidatorInputModel] | None = None
     key: str
