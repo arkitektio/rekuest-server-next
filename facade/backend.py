@@ -57,14 +57,19 @@ def get_waiter_for_context(info: Info, instance_id: str) -> None:
     return waiter
 
 
+# TODO: Implement this for nested structures and interfaces as well
 def acted_on_from_args(args: dict, action: models.Action) -> list[str]:
     acted_on = []
     for port in action.args:
         if port["kind"] == "STRUCTURE":
             identifier = port.get("identifier")
             key = port.get("key")
+
             if identifier and key in args:
-                acted_on.append(f"{identifier}:{args[key]}")
+                if isinstance(args[key], dict):
+                    acted_on.append(f"{identifier}:{args[key].get('object')}")
+                if isinstance(args[key], str):
+                    acted_on.append(f"{identifier}:{args[key]}")
 
     return acted_on
 
