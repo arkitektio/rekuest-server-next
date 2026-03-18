@@ -195,6 +195,9 @@ class Mutation:
     update_resolution = mutation(resolver=mutations.update_resolution, description="Update an existing resolution.")
     delete_resolution = mutation(resolver=mutations.delete_resolution, description="Delete a resolution by ID.")
 
+    log_patches = mutation(resolver=mutations.log_patches, description="Log state patches")
+    log_snapshot = mutation(resolver=mutations.log_snapshot, description="Log a state snapshot ")
+
 
 @strawberry.type(description="Root subscription type for real-time event streams from the system.")
 class Subscription:

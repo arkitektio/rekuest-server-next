@@ -461,7 +461,6 @@ class DefinitionInput:
         description="The returns of the definition. This is the output ports of the definition",
     )
     tests: ActionDependencyInput | None = strawberry.field(default=None)
-
     kind: enums.ActionKind = strawberry.field(description="The kind of the definition. This is the type of the definition. Can be either a function or a generator")
     is_test_for: list["str"] = strawberry.field(
         default_factory=list,

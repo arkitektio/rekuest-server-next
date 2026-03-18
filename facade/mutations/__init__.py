@@ -7,7 +7,7 @@ from .dashboard import create_dashboard
 from .state_schema import create_state_schema
 from .shortcut import create_shortcut, delete_shortcut
 from .toolbox import create_toolbox, delete_toolbox
-from .state import set_state, update_state, archive_state, set_agent_states
+from .state import set_state, update_state, archive_state, set_agent_states, log_patches, log_snapshot
 from .blok import create_blok
 from .materialized_blok import materialize_blok
 from .lifeline import reinit
