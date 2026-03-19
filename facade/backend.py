@@ -231,7 +231,7 @@ class RedisControllBackend(ControllBackend):
                 raise ValueError(f"No active implementation found for action {action.name}")
             agent = implementation.agent
 
-        elif input.interface:
+        elif input.implementation:
             reservation = None
             implementation = models.Implementation.objects.get(id=input.implementation)
             action = implementation.action
@@ -240,11 +240,14 @@ class RedisControllBackend(ControllBackend):
         else:
             raise ValueError("You need to provide either, action_hash or action_id, to create an assignment for an agent")
 
+        if not action:
+            raise ValueError("Could not determine action for this assignation")
+
         acted_on = acted_on_from_args(input.args, action)
 
         reference = input.reference or self.create_message_id()
 
-        if implementation.dependencies.exists():
+        if action.dependencies.exists():
             assert resolution is not None, "Assignments to implementations with dependencies must provide a resolution"
 
         # TODO: if ephemeral is set, we should not store the assignation in the database

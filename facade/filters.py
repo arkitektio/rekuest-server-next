@@ -843,6 +843,7 @@ class ActionFilter(SearchFilter):
     in_collection: str | None
     used_before: datetime.datetime | None
     used_after: datetime.datetime | None
+    stateful: bool | None
 
     def filter_used_before(self, queryset, info):
         if self.used_before is None:
@@ -859,6 +860,15 @@ class ActionFilter(SearchFilter):
             return queryset
 
         return queryset.filter(collections__name=self.in_collection)
+
+    def filter_stateful(self, queryset, info):
+        if self.stateful is None:
+            return queryset
+
+        if self.stateful:
+            return queryset.filter(stateful=True)
+        else:
+            return queryset.filter(stateful=False)
 
     def filter_demands(self, queryset, info):
         if self.demands is None:

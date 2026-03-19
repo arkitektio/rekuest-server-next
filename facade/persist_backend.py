@@ -127,5 +127,11 @@ class ModelPersistBackend:
             message=message.message,
         )
 
+    async def on_agent_log_patches(self, agent_id: str, message: messages.LogPatches) -> None:
+        logging.info(f"Log Patches for Assignation {message.assignation} - {len(message.patches)} patches")
+
+    async def on_agent_log_snapshot(self, agent_id: str, message: messages.LogSnapshot) -> None:
+        logging.info(f"Log Snapshot for Assignation {message.assignation}")
+
 
 persist_backend = ModelPersistBackend()

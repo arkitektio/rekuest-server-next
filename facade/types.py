@@ -135,6 +135,9 @@ class Action:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the action.")
     hash: rscalars.ActionHash = strawberry_django.field(description="Unique hash identifying the action definition.")
     name: str = strawberry_django.field(description="Name of the action.")
+    key: str = strawberry_django.field(description="Key of the action, used for grouping and identification.")
+    app: App = strawberry_django.field(description="The app this action belongs to.")
+    version: str = strawberry_django.field(description="Version string of the action.")
     kind: renums.ActionKind = strawberry_django.field(description="The kind or category of the action.")
     stateful: bool = strawberry_django.field(description="Indicates whether the action maintains state.")
     description: str | None = strawberry_django.field(description="Optional description of the action.")
@@ -151,6 +154,7 @@ class Action:
     test_cases: list[LazyType["TestCase", __name__]] | None = strawberry_django.field(description="Test cases for this action.")
     organization: "Organization" = strawberry_django.field(description="The organization that owns this action.")
     assignations: list[LazyType["Assignation", __name__]] = strawberry_django.field(description="Assignations created for this action.")
+    dependencies: list["Dependency"] = strawberry_django.field(description="Dependencies required by this action.")
 
     @strawberry_django.field(description="Retrieve assignations where this action has run.")
     def runs(self) -> list[LazyType["Assignation", __name__]] | None:
@@ -225,7 +229,6 @@ class Implementation:
     agent: "Agent" = strawberry_django.field(description="Agent running this implementation.")
     action: "Action" = strawberry_django.field(description="The action this implements.")
     params: rscalars.AnyDefault = strawberry_django.field(description="Arbitrary parameters for the implementation.")
-    dependencies: list["Dependency"] = strawberry_django.field(description="Dependencies required by this implementation.")
     resolutions: list["Resolution"] = strawberry_django.field(description="The resolved dependencies")
 
     @strawberry_django.field(description="Constructed name for display, combining interface and agent name.")
@@ -877,3 +880,50 @@ class OutputInterfaceUsage:
     port_index: int
     port_key: str
     modifiers: list[str]
+
+
+@strawberry.type
+class TaskBoundary:
+    correlation_id: str
+    start_global_revision: int | None
+    end_global_revision: int | None
+    start_time: datetime.datetime | None
+    end_time: datetime.datetime | None
+
+
+@strawberry.type
+class SessionBoundary:
+    session_id: str
+    start_global_revision: int | None
+    end_global_revision: int | None
+    start_time: datetime.datetime | None
+    end_time: datetime.datetime | None
+
+
+@strawberry_django.type(models.Patch)
+class Patch:
+    op: str
+    path: str
+    value: scalars.Args
+    timestamp: datetime.datetime
+    current_revision: int
+    future_revision: int
+    global_current_revision: int
+    global_future_revision: int
+    session_id: str
+    assignation: Assignation | None
+    state: State
+
+    @strawberry.field
+    def patch(self) -> JSONPatch:
+        return JSONPatch(op=self.op, path=self.path, value=self.value)
+
+
+@strawberry_django.type(models.Snapshot)
+class Snapshot:
+    value: scalars.Args
+    timestamp: datetime.datetime
+    revision: int
+    global_revision: int
+    session_id: str
+    state: State

@@ -67,6 +67,8 @@ class FromAgentMessageType(str, Enum):
     ASSIGNED = "ASSIGNED"
     INTERRUPTED = "INTERRUPTED"
     HEARTBEAT_ANSWER = "HEARTBEAT_ANSWER"
+    LOG_PATCHES = "LOG_PATCHES"
+    LOG_SNAPSHOT = "LOG_SNAPSHOT"
 
 
 class Message(BaseModel):
@@ -75,6 +77,31 @@ class Message(BaseModel):
     # This is the local mapping of the message, reply messages should have the same id
     model_config = ConfigDict(use_enum_values=True, frozen=True)
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+
+
+# State Updates Message
+class LogPatches(Message):
+    """A log patch message
+
+    A log patch message is sent from the agent to the rekuest backend
+    to log a patch that was applied to the state. This is used to
+    log patches from the agent to the rekuest backend.
+    """
+
+    type: Literal[FromAgentMessageType.LOG_PATCHES] = FromAgentMessageType.LOG_PATCHES
+    patches: list[str] = Field(description="The list of patches to log currently not implemented")
+
+
+class LogSnapshot(Message):
+    """A log patch message
+
+    A log patch message is sent from the agent to the rekuest backend
+    to log a patch that was applied to the state. This is used to
+    log patches from the agent to the rekuest backend.
+    """
+
+    type: Literal[FromAgentMessageType.LOG_SNAPSHOT] = FromAgentMessageType.LOG_SNAPSHOT
+    patches: list[str] = Field(description="The list of patches to log currently not implemented")
 
 
 class Assign(Message):
@@ -107,7 +134,12 @@ class Assign(Message):
         default=None,
         description="The resolution id if this assignation is part of a resolved set of dependencies",
     )
-    capture: bool = Field(default=False, description="Whether to run in debug mode")
+    delay_until: Optional[float] = Field(
+        default=None,
+        description="A timestamp until which the assignation should be delayed, in milliseconds since epoch (00:00:00 UTC on 1 January 1970), the agent should not start the assignation before this timestamp, in order to allow synchronisation, attention only if the agent respected the synchronize extensions this will be respected",
+    )
+
+    capture: bool = Field(default=False, description="Whether to run in debug mode and debug stdin and stdout, this should only be used for debugging purposes as it can have performance implications. (agents need to implement the capture feature for this to work)")
     reference: Optional[str] = Field(default=None, description="A reference that the assinger provided")
     args: Dict[str, ShallowJSONSerializable] = Field(description="The arguments that was sendend")
     message: Optional[str] = None
@@ -445,4 +477,6 @@ FromAgentMessage = Union[
     PausedEvent,
     CancelledEvent,
     InterruptedEvent,
+    LogPatches,
+    LogSnapshot,
 ]

@@ -1,5 +1,5 @@
 from kante.channel import build_channel
-from .channel_events import StateUpdateEvent, DBEvent, AssignationEventCreatedEvent, ImplementationSignal, AgentSignal, ChildAssignationEvent
+from .channel_events import StateUpdateEvent, DBEvent, AssignationEventCreatedEvent, ImplementationSignal, AgentSignal, ChildAssignationEvent, PatchEvent
 
 
 action_channel = build_channel(DBEvent, "action_created_broadcast")
@@ -16,6 +16,8 @@ new_implementation_channel = build_channel(ImplementationSignal)
 
 
 state_update_channel = build_channel(DBEvent, "state_update_event_broadcast")
+
+patch_channel = build_channel(PatchEvent)
 
 
 reservation_channel = build_channel(DBEvent, "reservation_event_broadcast")

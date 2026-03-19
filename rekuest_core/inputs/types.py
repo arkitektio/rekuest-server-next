@@ -443,11 +443,14 @@ class DefinitionInput:
         default_factory=list,
         description="The collections of the definition. This is used to group definitions together in the UI",
     )
+    key: str = strawberry.field(description="The key of the definition. This is used to uniquely identify the definition")
+    version: str = strawberry.field(description="The version of the definition. This is used to differentiate if the underyling algorithm has changed, i.e we would expect different results for the same input")
     name: str = strawberry.field(description="The name of the actions. This is used to uniquely identify the definition")
     stateful: bool = strawberry.field(
         default=False,
         description="Whether the definition is stateful or not. If the definition is stateful, it can be used to create a stateful action. If the definition is not stateful, it cannot be used to create a stateful action",
     )
+    dependencies: list[AgentDependencyInput] = strawberry.field(default_factory=list)
     port_groups: list[PortGroupInput] = strawberry.field(
         default_factory=list,
         description="The port groups of the definition. This is used to group ports together in the UI",
@@ -488,10 +491,6 @@ class DefinitionInput:
 class ImplementationInput:
     definition: DefinitionInput = strawberry.field(
         description="The definition of the implementation. This is used to uniquely identify the implementation",
-    )
-    dependencies: list[AgentDependencyInput] = strawberry.field(
-        default_factory=list,
-        description="The dependencies of the implementation. This is used to create a dependency graph for the implementation",
     )
     interface: str | None = strawberry.field(
         default=None,

@@ -154,6 +154,8 @@ class AgentDependencyInputModel(BaseModel):
 class DefinitionInputModel(BaseModel):
     """A definition for a implementation"""
 
+    key: str
+    version: str = "1"
     description: str = "No description provided"
     collections: list[str] = Field(default_factory=list)
     name: str
@@ -163,6 +165,7 @@ class DefinitionInputModel(BaseModel):
     returns: list[PortInputModel] = Field(default_factory=list)
     kind: enums.ActionKind
     tests: ActionDependencyInputModel | None = Field(default=None)
+    dependencies: list[AgentDependencyInputModel] = Field(default_factory=list)
     is_test_for: list["str"] = Field(default_factory=list)
     interfaces: list[str] = Field(default_factory=list)
     is_dev: bool = False
@@ -201,7 +204,6 @@ class DependencyInputModel(BaseModel):
 
 class ImplementationInputModel(BaseModel):
     definition: DefinitionInputModel
-    dependencies: list[AgentDependencyInputModel] = Field(default_factory=list)
     interface: str
     params: dict[str, Any] | None = None
     instance_id: str | None = None

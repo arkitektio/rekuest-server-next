@@ -2,7 +2,7 @@ from .action import new_actions
 from .assignation import assignation_events, assignations, child_assignations
 from .reservation import reservations
 from .implementation import implementation_change, implementations
-from .state import state_update_events
+from .state import state_update_events, latest_patches
 from .agent import agents
 
 
@@ -17,6 +17,7 @@ __all__ = [
     "reservation_listen",
     "implementation",
     "state_update_events",
+    "latest_patches",
     "child_assignations",
     "agents",
 ]

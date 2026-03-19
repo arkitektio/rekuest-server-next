@@ -48,6 +48,7 @@ class Query:
     event = field(resolver=queries.event, description="Fetch a specific event.")
     implementation_at = field(resolver=queries.implementation_at, description="Find implementation at given interface.")
     my_implementation_at = field(resolver=queries.my_implementation_at, description="Find your implementation at a specific interface.")
+    checkout = field(resolver=queries.checkout, description="Materialize the latest state for a specific agent")
     dashboards: list[types.Dashboard] = field(description="All dashboards.")
     states: list[types.State] = field(description="All states from agents.")
     bloks: list[types.Blok] = field(description="List of UI Blok.")
@@ -67,6 +68,14 @@ class Query:
     assignationStats: types.AssignationStats = field(resolver=types.AssignationStatsResolver, description="Statistics about assignations and their states.")
 
     state_for = field(resolver=queries.state_for, description="Retrieve state for a specific context.")
+
+    task_boundaries: types.TaskBoundary | None = field(resolver=queries.task_boundaries, description="Get task boundaries.")
+    session_boundaries: types.SessionBoundary | None = field(resolver=queries.session_boundaries, description="Get session boundaries.")
+    state_at_global_rev: list[types.Snapshot] = field(resolver=queries.state_at_global_rev, description="Get state at global revision.")
+    state_at_local_rev: list[types.Snapshot] = field(resolver=queries.state_at_local_rev, description="Get state at local revision.")
+    forward_events_after_rev: list[types.Patch] = field(resolver=queries.forward_events_after_rev, description="Get forward events after revision.")
+    patch_events_between_global_revs: list[types.Patch] = field(resolver=queries.patch_events_between_global_revs, description="Get patch events between global revisions.")
+    snapshots_around_rev: list[types.Snapshot] = field(resolver=queries.snapshots_around_rev, description="Get snapshots around revision.")
 
     @field(description="Fetch a client by ID.")
     def resolution(self, info: Info, id: strawberry.ID) -> types.Resolution:
@@ -209,6 +218,7 @@ class Subscription:
     implementation_change = subscription(resolver=subscriptions.implementation_change, description="Subscribe to changes in implementations.")
     implementations = subscription(resolver=subscriptions.implementations, description="Subscribe to creation or updates of implementations.")
     state_update_events = subscription(resolver=subscriptions.state_update_events, description="Subscribe to updates of state values and patches.")
+    latest_patches = subscription(resolver=subscriptions.latest_patches, description="Subscribe to latest patches for specific agents or states.")
     child_assignations = subscription(resolver=subscriptions.child_assignations, description="Subscribe to child assignation events.")
 
 

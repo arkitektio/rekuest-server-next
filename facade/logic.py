@@ -2,6 +2,7 @@ from facade import models, managers
 from kante.types import Info
 from dataclasses import dataclass
 import uuid
+import jsonpatch
 
 
 def auto_resolve(info: Info, implementation: models.Implementation, resolution: models.Resolution, visited_implementations: set[str] | None = None) -> None:
@@ -73,6 +74,65 @@ def auto_resolve(info: Info, implementation: models.Implementation, resolution: 
                         )
                         visited_implementations.add(impl.id)
 
-                count += 1
+                    count += 1
                 if count >= dependency.prefered_instances:
                     break
+
+
+def get_latest_state(
+    agent: models.Agent,
+    state_id: int | None = None,
+    global_revision: int | None = None,
+    local_revision: int | None = None,
+) -> dict:
+    results = {}
+
+    qs = models.State.objects.filter(agent=agent)
+    if state_id:
+        qs = qs.filter(id=state_id)
+
+    for state in qs:
+        snapshot_qs = models.Snapshot.objects.filter(state=state, agent=agent)
+        if global_revision:
+            snapshot_qs = snapshot_qs.filter(global_revision__lte=global_revision).order_by("-global_revision")
+        elif local_revision:
+            snapshot_qs = snapshot_qs.filter(revision__lte=local_revision).order_by("-revision")
+        else:
+            snapshot_qs = snapshot_qs.order_by("-timestamp")
+
+        snapshot = snapshot_qs.first()
+
+        base_value = snapshot.value if snapshot else {}
+        current_revision = snapshot.revision if snapshot else 0
+        current_global_revision = snapshot.global_revision if snapshot else 0
+        start_time = snapshot.timestamp if snapshot else None
+
+        patches_qs = models.Patch.objects.filter(state=state, agent=agent)
+        if start_time:
+            patches_qs = patches_qs.filter(timestamp__gt=start_time)
+
+        if global_revision:
+            patches_qs = patches_qs.filter(global_future_revision__lte=global_revision)
+        if local_revision:
+            patches_qs = patches_qs.filter(future_revision__lte=local_revision)
+
+        patches = patches_qs.order_by("timestamp")
+
+        current_value = base_value
+        for patch in patches:
+            try:
+                p = jsonpatch.JsonPatch([{"op": patch.op, "path": patch.path, "value": patch.value}])
+                current_value = p.apply(current_value)
+                current_revision = patch.future_revision
+                current_global_revision = patch.global_future_revision
+            except Exception as e:
+                pass
+
+        results[state.id] = {
+            "value": current_value,
+            "schema": state.state_schema,
+            "global_revision": current_global_revision,
+            "local_revision": current_revision,
+        }
+
+    return results

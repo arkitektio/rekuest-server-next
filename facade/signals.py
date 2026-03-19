@@ -93,3 +93,13 @@ def implementation_post_save(sender, instance: models.Implementation = None, cre
 def implementation_post_del(sender, instance: models.Implementation = None, **kwargs):
     if instance:
         channels.new_implementation_channel.broadcast(channel_events.ImplementationSignal(delete=instance.id), [f"implementation_{instance.id}"])
+
+
+@receiver(post_save, sender=models.Patch)
+def patch_post_save(sender, instance: models.Patch = None, created=None, **kwargs):
+    if created:
+        topics = [f"patches_state_{instance.state.id}"]
+        if instance.agent:
+            topics.append(f"patches_agent_{instance.agent.id}")
+
+        channels.patch_channel.broadcast(channel_events.PatchEvent(create=instance.id, state=instance.state.id, agent=instance.agent.id if instance.agent else None), topics)

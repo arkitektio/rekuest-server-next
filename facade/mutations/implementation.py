@@ -27,6 +27,9 @@ def hash_definition(definition: DefinitionInputModel) -> str:
             "stateful",
             "is_test_for",
             "collections",
+            "dependencies",
+            "key",
+            "version",
         ]
     }
     return hashlib.sha256(json.dumps(hashable_definition, sort_keys=True).encode()).hexdigest()
@@ -167,9 +170,14 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
     definition = input.definition
 
     hash = hash_definition(definition)
+    key = definition.key
+    version = definition.version
+    app = agent.app
 
     try:
-        action = models.Action.objects.get(hash=hash, organization=agent.registry.organization)
+        action = models.Action.objects.get(key=key, version=version, app=app, organization=agent.organization)
+        if action.hash != hash:
+            raise ValueError(f"Action with key {key} and version {version} already exists but has different hash. Please update the version or key of your action definition.")
     except models.Action.DoesNotExist:
         scope = infer_action_scope(definition)
 
@@ -187,6 +195,9 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
                 raise ValueError(f"Interface {interface} used in ports but not defined in any schema")
 
         action = models.Action.objects.create(
+            key=key,
+            version=version,
+            app=app,
             hash=hash,
             organization=agent.registry.organization,
             description=definition.description or "No description",
@@ -198,6 +209,19 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
             returns=[strawberry.asdict(i) for i in definition.returns],
             name=definition.name,
         )
+
+        new_deps = []
+
+        if definition.dependencies:
+            for i in definition.dependencies:
+                dep, _ = models.Dependency.objects.update_or_create(
+                    action=action,
+                    key=i.key,
+                    defaults=dict(
+                        action_demands=[strawberry.asdict(x) for x in i.action_demands] if i.action_demands else [],
+                    ),
+                )
+                new_deps.append(dep)
 
         create_usages(action, definition)
         protocols = infer_protocols(definition)
@@ -221,32 +245,15 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
             agent=agent,
         )
 
-        new_deps = []
-
-        if input.dependencies:
-            for i in input.dependencies:
-                dep, _ = models.Dependency.objects.update_or_create(
-                    implementation=implementation,
-                    key=i.key,
-                    defaults=dict(
-                        action_demands=[strawberry.asdict(x) for x in i.action_demands] if i.action_demands else [],
-                    ),
-                )
-                new_deps.append(dep)
-
-        for dep in implementation.dependencies.all():
-            if dep not in new_deps:
-                dep.delete()
-
-        if implementation.action.hash != hash:
+        if implementation.action.pk != action.pk:
             if implementation.action.implementations.count() == 1:
                 logger.info("Deleting Action because it has no more implementations")
                 implementation.action.delete()
 
         implementation.action = action
         implementation.extension = extension
-        implementation.dynamic = input.dynamic
         implementation.params = input.params or {}
+        implementation.release = agent.registry.client.release
         implementation.save()
 
     except models.Implementation.DoesNotExist:
@@ -259,19 +266,6 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
             params=input.params or {},
         )
 
-        new_deps = []
-
-        if input.dependencies:
-            for i in input.dependencies:
-                dep, _ = models.Dependency.objects.update_or_create(
-                    implementation=implementation,
-                    key=i.key,
-                    defaults=dict(
-                        action_demands=[strawberry.asdict(x) for x in i.action_demands] if i.action_demands else [],
-                    ),
-                )
-                new_deps.append(dep)
-
     return implementation
 
 
@@ -279,6 +273,7 @@ def create_implementation(info: Info, input: inputs.CreateImplementationInput) -
     registry, _ = models.Registry.objects.update_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
 
     agent, _ = models.Agent.objects.update_or_create(
+        app=info.context.request.client.release.app,
         registry=registry,
         instance_id=input.instance_id or "default",
         defaults=dict(

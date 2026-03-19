@@ -10,6 +10,7 @@ from django.contrib.postgres.fields import ArrayField
 
 # Create your models here.
 from rekuest_core.inputs.models import ActionDependencyInputModel
+from authentikate.models import Organization, User, Membership, App, Release
 
 
 class Collection(models.Model):
@@ -201,6 +202,14 @@ class Action(models.Model):
 
     See online Documentation"""
 
+    app = models.ForeignKey(
+        App,
+        on_delete=models.CASCADE,
+        related_name="actions",
+        help_text="The app this action belongs to (actions are part of an app and are NOT associated only with a release)",
+    )
+    key = models.CharField(max_length=2000, help_text="A unique identifier for this action within the app")
+    version = models.CharField(max_length=100, help_text="The version of this action (e.g. 1.0.0), this is used to differentiate if the underyling algorithm has changed, i.e we would expect different results for the same input")
     collections = models.ManyToManyField(
         Collection,
         related_name="actions",
@@ -229,7 +238,7 @@ class Action(models.Model):
     )
     interfaces = models.JSONField(default=list, help_text="Interfaces that we use to interpret the meta data")
     port_groups = models.JSONField(default=list, help_text="Intercae that we use to interpret the meta data")
-    name = models.CharField(max_length=1000, help_text="The cleartext name of this Action")
+    name = models.CharField(max_length=1000, help_text="The cleartext name of this Action (e.g. 'Segment Image')", default="Unnamed Action")
     description = models.TextField(help_text="A description for the Action")
     scope = models.CharField(
         max_length=1000,
@@ -272,8 +281,8 @@ class Action(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["organization", "hash"],
-                name="No multiple Actions with same hash in the same organization allowed",
+                fields=["organization", "app", "key", "version"],
+                name="No multiple Actions with the same key and version in the same app for an organization allowed",
             )
         ]
 
@@ -391,6 +400,13 @@ class Icon(models.Model):
 
 
 class Agent(models.Model):
+    app = models.ForeignKey(
+        App,
+        on_delete=models.CASCADE,
+        related_name="agents",
+        help_text="The app this agent belongs to (agents are part of an app and are NOT associated only with a release)",
+    )
+    release = models.ForeignKey(Release, on_delete=models.CASCADE, related_name="agents", help_text="The release this agent belongs to (agents are part of a release and are NOT associated only with an app)")
     name = models.CharField(max_length=2000, help_text="This providers Name", default="Nana")
     extensions = models.JSONField(
         max_length=2000,
@@ -400,6 +416,11 @@ class Agent(models.Model):
     health_check_interval = models.IntegerField(
         default=60 * 5,
         help_text="How often should this agent be checked for its health. Defaults to 5 mins",
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        help_text="The user this Agent belongs to",
     )
     instance_id = models.CharField(default="main", max_length=1000)
     installed_at = models.DateTimeField(auto_created=True, auto_now_add=True)
@@ -437,6 +458,11 @@ class Agent(models.Model):
         help_text="The provide might be limited to a instance like ImageJ belonging to a specific person. Is nullable for backend users",
         null=True,
         related_name="agents",
+    )
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        help_text="The organization this Agent belongs to",
     )
     blocked = models.BooleanField(
         default=False,
@@ -646,10 +672,10 @@ class Dependency(models.Model):
 
     """
 
-    implementation = models.ForeignKey(
-        "Implementation",
+    action = models.ForeignKey(
+        Action,
         on_delete=models.CASCADE,
-        help_text="The Implementation that has this dependency",
+        help_text="The action that has this dependency",
         related_name="dependencies",
     )
     key = models.CharField(
@@ -726,6 +752,7 @@ class ResolvedDependency(models.Model):
 class Implementation(models.Model):
     """A Implementation is a conceptual implementation of A Action. It represents its implementation as well as its performance"""
 
+    release = models.ForeignKey(Release, on_delete=models.CASCADE, related_name="implementations", help_text="The release this implementation belongs to (implementations are part of a release and are NOT associated only with an app)")
     interface = models.CharField(max_length=1000, help_text="Interface (think Function)")
     action = models.ForeignKey(
         Action,
@@ -772,8 +799,12 @@ class Implementation(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["interface", "agent"],
-                name="A implementation has unique versions for every action it trys to implement",
-            )
+                name="A implementation has unique reachable versions for every action it trys to implement",
+            ),
+            models.UniqueConstraint(
+                fields=["action", "agent"],
+                name="An Agent can only have one implementation for the same Action",
+            ),
         ]
 
     def __str__(self):
@@ -1201,6 +1232,7 @@ class Patch(models.Model):
     """A Patch is a representation of a change to a state. Patches are used to represent the changes that happen to a state over time. They are stored as a log of changes to a state and can be used to reconstruct the state at any point in time."""
 
     state = models.ForeignKey(State, on_delete=models.CASCADE, related_name="patches")
+    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="patches_created", null=True, blank=True)
     op = models.CharField(max_length=1000, help_text="The operation of this patch (e.g. add, remove, replace)")
     path = models.CharField(max_length=1000, help_text="The path of this patch (e.g. the path to the value that is being changed)")
     value = models.JSONField(help_text="The value of this patch (e.g. the new value that is being set)")
@@ -1215,6 +1247,7 @@ class Patch(models.Model):
 
 class Snapshot(models.Model):
     state = models.ForeignKey(State, on_delete=models.CASCADE, related_name="snapshots")
+    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="snapshots_created", null=True, blank=True)
     value = models.JSONField(help_text="The value of this snapshot (e.g. the value of the state at the time of the snapshot)")
     timestamp = models.DateTimeField(auto_now_add=True, help_text="The time this snapshot was created")
     revision = models.IntegerField(help_text="The revision of the state at the time of the snapshot (e.g. to be able to reconstruct the state at this point in time)")

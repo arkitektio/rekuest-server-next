@@ -5,30 +5,21 @@ from rekuest_core import enums, scalars
 import strawberry
 import json
 
+
 def underscore(s: str) -> str:
     return s.replace(" ", "_").replace("-", "_").lower()
 
 
 def hash_state_schema(definition: inputs.StateSchemaInput) -> str:
-    hashable_schema = {
-        key: value
-        for key, value in dict(strawberry.asdict(definition)).items()
-        if key in ["ports"]
-    }
-    return hashlib.sha256(
-        json.dumps(hashable_schema, sort_keys=True).encode()
-    ).hexdigest()
-
-
+    hashable_schema = {key: value for key, value in dict(strawberry.asdict(definition)).items() if key in ["ports"]}
+    return hashlib.sha256(json.dumps(hashable_schema, sort_keys=True).encode()).hexdigest()
 
 
 def calculate_action_hash(
     definition: models.DefinitionInputModel,
 ) -> scalars.ActionHash:
     """Calculates the hash for a action."""
-    return hashlib.sha256(
-        json.dumps(definition.dict(), sort_keys=True).encode("utf-8")
-    ).hexdigest()
+    return hashlib.sha256(json.dumps(definition.dict(), sort_keys=True).encode("utf-8")).hexdigest()
 
 
 def traverse_scope(port: models.PortInputModel):
@@ -71,3 +62,4 @@ def assert_non_statefullness(definition: models.DefinitionInputModel):
     """Asserts that the definition is correctly stateful."""
     for port in definition.args:
         traverse_state_dependency(port)
+        # TODO: ALLSO CHECK IF THE RETURN OR ARGS HAVE MEMORY STRUCTURES (WHICH WOULD ALSO MAKE IT STATEFUL)

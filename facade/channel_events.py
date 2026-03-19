@@ -13,6 +13,14 @@ class StateUpdateEvent(BaseModel):
     state: int = Field(..., description="The state that was updated.")
 
 
+class PatchEvent(BaseModel):
+    """A model representing a patch event."""
+
+    create: int = Field(..., description="The patch ID that was created.")
+    state: int = Field(..., description="The state ID related to the patch.")
+    agent: int | None = Field(None, description="The agent ID related to the patch.")
+
+
 class AssignationEventCreatedEvent(BaseModel):
     """A model representing an assignation event created."""
 

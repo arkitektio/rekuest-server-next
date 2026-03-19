@@ -93,6 +93,8 @@ class AgentConsumer(AsyncWebsocketConsumer):
             ),
         )
 
+        print(f"Registered agent")
+
         if self.agent.blocked:
             await self.close(code=codes.AGENT_IS_BLOCKED_CODE)
             print("Agent is blocked")
@@ -209,19 +211,19 @@ class AgentConsumer(AsyncWebsocketConsumer):
                     case messages.HeartbeatEvent():
                         await self.on_agent_heartbeat()
                     case messages.CancelledEvent():
-                        await persist_backend.on_agent_cancelled(self.agent.id, payload.message)
+                        await persist_backend.on_agent_cancelled(self.agent.pk, payload.message)
                     case messages.YieldEvent():
-                        await persist_backend.on_agent_yield(self.agent.id, payload.message)
+                        await persist_backend.on_agent_yield(self.agent.pk, payload.message)
                     case messages.LogEvent():
-                        await persist_backend.on_agent_log(self.agent.id, payload.message)
+                        await persist_backend.on_agent_log(self.agent.pk, payload.message)
                     case messages.ProgressEvent():
-                        await persist_backend.on_agent_progress(self.agent.id, payload.message)
+                        await persist_backend.on_agent_progress(self.agent.pk, payload.message)
                     case messages.DoneEvent():
-                        await persist_backend.on_agent_done(self.agent.id, payload.message)
+                        await persist_backend.on_agent_done(self.agent.pk, payload.message)
                     case messages.ErrorEvent():
-                        await persist_backend.on_agent_error(self.agent.id, payload.message)
+                        await persist_backend.on_agent_error(self.agent.pk, payload.message)
                     case messages.CriticalEvent():
-                        await persist_backend.on_agent_critical(self.agent.id, payload.message)
+                        await persist_backend.on_agent_critical(self.agent.pk, payload.message)
                     case _:
                         logger.error("Unkwonw message in agent", exc_info=True)
                         await self.close(code=codes.FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE)
@@ -257,7 +259,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
                 return
 
         if hasattr(self, "agent") and self.agent:
-            await persist_backend.on_agent_disconnected(self.agent.id)
+            await persist_backend.on_agent_disconnected(self.agent.pk)
 
         if hasattr(self, "connection"):
             await self.connection.close()

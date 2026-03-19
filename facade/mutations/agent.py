@@ -30,25 +30,29 @@ class DeleteAgentInput:
     id: strawberry.ID = strawberry.field(description="The ID of the agent to delete. This is used to identify the agent in the system.")
 
 
-async def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
+def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
     # TODO: Hasch this
 
-    registry, _ = await models.Registry.objects.aupdate_or_create(
+    registry, _ = models.Registry.objects.update_or_create(
         client=info.context.request.client,
         user=info.context.request.user,
         organization=info.context.request.organization,
     )
 
-    agent, _ = await models.Agent.objects.aupdate_or_create(
+    agent, _ = models.Agent.objects.update_or_create(
         registry=registry,
         instance_id=input.instance_id or "default",
         defaults=dict(
             name=input.name or f"{str(registry.id)} on {input.instance_id}",
             extensions=input.extensions or [],
+            app=info.context.request.client.release.app,
+            organization=info.context.request.organization,
+            user=info.context.request.user,
+            release=info.context.request.client.release,
         ),
     )
 
-    memory_shelve, _ = await models.MemoryShelve.objects.aget_or_create(
+    memory_shelve, _ = models.MemoryShelve.objects.get_or_create(
         agent=agent,
         defaults=dict(
             name=f"{str(agent)} memory shelve",
@@ -56,10 +60,10 @@ async def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
         ),
     )
 
-    async for drawer in models.MemoryDrawer.objects.filter(
+    for drawer in models.MemoryDrawer.objects.filter(
         shelve=memory_shelve,
     ):
-        await drawer.adelete()
+        drawer.delete()
 
     return agent
 
