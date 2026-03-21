@@ -361,25 +361,25 @@ class ActionDependencyInput:
     )
     arg_matches: list[PortMatchInput] | None = strawberry.field(
         default=None,
-        description="The demands for the action args and returns. This is used to identify the demand in the system.",
+        description="The demands for the action args, this can be additionaly specified so that when we loosen the matching criteria for an action in a resolver, we can still make sure to match the right action based on the demands for the args. This is used to identify the demand in the system.",
     )
     return_matches: list[PortMatchInput] | None = strawberry.field(
         default=None,
-        description="The demands for the action args and returns. This is used to identify the demand in the system.",
+        description="The demands for the action args, this can be additionaly specified so that when we loosen the matching criteria for an action in a resolver, we can still make sure to match the right action based on the demands for the args. This is used to identify the demand in the system.",
     )
     protocols: list[strawberry.ID] | None = strawberry.field(
         default=None,
-        description="The protocols that the action has to implement. This is used to identify the demand in the system.",
+        description="The protocols that the action is implementing or relying on. This is used to identify the demand in the system, and can be used to match actions that are implementing the same protocol together.",
     )
     force_arg_length: int | None = strawberry.field(
         default=None,
-        description="Require that the action has a specific number of args. This is used to identify the demand in the system.",
+        description="Require that the action has a specific number of args. When loosing the matching criteria for an action in a resolver, we can still make sure to match the right action based on the demands for the args. This is used to identify the demand in the system.",
     )
     force_return_length: int | None = strawberry.field(
         default=None,
         description="Require that the action has a specific number of returns. This is used to identify the demand in the system.",
     )
-    optional: bool = strawberry.field(default=False, description="Whether the dependency is optional or not. If the dependency is optional, users can choose to not provide it")
+    optional: bool = strawberry.field(default=False, description="Whether the dependency is optional or not. If the dependency is optional, the agent doesn't have to provide it to be potentially callable")
 
 
 @pydantic.input(
@@ -389,11 +389,27 @@ class ActionDependencyInput:
 )
 class AgentDependencyInput:
     key: str = strawberry.field(
-        description="The key of the agent. This is used to identify the agent in the system.",
+        description="The key of tthis dependency, when assigning you can reference this key to specify which agent_dependency you are assigning to. ",
     )
-    identifier: str | None = strawberry.field(
+    app: str = strawberry.field(
         default=None,
-        description="The identifier of the agent. This is used to identify the agent in the system.",
+        description="Which app this dependency corresponds to (i.e. do you want to use a stardist agent for that or imagej agents needs to be a world unique classsifier (reverse domain notation) that identifies the type of agent you want to use, and then we can have multiple agents of the same type running in the system, e.g. startdist could be the app for all agents that correpsond to a startdist instance)",
+    )
+    version: str | None = strawberry.field(
+        default=None,
+        description="The version of the app that needs to be used. This is used to identify the demand in the system, and differentiate between different versions of the same app (e.g. if you have a startdist v1 and a stardist v2, you can specify which one you want to use with this field)",
+    )
+    user: str | None = strawberry.field(
+        default=None,
+        description="The user who is running the app that is needed for this dependency. This is used to identify the demand in the system, and differentiate between different users of the same app (e.g. if you have a startdist instance that is running for user A and another one that is running for user B, you can specify which one you want to use with this field)",
+    )
+    device: str | None = strawberry.field(
+        default=None,
+        description="The device that is running the app that is needed for this dependency. This is used to identify the demand in the system, and differentiate between different devices of the same app. It needs to be specified if the app needs to run on a specific device (e.g. if you have a startdist instance that is running on a GPU and another one that is running on a CPU, you can specify which one you want to use with this field)",
+    )
+    instance: str | None = strawberry.field(
+        default=None,
+        description="The instance of the app that is needed for this dependency. This is used to identify the demand in the system, and differentiate between different instances of the same app (e.g."
     )
     name: str | None = strawberry.field(
         default=None,
@@ -401,7 +417,7 @@ class AgentDependencyInput:
     )
     description: str | None = strawberry.field(
         default=None,
-        description="The description of the agent. This can described the agent and its purpose.",
+        description="A description of the dependency, why it is needed and what it is used for. This can be used to provide more context to users when assigning dependencies.",
     )
     optional: bool = strawberry.field(default=False, description="Whether the dependency is optional or not. If the dependency is optional, users can choose to not provide it")
     action_demands: list[ActionDependencyInput] | None = strawberry.field(
@@ -411,6 +427,14 @@ class AgentDependencyInput:
     min_viable_instances: int | None = strawberry.field(
         default=None,
         description="The minimum amount of viable instances for the agent. This is used to identify the demand in the system.",
+    )
+    max_viable_instances: int | None = strawberry.field(
+        default=None,
+        description="The maximum amount of viable instances for the agent. This is used to identify the demand in the system.",
+    )
+    mutually_exclusive_keys: list[str] | None = strawberry.field(
+        default=None,
+        description="A list of keys of other agent dependencies that are mutually exclusive with this one. This means two agent dependencies with mutually exclusive keys cannot be assigned to the same implementing agent. This is used to identify the demand in the system.",
     )
     prefered_instances: int | None = strawberry.field(
         default=None,
@@ -428,9 +452,6 @@ class AgentDependencyInput:
     Definitions provide a protocol of input and output, and do not contain
     any information about the actual implementation of the action ( this is handled
     by a implementation that implements a action).
-
-
-
 
     """,
 )

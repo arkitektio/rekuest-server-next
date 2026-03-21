@@ -6,15 +6,15 @@ import strawberry
 
 
 def auto_resolve(info: Info, input: inputs.AutoResolveInput) -> types.Resolution:
-    implementation = models.Implementation.objects.get(id=input.implementation)
+    action = models.Action.objects.get(id=input.action)
     resolution = models.Resolution.objects.create(
         name=f"Auto-resolve for {implementation.name}",
         creator=info.context.request.user,
         organization=info.context.request.organization,
-        implementation=implementation,
+        action=action,
     )
 
-    logic.auto_resolve(info, implementation, resolution)
+    logic.auto_resolve(info, action, resolution)
     return resolution
 
 

@@ -140,7 +140,7 @@ class ResolvedDependencyInput:
 
 @strawberry.input
 class AutoResolveInput:
-    implementation: strawberry.ID
+    action: strawberry.ID
 
 
 class CreateResolutionInputModel(BaseModel):

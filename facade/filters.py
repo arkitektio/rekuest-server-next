@@ -844,6 +844,7 @@ class ActionFilter(SearchFilter):
     used_before: datetime.datetime | None
     used_after: datetime.datetime | None
     stateful: bool | None
+    app_identifier: str | None = strawberry.field(default=None, description="Filter using app identifier")
 
     def filter_used_before(self, queryset, info):
         if self.used_before is None:
@@ -860,6 +861,11 @@ class ActionFilter(SearchFilter):
             return queryset
 
         return queryset.filter(collections__name=self.in_collection)
+
+    def filter_app_identifier(self, queryset, info):
+        if self.app_identifier is None:
+            return queryset
+        return queryset.filter(app__identifier=self.app_identifier)
 
     def filter_stateful(self, queryset, info):
         if self.stateful is None:

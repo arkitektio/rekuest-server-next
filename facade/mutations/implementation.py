@@ -259,6 +259,7 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
     except models.Implementation.DoesNotExist:
         implementation = models.Implementation.objects.create(
             interface=input.interface,
+            release=agent.registry.client.release,
             action=action,
             agent=agent,
             extension=extension,
@@ -273,11 +274,12 @@ def create_implementation(info: Info, input: inputs.CreateImplementationInput) -
     registry, _ = models.Registry.objects.update_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
 
     agent, _ = models.Agent.objects.update_or_create(
-        app=info.context.request.client.release.app,
         registry=registry,
         instance_id=input.instance_id or "default",
         defaults=dict(
-            name=f"{str(registry)} on {input.instance_id}",
+            name=f"{str(registry.pk)} on {input.instance_id}",
+            release=info.context.request.client.release,
+            app=info.context.request.client.release.app,
         ),
     )
 
@@ -307,7 +309,9 @@ def set_extension_implementations(info: Info, input: inputs.SetExtensionImplemen
         registry=registry,
         instance_id=input.instance_id or "default",
         defaults=dict(
-            name=f"{str(registry)} on {input.instance_id}",
+            name=f"{str(registry.pk)} on {input.instance_id}",
+            app=info.context.request.client.release.app,
+            release=info.context.request.client.release,
         ),
     )
 

@@ -364,6 +364,8 @@ class Agent:
     hook_url: str | None = strawberry_django.field(description="Webhook URL for this Agent (only if webhook)", default=None)
     hook_url_secret: str | None = strawberry_django.field(description="Webhook URL secret for this Agent (only if webhook)", default=None)
     assignations: list[LazyType["Assignation", __name__]] = strawberry_django.field(description="Assignations executed by this agent.")
+    app: App = strawberry_django.field(description="The app this agent belongs to.")
+    release: Release = strawberry_django.field(description="The release this agent belongs to.")
 
     @strawberry_django.field(description="Fetch a specific implementation by interface.")
     def implementation(self, interface: str) -> Implementation | None:

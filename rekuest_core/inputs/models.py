@@ -128,8 +128,7 @@ class PortMatchInputModel(BaseModel):
 
 class ActionDependencyInputModel(BaseModel):
     key: str
-    hash: str | None = None
-    name: str | None = None
+    version: str | None = None
     description: str | None = None
     arg_matches: list[PortMatchInputModel] | None = None
     return_matches: list[PortMatchInputModel] | None = None
@@ -142,10 +141,23 @@ class ActionDependencyInputModel(BaseModel):
 
 class AgentDependencyInputModel(BaseModel):
     key: str
-    name: str | None = None
+    
     description: str | None = None
     optional: bool = False
+    
+    
+    
+    # Filters for selecting which instances of the agent are valid for this dependency
     action_demands: list[ActionDependencyInputModel] | None = None
+    app: str
+    version: str | None = None
+    name: str | None = None
+    instance: str | None = None
+    device: str | None = None
+    
+    
+    
+    
     min_viable_instances: int | None = None
     prefered_instances: int | None = None
     assign_policy: enums.AssignPolicy = enums.AssignPolicy.BALANCED

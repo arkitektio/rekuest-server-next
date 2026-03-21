@@ -43,7 +43,7 @@ def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
         registry=registry,
         instance_id=input.instance_id or "default",
         defaults=dict(
-            name=input.name or f"{str(registry.id)} on {input.instance_id}",
+            name=input.name or f"{str(registry.pk)} on {input.instance_id}",
             extensions=input.extensions or [],
             app=info.context.request.client.release.app,
             organization=info.context.request.organization,

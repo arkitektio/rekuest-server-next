@@ -248,7 +248,8 @@ class RedisControllBackend(ControllBackend):
         reference = input.reference or self.create_message_id()
 
         if action.dependencies.exists():
-            assert resolution is not None, "Assignments to implementations with dependencies must provide a resolution"
+            if not resolution:
+                raise ValueError("Action has dependencies but no resolution was provided for the assignation")
 
         # TODO: if ephemeral is set, we should not store the assignation in the database
         assignation = models.Assignation.objects.create(
