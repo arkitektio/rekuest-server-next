@@ -49,6 +49,7 @@ def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
             organization=info.context.request.organization,
             user=info.context.request.user,
             release=info.context.request.client.release,
+            device=info.context.request.client.device,
         ),
     )
 

@@ -395,21 +395,9 @@ class AgentDependencyInput:
         default=None,
         description="Which app this dependency corresponds to (i.e. do you want to use a stardist agent for that or imagej agents needs to be a world unique classsifier (reverse domain notation) that identifies the type of agent you want to use, and then we can have multiple agents of the same type running in the system, e.g. startdist could be the app for all agents that correpsond to a startdist instance)",
     )
-    version: str | None = strawberry.field(
-        default=None,
-        description="The version of the app that needs to be used. This is used to identify the demand in the system, and differentiate between different versions of the same app (e.g. if you have a startdist v1 and a stardist v2, you can specify which one you want to use with this field)",
-    )
-    user: str | None = strawberry.field(
-        default=None,
-        description="The user who is running the app that is needed for this dependency. This is used to identify the demand in the system, and differentiate between different users of the same app (e.g. if you have a startdist instance that is running for user A and another one that is running for user B, you can specify which one you want to use with this field)",
-    )
-    device: str | None = strawberry.field(
-        default=None,
-        description="The device that is running the app that is needed for this dependency. This is used to identify the demand in the system, and differentiate between different devices of the same app. It needs to be specified if the app needs to run on a specific device (e.g. if you have a startdist instance that is running on a GPU and another one that is running on a CPU, you can specify which one you want to use with this field)",
-    )
-    instance: str | None = strawberry.field(
-        default=None,
-        description="The instance of the app that is needed for this dependency. This is used to identify the demand in the system, and differentiate between different instances of the same app (e.g."
+    auto_resolvable: bool = strawberry.field(
+        default=False,
+        description="Whether this dependency is auto resolvable or not. If so we will try to automatically resolve it based on the demands specified in the dependency and the capabilities of the available agents in the system. This is used to identify the demand in the system. Attention if any of the dependencies of this agent dependency is not auto resolvable, this dependency will also not be auto resolvable",
     )
     name: str | None = strawberry.field(
         default=None,
@@ -471,7 +459,6 @@ class DefinitionInput:
         default=False,
         description="Whether the definition is stateful or not. If the definition is stateful, it can be used to create a stateful action. If the definition is not stateful, it cannot be used to create a stateful action",
     )
-    dependencies: list[AgentDependencyInput] = strawberry.field(default_factory=list)
     port_groups: list[PortGroupInput] = strawberry.field(
         default_factory=list,
         description="The port groups of the definition. This is used to group ports together in the UI",
@@ -537,6 +524,7 @@ class ImplementationInput:
         default=None,
         description="The optimistics of the definition. This is used to optimistically set state values when the action is assigned. This is used to provide a better user experience by optimistically setting state",
     )
+    dependencies: list[AgentDependencyInput] = strawberry.field(default_factory=list)
 
 
 @pydantic.input(

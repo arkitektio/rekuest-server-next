@@ -177,22 +177,16 @@ class RedisControllBackend(ControllBackend):
             assert input.parent, "Dependency assignments must have a parent assignation"
 
             parent = models.Assignation.objects.get(id=input.parent)
-            resolved = models.ResolvedDependency.objects.filter(resolution=parent.resolution, dependency__key=input.dependency, key=input.method).all()
-            if not resolved:
-                raise ValueError(f"No resolved dependency found for key {input.dependency} {input.method} in parent assignation {input.parent}")
+            dependency = models.Dependency.objects.get(action=parent, dependency=input.dependency, key=input.method)
+            if not dependency.auto_resolvable:
+                raise ValueError(f"Dependency {dependency.key} is not auto resolvable, we currently do not support this. Its coming though..")
 
-            active_resolved = [r for r in resolved if r.implementation.agent.connected and r.implementation.agent.last_seen and r.implementation.agent.last_seen > datetime.now(timezone.utc) - timedelta(minutes=1)]
-            if not active_resolved:
-                raise ValueError(f"No active implementation found for resolved dependency {input.dependency} {input.method} in parent assignation {input.parent}")
+            
+            implementation = models.Implementation.objects.filter(app=dependency.app, agent__connected=True, agent__last_seen__gt=datetime.now() - timedelta(minutes=1)).all()
 
-            if len(resolved) > 1:
-                # TODO: Implement selecting logic here
-                pass
-
-            implementation = active_resolved[0].implementation
+            implementation = choice(implementation)
             action = implementation.action
             agent = implementation.agent
-            resolution = active_resolved[0].down_stream_resolution
 
         elif input.reservation:
             # TODO: Retrieve the reservation in the redis cache wth the provision keys set
@@ -247,9 +241,6 @@ class RedisControllBackend(ControllBackend):
 
         reference = input.reference or self.create_message_id()
 
-        if action.dependencies.exists():
-            if not resolution:
-                raise ValueError("Action has dependencies but no resolution was provided for the assignation")
 
         # TODO: if ephemeral is set, we should not store the assignation in the database
         assignation = models.Assignation.objects.create(

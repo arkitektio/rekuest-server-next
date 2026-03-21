@@ -10,7 +10,7 @@ from django.contrib.postgres.fields import ArrayField
 
 # Create your models here.
 from rekuest_core.inputs.models import ActionDependencyInputModel
-from authentikate.models import Organization, User, Membership, App, Release
+from authentikate.models import Organization, User, Membership, App, Release, Device
 
 
 class Collection(models.Model):
@@ -407,6 +407,7 @@ class Agent(models.Model):
         help_text="The app this agent belongs to (agents are part of an app and are NOT associated only with a release)",
     )
     release = models.ForeignKey(Release, on_delete=models.CASCADE, related_name="agents", help_text="The release this agent belongs to (agents are part of a release and are NOT associated only with an app)")
+    device = models.ForeignKey(Device, on_delete=models.CASCADE, related_name="agents", help_text="The device this agent belongs to (agents are part of a device and are NOT associated only with an app or release)")
     name = models.CharField(max_length=2000, help_text="This providers Name", default="Nana")
     extensions = models.JSONField(
         max_length=2000,
@@ -671,11 +672,10 @@ class Dependency(models.Model):
 
 
     """
-
-    action = models.ForeignKey(
-        Action,
+    implementatoin = models.ForeignKey(
+        Implementation,
         on_delete=models.CASCADE,
-        help_text="The action that has this dependency",
+        help_text="The implementation that has this dependency",
         related_name="dependencies",
     )
     key = models.CharField(
@@ -685,6 +685,10 @@ class Dependency(models.Model):
     action_demands = models.JSONField(
         default=list,
         help_text="The action demands this dependency has to meet",
+    )
+    auto_resolvable = models.BooleanField(
+        default=True,
+        help_text="If this dependency is auto resolvable, the system will try to automatically bind any agent that the user can assign to this dependency. If False, the user will have to manually bind an agent to this dependency before it can be used.",
     )
     optional = models.BooleanField(default=False, help_text="Is this dependency optional")
     description = models.TextField(null=True, blank=True, help_text="A description for this dependency")

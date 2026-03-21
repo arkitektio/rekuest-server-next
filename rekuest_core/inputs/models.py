@@ -149,11 +149,7 @@ class AgentDependencyInputModel(BaseModel):
     
     # Filters for selecting which instances of the agent are valid for this dependency
     action_demands: list[ActionDependencyInputModel] | None = None
-    app: str
-    version: str | None = None
-    name: str | None = None
-    instance: str | None = None
-    device: str | None = None
+    auto_resolvable: bool = False
     
     
     
@@ -177,7 +173,6 @@ class DefinitionInputModel(BaseModel):
     returns: list[PortInputModel] = Field(default_factory=list)
     kind: enums.ActionKind
     tests: ActionDependencyInputModel | None = Field(default=None)
-    dependencies: list[AgentDependencyInputModel] = Field(default_factory=list)
     is_test_for: list["str"] = Field(default_factory=list)
     interfaces: list[str] = Field(default_factory=list)
     is_dev: bool = False
@@ -216,6 +211,7 @@ class DependencyInputModel(BaseModel):
 
 class ImplementationInputModel(BaseModel):
     definition: DefinitionInputModel
+    dependencies: list[AgentDependencyInputModel] = Field(default_factory=list)
     interface: str
     params: dict[str, Any] | None = None
     instance_id: str | None = None

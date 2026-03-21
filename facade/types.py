@@ -198,11 +198,22 @@ ActionStats, ActionStatsResolver = create_stats_type(
 @strawberry_django.type(models.Dependency, filters=filters.DependencyFilter, pagination=True, description="Represents a dependency between implementations and actions.")
 class Dependency:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the dependency.")
-    implementation: "Implementation" = strawberry_django.field(description="Implementation this dependency belongs to.")
-    action_hash: rscalars.ActionHash | None = strawberry_django.field(description="Original hash when the dependency was created.")
+    implementation: "Implementation" = strawberry_django.field(description="The implementation this dependency belongs to.")
     key: str = strawberry_django.field(description="Optional string identifier or tag for reference.")
     optional: bool = strawberry_django.field(description="Indicates if the dependency is optional.")
     description: str | None = strawberry_django.field(description="Optional description of the dependency.")
+    auto_resolvable: bool = strawberry.field(
+        default=False,
+        description="Whether this dependency is auto resolvable or not. If so we will try to automatically resolve it based on the demands specified in the dependency and the capabilities of the available agents in the system. This is used to identify the demand in the system. Attention if any of the dependencies of this agent dependency is not auto resolvable, this dependency will also not be auto resolvable",
+    )
+    app_filter: str | None = strawberry_django.field(
+        default=None,
+        description="Optional filter string to limit which agents can be bound to this dependency based on the app they belong to. The filter string should be in the format 'app_identifier:version' where version can be a specific version or a wildcard '*'. For example, 'my_app:*' would allow any agent belonging to 'my_app' regardless of version, while 'my_app:1.0.0' would only allow agents with that specific version.",
+    )
+    version_filter: str | None = strawberry_django.field(
+        default=None,
+        description="Optional filter string to limit which agents can be bound to this dependency based on the version of the app they belong to. The filter string should be in the format 'version' where version can be a specific version or a wildcard '*'. For example, '*' would allow any version, while '1.0.0' would only allow agents with that specific version.",
+    )
 
     @strawberry_django.field(description="Protocols that this dependency needs to match.")
     def return_matches(self) -> list[rtypes.PortMatch] | None:
@@ -352,6 +363,8 @@ class Agent:
     instance_id: scalars.InstanceId = strawberry_django.field(description="Unique instance identifier on the agent.")
     registry: "Registry" = strawberry_django.field(description="Registry entry this agent belongs to.")
     hardware_records: list[HardwareRecord] = strawberry_django.field(description="Historical records of agent's hardware.")
+    device: Device = strawberry_django.field(description="Device associated with the agent.")
+    user: User = strawberry_django.field(description="User associated with the agent.")
     implementations: list["Implementation"] = strawberry_django.field(description="Implementations the agent can run.")
     memory_shelve: Optional["MemoryShelve"] = strawberry_django.field(description="Agent's associated memory shelve.")
     file_system_shelves: list["FilesystemShelve"] = strawberry_django.field(description="Filesystem shelves available on the agent.")

@@ -219,6 +219,7 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
                     key=i.key,
                     defaults=dict(
                         action_demands=[strawberry.asdict(x) for x in i.action_demands] if i.action_demands else [],
+                        app=models.App.objects.get_or_create(identifier=agent.app)[0],
                     ),
                 )
                 new_deps.append(dep)
