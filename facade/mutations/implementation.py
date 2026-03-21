@@ -210,19 +210,6 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
             name=definition.name,
         )
 
-        new_deps = []
-
-        if definition.dependencies:
-            for i in definition.dependencies:
-                dep, _ = models.Dependency.objects.update_or_create(
-                    action=action,
-                    key=i.key,
-                    defaults=dict(
-                        action_demands=[strawberry.asdict(x) for x in i.action_demands] if i.action_demands else [],
-                        app=models.App.objects.get_or_create(identifier=agent.app)[0],
-                    ),
-                )
-                new_deps.append(dep)
 
         create_usages(action, definition)
         protocols = infer_protocols(definition)
@@ -256,6 +243,22 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
         implementation.params = input.params or {}
         implementation.release = agent.registry.client.release
         implementation.save()
+        
+        
+        new_deps = []
+
+        if input.dependencies:
+            for i in input.dependencies:
+                dep, _ = models.Dependency.objects.update_or_create(
+                    implementation=implementation,
+                    key=i.key,
+                    defaults=dict(
+                        action_demands=[strawberry.asdict(x) for x in i.action_demands] if i.action_demands else [],
+                        app_filter = i.app,
+                        version_filter = i.version,
+                    ),
+                )
+                new_deps.append(dep)
 
     except models.Implementation.DoesNotExist:
         implementation = models.Implementation.objects.create(
@@ -267,6 +270,19 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
             dynamic=input.dynamic,
             params=input.params or {},
         )
+        
+        if input.dependencies:
+            for i in input.dependencies:
+                dep, _ = models.Dependency.objects.update_or_create(
+                    implementation=implementation,
+                    key=i.key,
+                    defaults=dict(
+                        action_demands=[strawberry.asdict(x) for x in i.action_demands] if i.action_demands else [],
+                        app_filter = i.app,
+                        version_filter = i.version,
+                    ),
+                )
+                new_deps.append(dep)
 
     return implementation
 

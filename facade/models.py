@@ -672,8 +672,8 @@ class Dependency(models.Model):
 
 
     """
-    implementatoin = models.ForeignKey(
-        Implementation,
+    implementation = models.ForeignKey(
+        "Implementation",
         on_delete=models.CASCADE,
         help_text="The implementation that has this dependency",
         related_name="dependencies",
@@ -690,6 +690,19 @@ class Dependency(models.Model):
         default=True,
         help_text="If this dependency is auto resolvable, the system will try to automatically bind any agent that the user can assign to this dependency. If False, the user will have to manually bind an agent to this dependency before it can be used.",
     )
+    app_filter = models.CharField(
+        max_length=2000,
+        null=True,
+        blank=True,
+        help_text="If set, only Agents of this app will be able to be assigned to this dependency.",
+    )
+    version_filter = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        help_text="If set, only Agents of this version will be able to be assigned to this dependency",
+    )
+    
     optional = models.BooleanField(default=False, help_text="Is this dependency optional")
     description = models.TextField(null=True, blank=True, help_text="A description for this dependency")
     created_at = models.DateTimeField(auto_created=True, auto_now_add=True)

@@ -154,7 +154,6 @@ class Action:
     test_cases: list[LazyType["TestCase", __name__]] | None = strawberry_django.field(description="Test cases for this action.")
     organization: "Organization" = strawberry_django.field(description="The organization that owns this action.")
     assignations: list[LazyType["Assignation", __name__]] = strawberry_django.field(description="Assignations created for this action.")
-    dependencies: list["Dependency"] = strawberry_django.field(description="Dependencies required by this action.")
 
     @strawberry_django.field(description="Retrieve assignations where this action has run.")
     def runs(self) -> list[LazyType["Assignation", __name__]] | None:
@@ -241,6 +240,7 @@ class Implementation:
     action: "Action" = strawberry_django.field(description="The action this implements.")
     params: rscalars.AnyDefault = strawberry_django.field(description="Arbitrary parameters for the implementation.")
     resolutions: list["Resolution"] = strawberry_django.field(description="The resolved dependencies")
+    dependencies: list["Dependency"] = strawberry_django.field(description="Dependencies required by this action.")
 
     @strawberry_django.field(description="Constructed name for display, combining interface and agent name.")
     def name(self) -> str:

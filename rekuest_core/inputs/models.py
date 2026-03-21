@@ -141,11 +141,11 @@ class ActionDependencyInputModel(BaseModel):
 
 class AgentDependencyInputModel(BaseModel):
     key: str
+    app: str | None = None
+    version: str | None = None
     
     description: str | None = None
     optional: bool = False
-    
-    
     
     # Filters for selecting which instances of the agent are valid for this dependency
     action_demands: list[ActionDependencyInputModel] | None = None

@@ -132,22 +132,22 @@ class AgentFilter(ScopeFilterMixin):
     def filter_version_number(self, queryset, info):
         if self.version_number is None:
             return queryset
-        return queryset.filter(registry__client__release__version=self.app_identifier)
+        return queryset.filter(release__version=self.version_number)
 
     def filter_device_id(self, queryset, info):
         if self.device_id is None:
             return queryset
-        return queryset.filter(registry__client__device__device_id=self.device_id)
+        return queryset.filter(device__device_id=self.device_id)
 
     def filter_app_identifier(self, queryset, info):
         if self.app_identifier is None:
             return queryset
-        return queryset.filter(registry__client__release__app__identifier=self.app_identifier)
+        return queryset.filter(app__identifier=self.app_identifier)
 
     def filter_user(self, queryset, info):
         if self.user is None:
             return queryset
-        return queryset.filter(registry__user__sub=self.user)
+        return queryset.filter(user__sub=self.user)
 
     def filter_search(self, queryset, info):
         if self.search is None or self.search == "":

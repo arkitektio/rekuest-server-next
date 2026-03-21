@@ -344,7 +344,7 @@ class PortMatchInput:
 )
 class ActionDependencyInput:
     key: str = strawberry.field(
-        description="The key of the action. This is used to identify the action in the system.",
+        description="The key of the action. This is used to identify the dependency in the system.",
     )
     hash: scalars.ActionHash | None = strawberry.field(
         default=None,
@@ -389,11 +389,15 @@ class ActionDependencyInput:
 )
 class AgentDependencyInput:
     key: str = strawberry.field(
-        description="The key of tthis dependency, when assigning you can reference this key to specify which agent_dependency you are assigning to. ",
+        description="The key of this dependency, when assigning you can reference this key to specify which agent_dependency you are assigning to. ",
     )
-    app: str = strawberry.field(
+    app: str | None = strawberry.field(
         default=None,
         description="Which app this dependency corresponds to (i.e. do you want to use a stardist agent for that or imagej agents needs to be a world unique classsifier (reverse domain notation) that identifies the type of agent you want to use, and then we can have multiple agents of the same type running in the system, e.g. startdist could be the app for all agents that correpsond to a startdist instance)",
+    )
+    version: str | None = strawberry.field(
+        default=None,
+        description="The version of the app this dependency corresponds to.",
     )
     auto_resolvable: bool = strawberry.field(
         default=False,
