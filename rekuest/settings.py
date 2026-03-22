@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "authentikate",
     "django_probes",
     "kante",
+    "datalayer",
     "facade",
     "health_check",  # required
     "health_check.db",  # stock Django health checkers

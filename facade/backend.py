@@ -177,12 +177,11 @@ class RedisControllBackend(ControllBackend):
             assert input.parent, "Dependency assignments must have a parent assignation"
 
             parent = models.Assignation.objects.get(id=input.parent)
-            dependency = models.Dependency.objects.get(action=parent, dependency=input.dependency, key=input.method)
+            dependency = models.Dependency.objects.get(implementation=parent.implementation, dependency=input.dependency, key=input.method)
             if not dependency.auto_resolvable:
                 raise ValueError(f"Dependency {dependency.key} is not auto resolvable, we currently do not support this. Its coming though..")
 
-            
-            implementation = models.Implementation.objects.filter(app=dependency.app, agent__connected=True, agent__last_seen__gt=datetime.now() - timedelta(minutes=1)).all()
+            implementation = models.Implementation.objects.filter(app=dependency.app_filter, agent__connected=True, agent__last_seen__gt=datetime.now() - timedelta(minutes=1)).all()
 
             implementation = choice(implementation)
             action = implementation.action
@@ -240,7 +239,6 @@ class RedisControllBackend(ControllBackend):
         acted_on = acted_on_from_args(input.args, action)
 
         reference = input.reference or self.create_message_id()
-
 
         # TODO: if ephemeral is set, we should not store the assignation in the database
         assignation = models.Assignation.objects.create(
