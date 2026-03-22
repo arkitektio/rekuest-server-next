@@ -18,11 +18,21 @@ Including another URLconf
 from django.contrib import admin
 from kante.path import dynamicpath
 from django.urls import include, path
-from health_check.views import MainView
+from health_check.views import HealthCheckView
 from django.views.decorators.csrf import csrf_exempt
 
 
 urlpatterns = [
     dynamicpath("admin/", admin.site.urls),
-    dynamicpath("ht",  csrf_exempt(MainView.as_view()), name="health_check"),
+    dynamicpath(
+        "ht",
+        csrf_exempt(
+            HealthCheckView.as_view(
+                checks=[
+                    "health_check.Database",
+                ]
+            )
+        ),
+        name="health_check",
+    ),
 ]

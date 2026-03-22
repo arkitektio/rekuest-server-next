@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
+    "django.contrib.postgres",
     "django.contrib.staticfiles",
     "guardian",
     "channels",
@@ -57,7 +58,6 @@ INSTALLED_APPS = [
     "datalayer",
     "facade",
     "health_check",  # required
-    "health_check.db",  # stock Django health checkers
 ]
 
 # Authentikate section
