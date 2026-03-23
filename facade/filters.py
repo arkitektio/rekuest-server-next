@@ -1059,25 +1059,7 @@ class ImplementationFilter:
 
         dependency = models.Dependency.objects.get(id=self.resolvable_for)
 
-        arg_demands = [rimodels.PortMatchInputModel(**d) for d in dependency.arg_matches] if dependency.arg_matches is not None else None
-        return_demands = [rimodels.PortMatchInputModel(**d) for d in dependency.return_matches] if dependency.return_matches is not None else None
-
-        demand = rimodels.ActionDependencyInputModel(
-            key=dependency.key,
-            hash=dependency.action_hash,
-            arg_matches=arg_demands,
-            force_arg_length=len(arg_demands) if arg_demands is not None else None,
-            force_return_length=len(return_demands) if return_demands is not None else None,
-            return_matches=return_demands,
-            protocols=dependency.protocols,
-        )
-        new_ids = managers.get_action_ids_by_action_demand(
-            demand,
-            model="facade_action",
-            organization_id=info.context.request.organization.id,
-        )
-
-        return queryset.filter(action__id__in=new_ids)
+        return queryset.filter(action__app__identifier=dependency.app_filter)
 
     def filter_ids(self, queryset, info):
         if self.ids is None:

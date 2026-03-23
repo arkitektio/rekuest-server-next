@@ -143,17 +143,14 @@ class AgentDependencyInputModel(BaseModel):
     key: str
     app: str | None = None
     version: str | None = None
-    
+
     description: str | None = None
     optional: bool = False
-    
+
     # Filters for selecting which instances of the agent are valid for this dependency
     action_demands: list[ActionDependencyInputModel] | None = None
     auto_resolvable: bool = False
-    
-    
-    
-    
+
     min_viable_instances: int | None = None
     prefered_instances: int | None = None
     assign_policy: enums.AssignPolicy = enums.AssignPolicy.BALANCED
@@ -166,6 +163,7 @@ class DefinitionInputModel(BaseModel):
     version: str = "1"
     description: str = "No description provided"
     collections: list[str] = Field(default_factory=list)
+    package: str | None = None
     name: str
     stateful: bool = False
     port_groups: list[PortGroupInputModel] = Field(default_factory=list)

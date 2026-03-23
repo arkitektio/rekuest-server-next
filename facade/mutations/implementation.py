@@ -172,7 +172,7 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
     hash = hash_definition(definition)
     key = definition.key
     version = definition.version
-    app = agent.app
+    app = agent.app or input.definition.app
 
     try:
         action = models.Action.objects.get(key=key, version=version, app=app, organization=agent.organization)
@@ -210,7 +210,6 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
             name=definition.name,
         )
 
-
         create_usages(action, definition)
         protocols = infer_protocols(definition)
         action.protocols.add(*protocols)
@@ -243,8 +242,7 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
         implementation.params = input.params or {}
         implementation.release = agent.registry.client.release
         implementation.save()
-        
-        
+
         new_deps = []
 
         if input.dependencies:
@@ -254,8 +252,8 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
                     key=i.key,
                     defaults=dict(
                         action_demands=[strawberry.asdict(x) for x in i.action_demands] if i.action_demands else [],
-                        app_filter = i.app,
-                        version_filter = i.version,
+                        app_filter=i.app,
+                        version_filter=i.version,
                     ),
                 )
                 new_deps.append(dep)
@@ -270,7 +268,9 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
             dynamic=input.dynamic,
             params=input.params or {},
         )
-        
+
+        new_deps = []
+
         if input.dependencies:
             for i in input.dependencies:
                 dep, _ = models.Dependency.objects.update_or_create(
@@ -278,8 +278,8 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
                     key=i.key,
                     defaults=dict(
                         action_demands=[strawberry.asdict(x) for x in i.action_demands] if i.action_demands else [],
-                        app_filter = i.app,
-                        version_filter = i.version,
+                        app_filter=i.app,
+                        version_filter=i.version,
                     ),
                 )
                 new_deps.append(dep)
@@ -336,6 +336,17 @@ def set_extension_implementations(info: Info, input: inputs.SetExtensionImplemen
 
     created_implementations_id = []
     created_implementations = []
+
+    for lock in input.locks or []:
+        lock = models.Lock.objects.get_or_create(
+            agent=agent,
+            key=lock.key,
+            extension=input.extension,
+            defaults=dict(
+                description=lock.description,
+            ),
+        )
+
     for implementation in input.implementations:
         created_implementation = _create_implementation(implementation, agent, input.extension)
 

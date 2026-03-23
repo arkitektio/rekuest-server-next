@@ -206,11 +206,11 @@ def set_agent_states(info: Info, input: inputs.SetAgentStatesInput) -> list[type
         registry=registry,
         instance_id=input.instance_id or "default",
         defaults=dict(
-            name=f"{str(registry.pk)} on {input.instance_id}",
             app=info.context.request.client.release.app,
             organization=info.context.request.organization,
             user=info.context.request.user,
             release=info.context.request.client.release,
+            device=info.context.request.client.device,
         ),
     )
 

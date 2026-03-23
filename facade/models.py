@@ -359,6 +359,28 @@ class OutputInterfaceUsage(models.Model):
     modifiers = models.JSONField(default=list)
 
 
+class Lock(models.Model):
+    agent = models.ForeignKey(
+        "Agent",
+        on_delete=models.CASCADE,
+        related_name="locks",
+        help_text="The agent this lock belongs to",
+    )
+    key = models.CharField(max_length=2000, help_text="A unique identifier for this lock within the agent")
+    extension = models.CharField(max_length=2000, help_text="The extension this lock is for (e.g. 'imagej')", default="general")
+    description = models.TextField(help_text="A description for the Lock")
+    created_at = models.DateTimeField(auto_created=True, auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    hold_by = models.ForeignKey(
+        "Assignation",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="held_locks",
+        help_text="The assigniation that currently holds this lock",
+    )
+
+
 class Shortcut(models.Model):
     name = models.CharField(max_length=1000)
     description = models.TextField(null=True, blank=True)
@@ -406,6 +428,7 @@ class Agent(models.Model):
         related_name="agents",
         help_text="The app this agent belongs to (agents are part of an app and are NOT associated only with a release)",
     )
+    hash = models.CharField(max_length=1000, help_text="The hash of the Agent (comparing the hash can be used to check if the agent has changed in a definition way)")
     release = models.ForeignKey(Release, on_delete=models.CASCADE, related_name="agents", help_text="The release this agent belongs to (agents are part of a release and are NOT associated only with an app)")
     device = models.ForeignKey(Device, on_delete=models.CASCADE, related_name="agents", help_text="The device this agent belongs to (agents are part of a device and are NOT associated only with an app or release)")
     name = models.CharField(max_length=2000, help_text="This providers Name", default="Nana")
@@ -672,6 +695,7 @@ class Dependency(models.Model):
 
 
     """
+
     implementation = models.ForeignKey(
         "Implementation",
         on_delete=models.CASCADE,
@@ -702,7 +726,7 @@ class Dependency(models.Model):
         blank=True,
         help_text="If set, only Agents of this version will be able to be assigned to this dependency",
     )
-    
+
     optional = models.BooleanField(default=False, help_text="Is this dependency optional")
     description = models.TextField(null=True, blank=True, help_text="A description for this dependency")
     created_at = models.DateTimeField(auto_created=True, auto_now_add=True)

@@ -457,6 +457,10 @@ class DefinitionInput:
         description="The collections of the definition. This is used to group definitions together in the UI",
     )
     key: str = strawberry.field(description="The key of the definition. This is used to uniquely identify the definition")
+    package: str | None = strawberry.field(
+        default=None,
+        description="The package of the function. Will default to the currents agent's app if not specified. This is used to group definitions together in the UI and provide a better user experience",
+    )
     version: str = strawberry.field(description="The version of the definition. This is used to differentiate if the underyling algorithm has changed, i.e we would expect different results for the same input")
     name: str = strawberry.field(description="The name of the actions. This is used to uniquely identify the definition")
     stateful: bool = strawberry.field(
