@@ -69,7 +69,7 @@ def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
     return agent
 
 
-def pin_agent(info, input: inputs.PinInput) -> types.Agent:
+def pin_agent(info: Info, input: inputs.PinInput) -> types.Agent:
     agent = models.Agent.objects.get(id=input.id)
     if input.pin:
         agent.pinned_by.add(info.context.request.user)
@@ -79,7 +79,7 @@ def pin_agent(info, input: inputs.PinInput) -> types.Agent:
     return agent
 
 
-def delete_agent(info, input: DeleteAgentInput) -> strawberry.ID:
+def delete_agent(info: Info, input: DeleteAgentInput) -> strawberry.ID:
     agent = models.Agent.objects.get(id=input.id)
     agent.delete()
     return input.id

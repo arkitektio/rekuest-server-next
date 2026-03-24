@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "channels",
     "authentikate",
     "django_probes",
+    "datalayer",
     "kante",
     "facade",
     "health_check",  # required

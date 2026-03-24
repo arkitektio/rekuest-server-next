@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import uuid
 from random import choice
-from typing import Dict, Protocol
+from typing import Dict, Protocol, Any
 
 from facade import enums, inputs, models, types, messages
 from facade.consumers.async_consumer import AgentConsumer
@@ -26,24 +26,40 @@ class ControllBackend(Protocol):
     def pause(self, info: Info, input: inputs.PauseInputModel) -> types.Assignation: ...
 
 
-def build_dependency_dict(implementation: models.Implementation, info: Info) -> Dict[str, str]:
+def build_agent_dependency_dict(agent: models.Agent, dep: models.Dependency) -> Dict[str, Any]:
+    implementations: Dict[str, str] = {}
+
+    for action in dep.get_action_demands():
+        implementation = models.Implementation.objects.get(action__key=action.key, agent=agent)
+
+        if implementation.dependencies.exists():
+            raise NotImplementedError("Nested dependencies are not supported yet, but they are coming soon!")
+
+        implementations[action.key] = {"implementation": str(implementation.pk), "dependencies": {}}
+
+    return {
+        "agent": str(agent.pk),
+        "actions": implementations,
+    }
+
+
+def build_dependency_dict(implementation: models.Implementation, info: Info, dependency_overwrites: Dict[str, str]) -> Dict[str, str]:
     dependencies = models.Dependency.objects.filter(implementation=implementation).all()
 
     dep_kwargs = {}
 
     for dep in dependencies:
-        if not dep.action_hash:
-            raise ValueError(f"Dependency {dep.key} has no action hash. This is not implemented yet for dynamic resolution.")
+        if not dep.auto_resolvable and dep.key not in dependency_overwrites:
+            raise ValueError(f"Dependency {dep.key} is not auto resolvable, and no overwrite was provided. Please provide a value for this dependency in the dependencies field of the assign mutation.")
 
-        try:
-            action = models.Action.objects.get(hash=dep.action_hash, organization=info.context.request.organization)
-        except models.Action.DoesNotExist:
-            raise ValueError(f"Dependency {dep.key} references action hash {dep.action_hash} which does not exist.")
-        implementation = models.Implementation.objects.filter(action=action, agent__connected=True, agent__last_seen__gt=datetime.now() - timedelta(minutes=1)).first()
-        if not implementation:
-            raise ValueError(f"No active implementation found for this depdendency {dep.key}")
+        if dep.auto_resolvable:
+            agents = models.Agent.objects.filter(app__identifier=dep.app_filter, connected=True, last_seen__gt=datetime.now() - timedelta(minutes=1), organization=info.context.request.organization).all()
+            # TODO: filter by desired length and by the user and organization of the agent as well, but for now we just take any agent that is connected and has seen in the last minute
 
-        dep_kwargs[dep.key] = str(implementation.id)
+            if len(agents) == 0:
+                raise ValueError(f"No implementations found for dependency {dep.key}. Cannot resolve dependency.")
+
+            dep_kwargs[dep.key] = [build_agent_dependency_dict(agent, dep) for agent in agents]
 
     return dep_kwargs
 
@@ -166,24 +182,38 @@ class RedisControllBackend(ControllBackend):
         implementation = None
         resolution = None
         agent = None
+        dependency_dict = None
 
         waiter = get_waiter_for_context(info, input.instance_id)
-
-        if input.resolution:
-            resolution = models.Resolution.objects.get(id=input.resolution)
 
         if input.dependency:
             assert input.method, "Method key must be provided when assigning to a dependency"
             assert input.parent, "Dependency assignments must have a parent assignation"
 
             parent = models.Assignation.objects.get(id=input.parent)
-            dependency = models.Dependency.objects.get(implementation=parent.implementation, dependency=input.dependency, key=input.method)
-            if not dependency.auto_resolvable:
-                raise ValueError(f"Dependency {dependency.key} is not auto resolvable, we currently do not support this. Its coming though..")
+            dependencies = parent.dependencies
 
-            implementation = models.Implementation.objects.filter(app=dependency.app_filter, agent__connected=True, agent__last_seen__gt=datetime.now() - timedelta(minutes=1)).all()
+            if input.dependency not in dependencies:
+                raise ValueError(f"Dependency {input.dependency} not found in parent assignation dependencies. {parent.dependencies}")
 
-            implementation = choice(implementation)
+            agent_dependency = dependencies[input.dependency]
+
+            # Choose random agent
+            chosen_agent = choice(agent_dependency)
+
+            if "actions" not in chosen_agent:
+                raise ValueError(f"Dependency {input.dependency} does not contain an action")
+
+            if input.method not in chosen_agent["actions"]:
+                raise ValueError(f"Method {input.method} not found in dependency {input.dependency} actions")
+
+            implementation_dep = chosen_agent["actions"][input.method]
+
+            implementation_id = implementation_dep["implementation"]
+            dependency_dict = implementation_dep["dependencies"]
+
+            implementation = models.Implementation.objects.get(id=implementation_id)
+            action = implementation.action
             action = implementation.action
             agent = implementation.agent
 
@@ -239,6 +269,8 @@ class RedisControllBackend(ControllBackend):
         acted_on = acted_on_from_args(input.args, action)
 
         reference = input.reference or self.create_message_id()
+        if dependency_dict is None:
+            dependency_dict = build_dependency_dict(implementation, info, input.dependencies or {})
 
         # TODO: if ephemeral is set, we should not store the assignation in the database
         assignation = models.Assignation.objects.create(
@@ -251,11 +283,14 @@ class RedisControllBackend(ControllBackend):
             acted_on=acted_on,
             capture=input.capture,
             implementation=implementation,
+            dependency=input.dependency,
+            dependency_method=input.method,
             resolution=resolution,
             is_done=False,
             latest_event_kind=enums.AssignationEventKind.ASSIGN,
             latest_instruct_kind=enums.AssignationInstructKind.ASSIGN,
             hooks=input.hooks or [],
+            dependencies=dependency_dict,
             waiter=waiter,
             ephemeral=input.ephemeral,
         )

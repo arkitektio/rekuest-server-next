@@ -361,7 +361,7 @@ def set_extension_implementations(info: Info, input: inputs.SetExtensionImplemen
     return created_implementations
 
 
-def pin_implementation(info, input: inputs.PinInput) -> types.Implementation:
+def pin_implementation(info: Info, input: inputs.PinInput) -> types.Implementation:
     user = info.context.request.user
 
     agent = models.Implementation.objects.get(id=input.id)

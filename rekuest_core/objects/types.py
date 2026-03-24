@@ -18,9 +18,12 @@ class ChoiceModel(BaseModel):
     description: str | None
 
 
-@pydantic.type(models.ChoiceModel, fields=["label", "value", "image", "description"])
+@pydantic.type(models.ChoiceModel)
 class Choice:
-    pass
+    label: str
+    value: str
+    image: str | None
+    description: str | None
 
 
 @pydantic.interface(models.AssignWidgetModel)

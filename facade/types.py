@@ -18,6 +18,7 @@ from .type_gen import create_stats_type
 from rekuest_ui_core.objects import models as uimodels
 from rekuest_ui_core.objects import types as uitypes
 from strawberry.experimental import pydantic
+from datalayer import types as dtypes
 
 
 def build_prescoped_queryset(info, queryset, field="organization"):
@@ -214,21 +215,9 @@ class Dependency:
         description="Optional filter string to limit which agents can be bound to this dependency based on the version of the app they belong to. The filter string should be in the format 'version' where version can be a specific version or a wildcard '*'. For example, '*' would allow any version, while '1.0.0' would only allow agents with that specific version.",
     )
 
-    @strawberry_django.field(description="Protocols that this dependency needs to match.")
-    def return_matches(self) -> list[rtypes.PortMatch] | None:
-        return [rmodels.PortMatchModel(**i) for i in self.return_matches] if self.return_matches else None
-
-    @strawberry_django.field(description="Protocols that this dependency needs to match.")
-    def arg_matches(self) -> list[rtypes.PortMatch] | None:
-        return [rmodels.PortMatchModel(**i) for i in self.arg_matches] if self.arg_matches else None
-
-    @strawberry_django.field(description="Check if this dependency can be resolved by a connected agent.")
-    def resolvable(self, info: Info) -> bool:
-        qs = models.Implementation.objects.filter(
-            action__hash=self.initial_hash,
-            agent__connected=True,
-        )
-        return qs.exists()
+    @strawberry_django.field(description="List of action demands")
+    def action_demands(self) -> list["ActionDemand"]:
+        return [ActionDemandModel(**i) for i in self.action_demands]
 
 
 @strawberry_django.type(models.Implementation, filters=filters.ImplementationFilter, order=filters.ImplementationOrder, pagination=True, description="Represents a concrete implementation of an action.")
@@ -360,6 +349,7 @@ class MemoryDrawer:
 @strawberry_django.type(models.Agent, filters=filters.AgentFilter, order=filters.AgentOrder, pagination=True, description="Represents a compute agent that can execute implementations.")
 class Agent:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the agent.")
+    hash: str = strawberry_django.field(description="Hash representing the agent's definition for change detection.")
     instance_id: scalars.InstanceId = strawberry_django.field(description="Unique instance identifier on the agent.")
     registry: "Registry" = strawberry_django.field(description="Registry entry this agent belongs to.")
     hardware_records: list[HardwareRecord] = strawberry_django.field(description="Historical records of agent's hardware.")
@@ -460,6 +450,8 @@ class Assignation:
     children: List["Assignation"] = strawberry.field(description="Child assignations spawned from this one.")
     agent: Agent | None = strawberry.field(description="Agent responsible for this assignation.")
     events: list["AssignationEvent"] = strawberry_django.field(description="The events")
+    dependency: str | None = strawberry_django.field(description="The dependency thats linked to the parents execution if applicable.")
+    dependency_method: str | None = strawberry_django.field(description="The method of the dependency that caused this assignation, if applicable.")
 
     @strawberry_django.field(description="List of recent instructions for this assignation.")
     def instructs(self) -> list["AssignationInstruct"]:
@@ -942,3 +934,36 @@ class Snapshot:
     global_revision: int
     session_id: str
     state: State
+
+
+@strawberry_django.type(models.Space)
+class Space:
+    id: strawberry.ID
+    name: str
+    description: str | None
+    creator: User
+    organization: Organization
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+
+
+@strawberry_django.type(models.SpaceMembership)
+class SpaceMembership:
+    id: strawberry.ID
+    space: Space
+    agent: Agent
+    role: str
+    joined_at: datetime.datetime
+    affine_matrix: list[list[float]] | None
+    model: str | None
+
+
+@strawberry_django.type(models.ThreeDModel)
+class ThreeDModel:
+    id: strawberry.ID
+    file: dtypes.MediaStore
+
+
+@strawberry_django.type(models.AgentScene)
+class AgentScene:
+    id: strawberry.ID

@@ -7,6 +7,10 @@ from rekuest_ui_core.constants import interface_types as uiinterface_types
 from strawberry_django.optimizer import DjangoOptimizerExtension
 from authentikate.strawberry import AuthentikateExtension, AuthExtension, AuthSubscribeExtension
 from typing import cast
+from datalayer import mutations as datalayer_mutations
+from datalayer.scalars import scalar_map as dscalar_map
+import kante
+from strawberry.schema.config import StrawberryConfig
 
 
 def field(permission_classes=None, **kwargs):
@@ -203,9 +207,29 @@ class Mutation:
     create_resolution = mutation(resolver=mutations.create_resolution, description="Create sa resolution from")
     update_resolution = mutation(resolver=mutations.update_resolution, description="Update an existing resolution.")
     delete_resolution = mutation(resolver=mutations.delete_resolution, description="Delete a resolution by ID.")
+    create_space = mutation(resolver=mutations.create_space, description="Create a new space.")
+    create_space_membership = mutation(resolver=mutations.create_space_membership, description="Create a new space membership for an agent in a space.")
 
     log_patches = mutation(resolver=mutations.log_patches, description="Log state patches")
     log_snapshot = mutation(resolver=mutations.log_snapshot, description="Log a state snapshot ")
+
+    # Datalayer
+    request_media_upload = kante.django_mutation(
+        description="Upload media and return a URL for access",
+        resolver=datalayer_mutations.request_media_upload,
+    )
+    finish_media_upload = kante.django_mutation(
+        description="Finalize a media upload after the client has written the object",
+        resolver=datalayer_mutations.finish_media_upload,
+    )
+    request_media_access = kante.django_mutation(
+        description="Request temporary S3 read credentials for a media file",
+        resolver=datalayer_mutations.request_media_access,
+    )
+
+    # 3D Model
+    create_agent_scene = mutation(resolver=mutations.create_agent_scene, description="Create a new agent scene with a 3D model.")
+    create_threed_model = mutation(resolver=mutations.create_threed_model, description="Create a new 3D model.")
 
 
 @strawberry.type(description="Root subscription type for real-time event streams from the system.")
@@ -222,7 +246,7 @@ class Subscription:
     child_assignations = subscription(resolver=subscriptions.child_assignations, description="Subscribe to child assignation events.")
 
 
-schema = strawberry.Schema(
+schema = kante.Schema(
     query=Query,
     subscription=Subscription,
     mutation=Mutation,
@@ -231,6 +255,11 @@ schema = strawberry.Schema(
         AuthentikateExtension,
     ],
     types=interface_types + uiinterface_types,
+    config=StrawberryConfig(
+        scalar_map={
+            **dscalar_map,
+        },
+    ),
     # We really need to register
     # all the types here, otherwise the schema will not be able to resolve them
     # and will throw a cryptic error

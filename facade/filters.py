@@ -117,7 +117,7 @@ class AgentFilter(ScopeFilterMixin):
         default=None,
         description="Filter by name of the agents",
     )
-    dependency: str | None = None
+    dependency: strawberry.ID | None = None
     distinct: bool | None
     action_demands: list[inputs.ActionDemandInput] | None
     state_demands: list[inputs.SchemaDemandInput] | None
@@ -222,25 +222,11 @@ class AgentFilter(ScopeFilterMixin):
         if self.dependency is None:
             return queryset
 
-        filtered_ids: set[str] = set()
-
         dependency = models.Dependency.objects.get(id=self.dependency)
-
-        for ports_demand in dependency.get_action_demands():
-            print(ports_demand)
-            new_ids = managers.get_action_ids_by_action_demand(
-                action_demand=ports_demand,
-            )
-            print(new_ids)
-
-            if len(new_ids) == 0:
-                # There are no actions that match the demand
-                raise ValueError(f"No actions found that match the given action demands {ports_demand}")
-
-            queryset = queryset.filter(implementations__action__id__in=new_ids)
-            print(queryset.count())
-
-        return queryset
+        if self.app_identifier:
+            return queryset.filter(app__identifier=dependency.app_filter)
+        else:
+            raise ValueError("Filtering by dependency currently ony allowed when also filtering by app identifier")
 
     def filter_state_demands(self, queryset, info):
         if self.state_demands is None:

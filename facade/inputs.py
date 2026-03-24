@@ -13,7 +13,7 @@ from rekuest_ui_core.inputs import types as uitypes
 from strawberry import LazyType
 from strawberry.experimental import pydantic
 import uuid
-
+from datalayer import scalars as dscalars
 
 class ResolvedDependencyInputModel(BaseModel):
     """Base model for mapping dependencies to implementations.
@@ -215,6 +215,54 @@ class CreateResolutionInput:
         default=None,
         description="The resolved dependencies of the resolution. This is used to identify the resolution in the system.",
     )
+
+
+class CreateSpaceInputModel(BaseModel):
+    """Base model for creating a resolution.
+
+    Attributes:
+        name: Name of the resolution
+        action_demands: List of action demands for the resolution
+        state_demands: List of state demands for the resolution
+        description: Description of the resolution
+        url: URL associated with the resolution
+    """
+
+    key: str
+    name: str
+
+
+@pydantic.input(
+    CreateSpaceInputModel,
+    description="The input for creating a space.",
+)
+class CreateSpaceInput:
+    key: str = strawberry.field(description="The key of the space. This is used to identify the space in the system.")
+    name: str = strawberry.field(description="The name of the space. This is used to identify the space in the system.")
+
+
+class CreateSpaceMembershipInputModel(BaseModel):
+    """Base model for creating a resolution.
+
+    Attributes:
+        name: Name of the resolution
+        action_demands: List of action demands for the resolution
+        state_demands: List of state demands for the resolution
+        description: Description of the resolution
+        url: URL associated with the resolution
+    """
+
+    space_id: str
+    agent_id: str
+
+
+@pydantic.input(
+    CreateSpaceMembershipInputModel,
+    description="The input for creating a space membership.",
+)
+class CreateSpaceMembershipInput:
+    space_id: str = strawberry.field(description="The ID of the space.")
+    agent_id: str = strawberry.field(description="The ID of the agent.")
 
 
 class DeleteResolutionInputModel(BaseModel):
@@ -1142,3 +1190,28 @@ class ArchiveStateInputModel(BaseModel):
 @pydantic.input(ArchiveStateInputModel, description="The input for archiving a state schema.")
 class ArchiveStateInput:
     state_schema: strawberry.ID = strawberry.field(description="The state schema to archive. This is used to identify the state schema in the system.")
+
+
+class CreateThreeDModelInputModel(BaseModel):
+    name: str
+    media: dscalars.MediaStore
+
+
+@pydantic.input(CreateThreeDModelInputModel, description="The input for creating a 3D model.")
+class CreateThreeDModelInput:
+    name: str = strawberry.field(description="The name of the 3D model. This is used to identify the 3D model in the system.")
+    media: dscalars.MediaStore = strawberry.field(description="The media of the 3D model. This is used to identify the 3D model in the system.")
+
+
+class CreateAgentSceneInputModel(BaseModel):
+    model_id: str
+    state_schemas: Any
+
+
+@pydantic.input(CreateAgentSceneInputModel, description="The input for creating an agent scene.")
+class CreateAgentSceneInput:
+    model_id: strawberry.ID = strawberry.field(description="The ID of the 3D model used for this scene. This is used to identify the 3D model in the system.")
+    state_schemas: list[strawberry.ID] | None = strawberry.field(
+        default=None,
+        description="The state schemas that are used in the 3D model. We need this to know which state schemas to transfer to the 3D model when we use it in a scene.",
+    )

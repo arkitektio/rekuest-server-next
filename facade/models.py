@@ -11,6 +11,7 @@ from django.contrib.postgres.fields import ArrayField
 # Create your models here.
 from rekuest_core.inputs.models import ActionDependencyInputModel
 from authentikate.models import Organization, User, Membership, App, Release, Device
+from datalayer.models import MediaStore
 
 
 class Collection(models.Model):
@@ -1008,6 +1009,19 @@ class Assignation(models.Model):
         default=uuid.uuid4,
         help_text="The Unique identifier of this Assignation considering its parent",
     )
+    dependency = models.CharField(
+        max_length=1000,
+        null=True,
+        blank=True,
+        help_text="The reference of the dependency this assignation was assigned to (e.g. imagej)",
+        default="general",
+    )
+    dependency_method = models.CharField(
+        max_length=1000,
+        null=True,
+        blank=True,
+        help_text="The action of the dependency this assignation was assigned to (e.g. imagej.fft )",
+    )
     capture = models.BooleanField(
         default=False,
         help_text="Should we capture the logs and events of this Assignation (e.g. for debugging or auditing purposes)?",
@@ -1381,6 +1395,48 @@ class HistoricalState(models.Model):
     state = models.ForeignKey(State, on_delete=models.CASCADE, related_name="historical_states")
     value = models.JSONField(default=dict, help_text=" The  value of this state atht he time of creation")
     archived_at = models.DateTimeField(auto_now_add=True, help_text="Date this State was archived")
+
+
+class ThreeDModel(models.Model):
+    name = models.CharField(max_length=1000)
+    description = models.TextField(null=True, blank=True)
+    file = models.ForeignKey(
+        MediaStore,
+        on_delete=models.CASCADE,
+        related_name="threedmodels",
+        help_text="The media file containing this 3D model",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class AgentScene(models.Model):
+    transfer_function = models.CharField(max_length=10000, help_text="The function used to transfer the state of the model to properties of the scence")
+    model = models.ForeignKey(ThreeDModel, on_delete=models.CASCADE, related_name="scenes", help_text="The 3D model used for this scene")
+    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="scenes", help_text="The agent this scene belongs to")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class Space(models.Model):
+    name = models.CharField(max_length=2000)
+    description = models.TextField(null=True, blank=True)
+    creator = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.CASCADE,
+        related_name="spaces",
+        help_text="The user that created this Space",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class SpaceMembership(models.Model):
+    space = models.ForeignKey(Space, on_delete=models.CASCADE, related_name="memberships")
+    agent_scene = models.ForeignKey(AgentScene, on_delete=models.CASCADE, related_name="space_memberships")
+    role = models.CharField(max_length=1000, help_text="The role of this membership ")
+    affine_matrix = models.JSONField(help_text="The affine matrix of this membership (e.g. the position and orientation of the agent in the space)", null=True, blank=True)
+    model = models.CharField(max_length=1000, help_text="The model of this membership (e.g. the model of the agent in the space)", null=True, blank=True)
 
 
 import facade.signals as signals  # noqa: E402
