@@ -13,7 +13,7 @@ from rekuest_ui_core.inputs import types as uitypes
 from strawberry import LazyType
 from strawberry.experimental import pydantic
 import uuid
-from datalayer import scalars as dscalars
+from datalayer import scalars as dscalars  # noqa: F401
 
 
 class ResolvedDependencyInputModel(BaseModel):
@@ -1195,24 +1195,117 @@ class ArchiveStateInput:
 
 class CreateThreeDModelInputModel(BaseModel):
     name: str
-    media: dscalars.MediaStore
+    description: str | None = None
+    media: str
 
 
 @pydantic.input(CreateThreeDModelInputModel, description="The input for creating a 3D model.")
 class CreateThreeDModelInput:
-    name: str = strawberry.field(description="The name of the 3D model. This is used to identify the 3D model in the system.")
-    media: str = strawberry.field(description="The media of the 3D model. This is used to identify the 3D model in the system.")
+    name: str = strawberry.field(description="The name of the 3D model.")
+    description: str | None = strawberry.field(default=None, description="A description of the 3D model.")
+    media: strawberry.ID = strawberry.field(description="The ID of the media store file for the 3D model.")
+
+
+class UpdateThreeDModelInputModel(BaseModel):
+    id: str
+    name: str | None = None
+    description: str | None = None
+    media: str | None = None
+
+
+@pydantic.input(UpdateThreeDModelInputModel, description="The input for updating a 3D model.")
+class UpdateThreeDModelInput:
+    id: strawberry.ID = strawberry.field(description="The ID of the 3D model to update.")
+    name: str | None = strawberry.field(default=None, description="The new name of the 3D model.")
+    description: str | None = strawberry.field(default=None, description="The new description of the 3D model.")
+    media: strawberry.ID | None = strawberry.field(default=None, description="The new media store file ID for the 3D model.")
+
+
+class DeleteThreeDModelInputModel(BaseModel):
+    id: str
+
+
+@pydantic.input(DeleteThreeDModelInputModel, description="The input for deleting a 3D model.")
+class DeleteThreeDModelInput:
+    id: strawberry.ID = strawberry.field(description="The ID of the 3D model to delete.")
 
 
 class CreateAgentSceneInputModel(BaseModel):
     model_id: str
-    state_schemas: Any
+    agent_id: str
+    transfer_function: str
 
 
 @pydantic.input(CreateAgentSceneInputModel, description="The input for creating an agent scene.")
 class CreateAgentSceneInput:
-    model_id: strawberry.ID = strawberry.field(description="The ID of the 3D model used for this scene. This is used to identify the 3D model in the system.")
-    state_schemas: list[strawberry.ID] | None = strawberry.field(
-        default=None,
-        description="The state schemas that are used in the 3D model. We need this to know which state schemas to transfer to the 3D model when we use it in a scene.",
-    )
+    model_id: strawberry.ID = strawberry.field(description="The ID of the 3D model used for this scene.")
+    agent_id: strawberry.ID = strawberry.field(description="The ID of the agent this scene belongs to.")
+    transfer_function: str = strawberry.field(description="The function used to transfer the state of the model to properties of the scene.")
+
+
+class UpdateAgentSceneInputModel(BaseModel):
+    id: str
+    transfer_function: str | None = None
+    model_id: str | None = None
+
+
+@pydantic.input(UpdateAgentSceneInputModel, description="The input for updating an agent scene.")
+class UpdateAgentSceneInput:
+    id: strawberry.ID = strawberry.field(description="The ID of the agent scene to update.")
+    transfer_function: str | None = strawberry.field(default=None, description="The new transfer function.")
+    model_id: strawberry.ID | None = strawberry.field(default=None, description="The new 3D model ID.")
+
+
+class DeleteAgentSceneInputModel(BaseModel):
+    id: str
+
+
+@pydantic.input(DeleteAgentSceneInputModel, description="The input for deleting an agent scene.")
+class DeleteAgentSceneInput:
+    id: strawberry.ID = strawberry.field(description="The ID of the agent scene to delete.")
+
+
+class UpdateSpaceInputModel(BaseModel):
+    id: str
+    name: str | None = None
+    description: str | None = None
+
+
+@pydantic.input(UpdateSpaceInputModel, description="The input for updating a space.")
+class UpdateSpaceInput:
+    id: strawberry.ID = strawberry.field(description="The ID of the space to update.")
+    name: str | None = strawberry.field(default=None, description="The new name of the space.")
+    description: str | None = strawberry.field(default=None, description="The new description of the space.")
+
+
+class DeleteSpaceInputModel(BaseModel):
+    id: str
+
+
+@pydantic.input(DeleteSpaceInputModel, description="The input for deleting a space.")
+class DeleteSpaceInput:
+    id: strawberry.ID = strawberry.field(description="The ID of the space to delete.")
+
+
+class UpdateSpaceMembershipInputModel(BaseModel):
+    id: str
+    role: str | None = None
+    affine_matrix: Any | None = None
+    model: str | None = None
+
+
+@pydantic.input(UpdateSpaceMembershipInputModel, description="The input for updating a space membership.")
+class UpdateSpaceMembershipInput:
+    id: strawberry.ID = strawberry.field(description="The ID of the space membership to update.")
+    role: str | None = strawberry.field(default=None, description="The new role for the membership.")
+    affine_matrix: list[list[float]] | None = strawberry.field(default=None, description="The new affine matrix for the membership.")
+    model: str | None = strawberry.field(default=None, description="The new model for the membership.")
+
+
+class DeleteSpaceMembershipInputModel(BaseModel):
+    id: str
+
+
+@pydantic.input(DeleteSpaceMembershipInputModel, description="The input for deleting a space membership.")
+class DeleteSpaceMembershipInput:
+    id: strawberry.ID = strawberry.field(description="The ID of the space membership to delete.")

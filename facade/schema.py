@@ -67,6 +67,27 @@ class Query:
     tasks: list[types.Assignation] = field(description="All tasks.")
     resolved_implementations = field(resolver=queries.resolved_implementations, description="Fetch resolved dependencies for a resolution.")
 
+    spaces: list[types.Space] = field(description="List all spaces.")
+    space_memberships: list[types.SpaceMembership] = field(description="List all space memberships.")
+    threed_models: list[types.ThreeDModel] = field(description="List all 3D models.")
+    agent_scenes: list[types.AgentScene] = field(description="List all agent scenes.")
+
+    @field(description="Get a space by ID.")
+    def space(self, info: Info, id: strawberry.ID) -> types.Space:
+        return cast(types.Space, models.Space.objects.get(id=id))
+
+    @field(description="Get a 3D model by ID.")
+    def threed_model(self, info: Info, id: strawberry.ID) -> types.ThreeDModel:
+        return cast(types.ThreeDModel, models.ThreeDModel.objects.get(id=id))
+
+    @field(description="Get an agent scene by ID.")
+    def agent_scene(self, info: Info, id: strawberry.ID) -> types.AgentScene:
+        return cast(types.AgentScene, models.AgentScene.objects.get(id=id))
+
+    @field(description="Get a space membership by ID.")
+    def space_membership(self, info: Info, id: strawberry.ID) -> types.SpaceMembership:
+        return cast(types.SpaceMembership, models.SpaceMembership.objects.get(id=id))
+
     # Stats
     actionStats: types.ActionStats = field(resolver=types.ActionStatsResolver, description="Statistics about actions and their implementations.")
     assignationStats: types.AssignationStats = field(resolver=types.AssignationStatsResolver, description="Statistics about assignations and their states.")
@@ -230,6 +251,16 @@ class Mutation:
     # 3D Model
     create_agent_scene = mutation(resolver=mutations.create_agent_scene, description="Create a new agent scene with a 3D model.")
     create_threed_model = mutation(resolver=mutations.create_threed_model, description="Create a new 3D model.")
+    update_threed_model = mutation(resolver=mutations.update_threed_model, description="Update an existing 3D model.")
+    delete_threed_model = mutation(resolver=mutations.delete_threed_model, description="Delete a 3D model.")
+    update_agent_scene = mutation(resolver=mutations.update_agent_scene, description="Update an existing agent scene.")
+    delete_agent_scene = mutation(resolver=mutations.delete_agent_scene, description="Delete an agent scene.")
+
+    # Space
+    update_space = mutation(resolver=mutations.update_space, description="Update an existing space.")
+    delete_space = mutation(resolver=mutations.delete_space, description="Delete a space.")
+    update_space_membership = mutation(resolver=mutations.update_space_membership, description="Update an existing space membership.")
+    delete_space_membership = mutation(resolver=mutations.delete_space_membership, description="Delete a space membership.")
 
 
 @strawberry.type(description="Root subscription type for real-time event streams from the system.")

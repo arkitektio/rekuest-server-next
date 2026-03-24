@@ -13,8 +13,8 @@ from .materialized_blok import materialize_blok
 from .lifeline import reinit
 from .action import cleanup_actions
 from .resolution import auto_resolve, create_resolution, update_resolution, delete_resolution
-from .space import create_space, create_space_membership
-from .scene import create_agent_scene, create_threed_model
+from .space import create_space, create_space_membership, update_space, delete_space, update_space_membership, delete_space_membership
+from .scene import create_agent_scene, create_threed_model, update_threed_model, delete_threed_model, update_agent_scene, delete_agent_scene
 
 __all__ = [
     "create_foreign_implementation",
@@ -36,6 +36,14 @@ __all__ = [
     "create_blok",
     "create_space",
     "create_space_membership",
+    "update_space",
+    "delete_space",
+    "update_space_membership",
+    "delete_space_membership",
+    "update_threed_model",
+    "delete_threed_model",
+    "update_agent_scene",
+    "delete_agent_scene",
     "pin_implementation",
     "set_state",
     "update_state",

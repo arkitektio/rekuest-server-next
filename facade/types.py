@@ -938,34 +938,66 @@ class Snapshot:
     state: State
 
 
-@strawberry_django.type(models.Space)
+@strawberry_django.type(
+    models.Space,
+    filters=filters.SpaceFilter,
+    order=filters.SpaceOrder,
+    pagination=True,
+    description="A space where agents can interact.",
+)
 class Space:
     id: strawberry.ID
     name: str
     description: str | None
     creator: User
-    organization: Organization
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+    memberships: list["SpaceMembership"]
+
+
+@strawberry_django.type(
+    models.SpaceMembership,
+    filters=filters.SpaceMembershipFilter,
+    order=filters.SpaceMembershipOrder,
+    pagination=True,
+    description="A membership of an agent scene in a space.",
+)
+class SpaceMembership:
+    id: strawberry.ID
+    space: Space
+    agent_scene: "AgentScene"
+    role: str
+    affine_matrix: scalars.Args | None
+    model: str | None
+
+
+@strawberry_django.type(
+    models.ThreeDModel,
+    filters=filters.ThreeDModelFilter,
+    order=filters.ThreeDModelOrder,
+    pagination=True,
+    description="A 3D model file.",
+)
+class ThreeDModel:
+    id: strawberry.ID
+    name: str
+    description: str | None
+    file: dtypes.MediaStore
     created_at: datetime.datetime
     updated_at: datetime.datetime
 
 
-@strawberry_django.type(models.SpaceMembership)
-class SpaceMembership:
-    id: strawberry.ID
-    space: Space
-    agent: Agent
-    role: str
-    joined_at: datetime.datetime
-    affine_matrix: list[list[float]] | None
-    model: str | None
-
-
-@strawberry_django.type(models.ThreeDModel)
-class ThreeDModel:
-    id: strawberry.ID
-    file: dtypes.MediaStore
-
-
-@strawberry_django.type(models.AgentScene)
+@strawberry_django.type(
+    models.AgentScene,
+    filters=filters.AgentSceneFilter,
+    order=filters.AgentSceneOrder,
+    pagination=True,
+    description="A scene linking an agent to a 3D model.",
+)
 class AgentScene:
     id: strawberry.ID
+    transfer_function: str
+    model: ThreeDModel
+    agent: Agent
+    created_at: datetime.datetime
+    updated_at: datetime.datetime

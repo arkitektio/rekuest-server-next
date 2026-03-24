@@ -45,7 +45,6 @@ class ResolutionFilter:
 
 @strawberry_django.filter_type(models.ResolvedDependency, description="A way to filter resolved dependencies")
 class ResolvedDependencyFilter:
-
     @filter_field
     def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
@@ -53,7 +52,6 @@ class ResolvedDependencyFilter:
 
 @strawberry_django.filter_type(models.Agent, description="A way to filter agents")
 class AgentFilter:
-
     @filter_field(description="Filter by scope")
     def scope(self, info: Info, queryset, value: ScopeFilter, prefix: str):
         q = Q()
@@ -179,7 +177,6 @@ class WaiterFilter:
 
 @strawberry_django.filter_type(models.FilesystemShelve, description="A way to filter shelved items")
 class FilesystemShelveFilter:
-
     @filter_field
     def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
@@ -300,7 +297,6 @@ class AssignationEventOrder:
 
 @strawberry_django.filter_type(models.AssignationEvent, description="A way to filter assignation events")
 class AssignationEventFilter:
-
     @filter_field
     def kind(self, info: Info, queryset, value: list[enums.AssignationEventKind], prefix: str):
         return queryset.filter(**{f"{prefix}kind__in": value}), Q()
@@ -317,7 +313,6 @@ class TestResultFilter:
 
 @strawberry_django.filter_type(models.Dependency)
 class DependencyFilter:
-
     @filter_field
     def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
@@ -440,7 +435,6 @@ class ToolboxFilter:
 
 @strawberry_django.filter_type(models.Action)
 class ShortcutActionFilter:
-
     @filter_field
     def search(self, info: Info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}name__icontains": value}), Q()
@@ -487,7 +481,6 @@ class ShortcutActionFilter:
 
 @strawberry_django.filter_type(models.Shortcut)
 class ShortcutFilter:
-
     @filter_field
     def search(self, info: Info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}name__icontains": value}), Q()
@@ -527,7 +520,6 @@ class ShortcutFilter:
 
 @strawberry_django.filter_type(models.HardwareRecord)
 class HardwareRecordFilter:
-
     @filter_field
     def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
@@ -539,49 +531,39 @@ class HardwareRecordFilter:
 
 @strawberry_django.filter_type(models.StructurePackage)
 class StructurePackageFilter:
-
     @filter_field
     def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
     def search(self, info: Info, queryset, value: str, prefix: str):
-        return queryset.filter(
-            Q(**{f"{prefix}key__icontains": value}) | Q(**{f"{prefix}description__icontains": value})
-        ), Q()
+        return queryset.filter(Q(**{f"{prefix}key__icontains": value}) | Q(**{f"{prefix}description__icontains": value})), Q()
 
 
 @strawberry_django.filter_type(models.Structure)
 class StructureFilter:
-
     @filter_field
     def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
     def search(self, info: Info, queryset, value: str, prefix: str):
-        return queryset.filter(
-            Q(**{f"{prefix}key__icontains": value}) | Q(**{f"{prefix}description__icontains": value})
-        ), Q()
+        return queryset.filter(Q(**{f"{prefix}key__icontains": value}) | Q(**{f"{prefix}description__icontains": value})), Q()
 
 
 @strawberry_django.filter_type(models.Interface)
 class InterfaceFilter:
-
     @filter_field
     def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
     def search(self, info: Info, queryset, value: str, prefix: str):
-        return queryset.filter(
-            Q(**{f"{prefix}key__icontains": value}) | Q(**{f"{prefix}description__icontains": value})
-        ), Q()
+        return queryset.filter(Q(**{f"{prefix}key__icontains": value}) | Q(**{f"{prefix}description__icontains": value})), Q()
 
 
 @strawberry_django.filter_type(models.InputInterfaceUsage)
 class InputInterfaceUsageFilter:
-
     @filter_field
     def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
@@ -593,7 +575,6 @@ class InputInterfaceUsageFilter:
 
 @strawberry_django.filter_type(models.OutputInterfaceUsage)
 class OutputInterfaceUsageFilter:
-
     @filter_field
     def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
@@ -605,7 +586,6 @@ class OutputInterfaceUsageFilter:
 
 @strawberry_django.filter_type(models.InputStructureUsage)
 class InputStructureUsageFilter:
-
     @filter_field
     def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
@@ -617,7 +597,6 @@ class InputStructureUsageFilter:
 
 @strawberry_django.filter_type(models.OutputStructureUsage)
 class OutputStructureUsageFilter:
-
     @filter_field
     def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
@@ -696,7 +675,6 @@ class ActionFilter:
 
 @strawberry_django.filter_type(models.Agent)
 class ImplementationAgentFilter:
-
     @filter_field
     def client_id(self, info: Info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}registry__app__client_id": value}), Q()
@@ -724,7 +702,6 @@ class ImplementationAgentFilter:
 
 @strawberry_django.filter_type(models.Action)
 class ImplementationActionFilter:
-
     @filter_field
     def search(self, info: Info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}name__icontains": value}), Q()
@@ -814,11 +791,7 @@ class ImplementationFilter:
 
     @filter_field
     def search(self, info: Info, queryset, value: str, prefix: str):
-        return queryset.filter(
-            Q(**{f"{prefix}action__name__icontains": value})
-            | Q(**{f"{prefix}agent__name__icontains": value})
-            | Q(**{f"{prefix}interface__icontains": value})
-        ), Q()
+        return queryset.filter(Q(**{f"{prefix}action__name__icontains": value}) | Q(**{f"{prefix}agent__name__icontains": value}) | Q(**{f"{prefix}interface__icontains": value})), Q()
 
     @filter_field
     def action_demand(self, info: Info, queryset, value: inputs.ActionDemandInput, prefix: str):
@@ -827,3 +800,92 @@ class ImplementationFilter:
             organization_id=info.context.request.organization.id,
         )
         return queryset.filter(**{f"{prefix}action__id__in": new_ids}), Q()
+
+
+# ThreeDModel
+
+
+@strawberry_django.order(models.ThreeDModel)
+class ThreeDModelOrder:
+    created_at: auto
+    updated_at: auto
+    name: auto
+
+
+@strawberry_django.filter_type(models.ThreeDModel, description="A way to filter 3D models")
+class ThreeDModelFilter:
+    @filter_field(description="Filter by IDs")
+    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+        return queryset.filter(**{f"{prefix}id__in": value}), Q()
+
+    @filter_field(description="Search by name")
+    def search(self, info: Info, queryset, value: str, prefix: str):
+        return queryset.filter(**{f"{prefix}name__icontains": value}), Q()
+
+
+# AgentScene
+
+
+@strawberry_django.order(models.AgentScene)
+class AgentSceneOrder:
+    created_at: auto
+    updated_at: auto
+
+
+@strawberry_django.filter_type(models.AgentScene, description="A way to filter agent scenes")
+class AgentSceneFilter:
+    @filter_field(description="Filter by IDs")
+    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+        return queryset.filter(**{f"{prefix}id__in": value}), Q()
+
+    @filter_field(description="Filter by agent")
+    def agent(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+        return queryset.filter(**{f"{prefix}agent_id": value}), Q()
+
+    @filter_field(description="Filter by 3D model")
+    def model(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+        return queryset.filter(**{f"{prefix}model_id": value}), Q()
+
+
+# Space
+
+
+@strawberry_django.order(models.Space)
+class SpaceOrder:
+    created_at: auto
+    updated_at: auto
+    name: auto
+
+
+@strawberry_django.filter_type(models.Space, description="A way to filter spaces")
+class SpaceFilter:
+    @filter_field(description="Filter by IDs")
+    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+        return queryset.filter(**{f"{prefix}id__in": value}), Q()
+
+    @filter_field(description="Search by name")
+    def search(self, info: Info, queryset, value: str, prefix: str):
+        return queryset.filter(**{f"{prefix}name__icontains": value}), Q()
+
+
+# SpaceMembership
+
+
+@strawberry_django.order(models.SpaceMembership)
+class SpaceMembershipOrder:
+    role: auto
+
+
+@strawberry_django.filter_type(models.SpaceMembership, description="A way to filter space memberships")
+class SpaceMembershipFilter:
+    @filter_field(description="Filter by IDs")
+    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+        return queryset.filter(**{f"{prefix}id__in": value}), Q()
+
+    @filter_field(description="Filter by space")
+    def space(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+        return queryset.filter(**{f"{prefix}space_id": value}), Q()
+
+    @filter_field(description="Filter by agent scene")
+    def agent_scene(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+        return queryset.filter(**{f"{prefix}agent_scene_id": value}), Q()
