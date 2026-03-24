@@ -15,6 +15,7 @@ from strawberry.experimental import pydantic
 import uuid
 from datalayer import scalars as dscalars
 
+
 class ResolvedDependencyInputModel(BaseModel):
     """Base model for mapping dependencies to implementations.
 
@@ -1200,7 +1201,7 @@ class CreateThreeDModelInputModel(BaseModel):
 @pydantic.input(CreateThreeDModelInputModel, description="The input for creating a 3D model.")
 class CreateThreeDModelInput:
     name: str = strawberry.field(description="The name of the 3D model. This is used to identify the 3D model in the system.")
-    media: dscalars.MediaStore = strawberry.field(description="The media of the 3D model. This is used to identify the 3D model in the system.")
+    media: str = strawberry.field(description="The media of the 3D model. This is used to identify the 3D model in the system.")
 
 
 class CreateAgentSceneInputModel(BaseModel):

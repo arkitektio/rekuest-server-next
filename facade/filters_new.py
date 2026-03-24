@@ -14,7 +14,6 @@ from strawberry import auto
 from strawberry_django.filters import FilterLookup
 from strawberry_django.fields.filter_order import filter_field
 from django.db.models import Max, Q
-from strawberry.types import Info
 
 
 @strawberry.input(description="A way to filter by scope")
@@ -30,7 +29,7 @@ class TestCaseFilter:
     name: Optional[FilterLookup[str]]
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
 
@@ -39,7 +38,7 @@ class ResolutionFilter:
     name: Optional[FilterLookup[str]]
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
 
@@ -47,7 +46,7 @@ class ResolutionFilter:
 class ResolvedDependencyFilter:
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
 
@@ -55,7 +54,7 @@ class ResolvedDependencyFilter:
 class AgentFilter:
 
     @filter_field(description="Filter by scope")
-    def scope(self, info: Info, queryset, value: ScopeFilter, prefix: str):
+    def scope(self, info, queryset, value: ScopeFilter, prefix: str):
         q = Q()
         if value.public is not None:
             q &= Q(**{f"{prefix}is_public": value.public})
@@ -68,31 +67,31 @@ class AgentFilter:
         return queryset, q
 
     @filter_field(description="Filter by client ID of the app the agent is registered to")
-    def client_id(self, info: Info, queryset, value: str, prefix: str):
+    def client_id(self, info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}registry__client__client_id": value}), Q()
 
     @filter_field(description="Filter by instance ID of the agent")
-    def instance_id(self, info: Info, queryset, value: str, prefix: str):
+    def instance_id(self, info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}instance_id": value}), Q()
 
     @filter_field(description="Filter by IDs of the agents")
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field(description="Filter by extensions of the agents")
-    def extensions(self, info: Info, queryset, value: list[str], prefix: str):
+    def extensions(self, info, queryset, value: list[str], prefix: str):
         return queryset.filter(**{f"{prefix}extensions__contains": value}), Q()
 
     @filter_field(description="Filter by implementations of the agents")
-    def has_implementations(self, info: Info, queryset, value: list[str], prefix: str):
+    def has_implementations(self, info, queryset, value: list[str], prefix: str):
         return queryset.filter(**{f"{prefix}implementations__action__hash__in": value}), Q()
 
     @filter_field(description="Filter by states of the agents")
-    def has_states(self, info: Info, queryset, value: list[str], prefix: str):
+    def has_states(self, info, queryset, value: list[str], prefix: str):
         return queryset.filter(**{f"{prefix}states__state_schema__hash__in": value}), Q()
 
     @filter_field(description="Filter by pinned agents")
-    def pinned(self, info: Info, queryset, value: bool, prefix: str):
+    def pinned(self, info, queryset, value: bool, prefix: str):
         user = info.context.request.user
         if value:
             return queryset.filter(**{f"{prefix}pinned_by__id": user.id}), Q()
@@ -100,13 +99,13 @@ class AgentFilter:
             return queryset.exclude(**{f"{prefix}pinned_by__id": user.id}), Q()
 
     @filter_field(description="Filter by name of the agents")
-    def search(self, info: Info, queryset, value: str, prefix: str):
+    def search(self, info, queryset, value: str, prefix: str):
         if value == "":
             return queryset, Q()
         return queryset.filter(**{f"{prefix}name__icontains": value}), Q()
 
     @filter_field
-    def dependency(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+    def dependency(self, info, queryset, value: strawberry.ID, prefix: str):
         dep = models.Dependency.objects.get(id=value)
         if self.app_identifier is not UNSET and self.app_identifier is not None:
             return queryset.filter(**{f"{prefix}app__identifier": dep.app_filter}), Q()
@@ -114,11 +113,11 @@ class AgentFilter:
             raise ValueError("Filtering by dependency currently only allowed when also filtering by app identifier")
 
     @filter_field
-    def distinct(self, info: Info, queryset, value: bool, prefix: str):
+    def distinct(self, info, queryset, value: bool, prefix: str):
         return queryset.distinct(), Q()
 
     @filter_field
-    def action_demands(self, info: Info, queryset, value: list[inputs.ActionDemandInput], prefix: str):
+    def action_demands(self, info, queryset, value: list[inputs.ActionDemandInput], prefix: str):
         for ports_demand in value:
             new_ids = managers.get_action_ids_by_action_demand(
                 action_demand=ports_demand,
@@ -133,7 +132,7 @@ class AgentFilter:
         return queryset, Q()
 
     @filter_field
-    def state_demands(self, info: Info, queryset, value: list[inputs.SchemaDemandInput], prefix: str):
+    def state_demands(self, info, queryset, value: list[inputs.SchemaDemandInput], prefix: str):
         filtered_ids: set[str] = set()
 
         for state_demand in value:
@@ -152,19 +151,19 @@ class AgentFilter:
         return queryset.filter(**{f"{prefix}states__state_schema__id__in": list(filtered_ids)}), Q()
 
     @filter_field(description="Filter by user ID")
-    def user(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+    def user(self, info, queryset, value: strawberry.ID, prefix: str):
         return queryset.filter(**{f"{prefix}user__sub": value}), Q()
 
     @filter_field(description="Filter using app identifier")
-    def app_identifier(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+    def app_identifier(self, info, queryset, value: strawberry.ID, prefix: str):
         return queryset.filter(**{f"{prefix}app__identifier": value}), Q()
 
     @filter_field(description="Filter based on version string")
-    def version_number(self, info: Info, queryset, value: str, prefix: str):
+    def version_number(self, info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}release__version": value}), Q()
 
     @filter_field(description="Filter based on device")
-    def device_id(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+    def device_id(self, info, queryset, value: strawberry.ID, prefix: str):
         return queryset.filter(**{f"{prefix}device__device_id": value}), Q()
 
 
@@ -173,7 +172,7 @@ class WaiterFilter:
     instance_id: scalars.InstanceId
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
 
@@ -181,7 +180,7 @@ class WaiterFilter:
 class FilesystemShelveFilter:
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
 
@@ -190,7 +189,7 @@ class MemoryShelveFilter:
     agent: strawberry.ID | None
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
 
@@ -201,7 +200,7 @@ class FileDrawerFilter:
     identifier: str | None
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
 
@@ -211,19 +210,19 @@ class MemoryDrawerFilter:
     agent: strawberry.ID | None
 
     @filter_field
-    def implementation(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+    def implementation(self, info, queryset, value: strawberry.ID, prefix: str):
         return queryset.filter(**{f"{prefix}shelve__agent__implementations": value}), Q()
 
     @filter_field
-    def identifier(self, info: Info, queryset, value: str, prefix: str):
+    def identifier(self, info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}identifier": value}), Q()
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
-    def search(self, info: Info, queryset, value: str, prefix: str):
+    def search(self, info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}label__icontains": value}), Q()
 
 
@@ -232,11 +231,11 @@ class ReservationFilter:
     waiter: WaiterFilter | None
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
-    def status(self, info: Info, queryset, value: list[enums.ReservationStatus], prefix: str):
+    def status(self, info, queryset, value: list[enums.ReservationStatus], prefix: str):
         return queryset.filter(**{f"{prefix}status__in": value}), Q()
 
 
@@ -253,43 +252,43 @@ class AssignationFilter:
     reservation: ReservationFilter | None
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
-    def status(self, info: Info, queryset, value: list[enums.AssignationStatus], prefix: str):
+    def status(self, info, queryset, value: list[enums.AssignationStatus], prefix: str):
         return queryset.filter(**{f"{prefix}status__in": value}), Q()
 
     @filter_field
-    def instance_id(self, info: Info, queryset, value: scalars.InstanceId, prefix: str):
+    def instance_id(self, info, queryset, value: scalars.InstanceId, prefix: str):
         return queryset.filter(**{f"{prefix}reservation__waiter__instance_id": value}), Q()
 
     @filter_field
-    def client_id(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+    def client_id(self, info, queryset, value: strawberry.ID, prefix: str):
         return queryset.filter(**{f"{prefix}agent__registry__client__client_id": value}), Q()
 
     @filter_field
-    def state(self, info: Info, queryset, value: list[enums.AssignationEventKind], prefix: str):
+    def state(self, info, queryset, value: list[enums.AssignationEventKind], prefix: str):
         return queryset.filter(**{f"{prefix}latest_event_kind__in": value}).distinct(), Q()
 
     @filter_field
-    def implementation(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+    def implementation(self, info, queryset, value: strawberry.ID, prefix: str):
         return queryset.filter(**{f"{prefix}implementation_id": value}), Q()
 
     @filter_field
-    def acted_on(self, info: Info, queryset, value: list[str], prefix: str):
+    def acted_on(self, info, queryset, value: list[str], prefix: str):
         return queryset.filter(**{f"{prefix}acted_on__overlap": value}), Q()
 
     @filter_field
-    def created_before(self, info: Info, queryset, value: datetime.datetime, prefix: str):
+    def created_before(self, info, queryset, value: datetime.datetime, prefix: str):
         return queryset.filter(**{f"{prefix}created_at__lt": value}), Q()
 
     @filter_field
-    def created_after(self, info: Info, queryset, value: datetime.datetime, prefix: str):
+    def created_after(self, info, queryset, value: datetime.datetime, prefix: str):
         return queryset.filter(**{f"{prefix}created_at__gt": value}), Q()
 
     @filter_field
-    def agent(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+    def agent(self, info, queryset, value: strawberry.ID, prefix: str):
         return queryset.filter(**{f"{prefix}agent_id": value}), Q()
 
 
@@ -302,7 +301,7 @@ class AssignationEventOrder:
 class AssignationEventFilter:
 
     @filter_field
-    def kind(self, info: Info, queryset, value: list[enums.AssignationEventKind], prefix: str):
+    def kind(self, info, queryset, value: list[enums.AssignationEventKind], prefix: str):
         return queryset.filter(**{f"{prefix}kind__in": value}), Q()
 
 
@@ -311,7 +310,7 @@ class TestResultFilter:
     name: Optional[FilterLookup[str]]
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
 
@@ -319,7 +318,7 @@ class TestResultFilter:
 class DependencyFilter:
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
 
@@ -328,7 +327,7 @@ class UserFilter:
     name: Optional[FilterLookup[str]]
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
 
@@ -350,7 +349,7 @@ class OrganizationFilter:
     slug: Optional[FilterLookup[str]]
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
 
@@ -364,15 +363,15 @@ class ClientFilter:
     interface: Optional[FilterLookup[str]]
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
-    def has_implementations_for(self, info: Info, queryset, value: list[rscalars.ActionHash], prefix: str):
+    def has_implementations_for(self, info, queryset, value: list[rscalars.ActionHash], prefix: str):
         return queryset.filter(**{f"{prefix}registry__agents__implementations__action__hash__in": value}).distinct(), Q()
 
     @filter_field
-    def mine(self, info: Info, queryset, value: bool, prefix: str):
+    def mine(self, info, queryset, value: bool, prefix: str):
         return queryset.filter(**{f"{prefix}user_id": info.context.user.id}), Q()
 
 
@@ -417,11 +416,11 @@ class ProtocolFilter:
     name: Optional[FilterLookup[str]]
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
-    def search(self, info: Info, queryset, value: str, prefix: str):
+    def search(self, info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}name__icontains": value}), Q()
 
 
@@ -430,11 +429,11 @@ class ToolboxFilter:
     name: Optional[FilterLookup[str]]
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
-    def search(self, info: Info, queryset, value: str, prefix: str):
+    def search(self, info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}name__icontains": value}), Q()
 
 
@@ -442,19 +441,19 @@ class ToolboxFilter:
 class ShortcutActionFilter:
 
     @filter_field
-    def search(self, info: Info, queryset, value: str, prefix: str):
+    def search(self, info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}name__icontains": value}), Q()
 
     @filter_field
-    def name(self, info: Info, queryset, value: str, prefix: str):
+    def name(self, info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}name": value}), Q()
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
-    def demands(self, info: Info, queryset, value: list[inputs.PortDemandInput], prefix: str):
+    def demands(self, info, queryset, value: list[inputs.PortDemandInput], prefix: str):
         filtered_ids = None
 
         for ports_demand in value:
@@ -477,11 +476,11 @@ class ShortcutActionFilter:
         return queryset.filter(**{f"{prefix}id__in": filtered_ids}), Q()
 
     @filter_field
-    def kind(self, info: Info, queryset, value: renums.ActionKind, prefix: str):
+    def kind(self, info, queryset, value: renums.ActionKind, prefix: str):
         return queryset.filter(**{f"{prefix}kind": value}), Q()
 
     @filter_field
-    def protocols(self, info: Info, queryset, value: list[str], prefix: str):
+    def protocols(self, info, queryset, value: list[str], prefix: str):
         return queryset.filter(**{f"{prefix}protocols__name__in": value}), Q()
 
 
@@ -489,15 +488,15 @@ class ShortcutActionFilter:
 class ShortcutFilter:
 
     @filter_field
-    def search(self, info: Info, queryset, value: str, prefix: str):
+    def search(self, info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}name__icontains": value}), Q()
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
-    def demands(self, info: Info, queryset, value: list[inputs.PortDemandInput], prefix: str):
+    def demands(self, info, queryset, value: list[inputs.PortDemandInput], prefix: str):
         filtered_ids = None
 
         for ports_demand in value:
@@ -521,7 +520,7 @@ class ShortcutFilter:
         return queryset.filter(**{f"{prefix}id__in": filtered_ids}), Q()
 
     @filter_field
-    def toolbox(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+    def toolbox(self, info, queryset, value: strawberry.ID, prefix: str):
         return queryset.filter(**{f"{prefix}toolbox_id": value}), Q()
 
 
@@ -529,11 +528,11 @@ class ShortcutFilter:
 class HardwareRecordFilter:
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
-    def cpu_vendor_name(self, info: Info, queryset, value: str, prefix: str):
+    def cpu_vendor_name(self, info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}cpu_vendor_name__contains": value}), Q()
 
 
@@ -541,11 +540,11 @@ class HardwareRecordFilter:
 class StructurePackageFilter:
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
-    def search(self, info: Info, queryset, value: str, prefix: str):
+    def search(self, info, queryset, value: str, prefix: str):
         return queryset.filter(
             Q(**{f"{prefix}key__icontains": value}) | Q(**{f"{prefix}description__icontains": value})
         ), Q()
@@ -555,11 +554,11 @@ class StructurePackageFilter:
 class StructureFilter:
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
-    def search(self, info: Info, queryset, value: str, prefix: str):
+    def search(self, info, queryset, value: str, prefix: str):
         return queryset.filter(
             Q(**{f"{prefix}key__icontains": value}) | Q(**{f"{prefix}description__icontains": value})
         ), Q()
@@ -569,11 +568,11 @@ class StructureFilter:
 class InterfaceFilter:
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
-    def search(self, info: Info, queryset, value: str, prefix: str):
+    def search(self, info, queryset, value: str, prefix: str):
         return queryset.filter(
             Q(**{f"{prefix}key__icontains": value}) | Q(**{f"{prefix}description__icontains": value})
         ), Q()
@@ -583,11 +582,11 @@ class InterfaceFilter:
 class InputInterfaceUsageFilter:
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
-    def interface(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+    def interface(self, info, queryset, value: strawberry.ID, prefix: str):
         return queryset.filter(**{f"{prefix}interface__id": value}), Q()
 
 
@@ -595,11 +594,11 @@ class InputInterfaceUsageFilter:
 class OutputInterfaceUsageFilter:
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
-    def interface(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+    def interface(self, info, queryset, value: strawberry.ID, prefix: str):
         return queryset.filter(**{f"{prefix}interface__id": value}), Q()
 
 
@@ -607,11 +606,11 @@ class OutputInterfaceUsageFilter:
 class InputStructureUsageFilter:
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
-    def structure(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+    def structure(self, info, queryset, value: strawberry.ID, prefix: str):
         return queryset.filter(**{f"{prefix}structure__id": value}), Q()
 
 
@@ -619,11 +618,11 @@ class InputStructureUsageFilter:
 class OutputStructureUsageFilter:
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
-    def structure(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+    def structure(self, info, queryset, value: strawberry.ID, prefix: str):
         return queryset.filter(**{f"{prefix}structure__id": value}), Q()
 
 
@@ -632,15 +631,15 @@ class ActionFilter:
     name: Optional[FilterLookup[str]]
 
     @filter_field
-    def search(self, info: Info, queryset, value: str, prefix: str):
+    def search(self, info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}name__icontains": value}), Q()
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
-    def demands(self, info: Info, queryset, value: list[inputs.PortDemandInput], prefix: str):
+    def demands(self, info, queryset, value: list[inputs.PortDemandInput], prefix: str):
         if len(value) == 0:
             return queryset, Q()
 
@@ -666,31 +665,31 @@ class ActionFilter:
         return queryset.filter(**{f"{prefix}id__in": filtered_ids}), Q()
 
     @filter_field
-    def protocols(self, info: Info, queryset, value: list[str], prefix: str):
+    def protocols(self, info, queryset, value: list[str], prefix: str):
         return queryset.filter(**{f"{prefix}protocols__name__in": value}), Q()
 
     @filter_field
-    def kind(self, info: Info, queryset, value: renums.ActionKind, prefix: str):
+    def kind(self, info, queryset, value: renums.ActionKind, prefix: str):
         return queryset.filter(**{f"{prefix}kind": value}), Q()
 
     @filter_field
-    def in_collection(self, info: Info, queryset, value: str, prefix: str):
+    def in_collection(self, info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}collections__name": value}), Q()
 
     @filter_field
-    def used_before(self, info: Info, queryset, value: datetime.datetime, prefix: str):
+    def used_before(self, info, queryset, value: datetime.datetime, prefix: str):
         return queryset.filter(**{f"{prefix}assignations__created_at__lt": value}), Q()
 
     @filter_field
-    def used_after(self, info: Info, queryset, value: datetime.datetime, prefix: str):
+    def used_after(self, info, queryset, value: datetime.datetime, prefix: str):
         return queryset.filter(**{f"{prefix}assignations__created_at__gt": value}), Q()
 
     @filter_field
-    def stateful(self, info: Info, queryset, value: bool, prefix: str):
+    def stateful(self, info, queryset, value: bool, prefix: str):
         return queryset.filter(**{f"{prefix}stateful": value}), Q()
 
     @filter_field(description="Filter using app identifier")
-    def app_identifier(self, info: Info, queryset, value: str, prefix: str):
+    def app_identifier(self, info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}app__identifier": value}), Q()
 
 
@@ -698,27 +697,27 @@ class ActionFilter:
 class ImplementationAgentFilter:
 
     @filter_field
-    def client_id(self, info: Info, queryset, value: str, prefix: str):
+    def client_id(self, info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}registry__app__client_id": value}), Q()
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
-    def instance_id(self, info: Info, queryset, value: str, prefix: str):
+    def instance_id(self, info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}instance_id": value}), Q()
 
     @filter_field
-    def extensions(self, info: Info, queryset, value: list[str], prefix: str):
+    def extensions(self, info, queryset, value: list[str], prefix: str):
         return queryset.filter(**{f"{prefix}extensions__contains": value}), Q()
 
     @filter_field
-    def has_implementations(self, info: Info, queryset, value: list[str], prefix: str):
+    def has_implementations(self, info, queryset, value: list[str], prefix: str):
         return queryset.filter(**{f"{prefix}implementations__action__hash__in": value}), Q()
 
     @filter_field
-    def has_states(self, info: Info, queryset, value: list[str], prefix: str):
+    def has_states(self, info, queryset, value: list[str], prefix: str):
         return queryset.filter(**{f"{prefix}states__state_schema__hash__in": value}), Q()
 
 
@@ -726,19 +725,19 @@ class ImplementationAgentFilter:
 class ImplementationActionFilter:
 
     @filter_field
-    def search(self, info: Info, queryset, value: str, prefix: str):
+    def search(self, info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}name__icontains": value}), Q()
 
     @filter_field
-    def name(self, info: Info, queryset, value: str, prefix: str):
+    def name(self, info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}name": value}), Q()
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
-    def demands(self, info: Info, queryset, value: list[inputs.PortDemandInput], prefix: str):
+    def demands(self, info, queryset, value: list[inputs.PortDemandInput], prefix: str):
         filtered_ids = None
 
         for ports_demand in value:
@@ -761,11 +760,11 @@ class ImplementationActionFilter:
         return queryset.filter(**{f"{prefix}id__in": filtered_ids}), Q()
 
     @filter_field
-    def kind(self, info: Info, queryset, value: renums.ActionKind, prefix: str):
+    def kind(self, info, queryset, value: renums.ActionKind, prefix: str):
         return queryset.filter(**{f"{prefix}kind": value}), Q()
 
     @filter_field
-    def protocols(self, info: Info, queryset, value: list[str], prefix: str):
+    def protocols(self, info, queryset, value: list[str], prefix: str):
         return queryset.filter(**{f"{prefix}protocols__name__in": value}), Q()
 
 
@@ -790,30 +789,30 @@ class ImplementationFilter:
     agent: ImplementationAgentFilter | None
 
     @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+    def ids(self, info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
-    def action_hash(self, info: Info, queryset, value: rscalars.ActionHash, prefix: str):
+    def action_hash(self, info, queryset, value: rscalars.ActionHash, prefix: str):
         return queryset.filter(**{f"{prefix}action__hash": value}), Q()
 
     @filter_field
-    def extension(self, info: Info, queryset, value: str, prefix: str):
+    def extension(self, info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}extension": value}), Q()
 
     @filter_field
-    def parameters(self, info: Info, queryset, value: list[ParamPair], prefix: str):
+    def parameters(self, info, queryset, value: list[ParamPair], prefix: str):
         for param in value:
             queryset = queryset.filter(**{f"{prefix}params__contains": {param.key: param.value}})
         return queryset, Q()
 
     @filter_field
-    def resolvable_for(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+    def resolvable_for(self, info, queryset, value: strawberry.ID, prefix: str):
         dependency = models.Dependency.objects.get(id=value)
         return queryset.filter(**{f"{prefix}action__app__identifier": dependency.app_filter}), Q()
 
     @filter_field
-    def search(self, info: Info, queryset, value: str, prefix: str):
+    def search(self, info, queryset, value: str, prefix: str):
         return queryset.filter(
             Q(**{f"{prefix}action__name__icontains": value})
             | Q(**{f"{prefix}agent__name__icontains": value})
@@ -821,7 +820,7 @@ class ImplementationFilter:
         ), Q()
 
     @filter_field
-    def action_demand(self, info: Info, queryset, value: inputs.ActionDemandInput, prefix: str):
+    def action_demand(self, info, queryset, value: inputs.ActionDemandInput, prefix: str):
         new_ids = managers.get_action_ids_by_action_demand(
             action_demand=value,
             organization_id=info.context.request.organization.id,

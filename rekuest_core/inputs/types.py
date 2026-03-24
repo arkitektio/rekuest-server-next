@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Annotated, List, Optional
 from strawberry.experimental import pydantic
 from strawberry import LazyType
 from rekuest_core.inputs import models
@@ -120,11 +120,11 @@ class AssignWidgetInput:
         default=None,
         description="The ward that is respoinsbiel for handling queriny the choices",
     )
-    fallback: Optional[LazyType["AssignWidgetInput", __name__]] = strawberry.field(
+    fallback: Optional[Annotated["AssignWidgetInput", strawberry.lazy(__name__)]] = strawberry.field(
         default=None,
         description="The fallback assign widget to use if the current one fails. This is used for custom assign widgets",
     )
-    filters: Optional[List[LazyType["PortInput", __name__]]] = strawberry.field(
+    filters: Optional[List[Annotated["PortInput", strawberry.lazy(__name__)]]] = strawberry.field(
         default_factory=list,
         description="The filters to apply to a search widget. This is used for custom assign widgets",
     )
@@ -254,7 +254,7 @@ class PortInput:
         description="The options for the port. This is used for dropdowns and text inputs",
     )
     default: scalars.AnyDefault | None = None
-    children: list[LazyType["PortInput", __name__]] | None = strawberry.field(default_factory=list)
+    children: list[Annotated["PortInput", strawberry.lazy(__name__)]] | None = strawberry.field(default_factory=list)
     assign_widget: Optional["AssignWidgetInput"] = None
     return_widget: Optional["ReturnWidgetInput"] = None
     descriptors: list[DescriptorInput] | None = strawberry.field(
@@ -331,7 +331,7 @@ class PortMatchInput:
         default=None,
         description="Whether the port is nullable. ",
     )
-    children: Optional[list[LazyType["PortMatchInput", __name__]]] = strawberry.field(
+    children: Optional[list[Annotated["PortMatchInput", strawberry.lazy(__name__)]]] = strawberry.field(
         default=None,
         description="The matches for the children of the port to match. ",
     )

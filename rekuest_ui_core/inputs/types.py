@@ -1,4 +1,5 @@
-from typing import Optional
+from typing import Optional, Annotated
+import strawberry
 from strawberry.experimental import pydantic
 from strawberry import LazyType
 from rekuest_ui_core.inputs import models
@@ -10,9 +11,9 @@ class UIChildInput:
     kind: enums.UIChildKind
     hidden: bool | None = False
     state: str | None = None
-    children: list[LazyType("UIChildInput", __name__)] | None
-    left: Optional[LazyType("UIChildInput", __name__)]
-    right: Optional[LazyType("UIChildInput", __name__)]
+    children: list[Annotated["UIChildInput", strawberry.lazy(__name__)]] | None
+    left: Optional[Annotated["UIChildInput", strawberry.lazy(__name__)]]
+    right: Optional[Annotated["UIChildInput", strawberry.lazy(__name__)]]
 
 
 @pydantic.input(models.UITreeInputModel)

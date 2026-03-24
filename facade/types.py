@@ -1,6 +1,7 @@
 import datetime
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
+import kante
 import strawberry
 import strawberry_django
 from authentikate import models as auth_models
@@ -37,8 +38,9 @@ def build_prescoper(field="organization"):
     return prescoper
 
 
-@strawberry_django.type(auth_models.User, filters=filters.UserFilter, pagination=True, order=filters.UserOrder, description="Represents an authenticated user.")
+@kante.django_type(auth_models.User, filters=filters.UserFilter, pagination=True, order=filters.UserOrder, description="Represents an authenticated user.")
 class User:
+    id: strawberry.ID = strawberry_django.field(description="Unique ID of the user.")
     sub: strawberry.ID = strawberry_django.field(description="The subject identifier of the user.")
 
 
@@ -151,13 +153,13 @@ class Action:
     interfaces: list[str] = strawberry_django.field(description="Interfaces implemented by the action.")
     protocols: list["Protocol"] = strawberry_django.field(description="Protocols associated with the action.")
     defined_at: datetime.datetime = strawberry_django.field(description="Timestamp when the action was defined.")
-    reservations: list[LazyType["Reservation", __name__]] | None = strawberry_django.field(description="Reservations related to this action.")
-    test_cases: list[LazyType["TestCase", __name__]] | None = strawberry_django.field(description="Test cases for this action.")
+    reservations: list[Annotated["Reservation", strawberry.lazy(__name__)]] | None = strawberry_django.field(description="Reservations related to this action.")
+    test_cases: list[Annotated["TestCase", strawberry.lazy(__name__)]] | None = strawberry_django.field(description="Test cases for this action.")
     organization: "Organization" = strawberry_django.field(description="The organization that owns this action.")
-    assignations: list[LazyType["Assignation", __name__]] = strawberry_django.field(description="Assignations created for this action.")
+    assignations: list[Annotated["Assignation", strawberry.lazy(__name__)]] = strawberry_django.field(description="Assignations created for this action.")
 
     @strawberry_django.field(description="Retrieve assignations where this action has run.")
-    def runs(self) -> list[LazyType["Assignation", __name__]] | None:
+    def runs(self) -> list[Annotated["Assignation", strawberry.lazy(__name__)]] | None:
         return models.Assignation.objects.filter(action=self).order_by("-created_at")
 
     @strawberry_django.field(description="Input arguments (ports) for the action.")
@@ -279,13 +281,13 @@ class ResolvedDependency:
     resolution_key: str = strawberry_django.field(description="The resolution key associated with this resolved dependency.")
     dependency: "Dependency" = strawberry_django.field(description="The original dependency.")
     implementation: "Implementation" = strawberry_django.field(description="The implementation that resolves the dependency.")
-    down_stream_resolution: LazyType["Resolution", __name__] | None = strawberry_django.field(description="Resolution for streaming data down to this dependency.")
+    down_stream_resolution: Annotated["Resolution", strawberry.lazy(__name__)] | None = strawberry_django.field(description="Resolution for streaming data down to this dependency.")
 
 
 @strawberry.type
 class MethodMatch:
     implementation: "Implementation"
-    down_stream_resolution: LazyType["Resolution", __name__] | None = strawberry_django.field(description="Resolution for streaming data down to this dependency.")
+    down_stream_resolution: Annotated["Resolution", strawberry.lazy(__name__)] | None = strawberry_django.field(description="Resolution for streaming data down to this dependency.")
 
 
 @strawberry.type
@@ -311,13 +313,13 @@ class MemoryShelve:
     agent: "Agent" = strawberry_django.field(description="Agent that owns this memory shelve.")
     name: str = strawberry_django.field(description="Name of the shelve.")
     description: str | None = strawberry_django.field(description="Optional description of the shelve.")
-    drawers: list[LazyType["MemoryDrawer", __name__]] = strawberry_django.field(description="List of memory drawers within the shelve.")
+    drawers: list[Annotated["MemoryDrawer", strawberry.lazy(__name__)]] = strawberry_django.field(description="List of memory drawers within the shelve.")
 
 
 @strawberry_django.type(models.FilesystemShelve, filters=filters.FilesystemShelveFilter, pagination=True, description="Shelve on an agent for filesystem-based resources.")
 class FilesystemShelve:
     id: strawberry.ID = strawberry_django.field(description="ID of the filesystem shelve.")
-    drawers: list[LazyType["FileDrawer", __name__]] = strawberry_django.field(description="List of file drawers in the shelve.")
+    drawers: list[Annotated["FileDrawer", strawberry.lazy(__name__)]] = strawberry_django.field(description="List of file drawers in the shelve.")
 
 
 @strawberry_django.type(models.FileDrawer, filters=filters.FileDrawerFilter, pagination=True, description="Represents a file-based drawer within a filesystem shelve.")
@@ -366,7 +368,7 @@ class Agent:
     kind: enums.AgentKind = strawberry_django.field(description="Kind of the agent.")
     hook_url: str | None = strawberry_django.field(description="Webhook URL for this Agent (only if webhook)", default=None)
     hook_url_secret: str | None = strawberry_django.field(description="Webhook URL secret for this Agent (only if webhook)", default=None)
-    assignations: list[LazyType["Assignation", __name__]] = strawberry_django.field(description="Assignations executed by this agent.")
+    assignations: list[Annotated["Assignation", strawberry.lazy(__name__)]] = strawberry_django.field(description="Assignations executed by this agent.")
     app: App = strawberry_django.field(description="The app this agent belongs to.")
     release: Release = strawberry_django.field(description="The release this agent belongs to.")
 

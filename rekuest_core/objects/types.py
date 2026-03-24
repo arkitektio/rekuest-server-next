@@ -1,5 +1,5 @@
 import datetime
-from typing import Optional
+from typing import Annotated, Optional
 
 import strawberry
 import strawberry_django
@@ -48,16 +48,6 @@ class ChoiceAssignWidget(AssignWidget):
 class CustomAssignWidget(AssignWidget):
     hook: str
     ward: str
-
-
-@pydantic.type(models.SearchAssignWidgetModel)
-class SearchAssignWidget(AssignWidget):
-    query: str
-    ward: str
-    filters: Optional[list[LazyType["Port", __name__]]] = None
-    dependencies: list[str] | None = None
-
-    # this took me a while to figure out should be more obvious
 
 
 @pydantic.type(models.StateChoiceAssignWidgetModel)
@@ -155,7 +145,7 @@ class PortMatch:
         default=None,
         description="Whether the port is nullable. ",
     )
-    children: list[LazyType["PortMatch", __name__]] | None = strawberry.field(
+    children: list[Annotated["PortMatch", strawberry.lazy(__name__)]] | None = strawberry.field(
         default=None,
         description="Child ports to match. ",
     )
@@ -201,12 +191,20 @@ class Port:
     label: str | None
     description: str | None
     effects: list[Effect] | None = None
-    children: list[LazyType["Port", __name__]] | None = None
+    children: list[Annotated["Port", strawberry.lazy(__name__)]] | None = None
     choices: list[Choice] | None = None
     assign_widget: AssignWidget | None = None
     return_widget: ReturnWidget | None = None
     validators: list[Validator] | None = None
     descriptors: list[Descriptor] | None = None
+
+
+@pydantic.type(models.SearchAssignWidgetModel)
+class SearchAssignWidget(AssignWidget):
+    query: str
+    ward: str
+    filters: list[Port] | None = None
+    dependencies: list[str] | None = None
 
 
 # TODO: Should be saved and made accessible
