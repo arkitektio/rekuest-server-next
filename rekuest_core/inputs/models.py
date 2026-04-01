@@ -54,7 +54,7 @@ class AssignWidgetInputModel(BaseModel):
     hook: str | None = None
     ward: str | None = None
     fallback: Optional["AssignWidgetInputModel"] = None
-    filters: list["PortInputModel"] | None = None
+    filters: list["ArgPortInputModel"] | None = None
     dependencies: list[str] | None = []
 
 
@@ -70,8 +70,15 @@ class ReturnWidgetInputModel(BaseModel):
     ward: str | None = None
 
 
-class DescriptorInputModel(BaseModel):
+class RequiresInputModel(BaseModel):
     key: str
+    operator: enums.RequiresOperator
+    value: Any
+
+
+class ProvidesInputModel(BaseModel):
+    key: str
+    operator: enums.ProvidesOperator
     value: Any
 
 
@@ -98,9 +105,29 @@ class PortInputModel(BaseModel):
     default: Any | None = None
     children: list["PortInputModel"] | None = None
     choices: list[ChoiceInputModel] | None = None
-    assign_widget: Optional["AssignWidgetInputModel"] = None
-    return_widget: Optional["ReturnWidgetInputModel"] = None
-    descriptors: list[DescriptorInputModel] | None = None
+
+    @model_validator(mode="after")
+    def check_children_for_port(cls, self) -> Self:
+        if self.kind == enums.PortKind.LIST and (self.children is None or len(self.children) != 1):
+            raise ValueError("Port of kind LIST must have exactly on children")
+        return self
+
+
+class ArgPortInputModel(PortInputModel):
+    default: Any | None = None
+    widget: Optional["AssignWidgetInputModel"] = None
+    requires: list[RequiresInputModel] | None = None
+
+    @model_validator(mode="after")
+    def check_children_for_port(cls, self) -> Self:
+        if self.kind == enums.PortKind.LIST and (self.children is None or len(self.children) != 1):
+            raise ValueError("Port of kind LIST must have exactly on children")
+        return self
+
+
+class ReturnPortInputModel(PortInputModel):
+    widget: Optional["ReturnWidgetInputModel"] = None
+    provides: list[ProvidesInputModel] | None = None
 
     @model_validator(mode="after")
     def check_children_for_port(cls, self) -> Self:
@@ -167,8 +194,8 @@ class DefinitionInputModel(BaseModel):
     name: str
     stateful: bool = False
     port_groups: list[PortGroupInputModel] = Field(default_factory=list)
-    args: list[PortInputModel] = Field(default_factory=list)
-    returns: list[PortInputModel] = Field(default_factory=list)
+    args: list[ArgPortInputModel] = Field(default_factory=list)
+    returns: list[ReturnPortInputModel] = Field(default_factory=list)
     kind: enums.ActionKind
     tests: ActionDependencyInputModel | None = Field(default=None)
     is_test_for: list["str"] = Field(default_factory=list)

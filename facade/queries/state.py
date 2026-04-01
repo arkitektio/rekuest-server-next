@@ -262,7 +262,6 @@ def checkout(
     info: Info,
     state: strawberry.ID,
     global_revision: int | None = None,
-    local_revision: int | None = None,
 ) -> StateWithValue:
     """Checkout a state at a specific revision."""
     state_inst = models.State.objects.get(id=state)
@@ -271,7 +270,6 @@ def checkout(
         state_inst.agent,
         state_id=state_inst.id,
         global_revision=global_revision,
-        local_revision=local_revision,
     )
 
     if not result:
@@ -282,5 +280,4 @@ def checkout(
         value={str(k): v for k, v in result[key]["value"].items()},
         schema=result[key]["schema"],
         global_revision=result[key].get("global_revision"),
-        local_revision=result[key].get("local_revision"),
     )

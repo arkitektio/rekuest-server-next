@@ -48,6 +48,7 @@ class SearchAssignWidgetModel(AssignWidgetModel):
 class StateChoiceAssignWidgetModel(AssignWidgetModel):
     kind: Literal["STATE_CHOICE"]
     state_choices: str
+    accessor_func: str | None = None
 
 
 class StringWidgetModel(AssignWidgetModel):
@@ -108,13 +109,6 @@ class CustomEffectModel(EffectModel):
 EffectModelUnion = Union[MessageEffectModel, HideEffectModel, CustomEffectModel]
 
 
-class BindsModel(BaseModel):
-    implementations: Optional[list[str]] = None
-    clients: Optional[list[str]] = None
-    desired_instances: int = 1
-    minimum_instances: int = 1
-
-
 class PortGroupModel(BaseModel):
     key: str
     title: str | None
@@ -130,12 +124,6 @@ class ValidatorModel(BaseModel):
     error_message: str | None = None
 
 
-class DescriptorMatchModel(BaseModel):
-    key: str | None = None
-    operator: enums.DescriptorOperator
-    value: Any | None = None
-
-
 class PortMatchModel(BaseModel):
     at: int | None = None
     key: str | None = None
@@ -143,11 +131,17 @@ class PortMatchModel(BaseModel):
     identifier: str | None = None
     children: list["PortMatchModel"] | None = None
     nullable: bool | None = False
-    descriptors: list[DescriptorMatchModel] | None = None
 
 
-class DescriptorModel(BaseModel):
+class RequiresModel(BaseModel):
     key: str
+    operator: enums.RequiresOperator
+    value: Any
+
+
+class ProvidesModel(BaseModel):
+    key: str
+    operator: enums.ProvidesOperator
     value: Any
 
 
@@ -168,10 +162,19 @@ class PortModel(BaseModel):
     default: Any | None = None
     children: list["PortModel"] | None
     choices: list[ChoiceModel] | None = None
-    assign_widget: AssignWidgetModelUnion | None
-    return_widget: ReturnWidgetModelUnion | None
+
+
+class ArgPortModel(PortModel):
     validators: list[ValidatorModel] | None
-    descriptors: list[DescriptorModel] | None = None
+    children: list["ArgPortModel"] | None = None
+    widget: Optional[AssignWidgetModelUnion] = None
+    requires: list[RequiresModel] | None = None
+
+
+class ReturnPortModel(PortModel):
+    children: list["ReturnPortModel"] | None = None
+    widget: Optional[ReturnWidgetModelUnion] = None
+    provides: list[ProvidesModel] | None = None
 
 
 class DefinitionModel(BaseModel):
@@ -188,8 +191,8 @@ class DefinitionModel(BaseModel):
     protocols: list[str]
     defined_at: datetime.datetime
     is_dev: bool = False
-    args: list[PortModel]
-    returns: list[PortModel]
+    args: list[ArgPortModel]
+    returns: list[ReturnPortModel]
     optimistics: list[OptimisticModel] | None = None
 
 

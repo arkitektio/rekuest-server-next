@@ -113,6 +113,9 @@ MY_SCRIPT_NAME = conf.get("force_script_name", "")
 CORS_ALLOW_ALL_ORIGINS = True
 
 
+DATALAYER = conf.get("datalayer", {})
+
+
 ROOT_URLCONF = "rekuest.urls"
 
 TEMPLATES = [

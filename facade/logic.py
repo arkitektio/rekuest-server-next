@@ -83,7 +83,6 @@ def get_latest_state(
     agent: models.Agent,
     state_id: int | None = None,
     global_revision: int | None = None,
-    local_revision: int | None = None,
 ) -> dict:
     results = {}
 
@@ -95,16 +94,15 @@ def get_latest_state(
         snapshot_qs = models.Snapshot.objects.filter(state=state, agent=agent)
         if global_revision:
             snapshot_qs = snapshot_qs.filter(global_revision__lte=global_revision).order_by("-global_revision")
-        elif local_revision:
-            snapshot_qs = snapshot_qs.filter(revision__lte=local_revision).order_by("-revision")
         else:
             snapshot_qs = snapshot_qs.order_by("-timestamp")
 
         snapshot = snapshot_qs.first()
+        if not snapshot:
+            raise ValueError(f"No snapshot found for state {state.id}")
+        print(f"Snapshot for state {state} is {snapshot}")
 
         base_value = snapshot.value if snapshot else {}
-        current_revision = snapshot.revision if snapshot else 0
-        current_global_revision = snapshot.global_revision if snapshot else 0
         start_time = snapshot.timestamp if snapshot else None
 
         patches_qs = models.Patch.objects.filter(state=state, agent=agent)
@@ -113,26 +111,23 @@ def get_latest_state(
 
         if global_revision:
             patches_qs = patches_qs.filter(global_future_revision__lte=global_revision)
-        if local_revision:
-            patches_qs = patches_qs.filter(future_revision__lte=local_revision)
 
         patches = patches_qs.order_by("timestamp")
 
         current_value = base_value
+        current_global_revision = snapshot.global_rev if snapshot else None
         for patch in patches:
             try:
                 p = jsonpatch.JsonPatch([{"op": patch.op, "path": patch.path, "value": patch.value}])
                 current_value = p.apply(current_value)
-                current_revision = patch.future_revision
-                current_global_revision = patch.global_future_revision
+                current_global_revision = patch.global_rev
             except Exception as e:
                 pass
 
-        results[state.id] = {
+        results[state.interface] = {
             "value": current_value,
             "schema": state.state_schema,
             "global_revision": current_global_revision,
-            "local_revision": current_revision,
         }
 
     return results

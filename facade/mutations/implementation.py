@@ -7,9 +7,10 @@ from facade import inputs, models, types
 from facade.protocol import infer_protocols
 from facade.unique import assert_non_statefullness, infer_action_scope
 from kante.types import Info
-from rekuest_core.inputs.models import DefinitionInputModel, ImplementationInputModel, PortInputModel
+from rekuest_core.inputs.models import DefinitionInputModel, ImplementationInputModel, PortInputModel, RequiresInputModel, ProvidesInputModel
 from rekuest_core.enums import PortKind
 from authentikate.vars import get_user, get_client
+import typing as t
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,111 @@ def identifier_to_package_key(identifier: str) -> str:
 
     else:
         raise ValueError(f"Identifier {identifier} does not contain a package part")
+
+
+def compile_descriptors_to_jsonpath(descriptors: list[t.Union[RequiresInputModel, ProvidesInputModel]] | None) -> str | None:
+    """
+    Translates Pydantic descriptor models into a valid PostgreSQL JSONPath string.
+    Returns None if no descriptors exist, which allows Django to save NULL to the DB.
+    """
+    if not descriptors:
+        return None
+
+    path_conditions = []
+
+    for desc in descriptors:
+        # Standardize the key path (e.g., 'axes.c' becomes '$.axes.c')
+        # If they already put '$.', don't duplicate it.
+        pg_path = desc.key if desc.key.startswith("$.") else f"$.{desc.key}"
+
+        # PRO-TIP: json.dumps natively formats Python True to 'true',
+        # strings to '"string"', and ints to '1' (Perfect for JSONPath).
+        formatted_val = json.dumps(desc.value)
+
+        # Extract string value from enum (handles both standard Enum and Django TextChoices)
+        op = desc.operator.value if hasattr(desc.operator, "value") else desc.operator
+
+        # Map the operators to PG JSONPath Syntax
+        if op == "exists":
+            # In PG JSONPath, exists() returns a boolean based on path existence.
+            # We check if the user asked for exists=True or exists=False
+            if desc.value is True:
+                path_conditions.append(f"exists({pg_path})")
+            else:
+                path_conditions.append(f"!(exists({pg_path}))")
+
+        elif op == "equals":
+            path_conditions.append(f"{pg_path} == {formatted_val}")
+
+        elif op == "neq":
+            path_conditions.append(f"{pg_path} != {formatted_val}")
+
+        elif op == "gt":
+            path_conditions.append(f"{pg_path} > {formatted_val}")
+
+        elif op == "gte":
+            path_conditions.append(f"{pg_path} >= {formatted_val}")
+
+        elif op == "lt":
+            path_conditions.append(f"{pg_path} < {formatted_val}")
+
+        elif op == "lte":
+            path_conditions.append(f"{pg_path} <= {formatted_val}")
+
+        elif op == "contains":
+            # JSONPath array inclusion. e.g., $.tags[*] == "brain"
+            path_conditions.append(f"{pg_path}[*] == {formatted_val}")
+
+        else:
+            raise ValueError(f"Unsupported JSONPath operator: {op}")
+
+    # Join all the constraints using the logical AND operator for JSONPath
+    return " && ".join(path_conditions)
+
+
+# =========================================================
+# 2. THE RECURSIVE PORT EXTRACTOR (The Relational Engine Builder)
+# =========================================================
+def extract_ports_recursively(
+    port_data: t.Any,  # Pydantic Model (ArgPortInputModel, PortInputModel, etc.)
+    action_instance: models.Action,  # The saved Action Django model instance to link to
+    port_class: t.Type,  # The Django Model Class (ArgPort or ReturnPort)
+    parent_instance: t.Any = None,  # The saved Parent Port Django model (if nested)
+    index: int = 0,
+    parent_path: str = "",  # The semantic materialized string path
+) -> None:
+    """
+    Recursively flattens the Pydantic tree into relational DB objects.
+    Because of the `parent` ForeignKey, we MUST save the parent to the database
+    first to get its ID before we can save its children.
+    """
+
+    # 1. Build the Semantic Materialized Path (e.g., "options.advanced.mask")
+    current_path = f"{parent_path}.{port_data.key}" if parent_path else port_data.key
+
+    # 2. Extract Descriptors safely (children might be base PortInputModels without requires/provides)
+    descriptors = getattr(port_data, "requires", None) or getattr(port_data, "provides", None) or []
+    compiled_path = compile_descriptors_to_jsonpath(descriptors)
+
+    # 3. Create and Save the Current Port
+    current_port = port_class(
+        action=action_instance, parent=parent_instance, index=index, key=port_data.key, key_path=current_path, kind=port_data.kind.value if hasattr(port_data.kind, "value") else port_data.kind, identifier=port_data.identifier, compiled_jsonpath=compiled_path, nullable=port_data.nullable
+    )
+
+    # The Write-Time Hit: We save immediately to get the Primary Key (ID)
+    current_port.save()
+
+    # 4. Recurse for Children (e.g., items inside a LIST or properties of a DICT/STRUCTURE)
+    if port_data.children:
+        for child_idx, child_data in enumerate(port_data.children):
+            extract_ports_recursively(
+                port_data=child_data,
+                action_instance=action_instance,
+                port_class=port_class,
+                parent_instance=current_port,  # Link the child to this newly saved port
+                index=child_idx,
+                parent_path=current_path,  # Pass the materialized path down
+            )
 
 
 def recursive_create_input_usages(action: models.Action, port: PortInputModel, index: int, key: str, modifiers: list[str]) -> None:
@@ -184,16 +290,6 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
         if definition.stateful is False:
             assert_non_statefullness(definition)
 
-        structures = extract_structures(definition)
-        for structure in structures:
-            if not models.Structure.objects.filter(key=identifier_to_key(structure).lower(), package__key=identifier_to_package_key(structure).lower()).exists():
-                raise ValueError(f"Structure {structure} used in ports but not defined in any schema")
-
-        interfaces = extract_interfaces(definition)
-        for interface in interfaces:
-            if not models.Interface.objects.filter(key=identifier_to_key(interface).lower(), package__key=identifier_to_package_key(interface).lower()).exists():
-                raise ValueError(f"Interface {interface} used in ports but not defined in any schema")
-
         action = models.Action.objects.create(
             key=key,
             version=version,
@@ -209,6 +305,16 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
             returns=[strawberry.asdict(i) for i in definition.returns],
             name=definition.name,
         )
+
+        # 2. Build the Relational ArgPorts (The Micro-Filtering Engine)
+        if definition.args:
+            for idx, arg in enumerate(definition.args):
+                extract_ports_recursively(port_data=arg, action_instance=action, port_class=models.ArgPort, index=idx)
+
+        # 3. Build the Relational ReturnPorts (The Micro-Filtering Engine)
+        if definition.returns:
+            for idx, ret in enumerate(definition.returns):
+                extract_ports_recursively(port_data=ret, action_instance=action, port_class=models.ReturnPort, index=idx)
 
         create_usages(action, definition)
         protocols = infer_protocols(definition)

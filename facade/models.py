@@ -276,6 +276,10 @@ class Action(models.Model):
     args = models.JSONField(default=list, help_text="Inputs for this Action")
     returns = models.JSONField(default=list, help_text="Outputs for this Action")
 
+    # --- NEW CACHE FIELDS FOR FAST FILTERING ---
+    arg_count = models.IntegerField(default=0, help_text="Pre-calculated number of root input ports")
+    return_count = models.IntegerField(default=0, help_text="Pre-calculated number of root output ports")
+
     def __str__(self):
         return f"{self.name}"
 
@@ -286,6 +290,55 @@ class Action(models.Model):
                 name="No multiple Actions with the same key and version in the same app for an organization allowed",
             )
         ]
+
+
+class BasePort(models.Model):
+    """
+    Abstract base class containing all the shared schema for Args and Returns.
+    This guarantees Django writes to two physically separate tables.
+    """
+
+    index = models.IntegerField(help_text="The position of this port in the list")
+    key = models.CharField(max_length=255, null=True, help_text="The local key (e.g. 'mask')")
+
+    # The Semantic Materialized Path for O(1) nested execution lookups
+    key_path = models.CharField(max_length=500, db_index=True, help_text="The full dot-notation path (e.g. 'options.advanced.mask')")
+
+    kind = models.CharField(max_length=50, null=True, help_text="The structural kind (e.g. LIST, DICT, INT)")
+    identifier = models.CharField(max_length=255, null=True, db_index=True, help_text="The macro-type (e.g. '@mikro/image')")
+
+    # The ECS JSONPath string compiler output
+    compiled_jsonpath = models.CharField(max_length=1000, null=True, blank=True, help_text="PostgreSQL JSONPath string for micro-constraints")
+    nullable = models.BooleanField(default=False)
+
+    class Meta:
+        abstract = True
+        indexes = [
+            # Composite index for instant payload resolution at execution time
+            models.Index(fields=["action", "key_path"]),
+            # Index for fast reverse-matching graph searches
+            models.Index(fields=["identifier"]),
+        ]
+
+
+class ArgPort(BasePort):
+    """Inputs for the Action"""
+
+    action = models.ForeignKey(Action, on_delete=models.CASCADE, related_name="arg_ports")
+    parent = models.ForeignKey("self", on_delete=models.CASCADE, null=True, blank=True, related_name="children", help_text="If this port is nested inside a LIST or DICT")
+
+    def __str__(self):
+        return f"Arg: {self.key_path} ({self.identifier})"
+
+
+class ReturnPort(BasePort):
+    """Outputs for the Action"""
+
+    action = models.ForeignKey(Action, on_delete=models.CASCADE, related_name="return_ports")
+    parent = models.ForeignKey("self", on_delete=models.CASCADE, null=True, blank=True, related_name="children", help_text="If this port is nested inside a LIST or DICT")
+
+    def __str__(self):
+        return f"Return: {self.key_path} ({self.identifier})"
 
 
 class InputStructureUsage(models.Model):
@@ -1292,10 +1345,7 @@ class Patch(models.Model):
     path = models.CharField(max_length=1000, help_text="The path of this patch (e.g. the path to the value that is being changed)")
     value = models.JSONField(help_text="The value of this patch (e.g. the new value that is being set)")
     timestamp = models.DateTimeField(auto_now_add=True, help_text="The time this patch was created")
-    current_revision = models.IntegerField(help_text="The current revision of the state after applying this patch")
-    future_revision = models.IntegerField(help_text="The number of future revisions that have been applied after this patch (e.g. if this patch is in the middle of the log, there might be future patches that have been applied after it)")
-    global_current_revision = models.IntegerField(help_text="The current revision of the state in the global context (e.g. considering all patches that have been applied to this state)")
-    global_future_revision = models.IntegerField(help_text="The number of future revisions that have been applied after this patch in the global context (e.g. if this patch is in the middle of")
+    global_rev = models.IntegerField(help_text="The current revision of the state in the global context (e.g. considering all patches that have been applied to this state)")
     session_id = models.CharField(max_length=1000, help_text="The session id of the user that made this change (e.g. to be able to track changes by user)")
     assignation = models.ForeignKey(Assignation, on_delete=models.CASCADE, null=True, blank=True, help_text="The assignation that caused this patch (e.g. to be able to track changes by assignation)", related_name="patches")
 
@@ -1305,9 +1355,8 @@ class Snapshot(models.Model):
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="snapshots_created", null=True, blank=True)
     value = models.JSONField(help_text="The value of this snapshot (e.g. the value of the state at the time of the snapshot)")
     timestamp = models.DateTimeField(auto_now_add=True, help_text="The time this snapshot was created")
-    revision = models.IntegerField(help_text="The revision of the state at the time of the snapshot (e.g. to be able to reconstruct the state at this point in time)")
     session_id = models.CharField(max_length=1000, help_text="The session id of the user that made this snapshot (e.g. to be able to track snapshots by user)")
-    global_revision = models.IntegerField(help_text="The revision of the state in the global context at the time of the snapshot (e.g. considering all patches that have been applied to this state)")
+    global_rev = models.IntegerField(help_text="The revision of the state in the global context at the time of the snapshot (e.g. considering all patches that have been applied to this state)")
 
 
 class Blok(models.Model):

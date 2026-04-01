@@ -125,12 +125,12 @@ class Shortcut:
     )
 
     @strawberry_django.field(description="Input ports for the shortcut's action.dd")
-    def args(self) -> list[rtypes.Port]:
-        return [rmodels.PortModel(**i) for i in self.args]
+    def args(self) -> list[rtypes.ArgPort]:
+        return [rmodels.ArgPortModel(**i) for i in self.args]
 
     @strawberry_django.field(description="Return ports from the shortcut's action.")
-    def returns(self) -> list[rtypes.Port]:
-        return [rmodels.PortModel(**i) for i in self.returns]
+    def returns(self) -> list[rtypes.ReturnPort]:
+        return [rmodels.ReturnPortModel(**i) for i in self.returns]
 
 
 @strawberry_django.type(models.Action, filters=filters.ActionFilter, pagination=True, order=filters.ActionOrder, description="Represents an executable action in the system.")
@@ -163,14 +163,14 @@ class Action:
         return models.Assignation.objects.filter(action=self).order_by("-created_at")
 
     @strawberry_django.field(description="Input arguments (ports) for the action.")
-    def args(self) -> list[rtypes.Port]:
-        x = [rmodels.PortModel(**i) for i in self.args]
+    def args(self) -> list[rtypes.ArgPort]:
+        x = [rmodels.ArgPortModel(**i) for i in self.args]
         print(x)
         return x
 
     @strawberry_django.field(description="Output values (ports) returned by the action.")
-    def returns(self) -> list[rtypes.Port]:
-        return [rmodels.PortModel(**i) for i in self.returns]
+    def returns(self) -> list[rtypes.ReturnPort]:
+        return [rmodels.ReturnPortModel(**i) for i in self.returns]
 
     @strawberry_django.field(description="Port groups used in the action for organizing ports.")
     def port_groups(self) -> list[rtypes.PortGroup]:
@@ -418,7 +418,6 @@ class Reservation:
     updated_at: datetime.datetime = strawberry_django.field(description="Last update timestamp.")
     reference: str = strawberry_django.field(description="Reference string for identification.")
     implementations: list["Implementation"] = strawberry_django.field(description="Available implementations for the reservation.")
-    binds: rtypes.Binds | None = strawberry_django.field(description="Bind configuration for the reservation.")
     causing_dependency: Dependency | None = strawberry_django.field(description="Dependency that triggered the reservation.")
     strategy: enums.ReservationStrategy = strawberry_django.field(description="Reservation strategy applied.")
     viable: bool = strawberry_django.field(description="Is the reservation currently viable.")
@@ -731,8 +730,8 @@ class StateSchema:
     name: str
 
     @strawberry_django.field()
-    def ports(self) -> list[rtypes.Port]:
-        return [rmodels.PortModel(**i) for i in self.ports]
+    def ports(self) -> list[rtypes.ReturnPort]:
+        return [rtypes.ReturnPort.from_pydantic(rmodels.ReturnPortModel(**i)) for i in self.ports]
 
 
 @strawberry_django.type(models.State)

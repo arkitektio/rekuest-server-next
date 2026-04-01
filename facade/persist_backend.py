@@ -127,11 +127,35 @@ class ModelPersistBackend:
             message=message.message,
         )
 
-    async def on_agent_log_patches(self, agent_id: str, message: messages.LogPatches) -> None:
-        logging.info(f"Log Patches for Assignation {message.assignation} - {len(message.patches)} patches")
+    async def on_agent_state_patch(self, agent_id: str, message: messages.StatePatchEvent) -> None:
+        logging.info(f"Log Patch for Assignation {message.state_name}")
 
-    async def on_agent_log_snapshot(self, agent_id: str, message: messages.LogSnapshot) -> None:
-        logging.info(f"Log Snapshot for Assignation {message.assignation}")
+        state = await models.State.objects.aget(agent_id=agent_id, interface=message.state_name)
+
+        await models.Patch.objects.acreate(
+            state=state,
+            agent_id=agent_id,
+            op=message.op,
+            path=message.path,
+            value=message.value,
+            assignation_id=message.correlation_id,
+            global_rev=message.global_rev,
+        )
+
+    async def on_agent_state_snapshot(self, agent_id: str, message: messages.StateSnapshotEvent) -> None:
+        logging.info(f"Log Snapshot for Assignation {agent_id}")
+
+        for state_name, snapshot in message.snapshots.items():
+            state = await models.State.objects.aget(agent_id=agent_id, interface=state_name)
+            agent = await models.Agent.objects.aget(id=agent_id)
+
+            await models.Snapshot.objects.acreate(
+                state=state,
+                agent=agent,
+                value=snapshot,
+                global_rev=message.global_rev,
+                session_id=message.session_id,
+            )
 
 
 persist_backend = ModelPersistBackend()

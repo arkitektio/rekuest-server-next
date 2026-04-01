@@ -224,6 +224,11 @@ class AgentConsumer(AsyncWebsocketConsumer):
                         await persist_backend.on_agent_error(self.agent.pk, payload.message)
                     case messages.CriticalEvent():
                         await persist_backend.on_agent_critical(self.agent.pk, payload.message)
+                    case messages.StatePatchEvent():
+                        await persist_backend.on_agent_state_patch(self.agent.pk, payload.message)
+                    case messages.StateSnapshotEvent():
+                        await persist_backend.on_agent_state_snapshot(self.agent.pk, payload.message)
+
                     case _:
                         logger.error("Unkwonw message in agent", exc_info=True)
                         await self.close(code=codes.FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE)

@@ -1,6 +1,6 @@
 """Messages that are used to communicate between the rekuest backend and the agent"""
 
-from typing import Any, Optional, Literal, Union, Dict
+from typing import Any, List, Optional, Literal, Union, Dict
 from pydantic import BaseModel, ConfigDict
 from enum import Enum
 from pydantic import Field
@@ -47,6 +47,7 @@ class ToAgentMessageType(str, Enum):
     HEARTBEAT = "HEARTBEAT"
     BOUNCE = "BOUNCE"
     KICK = "KICK"
+    PROTOCOL_ERROR = "PROTOCOL_ERROR"
 
 
 class FromAgentMessageType(str, Enum):
@@ -67,8 +68,10 @@ class FromAgentMessageType(str, Enum):
     ASSIGNED = "ASSIGNED"
     INTERRUPTED = "INTERRUPTED"
     HEARTBEAT_ANSWER = "HEARTBEAT_ANSWER"
-    LOG_PATCHES = "LOG_PATCHES"
-    LOG_SNAPSHOT = "LOG_SNAPSHOT"
+    STATE_PATCH = "STATE_PATCH"
+    LOCK = "LOCK"
+    UNLOCK = "UNLOCK"
+    STATE_SNAPSHOT = "STATE_SNAPSHOT"
 
 
 class Message(BaseModel):
@@ -77,31 +80,6 @@ class Message(BaseModel):
     # This is the local mapping of the message, reply messages should have the same id
     model_config = ConfigDict(use_enum_values=True, frozen=True)
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-
-
-# State Updates Message
-class LogPatches(Message):
-    """A log patch message
-
-    A log patch message is sent from the agent to the rekuest backend
-    to log a patch that was applied to the state. This is used to
-    log patches from the agent to the rekuest backend.
-    """
-
-    type: Literal[FromAgentMessageType.LOG_PATCHES] = FromAgentMessageType.LOG_PATCHES
-    patches: list[str] = Field(description="The list of patches to log currently not implemented")
-
-
-class LogSnapshot(Message):
-    """A log patch message
-
-    A log patch message is sent from the agent to the rekuest backend
-    to log a patch that was applied to the state. This is used to
-    log patches from the agent to the rekuest backend.
-    """
-
-    type: Literal[FromAgentMessageType.LOG_SNAPSHOT] = FromAgentMessageType.LOG_SNAPSHOT
-    patches: list[str] = Field(description="The list of patches to log currently not implemented")
 
 
 class Assign(Message):
@@ -119,6 +97,7 @@ class Assign(Message):
     interface: str = Field(description="The registered interface")
     extension: str = Field(description="The extension that registered the interface")
     reservation: Optional[str] = Field(default=None, description="The reservation id if assigned through that")
+    step: bool | None = Field(default=None, description="Whether to step the assignation or not")
     assignation: str = Field(description="The assignation id")
     root: Optional[str] = Field(
         default=None,
@@ -130,23 +109,15 @@ class Assign(Message):
         description="The direct parent of this assignation, None if this is this is the mother",
     )
     """ The parent s"""
-    resolution: Optional[str] = Field(
-        default=None,
-        description="The resolution id if this assignation is part of a resolved set of dependencies",
-    )
-    delay_until: Optional[float] = Field(
-        default=None,
-        description="A timestamp until which the assignation should be delayed, in milliseconds since epoch (00:00:00 UTC on 1 January 1970), the agent should not start the assignation before this timestamp, in order to allow synchronisation, attention only if the agent respected the synchronize extensions this will be respected",
-    )
-
-    capture: bool = Field(default=False, description="Whether to run in debug mode and debug stdin and stdout, this should only be used for debugging purposes as it can have performance implications. (agents need to implement the capture feature for this to work)")
+    resolution: Optional[str] = Field(default=None, description="The resolution id this assignation has dependencies")
+    capture: bool = Field(default=False, description="Whether to run in debug mode")
     reference: Optional[str] = Field(default=None, description="A reference that the assinger provided")
     args: Dict[str, ShallowJSONSerializable] = Field(description="The arguments that was sendend")
     message: Optional[str] = None
     user: str = Field(..., description="The assinging user")
     org: Optional[str] = Field(default=None, description="The org that the user currently belongs to")
     app: str = Field(description="The assinging app")
-    action: str = Field(description="The action that triggered this assignation")
+    action: str = Field(description="The action that triggered this assignation.")
 
     @property
     def actor_id(self) -> str:
@@ -417,6 +388,65 @@ class HeartbeatEvent(Message):
     type: Literal[FromAgentMessageType.HEARTBEAT_ANSWER] = FromAgentMessageType.HEARTBEAT_ANSWER
 
 
+class StatePatchEvent(Message):
+    """A state patch event
+
+    A state patch event is sent when the agent wants to send a state patch
+    to the rekuest backend. This is used to
+    send state patches from the agent to the rekuest backend
+    """
+
+    type: Literal[FromAgentMessageType.STATE_PATCH] = FromAgentMessageType.STATE_PATCH
+    session_id: str = Field(description="The session id of the agent (generated on a restart of the agent)")
+    global_rev: int = Field(description="The global revision of the state")
+    state_name: str = Field(description="The name of the state that is being patched")
+    ts: float
+    op: str
+    path: str
+    value: Any
+    old_value: Any | None = Field(description="The old value of the patch, which can be used for debugging and tracing purposes")
+    correlation_id: Optional[str] = Field(default=None, description="An optional correlation id to correlate this patch with a specific action or event in the agent's execution, which can be used for debugging and tracing purposes")
+
+
+class StateSnapshotEvent(Message):
+    """A state snapshot event
+
+    A state snapshot event is sent when the agent wants to send a state snapshot
+    to the rekuest backend. This is used to
+    send state patches from the agent to the rekuest backend
+    """
+
+    type: Literal[FromAgentMessageType.STATE_SNAPSHOT] = FromAgentMessageType.STATE_SNAPSHOT
+    session_id: str = Field(description="The session id of the agent (generated on a restart of the agent)")
+    global_rev: int = Field(description="The global revision of the state")
+    snapshots: Dict[str, Any] = Field(description="A dictionary containing the state snapshots, where the key is the state name and the value is the state snapshot")
+
+
+class LockEvent(Message):
+    """A state patch event
+
+    A state patch event is sent when the agent wants to send a state patch
+    to the rekuest backend. This is used to
+    send state patches from the agent to the rekuest backend
+    """
+
+    type: Literal[FromAgentMessageType.LOCK] = FromAgentMessageType.LOCK
+    key: str
+    assignation: str
+
+
+class UnlockEvent(Message):
+    """A state patch event
+
+    A state patch event is sent when the agent wants to send a state patch
+    to the rekuest backend. This is used to
+    send state patches from the agent to the rekuest backend
+    """
+
+    type: Literal[FromAgentMessageType.UNLOCK] = FromAgentMessageType.UNLOCK
+    key: str
+
+
 class AssignInquiry(BaseModel):
     """An assign inquiry
 
@@ -444,6 +474,7 @@ class Register(Message):
 
 
 class ProtocolError(Message):
+    type: Literal[ToAgentMessageType.PROTOCOL_ERROR] = ToAgentMessageType.PROTOCOL_ERROR
     error: str
     """ The error message that was raised by the agent"""
 
@@ -462,7 +493,20 @@ class Init(Message):
     inquiries: list[AssignInquiry] = []
 
 
-ToAgentMessage = Union[Init, Assign, Cancel, Interrupt, Heartbeat, Step, Pause, Resume, Collect, ProtocolError]
+ToAgentMessage = Union[
+    Init,
+    Assign,
+    Cancel,
+    Interrupt,
+    Heartbeat,
+    Step,
+    Pause,
+    Resume,
+    Collect,
+    ProtocolError,
+    Bounce,
+    Kick,
+]
 FromAgentMessage = Union[
     CriticalEvent,
     LogEvent,
@@ -477,6 +521,8 @@ FromAgentMessage = Union[
     PausedEvent,
     CancelledEvent,
     InterruptedEvent,
-    LogPatches,
-    LogSnapshot,
+    StatePatchEvent,
+    StateSnapshotEvent,
+    LockEvent,
+    UnlockEvent,
 ]

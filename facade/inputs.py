@@ -414,10 +414,6 @@ class ReserveInput:
         default=None,
         description="The reference of the reservation. This is used to identify the reservation in the system.",
     )
-    binds: ritypes.BindsInput | None = strawberry.field(
-        default=None,
-        description="The binds of the reservation. This is used to identify the reservation in the system.",
-    )
     assignation_id: strawberry.ID | None = strawberry.field(
         default=None,
         description="The assignation ID of the reservation. This is used to identify the reservation in the system.",
@@ -1100,7 +1096,7 @@ class StateSchemaInputModel(BaseModel):
 
 @pydantic.input(StateSchemaInputModel, description="The input for creating a state schema.")
 class StateSchemaInput:
-    ports: list[ritypes.PortInput] = strawberry.field(description="The ports of the state schema. This is used to identify the state schema in the system.")
+    ports: list[ritypes.ReturnPortInput] = strawberry.field(description="The ports of the state schema. This is used to identify the state schema in the system.")
     name: str = strawberry.field(description="The name of the state schema. This is used to identify the state schema in the system.")
 
 
@@ -1203,7 +1199,7 @@ class CreateThreeDModelInputModel(BaseModel):
 class CreateThreeDModelInput:
     name: str = strawberry.field(description="The name of the 3D model.")
     description: str | None = strawberry.field(default=None, description="A description of the 3D model.")
-    media: strawberry.ID = strawberry.field(description="The ID of the media store file for the 3D model.")
+    media: dscalars.MediaLike
 
 
 class UpdateThreeDModelInputModel(BaseModel):

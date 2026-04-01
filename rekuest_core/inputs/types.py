@@ -124,7 +124,7 @@ class AssignWidgetInput:
         default=None,
         description="The fallback assign widget to use if the current one fails. This is used for custom assign widgets",
     )
-    filters: Optional[List[Annotated["PortInput", strawberry.lazy(__name__)]]] = strawberry.field(
+    filters: Optional[List[Annotated["ArgPortInput", strawberry.lazy(__name__)]]] = strawberry.field(
         default_factory=list,
         description="The filters to apply to a search widget. This is used for custom assign widgets",
     )
@@ -201,14 +201,22 @@ class OptimisticInput:
     accessor: str | None = strawberry.field(default=None, description="The accessor to get the value to optimistically set. This is used when the value to optimistically set is not the same as the value of the port")
 
 
-@pydantic.input(models.DescriptorInputModel)
-class DescriptorInput:
-    key: str = strawberry.field(description="The key of the descriptor. This is used to uniquely identify the descriptor")
-    value: scalars.Arg = strawberry.field(description="The value of the descriptor. This can be any JSON serializable value")
+@pydantic.input(models.RequiresInputModel)
+class RequiresInput:
+    key: str = strawberry.field(description="The key of the requirement. This is used to uniquely identify the requirement")
+    operator: enums.RequiresOperator = strawberry.field(description="The operator for the requirement")
+    value: scalars.Arg = strawberry.field(description="The value of the requirement. This can be any JSON serializable value")
+
+
+@pydantic.input(models.ProvidesInputModel)
+class ProvidesInput:
+    key: str = strawberry.field(description="The key of the provision. This is used to uniquely identify the provision")
+    operator: enums.ProvidesOperator = strawberry.field(description="The operator for the provision")
+    value: scalars.Arg = strawberry.field(description="The value of the provision. This can be any JSON serializable value")
 
 
 @pydantic.input(
-    models.PortInputModel,
+    models.ArgPortInputModel,
     description="""Port
 
     A Port is a single input or output of a action. It is composed of a key and a kind
@@ -228,7 +236,7 @@ class DescriptorInput:
 
     """,
 )
-class PortInput:
+class ArgPortInput:
     validators: list[ValidatorInput] | None = strawberry.field(default_factory=list, description="The validators for the port")
     key: str = strawberry.field(description="The key of the port")
     label: str | None = strawberry.field(
@@ -254,11 +262,64 @@ class PortInput:
         description="The options for the port. This is used for dropdowns and text inputs",
     )
     default: scalars.AnyDefault | None = None
-    children: list[Annotated["PortInput", strawberry.lazy(__name__)]] | None = strawberry.field(default_factory=list)
-    assign_widget: Optional["AssignWidgetInput"] = None
-    return_widget: Optional["ReturnWidgetInput"] = None
-    descriptors: list[DescriptorInput] | None = strawberry.field(
+    children: list[Annotated["ArgPortInput", strawberry.lazy(__name__)]] | None = strawberry.field(default_factory=list)
+    widget: Optional["AssignWidgetInput"] = None
+    requires: list[RequiresInput] | None = strawberry.field(
         default_factory=list, description="The descriptors for the port. Descriptors are key-value pairs that can be used to add additional metadata to a port. When using rekuest's action search, you can filter actions based on their port descriptors"
+    )
+
+
+@pydantic.input(
+    models.ReturnPortInputModel,
+    description="""Port
+
+    A Port is a single input or output of a action. It is composed of a key and a kind
+    which are used to uniquely identify the port.
+
+    If the Port is a structure, we need to define a identifier and scope,
+    Identifiers uniquely identify a specific type of model for the scopes (e.g
+    all the ports that have the identifier "@mikro/image" are of the same type, and
+    are hence compatible with each other). Scopes are used to define in which context
+    the identifier is valid (e.g. a port with the identifier "@mikro/image" and the
+    scope "local", can only be wired to other ports that have the same identifier and
+    are running in the same app). Global ports are ports that have the scope "global",
+    and can be wired to any other port that has the same identifier, as there exists a
+    mechanism to resolve and retrieve the object for each app. Please check the rekuest
+    documentation for more information on how this works.
+
+
+    """,
+)
+class ReturnPortInput:
+    validators: list[ValidatorInput] | None = strawberry.field(default_factory=list, description="The validators for the port")
+    key: str = strawberry.field(description="The key of the port")
+    label: str | None = strawberry.field(
+        default=None,
+        description="The label of the port. This is the text that is displayed in the UI",
+    )
+    kind: enums.PortKind = strawberry.field(description="The kind of the port. This is the type of the port. Can be either int, string, structure, list, bool, dict, float, date, union or model")
+    description: str | None = strawberry.field(
+        default=None,
+        description="The description of the port. This is the text that is displayed in the UI when the user hovers over the port",
+    )
+    identifier: str | None = strawberry.field(
+        default=None,
+        description="The identifier of a structure port. This is used to uniquely identify a specific type of structure.",
+    )
+    nullable: bool = strawberry.field(
+        default=False,
+        description="Whether the port is nullable or not. If the port is nullable, it can return null",
+    )
+    effects: list[EffectInput] | None = strawberry.field(default_factory=list, description="The effects of the port")
+    choices: list[ChoiceInput] | None = strawberry.field(
+        default_factory=list,
+        description="The options for the port. This is used for dropdowns and text inputs",
+    )
+    default: scalars.AnyDefault | None = None
+    children: list[Annotated["ReturnPortInput", strawberry.lazy(__name__)]] | None = strawberry.field(default_factory=list)
+    widget: Optional["ReturnWidgetInput"] = None
+    provides: list[ProvidesInput] | None = strawberry.field(
+        default_factory=list, description="The provisions for the port. Provisions are key-value pairs that can be used to add additional metadata to a port. When using rekuest's action search, you can filter actions based on their port provisions"
     )
 
 
@@ -271,38 +332,6 @@ class PortGroupInput:
     description: str | None
     effects: list[EffectInput] | None = strawberry.field(default_factory=list)
     ports: list[str] | None = strawberry.field(default_factory=list)
-
-
-@pydantic.input(models.BindsInputModel)
-class BindsInput:
-    implementations: Optional[list[str]]
-    clients: Optional[list[str]]
-    desired_instances: int = 1
-
-
-@pydantic.input(
-    models.DependencyInputModel,
-    description="""A dependency for a implementation. By defining dependencies, you can
-    create a dependency graph for your implementations and actions""",
-)
-class DependencyInput:
-    """A dependency for a implementation. By defining dependencies, you can
-    create a dependency graph for your implementations and actions"""
-
-    hash: scalars.ActionHash | None = strawberry.field(description="The hash of the dependency. This is used to uniquely the required action")
-    reference: str | None = strawberry.field(
-        default=None,  # How to reference this dependency (e.g. if it corresponds to a action_id in a flow)
-        description="The reference of the dependency. This is used to uniquely identify the dependency according to the implementation that relies on it",
-    )
-    binds: BindsInput | None = strawberry.field(
-        default=None,
-        description="The binds of the dependency. YOu can specifiy the amount of implementations and clients that are needed to run the dependency",
-    )
-    optional: bool = strawberry.field(
-        default=False,
-        description="Whether the dependency is optional or not. If the dependency is optional, it can be used to create a action without the dependency. If the dependency is not optional, it cannot be used to create a action without the dependency",
-    )
-    viable_instances: int | None = None
 
 
 @pydantic.input(
@@ -326,6 +355,10 @@ class PortMatchInput:
     identifier: str | None = strawberry.field(
         default=None,
         description="The identifier of the port to match. ",
+    )
+    object: scalars.Arg | None = strawberry.field(
+        default=None,
+        description="The object of the port to match. This is used for adanved pattern matching based on the exact object descriptors of the object. i.e { x: 1, y: 2} ",
     )
     nullable: bool | None = strawberry.field(
         default=None,
@@ -471,11 +504,11 @@ class DefinitionInput:
         default_factory=list,
         description="The port groups of the definition. This is used to group ports together in the UI",
     )
-    args: list[PortInput] = strawberry.field(
+    args: list[ArgPortInput] = strawberry.field(
         default_factory=list,
         description="The args of the definition. This is the input ports of the definition",
     )
-    returns: list[PortInput] = strawberry.field(
+    returns: list[ReturnPortInput] = strawberry.field(
         default_factory=list,
         description="The returns of the definition. This is the output ports of the definition",
     )

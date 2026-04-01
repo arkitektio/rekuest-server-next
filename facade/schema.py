@@ -274,6 +274,8 @@ class Subscription:
     implementations = subscription(resolver=subscriptions.implementations, description="Subscribe to creation or updates of implementations.")
     state_update_events = subscription(resolver=subscriptions.state_update_events, description="Subscribe to updates of state values and patches.")
     latest_patches = subscription(resolver=subscriptions.latest_patches, description="Subscribe to latest patches for specific agents or states.")
+    watch_state = subscription(resolver=subscriptions.watch_state, description="Watch a state: yields the current snapshot then streams patches.")
+    watch_agent = subscription(resolver=subscriptions.watch_agent, description="Watch an agent: yields snapshots for all states then streams patches.")
     child_assignations = subscription(resolver=subscriptions.child_assignations, description="Subscribe to child assignation events.")
 
 
