@@ -1,4 +1,5 @@
 from typing import NewType
+from datalayer import models
 import strawberry
 
 
@@ -10,6 +11,4 @@ MediaLike = strawberry.scalar(
 )
 
 
-scalar_map = {
-    MediaLike: MediaLike,
-}
+scalar_map = {MediaLike: MediaLike}

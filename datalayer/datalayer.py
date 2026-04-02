@@ -348,17 +348,13 @@ class Datalayer:
     def generate_media_upload_grant(self, input: base_models.RequestMediaUploadInput) -> base_models.MediaUploadGrant:
         """Create a media store and a presigned PUT URL for upload.
 
-        Args:
-            input: Media upload request metadata.
-
-        Returns:
-            A presigned PUT URL and metadata for the new media store.
+        The presigned URL is generated against the internal S3 endpoint, then
+        the base URL is rewritten to match the client-provided addressing.
         """
         from datalayer import models
 
         conf = self.get_bucket_config("media")
         key = self._new_key()
-
         store = models.MediaStore.objects.create(
             path=self.build_store_path("media", key),
             key=key,
@@ -368,48 +364,30 @@ class Datalayer:
         )
 
         ttl = self._session_duration()
+
+        access_key, secret_key, session_token = self._issue_temporary_credentials("media", store.key, "upload", ttl)
         full_key = self.build_object_key("media", store.key)
 
-        params = {
-            "Bucket": conf.bucket,
-            "Key": full_key,
-        }
-        if input.content_type:
-            params["ContentType"] = input.content_type
-
-        presigned_url = self._s3.generate_presigned_url(
-            "put_object",
-            Params=params,
-            ExpiresIn=ttl,
-        )
-
-        parsed = urlparse(presigned_url)
-        qs = parse_qs(parsed.query)
-        base_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
-
         return base_models.MediaUploadGrant(
-            store=str(store.pk),
-            key=full_key,
+            access_key=access_key,
+            secret_key=secret_key,
+            session_token=session_token,
             bucket=conf.bucket,
+            region=self.config.region,
+            key=full_key,
+            path=self.build_store_path("media", store.key),
+            expires_in=ttl,
             datalayer="media",
-            base_url=base_url,
-            x_amz_algorithm=qs["X-Amz-Algorithm"][0],
-            x_amz_credential=qs["X-Amz-Credential"][0],
-            x_amz_date=qs["X-Amz-Date"][0],
-            x_amz_expires=qs["X-Amz-Expires"][0],
-            x_amz_signed_headers=qs["X-Amz-SignedHeaders"][0],
-            x_amz_signature=qs["X-Amz-Signature"][0],
+            max_bytes=input.file_size or conf.default_max_bytes,
+            original_file_name=store.original_file_name,
+            upload_file_name=store.get_upload_file_name(),
+            upload_content_type=store.content_type,
+            upload_form_field="file",
+            store=str(store.pk),
         )
 
     def generate_bigfile_upload_grant(self, input: base_models.RequestBigFileUploadInput) -> base_models.BigFileUploadGrant:
-        """Create a big file store and upload grant.
-
-        Args:
-            input: Big file upload request metadata.
-
-        Returns:
-            Temporary credentials and upload metadata for the new big file store.
-        """
+        """Create a big file store and upload grant."""
         from datalayer import models
 
         conf = self.get_bucket_config("bigfile")
@@ -434,7 +412,6 @@ class Datalayer:
             bucket=conf.bucket,
             key=full_key,
             path=self.build_store_path("bigfile", store.key),
-            action="upload",
             expires_in=ttl,
             datalayer="bigfile",
             max_bytes=input.file_size or conf.default_max_bytes,
@@ -446,14 +423,7 @@ class Datalayer:
         )
 
     def generate_zarr_upload_grant(self, input: base_models.RequestZarrUploadInput) -> base_models.ZarrUploadGrant:
-        """Create a Zarr store and upload grant.
-
-        Args:
-            input: Zarr upload request metadata.
-
-        Returns:
-            Temporary credentials and upload metadata for the new Zarr store.
-        """
+        """Create a Zarr store and upload grant."""
         from datalayer import models
 
         conf = self.get_bucket_config("zarr")
@@ -478,7 +448,6 @@ class Datalayer:
             bucket=conf.bucket,
             key=full_key,
             path=self.build_store_path("zarr", store.key),
-            action="upload",
             expires_in=ttl,
             datalayer="zarr",
             max_bytes=conf.default_max_bytes,
@@ -490,14 +459,7 @@ class Datalayer:
         )
 
     def generate_parquet_upload_grant(self, input: base_models.RequestParquetUploadInput) -> base_models.ParquetUploadGrant:
-        """Create a parquet store and upload grant.
-
-        Args:
-            input: Parquet upload request metadata.
-
-        Returns:
-            Temporary credentials and upload metadata for the new parquet store.
-        """
+        """Create a parquet store and upload grant."""
         from datalayer import models
 
         conf = self.get_bucket_config("parquet")
@@ -521,7 +483,6 @@ class Datalayer:
             bucket=conf.bucket,
             key=full_key,
             path=self.build_store_path("parquet", store.key),
-            action="upload",
             expires_in=ttl,
             datalayer="parquet",
             max_bytes=conf.default_max_bytes,
@@ -636,6 +597,7 @@ class Datalayer:
             action="read",
             expires_in=ttl,
             datalayer=bucket_key,
+            endpoint=self.config.endpoint_url or "",
             store=str(store_id) if store_id is not None else None,
         )
 
@@ -672,6 +634,7 @@ class Datalayer:
             action="delete",
             expires_in=ttl,
             datalayer=bucket_key,
+            endpoint=self.config.endpoint_url or "",
             store=str(store_id) if store_id is not None else None,
         )
 
@@ -706,6 +669,7 @@ class Datalayer:
             action="read",
             expires_in=ttl,
             datalayer="bigfile",
+            endpoint=self.config.endpoint_url or "",
             store=str(store_id) if store_id is not None else None,
         )
 
@@ -734,12 +698,14 @@ class Datalayer:
             access_key=access_key,
             secret_key=secret_key,
             session_token=session_token,
+            region=self.config.region,
             bucket=conf.bucket,
             key=full_key,
             path=self.build_store_path("media", object_path),
             action="read",
             expires_in=ttl,
             datalayer="media",
+            endpoint=self.config.endpoint_url or "",
             store=str(store_id) if store_id is not None else None,
         )
 
@@ -774,6 +740,7 @@ class Datalayer:
             action="read",
             expires_in=ttl,
             datalayer="zarr",
+            endpoint=self.config.endpoint_url or "",
             store=str(store_id) if store_id is not None else None,
         )
 
@@ -808,6 +775,7 @@ class Datalayer:
             action="read",
             expires_in=ttl,
             datalayer="parquet",
+            endpoint=self.config.endpoint_url or "",
             store=str(store_id) if store_id is not None else None,
         )
 

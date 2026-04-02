@@ -912,7 +912,7 @@ class SessionBoundary:
 
 @strawberry_django.type(models.Patch)
 class Patch:
-    id:
+    id: strawberry.ID
     op: str
     path: str
     value: scalars.Args
