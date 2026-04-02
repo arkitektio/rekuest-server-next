@@ -72,6 +72,7 @@ class FromAgentMessageType(str, Enum):
     LOCK = "LOCK"
     UNLOCK = "UNLOCK"
     STATE_SNAPSHOT = "STATE_SNAPSHOT"
+    SESSION_INIT = "SESSION_INIT"
 
 
 class Message(BaseModel):
@@ -388,6 +389,19 @@ class HeartbeatEvent(Message):
     type: Literal[FromAgentMessageType.HEARTBEAT_ANSWER] = FromAgentMessageType.HEARTBEAT_ANSWER
 
 
+class SessionInitMessage(Message):
+    """A session init message
+
+    A session init message is sent when the agent starts and wants to
+    initialize the session with the rekuest backend. This is used to
+    send session initialization information from the agent to the rekuest backend
+    """
+
+    type: Literal[FromAgentMessageType.SESSION_INIT] = FromAgentMessageType.SESSION_INIT
+    session_id: str = Field(description="The session id of the agent (generated on a restart of the agent)")
+    states: Dict[str, Any] = Field(description="A dictionary containing the initial state snapshots, where the key is the state name and the value is the state snapshot")
+
+
 class StatePatchEvent(Message):
     """A state patch event
 
@@ -405,7 +419,10 @@ class StatePatchEvent(Message):
     path: str
     value: Any
     old_value: Any | None = Field(description="The old value of the patch, which can be used for debugging and tracing purposes")
-    correlation_id: Optional[str] = Field(default=None, description="An optional correlation id to correlate this patch with a specific action or event in the agent's execution, which can be used for debugging and tracing purposes")
+    correlation_id: Optional[str] = Field(
+        default=None,
+        description="An optional correlation id to correlate this patch with a specific action or event in the agent's execution, which can be used for debugging and tracing purposes",
+    )
 
 
 class StateSnapshotEvent(Message):
@@ -507,22 +524,4 @@ ToAgentMessage = Union[
     Bounce,
     Kick,
 ]
-FromAgentMessage = Union[
-    CriticalEvent,
-    LogEvent,
-    ProgressEvent,
-    DoneEvent,
-    ErrorEvent,
-    YieldEvent,
-    Register,
-    HeartbeatEvent,
-    SteppedEvent,
-    ResumedEvent,
-    PausedEvent,
-    CancelledEvent,
-    InterruptedEvent,
-    StatePatchEvent,
-    StateSnapshotEvent,
-    LockEvent,
-    UnlockEvent,
-]
+FromAgentMessage = Union[CriticalEvent, LogEvent, ProgressEvent, DoneEvent, ErrorEvent, YieldEvent, Register, HeartbeatEvent, SteppedEvent, ResumedEvent, PausedEvent, CancelledEvent, InterruptedEvent, StatePatchEvent, StateSnapshotEvent, LockEvent, UnlockEvent, SessionInitMessage]

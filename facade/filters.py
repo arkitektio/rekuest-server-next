@@ -889,3 +889,23 @@ class SpaceMembershipFilter:
     @filter_field(description="Filter by agent scene")
     def agent_scene(self, info: Info, queryset, value: strawberry.ID, prefix: str):
         return queryset.filter(**{f"{prefix}agent_scene_id": value}), Q()
+
+
+# Session
+
+
+@strawberry_django.order(models.Session)
+class SessionOrder:
+    started_at: auto
+    ended_at: auto
+
+
+@strawberry_django.filter_type(models.Session, description="A way to filter sessions")
+class SessionFilter:
+    @filter_field(description="Filter by IDs")
+    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+        return queryset.filter(**{f"{prefix}id__in": value}), Q()
+
+    @filter_field(description="Filter by space")
+    def agent(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+        return queryset.filter(**{f"{prefix}agent_id": value}), Q()

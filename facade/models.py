@@ -1336,26 +1336,36 @@ class State(models.Model):
         ]
 
 
+class Session(models.Model):
+    """A Session is a representation of a user session. Sessions are used to represent the current session of a user and can be used to track the changes that happen to a state over time. They are stored as a log of changes to a state and can be used to reconstruct the state at any point in time."""
+
+    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="sessions")
+    session_id = models.CharField(max_length=1000, help_text="The unique identifier for this session")
+    created_at = models.DateTimeField(auto_now_add=True, help_text="The time this session was created")
+    updated_at = models.DateTimeField(auto_now=True, help_text="The time this session was last updated")
+    active = models.BooleanField(default=True, help_text="Is this session active?")
+
+
 class Patch(models.Model):
     """A Patch is a representation of a change to a state. Patches are used to represent the changes that happen to a state over time. They are stored as a log of changes to a state and can be used to reconstruct the state at any point in time."""
 
     state = models.ForeignKey(State, on_delete=models.CASCADE, related_name="patches")
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="patches_created", null=True, blank=True)
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name="patches", null=True, blank=True)
     op = models.CharField(max_length=1000, help_text="The operation of this patch (e.g. add, remove, replace)")
     path = models.CharField(max_length=1000, help_text="The path of this patch (e.g. the path to the value that is being changed)")
     value = models.JSONField(help_text="The value of this patch (e.g. the new value that is being set)")
     timestamp = models.DateTimeField(auto_now_add=True, help_text="The time this patch was created")
     global_rev = models.IntegerField(help_text="The current revision of the state in the global context (e.g. considering all patches that have been applied to this state)")
-    session_id = models.CharField(max_length=1000, help_text="The session id of the user that made this change (e.g. to be able to track changes by user)")
     assignation = models.ForeignKey(Assignation, on_delete=models.CASCADE, null=True, blank=True, help_text="The assignation that caused this patch (e.g. to be able to track changes by assignation)", related_name="patches")
 
 
 class Snapshot(models.Model):
     state = models.ForeignKey(State, on_delete=models.CASCADE, related_name="snapshots")
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="snapshots_created", null=True, blank=True)
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name="snapshots", null=True, blank=True)
     value = models.JSONField(help_text="The value of this snapshot (e.g. the value of the state at the time of the snapshot)")
     timestamp = models.DateTimeField(auto_now_add=True, help_text="The time this snapshot was created")
-    session_id = models.CharField(max_length=1000, help_text="The session id of the user that made this snapshot (e.g. to be able to track snapshots by user)")
     global_rev = models.IntegerField(help_text="The revision of the state in the global context at the time of the snapshot (e.g. considering all patches that have been applied to this state)")
 
 

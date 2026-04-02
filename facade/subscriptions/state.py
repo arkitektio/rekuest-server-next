@@ -63,6 +63,7 @@ class StateSnapshotEvent:
     interface: str
     value: scalars.Args
     global_revision: int
+    session_id: str
     timestamp: datetime.datetime
 
 
@@ -99,6 +100,7 @@ async def watch_state(
         interface=state.interface,
         value=snapshot_value,
         global_revision=global_rev,
+        session_id=latest_snapshot.session_id if latest_snapshot else None,
         timestamp=state.updated_at,
     )
 
@@ -106,6 +108,8 @@ async def watch_state(
         f"state_{state.id}",
         f"patches_state_{state.id}",
     ]
+
+    print("Watching state with topics:", topics)
 
     async for message in patch_channel.listen(info.context, topics):
         try:

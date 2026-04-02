@@ -82,24 +82,27 @@ def auto_resolve(info: Info, implementation: models.Implementation, resolution: 
 def get_latest_state(
     agent: models.Agent,
     state_id: int | None = None,
+    session_id: str | None = None,
     global_revision: int | None = None,
 ) -> dict:
     results = {}
+
+    t = models.Session.objects.filter(agent=agent).order_by("-created_at").first() if not session_id else models.Session.objects.get(agent=agent, session_id=session_id)
 
     qs = models.State.objects.filter(agent=agent)
     if state_id:
         qs = qs.filter(id=state_id)
 
     for state in qs:
-        snapshot_qs = models.Snapshot.objects.filter(state=state, agent=agent)
+        snapshot_qs = models.Snapshot.objects.filter(state=state, agent=agent, session=t)
         if global_revision:
-            snapshot_qs = snapshot_qs.filter(global_revision__lte=global_revision).order_by("-global_revision")
+            snapshot_qs = snapshot_qs.filter(global_rev__lte=global_revision).order_by("-global_rev")
         else:
             snapshot_qs = snapshot_qs.order_by("-timestamp")
 
         snapshot = snapshot_qs.first()
         if not snapshot:
-            raise ValueError(f"No snapshot found for state {state.id}")
+            raise ValueError(f"No snapshot found for state {state_id}")
         print(f"Snapshot for state {state} is {snapshot}")
 
         base_value = snapshot.value if snapshot else {}
@@ -110,7 +113,7 @@ def get_latest_state(
             patches_qs = patches_qs.filter(timestamp__gt=start_time)
 
         if global_revision:
-            patches_qs = patches_qs.filter(global_future_revision__lte=global_revision)
+            patches_qs = patches_qs.filter(global_rev__lte=global_revision)
 
         patches = patches_qs.order_by("timestamp")
 

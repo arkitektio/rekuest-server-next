@@ -97,9 +97,12 @@ def implementation_post_del(sender, instance: models.Implementation = None, **kw
 
 @receiver(post_save, sender=models.Patch)
 def patch_post_save(sender, instance: models.Patch = None, created=None, **kwargs):
+    print("Patch post save signal received for patch:", instance)
     if created:
         topics = [f"patches_state_{instance.state.id}"]
         if instance.agent:
             topics.append(f"patches_agent_{instance.agent.id}")
+
+        print("Broadcasting patch event to topics:", topics)
 
         channels.patch_channel.broadcast(channel_events.PatchEvent(create=instance.id, state=instance.state.id, agent=instance.agent.id if instance.agent else None), topics)

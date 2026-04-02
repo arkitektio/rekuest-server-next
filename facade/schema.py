@@ -72,6 +72,9 @@ class Query:
     threed_models: list[types.ThreeDModel] = field(description="List all 3D models.")
     agent_scenes: list[types.AgentScene] = field(description="List all agent scenes.")
 
+    sessions: list[types.Session] = field(description="List all sessions.")
+    session: types.Session = field(description="Fetch a specific session by ID.")
+
     @field(description="Get a space by ID.")
     def space(self, info: Info, id: strawberry.ID) -> types.Space:
         return cast(types.Space, models.Space.objects.get(id=id))

@@ -60,10 +60,12 @@ def task_boundaries(
 
 def session_boundaries(
     info: Info,
-    session_id: str,
+    session_id: strawberry.ID,
     state_id: strawberry.ID | None = None,
 ) -> Optional[types.SessionBoundary]:
-    queryset = models.Patch.objects.filter(session_id=session_id)
+    session = models.Session.objects.get(session_id=session_id)
+
+    queryset = models.Patch.objects.filter(session=session_id)
     if state_id:
         queryset = queryset.filter(state_id=state_id)
 
@@ -261,6 +263,7 @@ class StateWithValue:
 def checkout(
     info: Info,
     state: strawberry.ID,
+    session_id: strawberry.ID | None = None,
     global_revision: int | None = None,
 ) -> StateWithValue:
     """Checkout a state at a specific revision."""
@@ -270,6 +273,7 @@ def checkout(
         state_inst.agent,
         state_id=state_inst.id,
         global_revision=global_revision,
+        session_id=session_id,
     )
 
     if not result:

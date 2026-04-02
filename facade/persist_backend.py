@@ -131,10 +131,12 @@ class ModelPersistBackend:
         logging.info(f"Log Patch for Assignation {message.state_name}")
 
         state = await models.State.objects.aget(agent_id=agent_id, interface=message.state_name)
+        session, _ = await models.Session.objects.aget_or_create(agent_id=agent_id, session_id=message.session_id)
 
         await models.Patch.objects.acreate(
             state=state,
             agent_id=agent_id,
+            session=session,
             op=message.op,
             path=message.path,
             value=message.value,
@@ -145,17 +147,23 @@ class ModelPersistBackend:
     async def on_agent_state_snapshot(self, agent_id: str, message: messages.StateSnapshotEvent) -> None:
         logging.info(f"Log Snapshot for Assignation {agent_id}")
 
+        session, _ = await models.Session.objects.aget_or_create(agent_id=agent_id, session_id=message.session_id)
+
         for state_name, snapshot in message.snapshots.items():
             state = await models.State.objects.aget(agent_id=agent_id, interface=state_name)
             agent = await models.Agent.objects.aget(id=agent_id)
 
             await models.Snapshot.objects.acreate(
+                session=session,
                 state=state,
                 agent=agent,
                 value=snapshot,
                 global_rev=message.global_rev,
-                session_id=message.session_id,
             )
+
+    async def on_session_init(self, agent_id: str, message: messages.SessionInitMessage) -> None:
+        logging.info(f"Session init {message.session_id} with data {message.data}")
+        # For now we don't do anything with this, but it could be used to initialize session-specific data
 
 
 persist_backend = ModelPersistBackend()

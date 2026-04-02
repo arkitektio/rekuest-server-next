@@ -371,6 +371,8 @@ class Agent:
     assignations: list[Annotated["Assignation", strawberry.lazy(__name__)]] = strawberry_django.field(description="Assignations executed by this agent.")
     app: App = strawberry_django.field(description="The app this agent belongs to.")
     release: Release = strawberry_django.field(description="The release this agent belongs to.")
+    scenes: list["AgentScene"] = strawberry_django.field(description="Scenes associated with this agent.")
+    sessions: list["Session"] = strawberry_django.field(description="Sessions associated with this agent.")
 
     @strawberry_django.field(description="Fetch a specific implementation by interface.")
     def implementation(self, interface: str) -> Implementation | None:
@@ -910,6 +912,7 @@ class SessionBoundary:
 
 @strawberry_django.type(models.Patch)
 class Patch:
+    id:
     op: str
     path: str
     value: scalars.Args
@@ -929,6 +932,7 @@ class Patch:
 
 @strawberry_django.type(models.Snapshot)
 class Snapshot:
+    id: strawberry.ID
     value: scalars.Args
     timestamp: datetime.datetime
     revision: int
@@ -1000,3 +1004,19 @@ class AgentScene:
     agent: Agent
     created_at: datetime.datetime
     updated_at: datetime.datetime
+
+
+@kante.django_type(
+    models.Session,
+    filters=filters.SessionFilter,
+    order=filters.SessionOrder,
+    pagination=True,
+    description="A session representing a continuous interaction of an agent with the system.",
+)
+class Session:
+    id: strawberry.ID
+    agent: Agent
+    started_at: datetime.datetime
+    ended_at: datetime.datetime | None
+    snapshots: list[Snapshot]
+    patches: list[Patch]
