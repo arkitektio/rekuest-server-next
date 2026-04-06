@@ -175,7 +175,7 @@ class ArgPort:
     choices: list[Choice] | None = None
     widget: AssignWidget | None = None
     validators: list[Validator] | None = None
-    provides: list[Provides] | None = None
+    requires: list[Requires] | None = None
 
 
 @pydantic.type(models.ReturnPortModel)
