@@ -129,7 +129,7 @@ def get_latest_state(
 
         results[state.interface] = {
             "value": current_value,
-            "schema": state.state_schema,
+            "definition": state.definition,
             "global_revision": current_global_revision,
         }
 
