@@ -218,54 +218,6 @@ class CreateResolutionInput:
     )
 
 
-class CreateSpaceInputModel(BaseModel):
-    """Base model for creating a resolution.
-
-    Attributes:
-        name: Name of the resolution
-        action_demands: List of action demands for the resolution
-        state_demands: List of state demands for the resolution
-        description: Description of the resolution
-        url: URL associated with the resolution
-    """
-
-    key: str
-    name: str
-
-
-@pydantic.input(
-    CreateSpaceInputModel,
-    description="The input for creating a space.",
-)
-class CreateSpaceInput:
-    key: str = strawberry.field(description="The key of the space. This is used to identify the space in the system.")
-    name: str = strawberry.field(description="The name of the space. This is used to identify the space in the system.")
-
-
-class CreateSpaceMembershipInputModel(BaseModel):
-    """Base model for creating a resolution.
-
-    Attributes:
-        name: Name of the resolution
-        action_demands: List of action demands for the resolution
-        state_demands: List of state demands for the resolution
-        description: Description of the resolution
-        url: URL associated with the resolution
-    """
-
-    space_id: str
-    agent_id: str
-
-
-@pydantic.input(
-    CreateSpaceMembershipInputModel,
-    description="The input for creating a space membership.",
-)
-class CreateSpaceMembershipInput:
-    space_id: str = strawberry.field(description="The ID of the space.")
-    agent_id: str = strawberry.field(description="The ID of the agent.")
-
-
 class DeleteResolutionInputModel(BaseModel):
     """Base model for deleting a resolution.
 
@@ -939,40 +891,6 @@ class DeleteImplementationInput:
     implementation: strawberry.ID = strawberry.field(description="The implementation ID to delete. This is used to identify the implementation in the system.")
 
 
-class SetExtensionImplementationsInputModel(BaseModel):
-    """Base model for setting extension implementations.
-
-    Attributes:
-        implementation: Implementation configuration data
-        instance_id: Instance ID of the agent this extension belongs to
-        extension: Extension identifier
-        run_cleanup: Whether to run cleanup after setting implementations
-    """
-
-    implementation: rimodels.ImplementationInputModel
-    instance_id: str
-    extension: str
-    run_cleanup: bool = False
-
-
-@pydantic.input(
-    SetExtensionImplementationsInputModel,
-    description="The input for setting extension implementations.",
-)
-class SetExtensionImplementationsInput:
-    locks: list[ritypes.LockSchemaInput] | None = strawberry.field(
-        default=None,
-        description="The locks to set on the implementations. This is used to identify the locks in the system.",
-    )
-    implementations: list[ritypes.ImplementationInput] = strawberry.field(description="The implementations to set. This is used to identify the implementations in the system.")
-    extension: str = strawberry.field(description="The extension that these implementations will be set to")
-    run_cleanup: bool = strawberry.field(
-        default=False,
-        description="Whether to run the cleanup process after setting the implementations. If true, all implementations that are not in the list will be deleted.",
-    )
-    instance_id: scalars.InstanceId = strawberry.field(description="The instance ID of the agent that this extension belongs to.")
-
-
 class CreateDashboardInputModel(BaseModel):
     tree: uimodels.UITreeInputModel | None = None
 
@@ -1089,78 +1007,6 @@ class DeleteShortcutInput:
     id: strawberry.ID
 
 
-class StateSchemaInputModel(BaseModel):
-    ports: list[rimodels.PortInputModel]
-    name: str
-
-
-@pydantic.input(StateSchemaInputModel, description="The input for creating a state schema.")
-class StateSchemaInput:
-    ports: list[ritypes.ReturnPortInput] = strawberry.field(description="The ports of the state schema. This is used to identify the state schema in the system.")
-    name: str = strawberry.field(description="The name of the state schema. This is used to identify the state schema in the system.")
-
-
-class CreateStateSchemaInputModel(BaseModel):
-    state_schema: StateSchemaInputModel
-    instance_id: str
-
-
-@pydantic.input(CreateStateSchemaInputModel, description="The input for creating a state schema.")
-class CreateStateSchemaInput:
-    state_schema: StateSchemaInput = strawberry.field(description="The state schema to create. This is used to identify the state schema in the system.")
-
-
-class SetStateInputModel(BaseModel):
-    interface: str
-    instance_id: str
-    value: Dict[str, Any]
-
-
-@pydantic.input(SetStateInputModel, description="The input for setting a state schema.")
-class SetStateInput:
-    interface: str = strawberry.field(description="The state schema to set. This is used to identify the state schema in the system.")
-    instance_id: scalars.InstanceId = strawberry.field(description="The instance ID of the agent that this state belongs to.")
-    value: scalars.Args = strawberry.field(description="The value to set the state schema to. This is used to identify the state schema in the system.")
-
-
-class StateInitInputModel(BaseModel):
-    state_schema: strawberry.ID
-    value: Dict[str, Any]
-
-
-@pydantic.input(StateInitInputModel, description="The initializing input for a state schema.")
-class StateInitInput:
-    state_schema: strawberry.ID = strawberry.field(description="The state schema to initialize. This is used to identify the state schema in the system.")
-    value: scalars.Args = strawberry.field(description="The value to set the state schema to. This is used to identify the state schema in the system.")
-
-
-class StateImplementationInputModel(BaseModel):
-    interface: str
-    state_schema: StateSchemaInputModel = strawberry.field(description="The state schema to set. This is used to identify the state schema in the system.")
-    initial: Dict[str, Any]
-
-
-@pydantic.input(StateImplementationInputModel, description="The input for initializing a state schema.")
-class StateImplementationInput:
-    interface: str = strawberry.field(description="The interface of the implementation. Only ussable if you also set agent")
-    state_schema: StateSchemaInput = strawberry.field(description="The state schema to set. This is used to identify the state schema in the system.")
-    initial: scalars.Args = strawberry.field(description="The value to set the state schema to. This is used to identify the state schema in the system.")
-
-
-class SetAgentStatesInputModel(BaseModel):
-    implementations: list[StateImplementationInputModel]
-    instance_id: str
-
-
-@pydantic.input(
-    SetAgentStatesInputModel,
-    description="The input for setting a state schema to an agent.",
-)
-class SetAgentStatesInput:
-    implementations: list[StateImplementationInput] = strawberry.field(description="The implementations of the state schemas. This is used to identify the state schemas in the system.")
-    instance_id: scalars.InstanceId = strawberry.field(description="The instance ID of the agent that this state belongs to.")
-
-
 class JSONPatchInputModel(BaseModel):
     op: Literal["add", "remove", "replace", "move", "copy", "test"]
     path: str
@@ -1193,13 +1039,17 @@ class CreateThreeDModelInputModel(BaseModel):
     name: str
     description: str | None = None
     media: str
+    transfer_function: str | None = None
+    dependency: rimodels.AgentDependencyInputModel | None = None
 
 
 @pydantic.input(CreateThreeDModelInputModel, description="The input for creating a 3D model.")
 class CreateThreeDModelInput:
     name: str = strawberry.field(description="The name of the 3D model.")
     description: str | None = strawberry.field(default=None, description="A description of the 3D model.")
-    media: dscalars.MediaLike
+    media: dscalars.MediaLike = strawberry.field(description="The media store file for the 3D model.")
+    transfer_function: str | None = strawberry.field(default=None, description="The function used to transfer the state of the model to properties of the scene. If not provided, a default function will be used.")
+    dependency: ritypes.AgentDependencyInput | None = strawberry.field(default=None, description="The dependency to run the transfer function in. If not provided, the transfer function will be run in the default agent.")
 
 
 class UpdateThreeDModelInputModel(BaseModel):
@@ -1217,8 +1067,23 @@ class UpdateThreeDModelInput:
     media: strawberry.ID | None = strawberry.field(default=None, description="The new media store file ID for the 3D model.")
 
 
+class PlacementInputModel(BaseModel):
+    role: str | None = None
+    affine_matrix: list[list[float]] | None = None
+    model: str | None = None
+    agent: str | None = None
+
+
 class DeleteThreeDModelInputModel(BaseModel):
     id: str
+
+
+@pydantic.input(PlacementInputModel, description="The input for creating or updating a placement.")
+class PlacementInput:
+    role: str | None = strawberry.field(default=None, description="The role of the placement. This is used to identify the placement in the system.")
+    affine_matrix: list[list[float]] | None = strawberry.field(default=None, description="The affine matrix for the placement. This is used to identify the placement in the system.")
+    model: strawberry.ID | None = strawberry.field(default=None, description="The 3D model ID for the placement. This is used to identify the 3D model in the system.")
+    agent: strawberry.ID | None = strawberry.field(default=None, description="The agent ID for the placement. This is used to identify the agent in the system.")
 
 
 @pydantic.input(DeleteThreeDModelInputModel, description="The input for deleting a 3D model.")
@@ -1226,39 +1091,52 @@ class DeleteThreeDModelInput:
     id: strawberry.ID = strawberry.field(description="The ID of the 3D model to delete.")
 
 
-class CreateAgentSceneInputModel(BaseModel):
-    model_id: str
+class CreateSpaceInputModel(BaseModel):
+    """Base model for creating a resolution.
+
+    Attributes:
+        name: Name of the resolution
+        action_demands: List of action demands for the resolution
+        state_demands: List of state demands for the resolution
+        description: Description of the resolution
+        url: URL associated with the resolution
+    """
+
+    name: str
+    placements: list[PlacementInputModel] | None = None
+
+
+@pydantic.input(
+    CreateSpaceInputModel,
+    description="The input for creating a space.",
+)
+class CreateSpaceInput:
+    name: str = strawberry.field(description="The name of the space. This is used to identify the space in the system.")
+    placements: list[PlacementInput] | None = strawberry.field(default=None, description="The placements to create in the space. This is used to identify the placements in the system.")
+
+
+class CreateSpaceMembershipInputModel(BaseModel):
+    """Base model for creating a resolution.
+
+    Attributes:
+        name: Name of the resolution
+        action_demands: List of action demands for the resolution
+        state_demands: List of state demands for the resolution
+        description: Description of the resolution
+        url: URL associated with the resolution
+    """
+
+    space_id: str
     agent_id: str
-    transfer_function: str
 
 
-@pydantic.input(CreateAgentSceneInputModel, description="The input for creating an agent scene.")
-class CreateAgentSceneInput:
-    model_id: strawberry.ID = strawberry.field(description="The ID of the 3D model used for this scene.")
-    agent_id: strawberry.ID = strawberry.field(description="The ID of the agent this scene belongs to.")
-    transfer_function: str = strawberry.field(description="The function used to transfer the state of the model to properties of the scene.")
-
-
-class UpdateAgentSceneInputModel(BaseModel):
-    id: str
-    transfer_function: str | None = None
-    model_id: str | None = None
-
-
-@pydantic.input(UpdateAgentSceneInputModel, description="The input for updating an agent scene.")
-class UpdateAgentSceneInput:
-    id: strawberry.ID = strawberry.field(description="The ID of the agent scene to update.")
-    transfer_function: str | None = strawberry.field(default=None, description="The new transfer function.")
-    model_id: strawberry.ID | None = strawberry.field(default=None, description="The new 3D model ID.")
-
-
-class DeleteAgentSceneInputModel(BaseModel):
-    id: str
-
-
-@pydantic.input(DeleteAgentSceneInputModel, description="The input for deleting an agent scene.")
-class DeleteAgentSceneInput:
-    id: strawberry.ID = strawberry.field(description="The ID of the agent scene to delete.")
+@pydantic.input(
+    CreateSpaceMembershipInputModel,
+    description="The input for creating a space membership.",
+)
+class CreateSpaceMembershipInput:
+    space_id: str = strawberry.field(description="The ID of the space.")
+    agent_id: str = strawberry.field(description="The ID of the agent.")
 
 
 class UpdateSpaceInputModel(BaseModel):
@@ -1283,25 +1161,37 @@ class DeleteSpaceInput:
     id: strawberry.ID = strawberry.field(description="The ID of the space to delete.")
 
 
-class UpdateSpaceMembershipInputModel(BaseModel):
-    id: str
-    role: str | None = None
-    affine_matrix: Any | None = None
-    model: str | None = None
+class CreatePlacementInputModel(PlacementInputModel):
+    space: str
+    pass
 
 
-@pydantic.input(UpdateSpaceMembershipInputModel, description="The input for updating a space membership.")
-class UpdateSpaceMembershipInput:
-    id: strawberry.ID = strawberry.field(description="The ID of the space membership to update.")
-    role: str | None = strawberry.field(default=None, description="The new role for the membership.")
-    affine_matrix: list[list[float]] | None = strawberry.field(default=None, description="The new affine matrix for the membership.")
-    model: str | None = strawberry.field(default=None, description="The new model for the membership.")
-
-
-class DeleteSpaceMembershipInputModel(BaseModel):
+class UpdatePlacementInputModel(PlacementInputModel):
     id: str
 
 
-@pydantic.input(DeleteSpaceMembershipInputModel, description="The input for deleting a space membership.")
-class DeleteSpaceMembershipInput:
-    id: strawberry.ID = strawberry.field(description="The ID of the space membership to delete.")
+@pydantic.input(CreatePlacementInputModel, description="The input for creating a placement.")
+class CreatePlacementInput:
+    space: str = strawberry.field(description="The ID of the space to create the placement in.")
+    role: str | None = strawberry.field(default=None, description="The role for the placement.")
+    affine_matrix: list[list[float]] | None = strawberry.field(default=None, description="The affine matrix for the placement.")
+    model: strawberry.ID | None = strawberry.field(default=None, description="The model for the placement.")
+    agent: strawberry.ID | None = strawberry.field(default=None, description="The agent ID to create the placement for. If not provided, the placement will be created for the default agent.")
+
+
+@pydantic.input(UpdatePlacementInputModel, description="The input for updating a placement.")
+class UpdatePlacementInput:
+    id: strawberry.ID = strawberry.field(description="The ID of the placement to update.")
+    role: str | None = strawberry.field(default=None, description="The new role for the placement.")
+    affine_matrix: list[list[float]] | None = strawberry.field(default=None, description="The new affine matrix for the placement.")
+    model: strawberry.ID | None = strawberry.field(default=None, description="The new model for the placement.")
+    agent: strawberry.ID | None = strawberry.field(default=None, description="The new agent ID for the placement.")
+
+
+class DeletePlacementInputModel(BaseModel):
+    id: str
+
+
+@pydantic.input(DeletePlacementInputModel, description="The input for deleting a placement.")
+class DeletePlacementInput:
+    id: strawberry.ID = strawberry.field(description="The ID of the placement to delete.")

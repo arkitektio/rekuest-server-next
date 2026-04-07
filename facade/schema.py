@@ -58,7 +58,7 @@ class Query:
     bloks: list[types.Blok] = field(description="List of UI Blok.")
     resolutions: list[types.Resolution] = field(description="All resolutions.")
     materialized_bloks: list[types.MaterializedBlok] = field(description="List of UI Blok.")
-    state_schemas: list[types.StateSchema] = field(description="Available state schemas.")
+    state_definitions: list[types.StateDefinition] = field(description="Available state schemas.")
     memory_shelves: list[types.MemoryShelve] = field(description="All memory shelves.")
     memory_drawers: list[types.MemoryDrawer] = field(description="All memory drawers.")
     structures: list[types.Structure] = field(description="All registered structures.")
@@ -67,29 +67,17 @@ class Query:
     tasks: list[types.Assignation] = field(description="All tasks.")
     resolved_implementations = field(resolver=queries.resolved_implementations, description="Fetch resolved dependencies for a resolution.")
 
+    agent: types.Agent = field(resolver=queries.agent, description="Fetch a specific agent by ID or by app, version, device_id and instance_id.")
+
     spaces: list[types.Space] = field(description="List all spaces.")
-    space_memberships: list[types.SpaceMembership] = field(description="List all space memberships.")
+    space: types.Space = field(description="Fetch a specific space by ID.")
+    placements: list[types.Placement] = field(description="List all placements.")
+    placement: types.Placement = field(description="Fetch a specific placement by ID.")
     threed_models: list[types.ThreeDModel] = field(description="List all 3D models.")
-    agent_scenes: list[types.AgentScene] = field(description="List all agent scenes.")
+    threed_model: types.ThreeDModel = field(description="Fetch a specific 3D model by ID.")
 
     sessions: list[types.Session] = field(description="List all sessions.")
     session: types.Session = field(description="Fetch a specific session by ID.")
-
-    @field(description="Get a space by ID.")
-    def space(self, info: Info, id: strawberry.ID) -> types.Space:
-        return cast(types.Space, models.Space.objects.get(id=id))
-
-    @field(description="Get a 3D model by ID.")
-    def threed_model(self, info: Info, id: strawberry.ID) -> types.ThreeDModel:
-        return cast(types.ThreeDModel, models.ThreeDModel.objects.get(id=id))
-
-    @field(description="Get an agent scene by ID.")
-    def agent_scene(self, info: Info, id: strawberry.ID) -> types.AgentScene:
-        return cast(types.AgentScene, models.AgentScene.objects.get(id=id))
-
-    @field(description="Get a space membership by ID.")
-    def space_membership(self, info: Info, id: strawberry.ID) -> types.SpaceMembership:
-        return cast(types.SpaceMembership, models.SpaceMembership.objects.get(id=id))
 
     # Stats
     actionStats: types.ActionStats = field(resolver=types.ActionStatsResolver, description="Statistics about actions and their implementations.")
@@ -137,9 +125,9 @@ class Query:
     def materialized_blok(self, info: Info, id: strawberry.ID) -> types.MaterializedBlok:
         return cast(types.MaterializedBlok, models.MaterializedBlok.objects.get(id=id))
 
-    @field(description="Retrieve a state schema by ID.")
-    def state_schema(self, info: Info, id: strawberry.ID) -> types.StateSchema:
-        return cast(types.StateSchema, models.StateSchema.objects.get(id=id))
+    @field(description="Retrieve a state definition by ID.")
+    def state_definition(self, info: Info, id: strawberry.ID) -> types.StateDefinition:
+        return cast(types.StateDefinition, models.StateDefinition.objects.get(id=id))
 
     @field(description="Get toolbox by ID.")
     def toolbox(self, info: Info, id: strawberry.ID) -> types.Toolbox:
@@ -152,10 +140,6 @@ class Query:
     @field(description="Get hardware record by ID.")
     def hardware_record(self, info: Info, id: strawberry.ID) -> types.HardwareRecord:
         return cast(types.HardwareRecord, models.HardwareRecord.objects.get(id=id))
-
-    @field(description="Retrieve an agent by ID.")
-    def agent(self, info: Info, id: strawberry.ID) -> types.Agent:
-        return cast(types.Agent, models.Agent.objects.get(id=id))
 
     @field(description="Get dashboard by ID.")
     def dashboard(self, info: Info, id: strawberry.ID) -> types.Dashboard:
@@ -190,7 +174,6 @@ class Query:
 class Mutation:
     create_implementation = mutation(resolver=mutations.create_implementation, description="Create a new implementation entry.")
     create_foreign_implementation = mutation(resolver=mutations.create_foreign_implementation, description="Register an external implementation.")
-    set_extension_implementations = mutation(resolver=mutations.set_extension_implementations, description="Set implementations provided by an extension.")
     ack = mutation(resolver=mutations.ack, description="Acknowledge an assignation.")
     bounce = mutation(resolver=mutations.bounce, description="Bounce an agent so it reconnects.")
     kick = mutation(resolver=mutations.kick, description="Kick an agent to force disconnect. It will fail and not reconnect.")
@@ -213,26 +196,19 @@ class Mutation:
     shelve_in_memory_drawer = mutation(resolver=mutations.shelve_in_memory_drawer, description="Shelve data into a memory drawer.")
     unshelve_memory_drawer = mutation(resolver=mutations.unshelve_memory_drawer, description="Unshelve data from a memory drawer.")
     create_dashboard = mutation(resolver=mutations.create_dashboard, description="Create a dashboard layout.")
-    create_state_schema = mutation(resolver=mutations.create_state_schema, description="Define a new state schema.")
     create_blok = mutation(resolver=mutations.create_blok, description="Create a user interface panel.")
-    set_state = mutation(resolver=mutations.set_state, description="Set the value of a state object.")
     materialize_blok = mutation(resolver=mutations.materialize_blok, description="Materialize a UI blok into a concrete instance on a dashboard.")
-    update_state = mutation(resolver=mutations.update_state, description="Update fields in a state object.")
-    archive_state = mutation(resolver=mutations.archive_state, description="Archive a state schema.")
     pin_agent = mutation(resolver=mutations.pin_agent, description="Pin an agent to the user.")
     pin_implementation = mutation(resolver=mutations.pin_implementation, description="Pin an implementation to the user.")
     delete_agent = mutation(resolver=mutations.delete_agent, description="Delete an agent record.")
     create_shortcut = mutation(resolver=mutations.create_shortcut, description="Create a shortcut to an action.")
     delete_shortcut = mutation(resolver=mutations.delete_shortcut, description="Delete a shortcut.")
     create_toolbox = mutation(resolver=mutations.create_toolbox, description="Create a new toolbox with shortcuts.")
-    set_agent_states = mutation(resolver=mutations.set_agent_states, description="Set states for an agent.")
     cleanup_actions = mutation(resolver=mutations.cleanup_actions, description="Delete unreferenced actions from the system.")
     auto_resolve = mutation(resolver=mutations.auto_resolve, description="Automatically resolve dependencies for an implementation.")
     create_resolution = mutation(resolver=mutations.create_resolution, description="Create sa resolution from")
     update_resolution = mutation(resolver=mutations.update_resolution, description="Update an existing resolution.")
     delete_resolution = mutation(resolver=mutations.delete_resolution, description="Delete a resolution by ID.")
-    create_space = mutation(resolver=mutations.create_space, description="Create a new space.")
-    create_space_membership = mutation(resolver=mutations.create_space_membership, description="Create a new space membership for an agent in a space.")
 
     log_patches = mutation(resolver=mutations.log_patches, description="Log state patches")
     log_snapshot = mutation(resolver=mutations.log_snapshot, description="Log a state snapshot ")
@@ -251,19 +227,23 @@ class Mutation:
         resolver=datalayer_mutations.request_media_access,
     )
 
+    # Implement Agent
+    implement_agent = mutation(resolver=mutations.implement_agent, description="Implement an agent with given states and implementations. This is used to set up an agent with its initial configuration and capabilities.")
+
     # 3D Model
-    create_agent_scene = mutation(resolver=mutations.create_agent_scene, description="Create a new agent scene with a 3D model.")
     create_threed_model = mutation(resolver=mutations.create_threed_model, description="Create a new 3D model.")
     update_threed_model = mutation(resolver=mutations.update_threed_model, description="Update an existing 3D model.")
     delete_threed_model = mutation(resolver=mutations.delete_threed_model, description="Delete a 3D model.")
-    update_agent_scene = mutation(resolver=mutations.update_agent_scene, description="Update an existing agent scene.")
-    delete_agent_scene = mutation(resolver=mutations.delete_agent_scene, description="Delete an agent scene.")
 
     # Space
+
+    create_space = mutation(resolver=mutations.create_space, description="Create a new space.")
     update_space = mutation(resolver=mutations.update_space, description="Update an existing space.")
     delete_space = mutation(resolver=mutations.delete_space, description="Delete a space.")
-    update_space_membership = mutation(resolver=mutations.update_space_membership, description="Update an existing space membership.")
-    delete_space_membership = mutation(resolver=mutations.delete_space_membership, description="Delete a space membership.")
+
+    create_placement = mutation(resolver=mutations.create_placement, description="Create a new placement for an agent in a space.")
+    update_placement = mutation(resolver=mutations.update_placement, description="Update an existing placement.")
+    delete_placement = mutation(resolver=mutations.delete_placement, description="Delete a placement.")
 
 
 @strawberry.type(description="Root subscription type for real-time event streams from the system.")

@@ -1,8 +1,6 @@
 import hashlib
 from rekuest_core.inputs import models
-from facade import inputs
 from rekuest_core import enums, scalars
-import strawberry
 import json
 
 
@@ -10,8 +8,8 @@ def underscore(s: str) -> str:
     return s.replace(" ", "_").replace("-", "_").lower()
 
 
-def hash_state_schema(definition: inputs.StateSchemaInput) -> str:
-    hashable_schema = {key: value for key, value in dict(strawberry.asdict(definition)).items() if key in ["ports"]}
+def hash_state_definition(definition: models.StateImplementationInputModel) -> str:
+    hashable_schema = {key: value for key, value in dict(definition.model_dump()).items() if key in ["ports"]}
     return hashlib.sha256(json.dumps(hashable_schema, sort_keys=True).encode()).hexdigest()
 
 
@@ -19,7 +17,7 @@ def calculate_action_hash(
     definition: models.DefinitionInputModel,
 ) -> scalars.ActionHash:
     """Calculates the hash for a action."""
-    return hashlib.sha256(json.dumps(definition.dict(), sort_keys=True).encode("utf-8")).hexdigest()
+    return hashlib.sha256(json.dumps(definition.model_dump(), sort_keys=True).encode("utf-8")).hexdigest()
 
 
 def traverse_scope(port: models.PortInputModel):

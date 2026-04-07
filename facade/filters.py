@@ -112,6 +112,14 @@ class AgentFilter:
             raise ValueError("Filtering by dependency currently only allowed when also filtering by app identifier")
 
     @filter_field
+    def three_d_model(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+        dep = models.ThreeDModel.objects.get(id=value)
+        if self.app_identifier is not UNSET and self.app_identifier is not None:
+            return queryset.filter(**{f"{prefix}app__identifier": dep.app_filter}), Q()
+        else:
+            raise ValueError("Filtering by three_d_model currently only allowed when also filtering by app identifier")
+
+    @filter_field
     def distinct(self, info: Info, queryset, value: bool, prefix: str):
         return queryset.distinct(), Q()
 
@@ -823,30 +831,6 @@ class ThreeDModelFilter:
         return queryset.filter(**{f"{prefix}name__icontains": value}), Q()
 
 
-# AgentScene
-
-
-@strawberry_django.order(models.AgentScene)
-class AgentSceneOrder:
-    created_at: auto
-    updated_at: auto
-
-
-@strawberry_django.filter_type(models.AgentScene, description="A way to filter agent scenes")
-class AgentSceneFilter:
-    @filter_field(description="Filter by IDs")
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
-        return queryset.filter(**{f"{prefix}id__in": value}), Q()
-
-    @filter_field(description="Filter by agent")
-    def agent(self, info: Info, queryset, value: strawberry.ID, prefix: str):
-        return queryset.filter(**{f"{prefix}agent_id": value}), Q()
-
-    @filter_field(description="Filter by 3D model")
-    def model(self, info: Info, queryset, value: strawberry.ID, prefix: str):
-        return queryset.filter(**{f"{prefix}model_id": value}), Q()
-
-
 # Space
 
 
@@ -864,20 +848,21 @@ class SpaceFilter:
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field(description="Search by name")
-    def search(self, info: Info, queryset, value: str, prefix: str):
+    def search(self, info: Info, queryset, value: str | None, prefix: str):
         return queryset.filter(**{f"{prefix}name__icontains": value}), Q()
 
 
 # SpaceMembership
 
 
-@strawberry_django.order(models.SpaceMembership)
-class SpaceMembershipOrder:
+@strawberry_django.order_type(models.Placement)
+class PlacementOrder:
     role: auto
+    created_at: auto
 
 
-@strawberry_django.filter_type(models.SpaceMembership, description="A way to filter space memberships")
-class SpaceMembershipFilter:
+@strawberry_django.filter_type(models.Placement, description="A way to filter placements (space memberships)")
+class PlacementFilter:
     @filter_field(description="Filter by IDs")
     def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
@@ -886,9 +871,13 @@ class SpaceMembershipFilter:
     def space(self, info: Info, queryset, value: strawberry.ID, prefix: str):
         return queryset.filter(**{f"{prefix}space_id": value}), Q()
 
-    @filter_field(description="Filter by agent scene")
-    def agent_scene(self, info: Info, queryset, value: strawberry.ID, prefix: str):
-        return queryset.filter(**{f"{prefix}agent_scene_id": value}), Q()
+    @filter_field(description="Filter by agent")
+    def agent(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+        return queryset.filter(**{f"{prefix}agent_id": value}), Q()
+
+    @filter_field(description="Search by name")
+    def search(self, info: Info, queryset, value: str | None, prefix: str):
+        return queryset.filter(**{f"{prefix}name__icontains": value}), Q()
 
 
 # Session

@@ -421,7 +421,6 @@ class Lock(models.Model):
         help_text="The agent this lock belongs to",
     )
     key = models.CharField(max_length=2000, help_text="A unique identifier for this lock within the agent")
-    extension = models.CharField(max_length=2000, help_text="The extension this lock is for (e.g. 'imagej')", default="general")
     description = models.TextField(help_text="A description for the Lock")
     created_at = models.DateTimeField(auto_created=True, auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -877,13 +876,25 @@ class Implementation(models.Model):
         default=list,
         help_text="The attached extensions for this Implementation",
     )
-    extension = models.CharField(verbose_name="Extension", max_length=1000, default="global")
-
     policy = models.JSONField(
         max_length=2000,
         default=dict,
         help_text="The attached policy for this implementation",
     )
+    higher_order_for = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="lower_order_implementations",
+        help_text="If this implementation is a higher order implementation, this field links to the lower order implementation it is wrapping (the implementation will actually get the params, the implementation and the args of this)",
+    )
+    extension = models.CharField(
+        max_length=1000,
+        default="default",
+        help_text="If this implementation is an extension of another implementation, this field links to the extension point (the implementation will actually get the params, the implementation and the args of this)",
+    )
+
     params = models.JSONField(default=dict, help_text="Params for this Implementation")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -1289,12 +1300,12 @@ class Dashboard(models.Model):
     ui_tree = models.JSONField(null=True, blank=True)
 
 
-class StateSchema(models.Model):
-    """A state schema is an abstract representation of a state and describes
+class StateDefinition(models.Model):
+    """A state definition is an abstract representation of a state and describes
     the ports (datatypes) that a state can have. States also follow the
     port schema
 
-    State schemas do not belong directly to an agent, but are
+    State definitions do not belong directly to an agent, but are
     used by agents to describe the states they can have.
 
     The concept is closing linked to the concepot of a "Action", but
@@ -1317,7 +1328,7 @@ class State(models.Model):
 
     """
 
-    state_schema = models.ForeignKey(StateSchema, on_delete=models.CASCADE, related_name="states")
+    definition = models.ForeignKey(StateDefinition, on_delete=models.CASCADE, related_name="states")
     interface = models.CharField(
         max_length=1000,
         help_text="The interface this state is for (e.g. Function)",
@@ -1465,14 +1476,8 @@ class ThreeDModel(models.Model):
         related_name="threedmodels",
         help_text="The media file containing this 3D model",
     )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-
-class AgentScene(models.Model):
-    transfer_function = models.CharField(max_length=10000, help_text="The function used to transfer the state of the model to properties of the scence")
-    model = models.ForeignKey(ThreeDModel, on_delete=models.CASCADE, related_name="scenes", help_text="The 3D model used for this scene")
-    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="scenes", help_text="The agent this scene belongs to")
+    transfer_function = models.CharField(max_length=10000, help_text="The function used to transfer the state of the model to properties of the model")
+    dependency = models.JSONField(help_text="The protocol of the agent that we need to show this model", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1486,16 +1491,24 @@ class Space(models.Model):
         related_name="spaces",
         help_text="The user that created this Space",
     )
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="spaces",
+        help_text="The organization this Space belongs to",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
 
-class SpaceMembership(models.Model):
-    space = models.ForeignKey(Space, on_delete=models.CASCADE, related_name="memberships")
-    agent_scene = models.ForeignKey(AgentScene, on_delete=models.CASCADE, related_name="space_memberships")
-    role = models.CharField(max_length=1000, help_text="The role of this membership ")
-    affine_matrix = models.JSONField(help_text="The affine matrix of this membership (e.g. the position and orientation of the agent in the space)", null=True, blank=True)
-    model = models.CharField(max_length=1000, help_text="The model of this membership (e.g. the model of the agent in the space)", null=True, blank=True)
+class Placement(models.Model):
+    space = models.ForeignKey(Space, on_delete=models.CASCADE, related_name="placements")
+    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="placements")
+    model = models.ForeignKey(ThreeDModel, on_delete=models.CASCADE, related_name="placements", null=True, blank=True, help_text="An optional 3D model to represent this placement in a 3D space")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    role = models.CharField(max_length=1000, help_text="The role of this placement ")
+    affine_matrix = models.JSONField(help_text="The affine matrix of this placement (e.g. the position and orientation of the agent in the space)", null=True, blank=True)
 
 
 import facade.signals as signals  # noqa: E402

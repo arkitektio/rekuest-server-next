@@ -95,7 +95,7 @@ MIDDLEWARE = [
 
 CHANNEL_LAYERS = {
     "default": {
-        # This example app uses the Redis channel layer implementation channels_redis
+        # This example app uses the Redis chasnnel layer implementation channels_redis
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {"hosts": [(conf.redis.host, conf.redis.port)], "prefix": "mikro"},
     },

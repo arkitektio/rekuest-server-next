@@ -7,10 +7,24 @@ import strawberry
 def create_space(info: Info, input: inputs.CreateSpaceInput) -> types.Space:
     x, _ = models.Space.objects.update_or_create(
         name=input.name,
+        organization=info.context.request.organization,
         defaults=dict(
             creator=info.context.request.user,
         ),
     )
+
+    for placement_input in input.placements or []:
+        membership, _ = models.Placement.objects.update_or_create(
+            space=x,
+            agent_id=placement_input.agent,
+            model_id=placement_input.model,
+            defaults=dict(
+                role=placement_input.role or "just a member",
+                affine_matrix=placement_input.affine_matrix,
+                model_id=placement_input.model,
+            ),
+        )
+
     return x
 
 
@@ -30,23 +44,23 @@ def delete_space(info: Info, input: inputs.DeleteSpaceInput) -> strawberry.ID:
     return input.id
 
 
-def create_space_membership(info: Info, input: inputs.CreateSpaceMembershipInput) -> types.SpaceMembership:
-    space = models.Space.objects.get(id=input.space_id)
-    agent_scene = models.AgentScene.objects.get(id=input.agent_id)
+def create_placement(info: Info, input: inputs.CreatePlacementInput) -> types.Placement:
+    space = models.Space.objects.get(id=input.space)
 
-    membership, _ = models.SpaceMembership.objects.update_or_create(
+    placement, _ = models.Placement.objects.update_or_create(
         space=space,
-        agent_scene=agent_scene,
+        agent_id=input.agent,
+        model_id=input.model,
         defaults=dict(
             role="just a member",
         ),
     )
 
-    return membership
+    return placement
 
 
-def update_space_membership(info: Info, input: inputs.UpdateSpaceMembershipInput) -> types.SpaceMembership:
-    x = models.SpaceMembership.objects.get(id=input.id)
+def update_placement(info: Info, input: inputs.UpdatePlacementInput) -> types.Placement:
+    x = models.Placement.objects.get(id=input.id)
     if input.role is not None:
         x.role = input.role
     if input.affine_matrix is not None:
@@ -57,7 +71,7 @@ def update_space_membership(info: Info, input: inputs.UpdateSpaceMembershipInput
     return x
 
 
-def delete_space_membership(info: Info, input: inputs.DeleteSpaceMembershipInput) -> strawberry.ID:
-    x = models.SpaceMembership.objects.get(id=input.id)
+def delete_placement(info: Info, input: inputs.DeletePlacementInput) -> strawberry.ID:
+    x = models.Placement.objects.get(id=input.id)
     x.delete()
     return input.id

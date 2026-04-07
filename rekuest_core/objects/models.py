@@ -45,10 +45,16 @@ class SearchAssignWidgetModel(AssignWidgetModel):
     dependencies: list[str] | None = None
 
 
+class StateAccessorModel(BaseModel):
+    option_key: enums.OptionKey
+    sub_path: str | None = None
+
+
 class StateChoiceAssignWidgetModel(AssignWidgetModel):
     kind: Literal["STATE_CHOICE"]
-    state_choices: str
-    accessor_func: str | None = None
+    state_path: str
+    dependency: str | None = None
+    state_accessors: list[StateAccessorModel] | None = None
 
 
 class StringWidgetModel(AssignWidgetModel):

@@ -87,3 +87,11 @@ class AssignPolicy(str, Enum):
     ROUND_ROBIN = "ROUND_ROBIN"
     LEAST_BUSY = "LEAST_BUSY"
     FASTEST_RESPONSE = "FASTEST_RESPONSE"
+
+
+@strawberry.enum
+class OptionKey(str, Enum):
+    LABEL = "LABEL"
+    DESCRIPTION = "DESCRIPTION"
+    LOGO = "LOGO"
+    VALUE = "VALUE"

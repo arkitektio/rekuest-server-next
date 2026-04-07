@@ -41,6 +41,11 @@ class ValidatorInputModel(BaseModel):
     error_message: str | None = None
 
 
+class StateAccessorInputModel(BaseModel):
+    option_key: enums.OptionKey
+    sub_path: str | None = None
+
+
 class AssignWidgetInputModel(BaseModel):
     kind: enums.AssignWidgetKind
     query: str | None = None
@@ -56,6 +61,9 @@ class AssignWidgetInputModel(BaseModel):
     fallback: Optional["AssignWidgetInputModel"] = None
     filters: list["ArgPortInputModel"] | None = None
     dependencies: list[str] | None = []
+    dependency: str | None = None
+    state_path: str | None = None
+    state_accessors: list[StateAccessorInputModel] | None = None
 
 
 class ReturnWidgetInputModel(BaseModel):
@@ -157,11 +165,24 @@ class ActionDependencyInputModel(BaseModel):
     key: str
     version: str | None = None
     description: str | None = None
+    action_key: str | None = None
+    app: str | None = None
     arg_matches: list[PortMatchInputModel] | None = None
     return_matches: list[PortMatchInputModel] | None = None
     protocols: list[str] | None = None
     force_arg_length: int | None = None
     force_return_length: int | None = None
+    optional: bool = False
+    allow_inactive: bool = True
+
+
+class StateDependencyInputModel(BaseModel):
+    key: str
+    version: str | None = None
+    description: str | None = None
+    state_key: str | None = None
+    app: str | None = None
+    port_matches: list[PortMatchInputModel] | None = None
     optional: bool = False
     allow_inactive: bool = True
 
@@ -176,6 +197,7 @@ class AgentDependencyInputModel(BaseModel):
 
     # Filters for selecting which instances of the agent are valid for this dependency
     action_demands: list[ActionDependencyInputModel] | None = None
+    state_demands: list[StateDependencyInputModel] | None = None
     auto_resolvable: bool = False
 
     min_viable_instances: int | None = None
@@ -243,11 +265,27 @@ class ImplementationInputModel(BaseModel):
     dynamic: bool = False
     logo: str | None = None
     locks: list[str] | None = None
+    extension: str | None = None
 
 
-class LockSchemaInputModel(BaseModel):
+class StateDefinitionInputModel(BaseModel):
+    ports: list[ReturnPortInputModel]
+    name: str
+
+
+class StateImplementationInputModel(BaseModel):
+    interface: str
+    definition: StateDefinitionInputModel
+
+
+class LockDefinitionInputModel(BaseModel):
     key: str
     description: str | None = None
+
+
+class LockImplementationInputModel(BaseModel):
+    key: str
+    definition: LockDefinitionInputModel
 
 
 class InterfaceInputModel(BaseModel):

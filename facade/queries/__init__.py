@@ -14,7 +14,7 @@ from .state import (
     snapshots_around_rev,
     checkout,
 )
-
+from .agent import agent
 
 __all__ = [
     "assignations",

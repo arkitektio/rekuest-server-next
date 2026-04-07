@@ -49,9 +49,17 @@ class CustomAssignWidget(AssignWidget):
     ward: str
 
 
+@pydantic.type(models.StateAccessorModel)
+class StateAccessor:
+    option_key: enums.OptionKey
+    sub_path: str | None = None
+
+
 @pydantic.type(models.StateChoiceAssignWidgetModel)
 class StateChoiceAssignWidget(AssignWidget):
-    state_choices: str
+    state_path: str
+    dependency: str | None
+    state_accessors: list[StateAccessor] | None
 
 
 @pydantic.type(models.StringWidgetModel)

@@ -371,7 +371,7 @@ class Agent:
     assignations: list[Annotated["Assignation", strawberry.lazy(__name__)]] = strawberry_django.field(description="Assignations executed by this agent.")
     app: App = strawberry_django.field(description="The app this agent belongs to.")
     release: Release = strawberry_django.field(description="The release this agent belongs to.")
-    scenes: list["AgentScene"] = strawberry_django.field(description="Scenes associated with this agent.")
+    placements: list["Placement"] = strawberry_django.field(description="Placements associated with this agent.")
     sessions: list["Session"] = strawberry_django.field(description="Sessions associated with this agent.")
 
     @strawberry_django.field(description="Fetch a specific implementation by interface.")
@@ -725,8 +725,8 @@ class MaterializedBlok:
     )
 
 
-@strawberry_django.type(models.StateSchema)
-class StateSchema:
+@strawberry_django.type(models.StateDefinition)
+class StateDefinition:
     id: strawberry.ID
     hash: str
     name: str
@@ -739,18 +739,12 @@ class StateSchema:
 @strawberry_django.type(models.State)
 class State:
     id: strawberry.ID
-    state_schema: StateSchema = strawberry_django.field(deprecation_reason="Use schema instead")
-
+    definition: StateDefinition = strawberry_django.field(deprecation_reason="Use schema instead")
     value: scalars.Args
     agent: Agent
     interface: str
     created_at: datetime.datetime
     updated_at: datetime.datetime
-    historical_states: list["HistoricalState"]
-
-    @strawberry_django.field(deprecation_reason="Use schema instead")
-    def schema(self) -> StateSchema:
-        return self.state_schema
 
 
 @strawberry_django.type(models.HistoricalState)
@@ -930,6 +924,24 @@ class Patch:
         return JSONPatch(op=self.op, path=self.path, value=self.value)
 
 
+@strawberry_django.type(
+    models.ThreeDModel,
+    filters=filters.ThreeDModelFilter,
+    order=filters.ThreeDModelOrder,
+    pagination=True,
+    description="A 3D model file.",
+)
+class ThreeDModel:
+    id: strawberry.ID
+    name: str
+    description: str | None
+    transfer_function: str | None
+    dependency: Agent
+    file: dtypes.MediaStore
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+
+
 @strawberry_django.type(models.Snapshot)
 class Snapshot:
     id: strawberry.ID
@@ -955,55 +967,27 @@ class Space:
     creator: User
     created_at: datetime.datetime
     updated_at: datetime.datetime
-    memberships: list["SpaceMembership"]
+    placements: list["Placement"]
 
 
 @strawberry_django.type(
-    models.SpaceMembership,
-    filters=filters.SpaceMembershipFilter,
-    order=filters.SpaceMembershipOrder,
+    models.Placement,
+    filters=filters.PlacementFilter,
+    ordering=filters.PlacementOrder,
     pagination=True,
-    description="A membership of an agent scene in a space.",
+    description="A placement of an agent in a space.",
 )
-class SpaceMembership:
+class Placement:
     id: strawberry.ID
     space: Space
-    agent_scene: "AgentScene"
+    agent: Agent
     role: str
     affine_matrix: scalars.Args | None
-    model: str | None
+    model: ThreeDModel | None
 
-
-@strawberry_django.type(
-    models.ThreeDModel,
-    filters=filters.ThreeDModelFilter,
-    order=filters.ThreeDModelOrder,
-    pagination=True,
-    description="A 3D model file.",
-)
-class ThreeDModel:
-    id: strawberry.ID
-    name: str
-    description: str | None
-    file: dtypes.MediaStore
-    created_at: datetime.datetime
-    updated_at: datetime.datetime
-
-
-@strawberry_django.type(
-    models.AgentScene,
-    filters=filters.AgentSceneFilter,
-    order=filters.AgentSceneOrder,
-    pagination=True,
-    description="A scene linking an agent to a 3D model.",
-)
-class AgentScene:
-    id: strawberry.ID
-    transfer_function: str
-    model: ThreeDModel
-    agent: Agent
-    created_at: datetime.datetime
-    updated_at: datetime.datetime
+    @strawberry_django.field(description="Get the agent associated with this placement.")
+    def name(self) -> str:
+        return self.agent.name
 
 
 @kante.django_type(

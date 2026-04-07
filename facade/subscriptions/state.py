@@ -82,17 +82,28 @@ class StatePatchEvent:
 async def watch_state(
     self,
     info: Info,
-    state_id: strawberry.ID,
+    state_id: strawberry.ID | None = None,
+    agent_id: strawberry.ID | None = None,
+    interface: str | None = None,
 ) -> AsyncGenerator[StateSnapshotEvent | StatePatchEvent, None]:
     """Watch a state: yields the current snapshot then streams patches and state updates."""
 
-    state = await models.State.objects.select_related("agent").aget(id=state_id)
+    if state_id:
+        state = await models.State.objects.select_related("agent").aget(id=state_id)
+    else:
+        state = await models.State.objects.select_related("agent").aget(
+            agent_id=agent_id,
+            interface=interface,
+        )
 
     # Find the latest snapshot to determine global_revision
     latest_snapshot = await models.Snapshot.objects.filter(state=state).order_by("-global_rev").afirst()
 
     global_rev = latest_snapshot.global_rev if latest_snapshot else 0
     snapshot_value = latest_snapshot.value if latest_snapshot else state.value
+
+    if not latest_snapshot:
+        raise ValueError("State not found or has no snapshots yet.")
 
     yield StateSnapshotEvent(
         state_id=strawberry.ID(str(state.id)),

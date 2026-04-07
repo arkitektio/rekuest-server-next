@@ -255,7 +255,7 @@ class StateWithValue:
     """A state value and its schema."""
 
     value: strawberry.scalars.JSON
-    schema: types.StateSchema
+    definition: types.StateDefinition
     global_revision: int | None = None
     local_revision: int | None = None
 
@@ -282,6 +282,6 @@ def checkout(
     key = list(result.keys())[0]
     return StateWithValue(
         value={str(k): v for k, v in result[key]["value"].items()},
-        schema=result[key]["schema"],
+        definition=result[key]["definition"],
         global_revision=result[key].get("global_revision"),
     )

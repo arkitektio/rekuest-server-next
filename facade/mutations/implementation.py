@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 def hash_definition(definition: DefinitionInputModel) -> str:
     hashable_definition = {
         key: value
-        for key, value in dict(strawberry.asdict(definition)).items()
+        for key, value in dict(definition.model_dump()).items()
         if key
         in [
             "name",
@@ -272,7 +272,7 @@ def create_usages(action: models.Action, definition: DefinitionInputModel) -> No
         recursive_create_output_usages(action, port, i, port.key, [])
 
 
-def _create_implementation(input: ImplementationInputModel, agent: models.Agent, extension: str) -> models.Implementation:
+def _create_implementation(input: ImplementationInputModel, agent: models.Agent) -> models.Implementation:
     definition = input.definition
 
     hash = hash_definition(definition)
@@ -297,12 +297,12 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
             hash=hash,
             organization=agent.registry.organization,
             description=definition.description or "No description",
-            args=[strawberry.asdict(i) for i in definition.args],
+            args=[i.model_dump() for i in definition.args],
             scope=scope,
             stateful=definition.stateful,
             kind=definition.kind,
-            port_groups=[strawberry.asdict(i) for i in definition.port_groups],
-            returns=[strawberry.asdict(i) for i in definition.returns],
+            port_groups=[i.model_dump() for i in definition.port_groups],
+            returns=[i.model_dump() for i in definition.returns],
             name=definition.name,
         )
 
@@ -344,7 +344,6 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
                 implementation.action.delete()
 
         implementation.action = action
-        implementation.extension = extension
         implementation.params = input.params or {}
         implementation.release = agent.registry.client.release
         implementation.save()
@@ -357,7 +356,7 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
                     implementation=implementation,
                     key=i.key,
                     defaults=dict(
-                        action_demands=[strawberry.asdict(x) for x in i.action_demands] if i.action_demands else [],
+                        action_demands=[x.model_dump() for x in i.action_demands] if i.action_demands else [],
                         app_filter=i.app,
                         version_filter=i.version,
                     ),
@@ -370,7 +369,6 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
             release=agent.registry.client.release,
             action=action,
             agent=agent,
-            extension=extension,
             dynamic=input.dynamic,
             params=input.params or {},
         )
@@ -383,7 +381,7 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent,
                     implementation=implementation,
                     key=i.key,
                     defaults=dict(
-                        action_demands=[strawberry.asdict(x) for x in i.action_demands] if i.action_demands else [],
+                        action_demands=[x.model_dump() for x in i.action_demands] if i.action_demands else [],
                         app_filter=i.app,
                         version_filter=i.version,
                     ),
@@ -423,48 +421,6 @@ def delete_implementation(info: Info, input: inputs.DeleteImplementationInput) -
     implementation.delete()
 
     return input.id
-
-
-def set_extension_implementations(info: Info, input: inputs.SetExtensionImplementationsInput) -> list[types.Implementation]:
-    registry, _ = models.Registry.objects.update_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
-
-    agent, _ = models.Agent.objects.get_or_create(
-        registry=registry,
-        instance_id=input.instance_id or "default",
-        defaults=dict(
-            name=f"{str(registry.pk)} on {input.instance_id}",
-            app=info.context.request.client.release.app,
-            release=info.context.request.client.release,
-        ),
-    )
-
-    previous_implementations = models.Implementation.objects.filter(agent=agent, extension=input.extension).all()
-
-    created_implementations_id = []
-    created_implementations = []
-
-    for lock in input.locks or []:
-        lock = models.Lock.objects.get_or_create(
-            agent=agent,
-            key=lock.key,
-            extension=input.extension,
-            defaults=dict(
-                description=lock.description,
-            ),
-        )
-
-    for implementation in input.implementations:
-        created_implementation = _create_implementation(implementation, agent, input.extension)
-
-        created_implementations_id.append(created_implementation.id)
-        created_implementations.append(created_implementation)
-
-    if input.run_cleanup:
-        for i in previous_implementations:
-            if i.id not in created_implementations_id:
-                i.delete()
-
-    return created_implementations
 
 
 def pin_implementation(info: Info, input: inputs.PinInput) -> types.Implementation:
