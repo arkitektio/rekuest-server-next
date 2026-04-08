@@ -71,6 +71,7 @@ class ImplementAgentInputModel(BaseModel):
     states: list[StateImplementationInputModel] | None = None
     implementations: list[ImplementationInputModel] | None = None
     locks: list[LockImplementationInputModel] | None = None
+    hash: str | None = None
     pass
 
 
