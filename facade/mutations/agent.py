@@ -1,3 +1,5 @@
+import uuid
+
 from kante.types import Info
 from facade.mutations.implementation import _create_implementation
 import strawberry
@@ -123,7 +125,7 @@ def implement_agent(info: Info, input: ImplementAgentInput) -> types.Agent:
             user=info.context.request.user,
             release=info.context.request.client.release,
             device=info.context.request.client.device,
-            hash=input.hash,
+            hash=input.hash or str(uuid.uuid4()),
         ),
     )
 
