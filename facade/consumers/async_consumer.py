@@ -228,6 +228,8 @@ class AgentConsumer(AsyncWebsocketConsumer):
                         await persist_backend.on_agent_state_patch(self.agent.pk, payload.message)
                     case messages.StateSnapshotEvent():
                         await persist_backend.on_agent_state_snapshot(self.agent.pk, payload.message)
+                    case messages.SessionInitMessage():
+                        await persist_backend.on_agent_session_init(self.agent.pk, payload.message)
 
                     case _:
                         logger.error("Unkwonw message in agent", exc_info=True)

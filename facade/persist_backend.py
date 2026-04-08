@@ -161,8 +161,8 @@ class ModelPersistBackend:
                 global_rev=message.global_rev,
             )
 
-    async def on_session_init(self, agent_id: str, message: messages.SessionInitMessage) -> None:
-        logging.info(f"Session init {message.session_id} with data {message.data}")
+    async def on_agent_session_init(self, agent_id: str, message: messages.SessionInitMessage) -> None:
+        logging.info(f"Session init {message.session_id} with data {message}")
         # For now we don't do anything with this, but it could be used to initialize session-specific data
 
 
