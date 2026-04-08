@@ -35,7 +35,7 @@ def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
         organization=info.context.request.organization,
     )
 
-    agent, _ = models.Agent.objects.update_or_create(
+    agent, _ = models.Agent.objects.get_or_create(
         registry=registry,
         instance_id=input.instance_id or "default",
         defaults=dict(
@@ -97,16 +97,33 @@ class ImplementAgentInput:
         default=None,
         description="The implementations of the agent. This is used to specify the initial implementations of the agent",
     )
+    hash: str | None = strawberry.field(
+        default=None,
+        description="A unique hash of the agent definition. An agent can use this hash to check if its definition has changed and if it needs to update its implementations and states. This is used to optimize the update process by only updating the implementations and states that have changed.",
+    )
 
 
 def implement_agent(info: Info, input: ImplementAgentInput) -> types.Agent:
     input = input.to_pydantic()
 
-    agent = models.Agent.objects.get(
-        registry__client=info.context.request.client,
-        registry__user=info.context.request.user,
-        registry__organization=info.context.request.organization,
-        instance_id=input.instance_id,
+    registry, _ = models.Registry.objects.update_or_create(
+        client=info.context.request.client,
+        user=info.context.request.user,
+        organization=info.context.request.organization,
+    )
+
+    agent, _ = models.Agent.objects.update_or_create(
+        registry=registry,
+        instance_id=input.instance_id or "default",
+        defaults=dict(
+            name=input.name or f"{str(registry.pk)} on {input.instance_id}",
+            app=info.context.request.client.release.app,
+            organization=info.context.request.organization,
+            user=info.context.request.user,
+            release=info.context.request.client.release,
+            device=info.context.request.client.device,
+            hash=input.hash,
+        ),
     )
 
     previous_implementation_ids = models.Implementation.objects.filter(agent=agent).values("id").all()

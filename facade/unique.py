@@ -36,8 +36,6 @@ def has_locals(ports: list[models.PortInputModel]):
 
 
 def traverse_state_dependency(port: models.PortInputModel):
-    if port.assign_widget:
-        pass
     if port.children:
         return any(traverse_state_dependency(child) for child in port.children)
 
