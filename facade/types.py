@@ -1,5 +1,6 @@
+from dataclasses import dataclass, field
 import datetime
-from typing import Annotated, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 
 import kante
 import strawberry
@@ -20,6 +21,7 @@ from rekuest_ui_core.objects import models as uimodels
 from rekuest_ui_core.objects import types as uitypes
 from strawberry.experimental import pydantic
 from datalayer import types as dtypes
+from facade import loaders
 
 
 def build_prescoped_queryset(info, queryset, field="organization"):
@@ -427,6 +429,70 @@ class Reservation:
     implementation: Optional["Implementation"] = strawberry_django.field(description="Chosen implementation.")
 
 
+@strawberry.type
+class ImplementationMapping:
+    _key: strawberry.Private[str]
+    _value: strawberry.Private[Dict[str, Any]]
+
+    @strawberry_django.field(description="Get the key of the implementation mapping.")
+    def key(self) -> str:
+        return self._key
+
+    @strawberry_django.field(description="Get the key of the implementation mapping.")
+    async def implementation(self) -> Implementation:
+        return await loaders.implementation_loader.load(self._value.get("implementation"))
+
+    @strawberry_django.field(description="Get the key of the implementation mapping.")
+    def resolved_dependencies(self) -> list["ResolvedAgentDependency"]:
+        dependencies: list[ResolvedAgentDependency] = []
+        for value in self._value.get("dependencies"):
+            dependencies.append(ResolvedAgentDependency(_key=value.get("key"), _value=value.get("value")))
+        return dependencies
+
+
+@strawberry.type
+class AgentMapping:
+    _value: strawberry.Private[Dict[str, Any]]
+
+    @strawberry_django.field(description="Get the agent's name from the mapping.")
+    async def agent(self) -> Agent:
+        return await loaders.agent_loader.load(self._value.get("agent"))
+
+    @strawberry_django.field(description="Get the agent's ID from the mapping.")
+    def agent_id(self) -> str:
+        return self._value.get("agent")
+
+    @strawberry_django.field(description="Get a specific argument by key.")
+    def mapped_implementations(self) -> list[ImplementationMapping]:
+        mappings: list[ImplementationMapping] = []
+        for key, value in self._value.get("actions").items():
+            mappings.append(ImplementationMapping(_key=key, _value=value))
+
+        return mappings
+
+
+@strawberry.type
+class ResolvedAgentDependency:
+    _key: strawberry.Private[str]
+    _value: strawberry.Private[List[Dict[str, Any]]]
+
+    @strawberry_django.field(description="Get a specific argument by key.")
+    def values(self) -> str | None:
+        return str(self._value)
+
+    @strawberry_django.field(description="Get a specific argument by key.")
+    def mapped_agents(self) -> list[AgentMapping]:
+        mappings: list[AgentMapping] = []
+        for value in self._value:
+            mappings.append(AgentMapping(_value=value))
+
+        return mappings
+
+    @strawberry_django.field(description="Get the key of the resolved dependency.")
+    def key(self) -> str:
+        return self._key
+
+
 @strawberry_django.type(models.Assignation, filters=filters.AssignationFilter, order=filters.AssignationOrder, pagination=True, description="Tracks the assignment of an implementation to a specific task.")
 class Assignation:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the assignation.")
@@ -455,6 +521,7 @@ class Assignation:
     events: list["AssignationEvent"] = strawberry_django.field(description="The events")
     dependency: str | None = strawberry_django.field(description="The dependency thats linked to the parents execution if applicable.")
     dependency_method: str | None = strawberry_django.field(description="The method of the dependency that caused this assignation, if applicable.")
+    resolved_dependencies: list["ResolvedAgentDependency"] = strawberry_django.field(description="The resolved dependencies for this assignation.")
 
     @strawberry_django.field(description="List of recent instructions for this assignation.")
     def instructs(self) -> list["AssignationInstruct"]:
@@ -463,6 +530,14 @@ class Assignation:
     @strawberry_django.field(description="Get a specific argument by key.")
     def arg(self, key: str) -> scalars.Args | None:
         return self.args.get(key, None)
+
+    @strawberry_django.field(description="Get a specific dependency by key.")
+    def resolved_dependencies(self) -> List[ResolvedAgentDependency]:
+        resolved = []
+        for key, item in self.dependencies.items():
+            print("Processing dependency:", key, item)
+            resolved.append(ResolvedAgentDependency(_key=key, _value=item))
+        return resolved
 
     @classmethod
     def get_queryset(cls, queryset, info, **kwargs):
