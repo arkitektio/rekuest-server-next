@@ -58,6 +58,7 @@ class ActionScope(str, Enum):
 
 @strawberry.enum(description="The operator for matching descriptors.")
 class RequiresOperator(str, Enum):
+    MATCHES = "MATCHES"
     EXISTS = "EXISTS"
     LTE = "LTE"
     GTE = "GTE"
@@ -70,6 +71,7 @@ class RequiresOperator(str, Enum):
 
 @strawberry.enum(description="The operator for matching descriptors.")
 class ProvidesOperator(str, Enum):
+    MATCHES = "MATCHES"
     EXISTS = "EXISTS"
     LTE = "LTE"
     GTE = "GTE"

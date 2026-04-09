@@ -7,8 +7,8 @@ from facade import inputs, models, types
 from facade.protocol import infer_protocols
 from facade.unique import assert_non_statefullness, infer_action_scope
 from kante.types import Info
-from rekuest_core.inputs.models import DefinitionInputModel, ImplementationInputModel, PortInputModel, RequiresInputModel, ProvidesInputModel
-from rekuest_core.enums import PortKind
+from rekuest_core.inputs.models import ArgPortInputModel, DefinitionInputModel, ImplementationInputModel, PortInputModel, RequiresInputModel, ProvidesInputModel, ReturnPortInputModel
+from rekuest_core.enums import PortKind, ProvidesOperator, RequiresOperator
 from authentikate.vars import get_user, get_client
 import typing as t
 
@@ -87,7 +87,7 @@ def identifier_to_package_key(identifier: str) -> str:
         raise ValueError(f"Identifier {identifier} does not contain a package part")
 
 
-def compile_descriptors_to_jsonpath(descriptors: list[t.Union[RequiresInputModel, ProvidesInputModel]] | None) -> str | None:
+def compile_descriptors_to_jsonpath(descriptors: list[RequiresInputModel] | None) -> str | None:
     """
     Translates Pydantic descriptor models into a valid PostgreSQL JSONPath string.
     Returns None if no descriptors exist, which allows Django to save NULL to the DB.
@@ -107,10 +107,10 @@ def compile_descriptors_to_jsonpath(descriptors: list[t.Union[RequiresInputModel
         formatted_val = json.dumps(desc.value)
 
         # Extract string value from enum (handles both standard Enum and Django TextChoices)
-        op = desc.operator.value if hasattr(desc.operator, "value") else desc.operator
+        op = desc.operator
 
         # Map the operators to PG JSONPath Syntax
-        if op == "exists":
+        if op == RequiresOperator.MATCHES:
             # In PG JSONPath, exists() returns a boolean based on path existence.
             # We check if the user asked for exists=True or exists=False
             if desc.value is True:
@@ -118,25 +118,83 @@ def compile_descriptors_to_jsonpath(descriptors: list[t.Union[RequiresInputModel
             else:
                 path_conditions.append(f"!(exists({pg_path}))")
 
-        elif op == "equals":
+        elif op == RequiresOperator.MATCHES:
             path_conditions.append(f"{pg_path} == {formatted_val}")
 
-        elif op == "neq":
+        elif op == RequiresOperator.EQUALS:
+            path_conditions.append(f"{pg_path} == {formatted_val}")
+
+        elif op == RequiresOperator.NOT_EQUALS:
             path_conditions.append(f"{pg_path} != {formatted_val}")
 
-        elif op == "gt":
-            path_conditions.append(f"{pg_path} > {formatted_val}")
-
-        elif op == "gte":
+        elif op == RequiresOperator.GTE:
             path_conditions.append(f"{pg_path} >= {formatted_val}")
 
-        elif op == "lt":
-            path_conditions.append(f"{pg_path} < {formatted_val}")
-
-        elif op == "lte":
+        elif op == RequiresOperator.LTE:
             path_conditions.append(f"{pg_path} <= {formatted_val}")
 
-        elif op == "contains":
+        elif op == RequiresOperator.CONTAINS:
+            # JSONPath array inclusion. e.g., $.tags[*] == "brain"
+            path_conditions.append(f"{pg_path}[*] == {formatted_val}")
+
+        elif op == RequiresOperator.IN:
+            # JSONPath array inclusion. e.g., $.tags[*] IN ["brain", "neural"]
+            path_conditions.append(f"{pg_path} IN {formatted_val}")
+
+        else:
+            raise ValueError(f"Unsupported JSONPath operator: {op}")
+
+    # Join all the constraints using the logical AND operator for JSONPath
+    return " && ".join(path_conditions)
+
+
+def compile_returndescriptors_to_jsonpath(descriptors: list[ProvidesInputModel] | None) -> str | None:
+    """
+    Translates Pydantic descriptor models into a valid PostgreSQL JSONPath string.
+    Returns None if no descriptors exist, which allows Django to save NULL to the DB.
+    """
+    if not descriptors:
+        return None
+
+    path_conditions = []
+
+    for desc in descriptors:
+        # Standardize the key path (e.g., 'axes.c' becomes '$.axes.c')
+        # If they already put '$.', don't duplicate it.
+        pg_path = desc.key if desc.key.startswith("$.") else f"$.{desc.key}"
+
+        # PRO-TIP: json.dumps natively formats Python True to 'true',
+        # strings to '"string"', and ints to '1' (Perfect for JSONPath).
+        formatted_val = json.dumps(desc.value)
+
+        # Extract string value from enum (handles both standard Enum and Django TextChoices)
+        op = desc.operator
+
+        # Map the operators to PG JSONPath Syntax
+        if op == ProvidesOperator.EXISTS:
+            # In PG JSONPath, exists() returns a boolean based on path existence.
+            # We check if the user asked for exists=True or exists=False
+            if desc.value is True:
+                path_conditions.append(f"exists({pg_path})")
+            else:
+                path_conditions.append(f"!(exists({pg_path}))")
+
+        elif op == ProvidesOperator.MATCHES:
+            path_conditions.append(f"{pg_path} == {formatted_val}")
+
+        elif op == ProvidesOperator.EQUALS:
+            path_conditions.append(f"{pg_path} == {formatted_val}")
+
+        elif op == ProvidesOperator.NOT_EQUALS:
+            path_conditions.append(f"{pg_path} != {formatted_val}")
+
+        elif op == ProvidesOperator.GTE:
+            path_conditions.append(f"{pg_path} >= {formatted_val}")
+
+        elif op == ProvidesOperator.LTE:
+            path_conditions.append(f"{pg_path} <= {formatted_val}")
+
+        elif op == ProvidesOperator.CONTAINS:
             # JSONPath array inclusion. e.g., $.tags[*] == "brain"
             path_conditions.append(f"{pg_path}[*] == {formatted_val}")
 
@@ -151,9 +209,8 @@ def compile_descriptors_to_jsonpath(descriptors: list[t.Union[RequiresInputModel
 # 2. THE RECURSIVE PORT EXTRACTOR (The Relational Engine Builder)
 # =========================================================
 def extract_ports_recursively(
-    port_data: t.Any,  # Pydantic Model (ArgPortInputModel, PortInputModel, etc.)
+    port_data: ArgPortInputModel,
     action_instance: models.Action,  # The saved Action Django model instance to link to
-    port_class: t.Type,  # The Django Model Class (ArgPort or ReturnPort)
     parent_instance: t.Any = None,  # The saved Parent Port Django model (if nested)
     index: int = 0,
     parent_path: str = "",  # The semantic materialized string path
@@ -172,7 +229,7 @@ def extract_ports_recursively(
     compiled_path = compile_descriptors_to_jsonpath(descriptors)
 
     # 3. Create and Save the Current Port
-    current_port = port_class(
+    current_port = models.ArgPort(
         action=action_instance, parent=parent_instance, index=index, key=port_data.key, key_path=current_path, kind=port_data.kind.value if hasattr(port_data.kind, "value") else port_data.kind, identifier=port_data.identifier, compiled_jsonpath=compiled_path, nullable=port_data.nullable
     )
 
@@ -185,7 +242,49 @@ def extract_ports_recursively(
             extract_ports_recursively(
                 port_data=child_data,
                 action_instance=action_instance,
-                port_class=port_class,
+                parent_instance=current_port,  # Link the child to this newly saved port
+                index=child_idx,
+                parent_path=current_path,  # Pass the materialized path down
+            )
+
+
+# =========================================================
+# 2. THE RECURSIVE PORT EXTRACTOR (The Relational Engine Builder)
+# =========================================================
+def extract_returnports_recursively(
+    port_data: ReturnPortInputModel,
+    action_instance: models.Action,  # The saved Action Django model instance to link to
+    parent_instance: t.Any = None,  # The saved Parent Port Django model (if nested)
+    index: int = 0,
+    parent_path: str = "",  # The semantic materialized string path
+) -> None:
+    """
+    Recursively flattens the Pydantic tree into relational DB objects.
+    Because of the `parent` ForeignKey, we MUST save the parent to the database
+    first to get its ID before we can save its children.
+    """
+
+    # 1. Build the Semantic Materialized Path (e.g., "options.advanced.mask")
+    current_path = f"{parent_path}.{port_data.key}" if parent_path else port_data.key
+
+    # 2. Extract Descriptors safely (children might be base PortInputModels without requires/provides)
+    descriptors = getattr(port_data, "requires", None) or getattr(port_data, "provides", None) or []
+    compiled_path = compile_returndescriptors_to_jsonpath(descriptors)
+
+    # 3. Create and Save the Current Port
+    current_port = models.ReturnPort(
+        action=action_instance, parent=parent_instance, index=index, key=port_data.key, key_path=current_path, kind=port_data.kind.value if hasattr(port_data.kind, "value") else port_data.kind, identifier=port_data.identifier, compiled_jsonpath=compiled_path, nullable=port_data.nullable
+    )
+
+    # The Write-Time Hit: We save immediately to get the Primary Key (ID)
+    current_port.save()
+
+    # 4. Recurse for Children (e.g., items inside a LIST or properties of a DICT/STRUCTURE)
+    if port_data.children:
+        for child_idx, child_data in enumerate(port_data.children):
+            extract_returnports_recursively(
+                port_data=child_data,
+                action_instance=action_instance,
                 parent_instance=current_port,  # Link the child to this newly saved port
                 index=child_idx,
                 parent_path=current_path,  # Pass the materialized path down
@@ -309,12 +408,12 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
         # 2. Build the Relational ArgPorts (The Micro-Filtering Engine)
         if definition.args:
             for idx, arg in enumerate(definition.args):
-                extract_ports_recursively(port_data=arg, action_instance=action, port_class=models.ArgPort, index=idx)
+                extract_ports_recursively(port_data=arg, action_instance=action, index=idx)
 
         # 3. Build the Relational ReturnPorts (The Micro-Filtering Engine)
         if definition.returns:
             for idx, ret in enumerate(definition.returns):
-                extract_ports_recursively(port_data=ret, action_instance=action, port_class=models.ReturnPort, index=idx)
+                extract_returnports_recursively(port_data=ret, action_instance=action, index=idx)
 
         create_usages(action, definition)
         protocols = infer_protocols(definition)
