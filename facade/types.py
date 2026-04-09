@@ -814,12 +814,11 @@ class StateDefinition:
 @strawberry_django.type(models.State)
 class State:
     id: strawberry.ID
-    definition: StateDefinition = strawberry_django.field(deprecation_reason="Use schema instead")
-    value: scalars.Args
-    agent: Agent
-    interface: str
-    created_at: datetime.datetime
-    updated_at: datetime.datetime
+    definition: StateDefinition = strawberry_django.field(description="The schema definition for this state.")
+    agent: Agent = strawberry_django.field(description="The agent to which this state belongs.")
+    interface: str = strawberry_django.field(description="The interface this state is associated with.")
+    created_at: datetime.datetime = strawberry_django.field(description="Timestamp when this state was created.")
+    updated_at: datetime.datetime = strawberry_django.field(description="Timestamp when this state was last updated.")
 
 
 @strawberry_django.type(models.HistoricalState)
