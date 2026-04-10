@@ -254,6 +254,7 @@ def snapshots_around_rev(
 class StateWithValue:
     """A state value and its schema."""
 
+    state_id: strawberry.ID
     value: strawberry.scalars.JSON
     definition: types.StateDefinition
     global_revision: int | None = None
@@ -270,24 +271,7 @@ def checkout(
     """Checkout a state at a specific revision."""
     state_inst = models.State.objects.get(id=state)
 
-    if timestamp and global_revision:
-        raise ValueError("Cannot specify both timestamp and global_revision")
-
-    if global_revision:
-        if session_id is None:
-            latest_session = models.Session.objects.filter(agent=state_inst.agent).order_by("-created_at").first()
-            if not latest_session:
-                raise ObjectDoesNotExist(f"No sessions found for agent {state_inst.agent}")
-            session_id = latest_session.session_id
-
-        result = get_latest_state(
-            state_inst.agent,
-            state_id=state_inst.pk,
-            global_revision=global_revision,
-            session_id=session_id,
-        )
-
-    elif timestamp:
+    if timestamp:
         latest_patch = models.Patch.objects.filter(state_id=state, agent=state_inst.agent, timestamp__lte=timestamp, session_id=session_id).order_by("-timestamp").first()
         if not latest_patch:
             raise ObjectDoesNotExist(f"No patches found for state {state} before timestamp {timestamp}")
@@ -298,15 +282,20 @@ def checkout(
             global_revision=latest_patch.global_rev,
             session_id=latest_patch.session.pk,
         )
-
     else:
-        raise ValueError("Must specify either global_revision or timestamp")
+        result = get_latest_state(
+            state_inst.agent,
+            state_id=state_inst.pk,
+            global_revision=global_revision,
+            session_id=session_id,
+        )
 
     if not result:
         raise ObjectDoesNotExist(f"No state found for {state}")
 
     key = list(result.keys())[0]
     return StateWithValue(
+        state_id=state,
         value={str(k): v for k, v in result[key]["value"].items()},
         definition=result[key]["definition"],
         global_revision=result[key].get("global_revision"),
@@ -367,6 +356,7 @@ def checkout_agent(
             key = list(result.keys())[0]
             states.append(
                 StateWithValue(
+                    state_id=state.pk,
                     value={str(k): v for k, v in result[key]["value"].items()},
                     definition=result[key]["definition"],
                     global_revision=result[key].get("global_revision"),
