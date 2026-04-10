@@ -377,18 +377,30 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
     hash = hash_definition(definition)
     key = definition.key
     version = definition.version
-    app = agent.app or input.definition.app
+    app = agent.app or models.Action.objects.get_or_create(identifier=input.definition.app, organization=agent.organization)[0]
+
+    scope = infer_action_scope(definition)
+
+    if definition.stateful is False:
+        assert_non_statefullness(definition)
 
     try:
         action = models.Action.objects.get(key=key, version=version, app=app, organization=agent.organization)
         if action.hash != hash:
-            raise ValueError(f"Action with key {key} and version {version} already exists but has different hash. Please update the version or key of your action definition.")
+            print("We are in the update flow, but the hash is different. This means the definition has changed. We need to check if the app matches to prevent malicious updates.")
+            if action.app == agent.app:
+                action.hash = hash
+                action.args = [i.model_dump() for i in definition.args]
+                action.returns = [i.model_dump() for i in definition.returns]
+                action.stateful = definition.stateful
+                action.scope = scope
+                action.kind = definition.kind
+                action.description = definition.description or "No description"
+                action.name = definition.name
+                action.save()
+            else:
+                raise ValueError(f"Action with key {key} and version {version} already exists but has different hash and you are not the owner. Please update the version or key of your action definition.")
     except models.Action.DoesNotExist:
-        scope = infer_action_scope(definition)
-
-        if definition.stateful is False:
-            assert_non_statefullness(definition)
-
         action = models.Action.objects.create(
             key=key,
             version=version,
@@ -405,31 +417,31 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
             name=definition.name,
         )
 
-        # 2. Build the Relational ArgPorts (The Micro-Filtering Engine)
-        if definition.args:
-            for idx, arg in enumerate(definition.args):
-                extract_ports_recursively(port_data=arg, action_instance=action, index=idx)
+    # 2. Build the Relational ArgPorts (The Micro-Filtering Engine)
+    if definition.args:
+        for idx, arg in enumerate(definition.args):
+            extract_ports_recursively(port_data=arg, action_instance=action, index=idx)
 
-        # 3. Build the Relational ReturnPorts (The Micro-Filtering Engine)
-        if definition.returns:
-            for idx, ret in enumerate(definition.returns):
-                extract_returnports_recursively(port_data=ret, action_instance=action, index=idx)
+    # 3. Build the Relational ReturnPorts (The Micro-Filtering Engine)
+    if definition.returns:
+        for idx, ret in enumerate(definition.returns):
+            extract_returnports_recursively(port_data=ret, action_instance=action, index=idx)
 
-        create_usages(action, definition)
-        protocols = infer_protocols(definition)
-        action.protocols.add(*protocols)
+    create_usages(action, definition)
+    protocols = infer_protocols(definition)
+    action.protocols.add(*protocols)
 
-        if definition.is_test_for:
-            for actionhash in definition.is_test_for:
-                action.is_test_for.add(models.Action.objects.get(hash=actionhash))
+    if definition.is_test_for:
+        for actionhash in definition.is_test_for:
+            action.is_test_for.add(models.Action.objects.get(hash=actionhash))
 
-        if definition.collections:
-            for collection_name in definition.collections:
-                c, _ = models.Collection.objects.get_or_create(name=collection_name, defaults=dict(creator=agent.registry.user, organization=agent.registry.organization))
-                action.collections.add(c)
+    if definition.collections:
+        for collection_name in definition.collections:
+            c, _ = models.Collection.objects.get_or_create(name=collection_name, defaults=dict(creator=agent.registry.user, organization=agent.registry.organization))
+            action.collections.add(c)
 
-        logger.info(f"Created {action}")
-        action.save()
+    logger.info(f"Created {action}")
+    action.save()
 
     try:
         implementation = models.Implementation.objects.get(

@@ -13,6 +13,7 @@ from .state import (
     patch_events_between_global_revs,
     snapshots_around_rev,
     checkout,
+    checkout_agent,
 )
 from .agent import agent
 
@@ -27,6 +28,7 @@ __all__ = [
     "implementation_at",
     "my_implementation_at",
     "reservations",
+    "checkout_agent",
     "resolved_dependencies",
     "state_for",
     "task_boundaries",

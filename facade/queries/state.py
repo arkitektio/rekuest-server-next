@@ -265,16 +265,42 @@ def checkout(
     state: strawberry.ID,
     session_id: strawberry.ID | None = None,
     global_revision: int | None = None,
+    timestamp: datetime.datetime | None = None,
 ) -> StateWithValue:
     """Checkout a state at a specific revision."""
     state_inst = models.State.objects.get(id=state)
 
-    result = get_latest_state(
-        state_inst.agent,
-        state_id=state_inst.id,
-        global_revision=global_revision,
-        session_id=session_id,
-    )
+    if timestamp and global_revision:
+        raise ValueError("Cannot specify both timestamp and global_revision")
+
+    if global_revision:
+        if session_id is None:
+            latest_session = models.Session.objects.filter(agent=state_inst.agent).order_by("-created_at").first()
+            if not latest_session:
+                raise ObjectDoesNotExist(f"No sessions found for agent {state_inst.agent}")
+            session_id = latest_session.session_id
+
+        result = get_latest_state(
+            state_inst.agent,
+            state_id=state_inst.pk,
+            global_revision=global_revision,
+            session_id=session_id,
+        )
+
+    elif timestamp:
+        latest_patch = models.Patch.objects.filter(state_id=state, agent=state_inst.agent, timestamp__lte=timestamp, session_id=session_id).order_by("-timestamp").first()
+        if not latest_patch:
+            raise ObjectDoesNotExist(f"No patches found for state {state} before timestamp {timestamp}")
+
+        result = get_latest_state(
+            state_inst.agent,
+            state_id=state_inst.pk,
+            global_revision=latest_patch.global_rev,
+            session_id=latest_patch.session.pk,
+        )
+
+    else:
+        raise ValueError("Must specify either global_revision or timestamp")
 
     if not result:
         raise ObjectDoesNotExist(f"No state found for {state}")
@@ -285,3 +311,69 @@ def checkout(
         definition=result[key]["definition"],
         global_revision=result[key].get("global_revision"),
     )
+
+
+def checkout_agent(
+    info: Info,
+    agent: strawberry.ID,
+    session_id: strawberry.ID | None = None,
+    global_revision: int | None = None,
+    timestamp: datetime.datetime | None = None,
+) -> List[StateWithValue]:
+    """Checkout a state at a specific revision."""
+    agent = models.Agent.objects.get(id=agent)
+
+    states = []
+
+    for state in models.State.objects.filter(agent=agent):
+        state_inst = state
+
+        try:
+            if timestamp and global_revision:
+                raise ValueError("Cannot specify both timestamp and global_revision")
+
+            if global_revision:
+                if session_id is None:
+                    latest_session = models.Session.objects.filter(agent=state_inst.agent).order_by("-created_at").first()
+                    if not latest_session:
+                        raise ObjectDoesNotExist(f"No sessions found for agent {state_inst.agent}")
+                    session_id = latest_session.session_id
+
+                result = get_latest_state(
+                    state_inst.agent,
+                    state_id=state_inst.pk,
+                    global_revision=global_revision,
+                    session_id=session_id,
+                )
+
+            elif timestamp:
+                latest_patch = models.Patch.objects.filter(state_id=state, agent=state_inst.agent, timestamp__lte=timestamp, session_id=session_id).order_by("-timestamp").first()
+                if not latest_patch:
+                    raise ObjectDoesNotExist(f"No patches found for state {state} before timestamp {timestamp}")
+
+                result = get_latest_state(
+                    state_inst.agent,
+                    state_id=state_inst.pk,
+                    global_revision=latest_patch.global_rev,
+                    session_id=latest_patch.session.pk,
+                )
+
+            else:
+                raise ValueError("Must specify either global_revision or timestamp")
+
+            if not result:
+                raise ObjectDoesNotExist(f"No state found for {state}")
+
+            key = list(result.keys())[0]
+            states.append(
+                StateWithValue(
+                    value={str(k): v for k, v in result[key]["value"].items()},
+                    definition=result[key]["definition"],
+                    global_revision=result[key].get("global_revision"),
+                )
+            )
+        except Exception as e:
+            print(f"Error checking out state {state}: {e}")
+            continue
+
+    return states

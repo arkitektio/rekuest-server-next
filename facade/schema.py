@@ -53,6 +53,7 @@ class Query:
     implementation_at = field(resolver=queries.implementation_at, description="Find implementation at given interface.")
     my_implementation_at = field(resolver=queries.my_implementation_at, description="Find your implementation at a specific interface.")
     checkout = field(resolver=queries.checkout, description="Materialize the latest state for a specific agent")
+    checkout_agent = field(resolver=queries.checkout_agent, description="Materialize the latest states for a specific agent")
     dashboards: list[types.Dashboard] = field(description="All dashboards.")
     states: list[types.State] = field(description="All states from agents.")
     bloks: list[types.Blok] = field(description="List of UI Blok.")
