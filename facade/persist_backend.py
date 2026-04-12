@@ -137,6 +137,7 @@ class ModelPersistBackend:
             state=state,
             agent_id=agent_id,
             session=session,
+            interface=message.state_name,
             op=message.op,
             path=message.path,
             value=message.value,

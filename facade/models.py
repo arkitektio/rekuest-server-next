@@ -1362,6 +1362,7 @@ class Patch(models.Model):
 
     state = models.ForeignKey(State, on_delete=models.CASCADE, related_name="patches")
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="patches_created", null=True, blank=True)
+    interface = models.CharField(max_length=1000, help_text="The interface of the state in the agent")
     session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name="patches", null=True, blank=True)
     op = models.CharField(max_length=1000, help_text="The operation of this patch (e.g. add, remove, replace)")
     path = models.CharField(max_length=1000, help_text="The path of this patch (e.g. the path to the value that is being changed)")

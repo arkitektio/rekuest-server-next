@@ -118,6 +118,10 @@ class Query:
     def memory_shelve(self, info: Info, id: strawberry.ID) -> types.MemoryShelve:
         return cast(types.MemoryShelve, models.MemoryShelve.objects.get(id=id))
 
+    @field(description="Fetch a memory drawer by ID.")
+    def memory_drawer(self, info: Info, id: strawberry.ID) -> types.MemoryDrawer:
+        return cast(types.MemoryDrawer, models.MemoryDrawer.objects.get(id=id))
+
     @field(description="Get a blok by ID.")
     def blok(self, info: Info, id: strawberry.ID) -> types.Blok:
         return cast(types.Blok, models.Blok.objects.get(id=id))

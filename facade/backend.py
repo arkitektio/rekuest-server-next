@@ -30,7 +30,10 @@ def build_agent_dependency_dict(agent: models.Agent, dep: models.Dependency) -> 
     implementations: Dict[str, str] = {}
 
     for action in dep.get_action_demands():
-        implementation = models.Implementation.objects.get(action__key=action.key, agent=agent)
+        try:
+            implementation = models.Implementation.objects.get(action__key=action.key, agent=agent)
+        except models.Implementation.DoesNotExist:
+            raise ValueError(f"No implementation found for dependency demand {action} on agent {agent}")
 
         if implementation.dependencies.exists():
             raise NotImplementedError("Nested dependencies are not supported yet, but they are coming soon!")

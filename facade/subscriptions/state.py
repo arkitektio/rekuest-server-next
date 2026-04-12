@@ -1,12 +1,13 @@
 from kante.types import Info
 import strawberry
 import datetime
-from facade import types, models, scalars, enums
+from facade import types, models, scalars, enums, logic
 from typing import AsyncGenerator, Union
 from facade.channels import (
     state_update_channel,
     patch_channel,
 )
+from asgiref.sync import sync_to_async
 
 
 async def state_update_events(
@@ -71,6 +72,7 @@ class StateSnapshotEvent:
 class StatePatchEvent:
     state_id: strawberry.ID
     agent_id: strawberry.ID
+    interface: str
     op: str
     path: str
     value: scalars.Args
@@ -96,23 +98,16 @@ async def watch_state(
             interface=interface,
         )
 
-    # Find the latest snapshot to determine global_revision
-    latest_snapshot = await models.Snapshot.objects.filter(state=state).order_by("-global_rev").afirst()
-
-    global_rev = latest_snapshot.global_rev if latest_snapshot else 0
-    snapshot_value = latest_snapshot.value if latest_snapshot else state.value
-
-    if not latest_snapshot:
-        raise ValueError("State not found or has no snapshots yet.")
+    returned: dict[Unknown, Unknown] = await sync_to_async(logic.get_latest_state)(state.agent, state_id=state.id)
 
     yield StateSnapshotEvent(
-        state_id=strawberry.ID(str(state.id)),
+        state_id=strawberry.ID(str(state_id)),
         agent_id=strawberry.ID(str(state.agent_id)),
         interface=state.interface,
-        value=snapshot_value,
-        global_revision=global_rev,
-        session_id=latest_snapshot.session_id if latest_snapshot else None,
-        timestamp=state.updated_at,
+        value=returned.get("states", {}).get(state.interface),
+        global_revision=returned.get("global_revision", 0),
+        session_id=returned.get("session_id"),
+        timestamp=returned.get("timestamp"),
     )
 
     topics = [
@@ -135,37 +130,42 @@ async def watch_state(
                 global_revision=patch.global_rev,
                 session_id=patch.session_id,
                 timestamp=patch.timestamp,
+                interface=patch.interface,
             )
         except models.Patch.DoesNotExist:
             continue
+
+
+@strawberry.type(description="A plain snapshot of a state's current value.")
+class AgentSnapshotEvent:
+    agent_id: strawberry.ID
+    values: scalars.Args
+    global_revision: int
+    session_id: str
+    timestamp: datetime.datetime
 
 
 async def watch_agent(
     self,
     info: Info,
     agent_id: strawberry.ID,
-) -> AsyncGenerator[StateSnapshotEvent | StatePatchEvent, None]:
+) -> AsyncGenerator[AgentSnapshotEvent | StatePatchEvent, None]:
     """Watch an agent: yields current snapshots for all states then streams patches and state updates."""
 
     agent = await models.Agent.objects.aget(id=agent_id)
 
     # Yield a snapshot for each state of this agent
-    async for state in models.State.objects.filter(agent=agent):
-        latest_snapshot = await models.Snapshot.objects.filter(state=state).order_by("-global_rev").afirst()
+    state: dict[Unknown, Unknown] = logic.get_latest_state(agent)
 
-        global_rev = latest_snapshot.global_rev if latest_snapshot else 0
-        snapshot_value = latest_snapshot.value if latest_snapshot else state.value
+    topics = [f"patches_agent_{agent.pk}"]
 
-        yield StateSnapshotEvent(
-            state_id=strawberry.ID(str(state.id)),
-            agent_id=strawberry.ID(str(agent.id)),
-            interface=state.interface,
-            value=snapshot_value,
-            global_revision=global_rev,
-            timestamp=state.updated_at,
-        )
-
-    topics = [f"patches_agent_{agent.id}"]
+    yield AgentSnapshotEvent(
+        agent_id=strawberry.ID(str(agent.id)),
+        values=state.get("values", {}),
+        global_revision=state.get("global_revision", 0),
+        session_id=latest_snapshot.session_id if latest_snapshot else None,
+        timestamp=state.updated_at,
+    )
 
     async for message in patch_channel.listen(info.context, topics):
         try:
@@ -183,6 +183,7 @@ async def watch_agent(
                 global_revision=patch.global_rev,
                 session_id=patch.session_id,
                 timestamp=patch.timestamp,
+                interface=patch.interface,
             )
         except models.Patch.DoesNotExist:
             continue

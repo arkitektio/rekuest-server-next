@@ -84,25 +84,32 @@ def get_latest_state(
     state_id: int | None = None,
     session_id: str | None = None,
     global_revision: int | None = None,
+    forward_patch_count: int = 0,
 ) -> dict:
-    results = {}
+    states_data = {}
+    max_current_revision = 0
 
-    t = models.Session.objects.filter(agent=agent).order_by("-created_at").first() if not session_id else models.Session.objects.get(agent=agent, session_id=session_id)
+    if not session_id:
+        t = models.Session.objects.filter(agent=agent).order_by("-created_at").first()
+    else:
+        t = models.Session.objects.get(agent=agent, session_id=session_id)
 
     qs = models.State.objects.filter(agent=agent)
     if state_id:
         qs = qs.filter(id=state_id)
 
+    latest_timestamp = t.created_at
+
     for state in qs:
         snapshot_qs = models.Snapshot.objects.filter(state=state, agent=agent, session=t)
-        if global_revision:
+        if global_revision is not None:
             snapshot_qs = snapshot_qs.filter(global_rev__lte=global_revision).order_by("-global_rev")
         else:
             snapshot_qs = snapshot_qs.order_by("-timestamp")
 
         snapshot = snapshot_qs.first()
         if not snapshot:
-            raise ValueError(f"No snapshot found for state {state_id}")
+            raise ValueError(f"No snapshot found for state {state_id or state.pk}")
         print(f"Snapshot for state {state} is {snapshot}")
 
         base_value = snapshot.value if snapshot else {}
@@ -112,25 +119,41 @@ def get_latest_state(
         if start_time:
             patches_qs = patches_qs.filter(timestamp__gt=start_time)
 
-        if global_revision:
+        if global_revision is not None:
             patches_qs = patches_qs.filter(global_rev__lte=global_revision)
 
         patches = patches_qs.order_by("timestamp")
 
         current_value = base_value
-        current_global_revision = snapshot.global_rev if snapshot else None
+        current_global_revision = snapshot.global_rev if snapshot else 0
+
         for patch in patches:
             try:
-                p = jsonpatch.JsonPatch([{"op": patch.op, "path": patch.path, "value": patch.value}])
+                # Handle 'remove' operations which shouldn't have a 'value' key
+                patch_doc = {"op": patch.op, "path": patch.path}
+                if patch.op != "remove":
+                    patch_doc["value"] = patch.value
+
+                p = jsonpatch.JsonPatch([patch_doc])
                 current_value = p.apply(current_value)
                 current_global_revision = patch.global_rev
+                latest_timestamp = patch.timestamp
             except Exception as e:
                 pass
 
-        results[state.interface] = {
-            "value": current_value,
-            "definition": state.definition,
-            "global_revision": current_global_revision,
-        }
+        # Track the highest global revision across all states we process
+        if current_global_revision > max_current_revision:
+            max_current_revision = current_global_revision
 
-    return results
+        states_data[state.interface] = current_value
+
+    # Fetch n-patches forward at the global agent level (not scoped to state)
+    forward_patches = []
+    if forward_patch_count > 0:
+        # Use the requested target revision if provided, otherwise the max we just calculated
+        reference_rev = global_revision if global_revision is not None else max_current_revision
+
+        forward_patches = list(models.Patch.objects.filter(agent=agent, global_rev__gt=reference_rev).order_by("global_rev")[:forward_patch_count])
+
+    # Return a structured payload since patches are now an agent-level property
+    return {"states": states_data, "global_revision": max_current_revision, "forward_patches": forward_patches, "session_id": t.session_id if t else None, "timestamp": latest_timestamp}
