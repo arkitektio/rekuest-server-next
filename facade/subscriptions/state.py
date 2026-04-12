@@ -123,6 +123,7 @@ async def watch_state(
     print("Watching state with topics:", topics)
 
     async for message in patch_channel.listen(info.context, topics):
+        # TODO: optimize by NOT using a model here but sending the raw patch data in the channel message (from the agent to this receiver)
         try:
             patch = await models.Patch.objects.aget(id=message.create)
             yield StatePatchEvent(

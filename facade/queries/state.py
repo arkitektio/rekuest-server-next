@@ -1,3 +1,5 @@
+from attr import s
+from turtle import backward, forward
 from facade import models, types, inputs, managers
 from kante.types import Info
 import strawberry
@@ -251,14 +253,14 @@ def snapshots_around_rev(
 
 
 @strawberry.type
-class StateWithValue:
+class StateValue:
     """A state value and its schema."""
 
-    state_id: strawberry.ID
-    value: strawberry.scalars.JSON
-    definition: types.StateDefinition
-    global_revision: int | None = None
-    local_revision: int | None = None
+    state_id: strawberry.ID = strawberry.field(description="The ID of the state")
+    value: strawberry.scalars.JSON = strawberry.field(description="The state value")
+    global_revision: int | None = strawberry.field(description="The global revision of this state")
+    forward_patches: List[types.Patch] = strawberry.field(description="The patches that can be applied to move forward from this state")
+    backward_patches: List[types.Patch] = strawberry.field(description="The patches that can be applied to move backward from this state")
 
 
 def checkout(
@@ -267,7 +269,9 @@ def checkout(
     session_id: strawberry.ID | None = None,
     global_revision: int | None = None,
     timestamp: datetime.datetime | None = None,
-) -> StateWithValue:
+    forward_patch_count: int = 0,
+    backward_patch_count: int = 0,
+) -> StateValue:
     """Checkout a state at a specific revision."""
     state_inst = models.State.objects.get(id=state)
 
@@ -293,13 +297,33 @@ def checkout(
     if not result:
         raise ObjectDoesNotExist(f"No state found for {state}")
 
+    forward_patches = []
+    if forward_patch_count > 0:
+        forward_qs = models.Patch.objects.filter(state_id=state, global_current_revision__gt=result[0]["global_revision"])
+        if session_id:
+            forward_qs = forward_qs.filter(session_id=session_id)
+        forward_patches = list(forward_qs.order_by("global_current_revision")[:forward_patch_count])
+
+    backward_patches = []
+    if backward_patch_count > 0:
+        backward_qs = models.Patch.objects.filter(state_id=state, global_future_revision__lte=result[0]["global_revision"])
+        if session_id:
+            backward_qs = backward_qs.filter(session_id=session_id)
+        backward_patches = list(backward_qs.order_by("-global_future_revision")[:backward_patch_count])
+
     key = list(result.keys())[0]
-    return StateWithValue(
-        state_id=state,
-        value={str(k): v for k, v in result[key]["value"].items()},
-        definition=result[key]["definition"],
-        global_revision=result[key].get("global_revision"),
-    )
+    return StateValue(state_id=state, value={str(k): v for k, v in result[key]["value"].items()}, global_revision=result[key].get("global_revision"), forward_patches=forward_patches, backward_patches=backward_patches)
+
+
+@strawberry.type
+class AgentWithValues:
+    """A state value and its schema."""
+
+    agent_id: strawberry.ID = strawberry.field(description="The ID of the agent this state belongs to")
+    values: strawberry.scalars.JSON = strawberry.field(description="The state value, indexed by state_id")
+    global_revision: int = strawberry.field(description="The global revision of this state")
+    forward_patches: List[types.Patch] = strawberry.field(description="The patches that can be applied to move forward from this state")
+    backward_patches: List[types.Patch] = strawberry.field(description="The patches that can be applied to move backward from this state")
 
 
 def checkout_agent(
@@ -308,62 +332,10 @@ def checkout_agent(
     session_id: strawberry.ID | None = None,
     global_revision: int | None = None,
     timestamp: datetime.datetime | None = None,
-) -> List[StateWithValue]:
+    forward_patch_count: int = 0,
+    backward_patch_count: int = 0,
+) -> List[AgentWithValues]:
     """Checkout a state at a specific revision."""
     agent = models.Agent.objects.get(id=agent)
 
-    states = []
-
-    for state in models.State.objects.filter(agent=agent):
-        state_inst = state
-
-        try:
-            if timestamp and global_revision:
-                raise ValueError("Cannot specify both timestamp and global_revision")
-
-            if global_revision:
-                if session_id is None:
-                    latest_session = models.Session.objects.filter(agent=state_inst.agent).order_by("-created_at").first()
-                    if not latest_session:
-                        raise ObjectDoesNotExist(f"No sessions found for agent {state_inst.agent}")
-                    session_id = latest_session.session_id
-
-                result = get_latest_state(
-                    state_inst.agent,
-                    state_id=state_inst.pk,
-                    global_revision=global_revision,
-                    session_id=session_id,
-                )
-
-            elif timestamp:
-                latest_patch = models.Patch.objects.filter(state_id=state, agent=state_inst.agent, timestamp__lte=timestamp, session_id=session_id).order_by("-timestamp").first()
-                if not latest_patch:
-                    raise ObjectDoesNotExist(f"No patches found for state {state} before timestamp {timestamp}")
-
-                result = get_latest_state(
-                    state_inst.agent,
-                    state_id=state_inst.pk,
-                    global_revision=latest_patch.global_rev,
-                    session_id=latest_patch.session.pk,
-                )
-
-            else:
-                raise ValueError("Must specify either global_revision or timestamp")
-
-            if not result:
-                raise ObjectDoesNotExist(f"No state found for {state}")
-
-            key = list(result.keys())[0]
-            states.append(
-                StateWithValue(
-                    state_id=state.pk,
-                    value={str(k): v for k, v in result[key]["value"].items()},
-                    definition=result[key]["definition"],
-                    global_revision=result[key].get("global_revision"),
-                )
-            )
-        except Exception as e:
-            print(f"Error checking out state {state}: {e}")
-            continue
-
-    return states
+    return AgentWithValues(agent_id=agent.pk, values={s.state_id: s.value for s in states}, global_revision=max(s.global_revision for s in states if s.global_revision is not None) if states else 0, forward_patches=[], backward_patches=[])
