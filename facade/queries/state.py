@@ -259,6 +259,7 @@ class StateValue:
     value: strawberry.scalars.JSON = strawberry.field(description="The state value")
     global_revision: int | None = strawberry.field(description="The global revision of this state")
     forward_patches: List[types.Patch] = strawberry.field(description="The patches that can be applied to move forward from this state")
+    backward_patches: List[types.Patch] = strawberry.field(description="The patches that can be applied to move backward from this state")
 
 
 def checkout(
@@ -268,6 +269,7 @@ def checkout(
     global_revision: int | None = None,
     timestamp: datetime.datetime | None = None,
     forward_patch_count: int = 0,
+    backward_patch_count: int = 0,
 ) -> StateValue:
     """Checkout a state at a specific revision."""
     state_inst = models.State.objects.get(id=state)
@@ -290,6 +292,7 @@ def checkout(
         global_revision=target_global_rev,
         session_id=target_session,
         forward_patch_count=forward_patch_count,
+        backward_patch_count=backward_patch_count,
     )
 
     if not result_payload or "states" not in result_payload or state_inst.interface not in result_payload["states"]:
@@ -301,11 +304,15 @@ def checkout(
     # Forward patches are now fetched by get_latest_state at the global agent level
     forward_patches = result_payload.get("forward_patches", [])
 
+    # Backward patches are now fetched by get_latest_state at the global agent level
+    backward_patches = result_payload.get("backward_patches", [])
+
     return StateValue(
         state_id=state,
         value=state_data,
         global_revision=current_global_rev,
         forward_patches=forward_patches,
+        backward_patches=backward_patches,
     )
 
 
@@ -317,6 +324,7 @@ class AgentWithValues:
     values: strawberry.scalars.JSON = strawberry.field(description="The state value, indexed by state_interface")
     global_revision: int = strawberry.field(description="The maximum global revision across these states")
     forward_patches: List[types.Patch] = strawberry.field(description="The patches to move forward")
+    backward_patches: List[types.Patch] = strawberry.field(description="The patches to move backward")
 
 
 def checkout_agent(
@@ -326,6 +334,7 @@ def checkout_agent(
     global_revision: int | None = None,
     timestamp: datetime.datetime | None = None,
     forward_patch_count: int = 0,
+    backward_patch_count: int = 0,
 ) -> AgentWithValues:
     """Checkout all states for a given agent at a specific revision."""
     agent_inst = models.Agent.objects.get(id=agent)
@@ -348,6 +357,7 @@ def checkout_agent(
             global_revision=target_global_rev,
             session_id=target_session,
             forward_patch_count=forward_patch_count,
+            backward_patch_count=backward_patch_count,
         )
         or {}
     )
@@ -359,9 +369,13 @@ def checkout_agent(
     # Use the forward patches returned directly from the payload
     forward_patches = result_payload.get("forward_patches", [])
 
+    # Use the backward patches returned directly from the payload
+    backward_patches = result_payload.get("backward_patches", [])
+
     return AgentWithValues(
         agent_id=agent_inst.pk,
         values=result_map,
         global_revision=max_global_revision,
         forward_patches=forward_patches,
+        backward_patches=backward_patches,
     )

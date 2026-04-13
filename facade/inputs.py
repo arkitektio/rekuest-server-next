@@ -436,13 +436,13 @@ class AssignInputModel(BaseModel):
     args: dict[str, Any]
     reference: str | None = None
     parent: str | None = None
-    cached: bool = False
-    log: bool = False
-    capture: bool = False
-    ephemeral: bool = False
+    cached: bool | None = None
+    log: bool | None = None
+    capture: bool | None = None
+    ephemeral: bool | None = None
     dependencies: list[ResolvedDependencyInputModel] | None = None
-    is_hook: bool = False
-    step: bool = False
+    is_hook: bool | None = None
+    step: bool | None = None
 
 
 class CancelInputModel(BaseModel):

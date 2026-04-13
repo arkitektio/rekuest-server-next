@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import uuid
 from random import choice
-from typing import Dict, Protocol, Any
+from typing import Dict, List, Protocol, Any
 
 from facade import enums, inputs, models, types, messages
 from facade.consumers.async_consumer import AgentConsumer
@@ -46,13 +46,18 @@ def build_agent_dependency_dict(agent: models.Agent, dep: models.Dependency) -> 
     }
 
 
-def build_dependency_dict(implementation: models.Implementation, info: Info, dependency_overwrites: Dict[str, str]) -> Dict[str, str]:
+def build_dependency_dict(implementation: models.Implementation, info: Info, dependency_overwrites: List[inputs.ResolvedDependencyInputModel]) -> Dict[str, str]:
     dependencies = models.Dependency.objects.filter(implementation=implementation).all()
 
     dep_kwargs = {}
 
     for dep in dependencies:
-        if not dep.auto_resolvable and dep.key not in dependency_overwrites:
+        if dep.key in [overwrite.key for overwrite in dependency_overwrites]:
+            overwrite = next(overwrite for overwrite in dependency_overwrites if overwrite.key == dep.key)
+            dep_kwargs[dep.key] = overwrite.model_dump()
+            continue
+
+        if not dep.auto_resolvable and dep.key not in [overwrite.key for overwrite in dependency_overwrites]:
             raise ValueError(f"Dependency {dep.key} is not auto resolvable, and no overwrite was provided. Please provide a value for this dependency in the dependencies field of the assign mutation.")
 
         if dep.auto_resolvable:
@@ -273,7 +278,7 @@ class RedisControllBackend(ControllBackend):
 
         reference = input.reference or self.create_message_id()
         if dependency_dict is None:
-            dependency_dict = build_dependency_dict(implementation, info, input.dependencies or {})
+            dependency_dict = build_dependency_dict(implementation, info, input.dependencies or [])
 
         # TODO: if ephemeral is set, we should not store the assignation in the database
         assignation = models.Assignation.objects.create(
@@ -284,7 +289,7 @@ class RedisControllBackend(ControllBackend):
             parent_id=input.parent,
             agent=agent,
             acted_on=acted_on,
-            capture=input.capture,
+            capture=input.capture if input.capture is not None else False,
             implementation=implementation,
             dependency=input.dependency,
             dependency_method=input.method,
@@ -295,7 +300,7 @@ class RedisControllBackend(ControllBackend):
             hooks=input.hooks or [],
             dependencies=dependency_dict,
             waiter=waiter,
-            ephemeral=input.ephemeral,
+            ephemeral=input.ephemeral if input.ephemeral is not None else False,
         )
 
         action = implementation.action
@@ -309,7 +314,7 @@ class RedisControllBackend(ControllBackend):
                 app=str(info.context.request.client.client_id),
                 org=str(info.context.request.organization.slug) if info.context.request.organization else None,
                 reference=reference,
-                capture=input.capture,
+                capture=input.capture if input.capture is not None else False,
                 resolution=str(resolution.pk) if resolution else None,
                 interface=implementation.interface,
                 extension=implementation.extension,

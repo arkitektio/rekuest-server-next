@@ -85,6 +85,7 @@ def get_latest_state(
     session_id: str | None = None,
     global_revision: int | None = None,
     forward_patch_count: int = 0,
+    backward_patch_count: int = 0,
 ) -> dict:
     states_data = {}
     max_current_revision = 0
@@ -155,5 +156,13 @@ def get_latest_state(
 
         forward_patches = list(models.Patch.objects.filter(agent=agent, global_rev__gt=reference_rev).order_by("global_rev")[:forward_patch_count])
 
+    # Fetch n-patches backward at the global agent level (not scoped to state)
+    backward_patches = []
+    if backward_patch_count > 0:
+        # Use the requested target revision if provided, otherwise the max we just calculated
+        reference_rev = global_revision if global_revision is not None else max_current_revision
+
+        backward_patches = list(models.Patch.objects.filter(agent=agent, global_rev__lte=reference_rev).order_by("-global_rev")[:backward_patch_count][::-1])  # Reverse to maintain chronological order
+
     # Return a structured payload since patches are now an agent-level property
-    return {"states": states_data, "global_revision": max_current_revision, "forward_patches": forward_patches, "session_id": t.session_id if t else None, "timestamp": latest_timestamp}
+    return {"states": states_data, "global_revision": max_current_revision, "forward_patches": forward_patches, "backward_patches": backward_patches, "session_id": t.session_id if t else None, "timestamp": latest_timestamp}
