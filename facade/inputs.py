@@ -1,4 +1,4 @@
-from typing import Any, Dict, Literal, Optional
+from typing import Annotated, Any, Dict, Literal, Optional
 
 import strawberry
 from facade import enums, scalars
@@ -16,19 +16,53 @@ import uuid
 from datalayer import scalars as dscalars  # noqa: F401
 
 
-class ResolvedDependencyInputModel(BaseModel):
-    """Base model for mapping dependencies to implementations.
-
-    Attributes:
-        key: The dependency key
-        implementation: The implementation ID to map to the dependency
-    """
-
-    dependency: str
-    resolution_key: str | None = None
+class MappedActionInputModel(BaseModel):
     key: str
     implementation: str
-    down_stream_resolution: str | None = None
+    dependencies: list["ResolvedDependencyInputModel"] | None = None
+
+
+class MappedAgentInputModel(BaseModel):
+    key: str
+    agent: str
+    mapped_actions: list[str]
+
+
+class ResolvedDependencyInputModel(BaseModel):
+    key: str
+    mapped_agents: list[MappedAgentInputModel]
+
+
+@pydantic.input(
+    MappedActionInputModel,
+    description="The input for mapping an action to an implementation in a agent.",
+)
+class MappedActionInput:
+    key: str = strawberry.field(description="The key of the action to map. This is used to identify the action in the system.")
+    implementation: strawberry.ID = strawberry.field(description="The implementation ID to map the action to. This is used to identify the implementation in the system.")
+    dependencies: list[Annotated["ResolvedDependencyInput", strawberry.lazy(__name__)]] | None = strawberry.field(
+        default=None,
+        description="The dependencies of the mapped action. This is used to identify the dependencies in the system.",
+    )
+
+
+@pydantic.input(
+    MappedAgentInputModel,
+    description="The input for mapping actions to implementations in a agent.",
+)
+class MappedAgentInput:
+    key: str = strawberry.field(description="The key of the agent to map. This is used to identify the agent in the system.")
+    agent: strawberry.ID = strawberry.field(description="The agent ID to map the actions to. This is used to identify the agent in the system.")
+    mapped_actions: list[MappedActionInput] = strawberry.field(description="The list of action keys to map to implementations in the agent. This is used to identify the actions in the system.")
+
+
+@pydantic.input(
+    ResolvedDependencyInputModel,
+    description="The input for mapping dependencies to implementations in a agent.",
+)
+class ResolvedDependencyInput:
+    key: str = strawberry.field(description="The key of the dependency to map. This is used to identify the dependency in the system.")
+    mapped_agents: list[MappedAgentInput] = strawberry.field(description="The list of mapped agents to map to implementations in agents. This is used to identify the mapped agents in the system.")
 
 
 class PatchInputModel(BaseModel):
@@ -119,24 +153,6 @@ class LogSnapshotInputModel(BaseModel):
 class LogSnapshotInput:
     instance_id: str = strawberry.field(description="The instance ID of the state. This is used to identify the state in the system.")
     value: rscalars.AnyDefault = strawberry.field(description="The value of the state snapshot (index by state_keys). This is used to log the current state of the system.")
-
-
-@pydantic.input(
-    ResolvedDependencyInputModel,
-    description="The input for mapping a dependency to an implementation.",
-)
-class ResolvedDependencyInput:
-    dependency: strawberry.ID = strawberry.field(description="The dependency ID to map.")
-    resolution_key: str | None = strawberry.field(
-        default=None,
-        description="An optional key to identify this resolution in the context of its parent resolution.",
-    )
-    key: str = strawberry.field(description="The key of the dependency to map.")
-    implementation: strawberry.ID = strawberry.field(description="The implementation ID to map to the dependency.")
-    down_stream_resolution: strawberry.ID | None = strawberry.field(
-        default=None,
-        description="The resolution ID for the down stream resolution of the dependency.",
-    )
 
 
 @strawberry.input
@@ -424,7 +440,7 @@ class AssignInputModel(BaseModel):
     log: bool = False
     capture: bool = False
     ephemeral: bool = False
-    dependencies: dict[str, str] | None = None
+    dependencies: list[ResolvedDependencyInputModel] | None = None
     is_hook: bool = False
     step: bool = False
 
@@ -642,7 +658,7 @@ class AssignInput:
         default=False,
         description="Whether the assignation should step. Ie. go to the next breakpoint",
     )
-    dependencies: scalars.Args | None = strawberry.field(
+    dependencies: list[ResolvedDependencyInput] | None = strawberry.field(
         default=None,
         description="The dependencies of the assignation. This maps dependency keys to implementation IDs.",
     )

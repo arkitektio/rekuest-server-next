@@ -25,7 +25,8 @@ def unreserve(info: Info, input: UnreserveInput) -> str:
 
 
 def assign(info: Info, input: inputs.AssignInput) -> types.Assignation:
-    return controll_backend.assign(info, input)
+    model = input.to_pydantic()
+    return controll_backend.assign(info, model)
 
 
 def pause(info: Info, input: inputs.PauseInput) -> types.Assignation:
