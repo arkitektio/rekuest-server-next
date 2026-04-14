@@ -992,6 +992,7 @@ class Patch:
     session_id: str
     assignation: Assignation | None
     state: State
+    interface: str
 
     @strawberry.field
     def patch(self) -> JSONPatch:
