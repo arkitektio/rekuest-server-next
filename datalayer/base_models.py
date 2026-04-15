@@ -21,7 +21,13 @@ class FinishMediaUploadInput(BaseModel):
 class RequestMediaAccessInput(BaseModel):
     """Request temporary S3 access credentials for a media object."""
 
-    store_id: str | None = None
+    store_id: str
+
+
+class RequestGeneralMediaAccessInput(BaseModel):
+    """Request temporary S3 access credentials for media objects in the organization."""
+
+    expires_in: Optional[int] = None
 
 
 class RequestBigFileUploadInput(BaseModel):

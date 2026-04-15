@@ -51,7 +51,6 @@ class GeneralMediaAccessGrant:
     session_token: str
     region: str
     bucket: str
-    key: str
     path: str
     expires_in: int
     store: str | None

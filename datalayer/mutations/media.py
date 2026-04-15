@@ -7,7 +7,7 @@ from datalayer import models
 
 def request_media_upload(info: Info, input: inputs.RequestMediaUploadInput) -> types.MediaUploadGrant:
     """Request temporary S3 upload credentials for a media file."""
-    del info
+
     dl = get_current_datalayer()
     input_model = getattr(input, "to_pydantic")()
     return types.MediaUploadGrant(**dl.generate_media_upload_grant(input_model).model_dump())
@@ -15,7 +15,7 @@ def request_media_upload(info: Info, input: inputs.RequestMediaUploadInput) -> t
 
 def finish_media_upload(info: Info, input: inputs.FinishMediaUploadInput) -> types.MediaStore:
     """Mark the MediaStore as populated after a successful upload."""
-    del info
+
     dl = get_current_datalayer()
     input_model = getattr(input, "to_pydantic")()
     return cast(types.MediaStore, dl.finish_media_upload(input_model))
@@ -23,21 +23,18 @@ def finish_media_upload(info: Info, input: inputs.FinishMediaUploadInput) -> typ
 
 def request_media_access(info: Info, input: inputs.RequestMediaAccessInput) -> types.MediaAccessGrant:
     """Request temporary S3 read credentials for a media file."""
-    del info
+
     dl = get_current_datalayer()
     model = input.to_pydantic()
-
-    if not model.store:
-        raise ValueError("MediaStore not found")
 
     store = models.MediaStore.objects.get(id=model.store_id)
     return types.MediaAccessGrant.from_pydantic(dl.generate_media_access_grant(store))
 
 
-def request_general_media_access(info: Info, input: inputs.RequestMediaAccessInput) -> types.MediaAccessGrant:
+def request_general_media_access(info: Info, input: inputs.RequestGeneralMediaAccessInput) -> types.GeneralMediaAccessGrant:
     """Request temporary S3 read credentials for a media file."""
-    del info
+
     dl = get_current_datalayer()
     model = input.to_pydantic()
 
-    return types.GeneralMediaAccessGrant.from_pydantic(dl.generate_general_media_access_grant(info.context.request.organization_id, info.context.request.user.id))
+    return types.GeneralMediaAccessGrant.from_pydantic(dl.generate_general_media_access_grant(info.context.request.organization.id, info.context.request.user.id))
