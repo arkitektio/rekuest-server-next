@@ -146,6 +146,10 @@ class AssignWidgetInput:
         default=None,
         description="The path to the state value that we are going to use to fullfill the state choices. Always traverse from top to bottom level. i.e state.x for state.x and state.x.y for state.x.y. You can also use an arrow function to specify a dynamic path based on the other arguments, e.g. (args) => state[args.foo]",
     )
+    target_dependency: str | None = strawberry.field(default=None, description="The dependency that we are going to target with a proxy widget. This is used for proxy widgets")
+    target_action: str | None = strawberry.field(default=None, description="The action that we are going to target with a proxy widget. This is used for proxy widgets")
+    target_port: str | None = strawberry.field(default=None, description="The port that we are going to target with a proxy widget. This is used for proxy widgets")
+
     state_accessors: Optional[List[Annotated["StateAccessorInput", strawberry.lazy(__name__)]]] = strawberry.field(
         default=None,
         description="State accessors are used to specify how to access the state values that we are going to use to fullfill the state choices. This is used when the state value that we want to use is not the same as the one of the port, e.g. when we want to use a specific key of a state object, or when we want to use a dynamic key based on the other arguments. The option_key field is used to specify which part of the state accessor we want to use as the value for the assign widget (e.g. the key, the description, the logo, etc.)",

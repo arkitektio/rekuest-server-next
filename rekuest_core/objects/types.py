@@ -31,6 +31,13 @@ class AssignWidget:
     follow_value: str | None
 
 
+@pydantic.type(models.ProxyWidgetModel)
+class ProxyWidget(AssignWidget):
+    target_port: str = strawberry.field(description="The port key of the port that we are going to target with a proxy widget. This is used for proxy widgets")
+    target_action: str = strawberry.field(description="The action dependency name that we are going to target with a proxy widget. This is used for proxy widgets")
+    target_dependency: str | None = strawberry.field(description="The dependency that we are going to target with a proxy widget. This is used for proxy widgets")
+
+
 @pydantic.type(models.SliderAssignWidgetModel)
 class SliderAssignWidget(AssignWidget):
     min: float | None

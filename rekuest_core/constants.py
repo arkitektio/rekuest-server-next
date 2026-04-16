@@ -12,5 +12,6 @@ interface_types = [
     types.CustomAssignWidget,
     types.CustomEffect,
     types.MessageEffect,
+    types.ProxyWidget,
     types.HideEffect,
 ]

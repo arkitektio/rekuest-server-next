@@ -33,12 +33,14 @@ class AssignWidgetKind(str, Enum):
     CUSTOM = "CUSTOM"
     STRING = "STRING"
     STATE_CHOICE = "STATE_CHOICE"
+    PROXY = "PROXY"
 
 
 @strawberry.enum(description="The kind of return widget.")
 class ReturnWidgetKind(str, Enum):
     CHOICE = "CHOICE"
     CUSTOM = "CUSTOM"
+    PROXY = "PROXY"
 
 
 @strawberry.enum(description="The kind of effect.")

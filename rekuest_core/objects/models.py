@@ -57,6 +57,20 @@ class StateChoiceAssignWidgetModel(AssignWidgetModel):
     state_accessors: list[StateAccessorModel] | None = None
 
 
+class StateChoiceAssignWidgetModel(AssignWidgetModel):
+    kind: Literal["STATE_CHOICE"]
+    state_path: str
+    dependency: str | None = None
+    state_accessors: list[StateAccessorModel] | None = None
+
+
+class ProxyWidgetModel(AssignWidgetModel):
+    kind: Literal["PROXY"]
+    target_port: str
+    target_action: str
+    target_dependency: str | None = None
+
+
 class StringWidgetModel(AssignWidgetModel):
     kind: Literal["STRING"]
     placeholder: str | None
@@ -70,6 +84,7 @@ AssignWidgetModelUnion = Union[
     StateChoiceAssignWidgetModel,
     StringWidgetModel,
     CustomAssignWidgetModel,
+    ProxyWidgetModel,
 ]
 
 
