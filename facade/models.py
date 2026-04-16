@@ -783,12 +783,17 @@ class Dependency(models.Model):
     optional = models.BooleanField(default=False, help_text="Is this dependency optional")
     description = models.TextField(null=True, blank=True, help_text="A description for this dependency")
     created_at = models.DateTimeField(auto_created=True, auto_now_add=True)
-    minimal_viable_instances = models.IntegerField(
-        default=1,
+    min_viable_instances = models.IntegerField(
+        null=True,
         help_text="The minimal viable instance count for this dependency",
     )
+    max_viable_instances = models.IntegerField(
+        null=True,
+        help_text="The maximal viable instance count for this dependency",
+    )
+
     prefered_instances = models.IntegerField(
-        default=1,
+        null=True,
         help_text="The prefered instance count for this dependency",
     )
     assign_policy = models.CharField(

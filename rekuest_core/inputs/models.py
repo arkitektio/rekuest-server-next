@@ -204,6 +204,7 @@ class AgentDependencyInputModel(BaseModel):
     auto_resolvable: bool = False
 
     min_viable_instances: int | None = None
+    max_viable_instances: int | None = None
     prefered_instances: int | None = None
     assign_policy: enums.AssignPolicy = enums.AssignPolicy.BALANCED
 

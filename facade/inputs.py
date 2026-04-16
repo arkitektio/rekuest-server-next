@@ -31,6 +31,7 @@ class MappedAgentInputModel(BaseModel):
 class ResolvedDependencyInputModel(BaseModel):
     key: str
     mapped_agents: list[MappedAgentInputModel]
+    auto_resolve: bool = False
 
 
 @pydantic.input(
@@ -63,6 +64,10 @@ class MappedAgentInput:
 class ResolvedDependencyInput:
     key: str = strawberry.field(description="The key of the dependency to map. This is used to identify the dependency in the system.")
     mapped_agents: list[MappedAgentInput] = strawberry.field(description="The list of mapped agents to map to implementations in agents. This is used to identify the mapped agents in the system.")
+    auto_resolve: bool = strawberry.field(
+        default=False,
+        description="Whether this dependency should be automatically resolved by the system. If true, the system will attempt to find a agent that can resolve this dependency and assign it to the action when the action is assigned. This is used to enable automatic resolution of dependencies without requiring the user to specify a specific agent for the dependency.",
+    )
 
 
 class PatchInputModel(BaseModel):

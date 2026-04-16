@@ -218,6 +218,19 @@ class Dependency:
         default=None,
         description="Optional filter string to limit which agents can be bound to this dependency based on the version of the app they belong to. The filter string should be in the format 'version' where version can be a specific version or a wildcard '*'. For example, '*' would allow any version, while '1.0.0' would only allow agents with that specific version.",
     )
+    min_viable_instances: int | None = strawberry_django.field(
+        default=None,
+        description="Minimum number of viable agent instances required to resolve this dependency. This is used in combination with the auto_resolvable field to determine if a dependency can be automatically resolved. If the number of available agent instances that match the filters is less than this number, the dependency will not be considered auto resolvable.",
+    )
+    max_viable_instances: int | None = strawberry_django.field(
+        default=None,
+        description="Maximum number of viable agent instances that can be bound to this dependency. This is used in combination with the auto_resolvable field to determine if a dependency can be automatically resolved. If the number of available agent instances that match the filters is greater than this number, the dependency will not be considered auto resolvable.",
+    )
+
+    @strawberry_django.field(description="List of action demands specified in this dependency.")
+    def singular(self) -> bool:
+        """Whether this dependency is singular or not. A singular dependency is a dependency that can only be resolved to one agent, meaning that if there are multiple implementations that match the filters and demands of this dependency, it will not be considered singular."""
+        return self.min_viable_instances == 1 and (self.max_viable_instances is None or self.max_viable_instances == 1)
 
     @strawberry_django.field(description="List of action demands")
     def action_demands(self) -> list["ActionDemand"]:

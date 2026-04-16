@@ -495,6 +495,9 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
                         action_demands=[x.model_dump() for x in i.action_demands] if i.action_demands else [],
                         app_filter=i.app,
                         version_filter=i.version,
+                        min_viable_instances=i.min_viable_instances,
+                        max_viable_instances=i.max_viable_instances,
+                        prefered_instances=i.prefered_instances,
                     ),
                 )
                 new_deps.append(dep)

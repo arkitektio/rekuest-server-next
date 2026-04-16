@@ -54,7 +54,15 @@ def build_dependency_dict(implementation: models.Implementation, info: Info, dep
     for dep in dependencies:
         if dep.key in [overwrite.key for overwrite in dependency_overwrites]:
             overwrite = next(overwrite for overwrite in dependency_overwrites if overwrite.key == dep.key)
-            dep_kwargs[dep.key] = overwrite.model_dump()
+            if not overwrite.mapped_agents:
+                raise ValueError(f"Dependency {dep.key} was provided an overwrite, but no mapped agents were provided for this dependency. Please provide at least one agent that can resolve this dependency in the mapped_agents field of the ResolvedDependencyInputModel for this dependency.")
+
+            agents = models.Agent.objects.filter(pk__in=[agent_id.agent for agent_id in overwrite.mapped_agents], connected=True, last_seen__gt=datetime.now() - timedelta(minutes=1)).all()
+
+            if len(agents) == 0:
+                raise ValueError(f"No active agents found for the provided mapped agents for dependency {dep.key}. Please ensure that the agents provided for this dependency are currently active and connected.")
+
+            dep_kwargs[dep.key] = [build_agent_dependency_dict(agent, dep) for agent in agents]
             continue
 
         if not dep.auto_resolvable and dep.key not in [overwrite.key for overwrite in dependency_overwrites]:

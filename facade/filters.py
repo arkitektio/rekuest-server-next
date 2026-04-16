@@ -106,10 +106,10 @@ class AgentFilter:
     @filter_field
     def dependency(self, info: Info, queryset, value: strawberry.ID, prefix: str):
         dep = models.Dependency.objects.get(id=value)
-        if self.app_identifier is not UNSET and self.app_identifier is not None:
+        if dep.app_filter is not UNSET and dep.app_filter is not None:
             return queryset.filter(**{f"{prefix}app__identifier": dep.app_filter}), Q()
         else:
-            raise ValueError("Filtering by dependency currently only allowed when also filtering by app identifier")
+            raise ValueError("Filtering by dependency currently only allowed when the dependency declared an app filter, sorry :( This is coming")
 
     @filter_field
     def three_d_model(self, info: Info, queryset, value: strawberry.ID, prefix: str):
