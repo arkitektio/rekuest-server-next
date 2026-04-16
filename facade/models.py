@@ -764,7 +764,7 @@ class Dependency(models.Model):
         help_text="The action demands this dependency has to meet",
     )
     auto_resolvable = models.BooleanField(
-        default=True,
+        default=False,
         help_text="If this dependency is auto resolvable, the system will try to automatically bind any agent that the user can assign to this dependency. If False, the user will have to manually bind an agent to this dependency before it can be used.",
     )
     app_filter = models.CharField(

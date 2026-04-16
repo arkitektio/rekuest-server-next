@@ -52,30 +52,39 @@ def build_dependency_dict(implementation: models.Implementation, info: Info, dep
     dep_kwargs = {}
 
     for dep in dependencies:
-        if dep.key in [overwrite.key for overwrite in dependency_overwrites]:
+        provided = dep.key in [overwrite.key for overwrite in dependency_overwrites]
+        if provided:
             overwrite = next(overwrite for overwrite in dependency_overwrites if overwrite.key == dep.key)
-            if not overwrite.mapped_agents:
-                raise ValueError(f"Dependency {dep.key} was provided an overwrite, but no mapped agents were provided for this dependency. Please provide at least one agent that can resolve this dependency in the mapped_agents field of the ResolvedDependencyInputModel for this dependency.")
 
-            agents = models.Agent.objects.filter(pk__in=[agent_id.agent for agent_id in overwrite.mapped_agents], connected=True, last_seen__gt=datetime.now() - timedelta(minutes=1)).all()
+            if overwrite.auto_resolve:
+                if not dep.auto_resolvable:
+                    raise ValueError(f"Dependency {dep.key} is not auto resolvable, but was provided with an overwrite that has auto_resolve set to true. Please either set auto_resolve to false for this dependency overwrite, or make the dependency auto resolvable in the system.")
 
-            if len(agents) == 0:
-                raise ValueError(f"No active agents found for the provided mapped agents for dependency {dep.key}. Please ensure that the agents provided for this dependency are currently active and connected.")
+                agents = models.Agent.objects.filter(app__identifier=dep.app_filter, connected=True, last_seen__gt=datetime.now() - timedelta(minutes=1), organization=info.context.request.organization).all()
+                if dep.max_viable_instances is not None:
+                    agents = agents[: dep.max_viable_instances]
+                if dep.min_viable_instances is not None and len(agents) < dep.min_viable_instances:
+                    raise ValueError(f"Not enough agents found for dependency {dep.key}. Required at least {dep.min_viable_instances} but found only {len(agents)}. Please ensure that there are enough agents available to resolve this dependency.")
+
+            else:
+                agents = models.Agent.objects.filter(pk__in=[agent_id.agent for agent_id in overwrite.mapped_agents], connected=True, last_seen__gt=datetime.now() - timedelta(minutes=1)).all()
+                if dep.max_viable_instances is not None:
+                    agents = agents[: dep.max_viable_instances]
+                if dep.min_viable_instances is not None and len(agents) < dep.min_viable_instances:
+                    raise ValueError(f"Not enough agents found for dependency {dep.key}. Required at least {dep.min_viable_instances} but found only {len(agents)}. Please ensure that there are enough agents available to resolve this dependency.")
 
             dep_kwargs[dep.key] = [build_agent_dependency_dict(agent, dep) for agent in agents]
             continue
-
-        if not dep.auto_resolvable and dep.key not in [overwrite.key for overwrite in dependency_overwrites]:
-            raise ValueError(f"Dependency {dep.key} is not auto resolvable, and no overwrite was provided. Please provide a value for this dependency in the dependencies field of the assign mutation.")
-
-        if dep.auto_resolvable:
-            agents = models.Agent.objects.filter(app__identifier=dep.app_filter, connected=True, last_seen__gt=datetime.now() - timedelta(minutes=1), organization=info.context.request.organization).all()
-            # TODO: filter by desired length and by the user and organization of the agent as well, but for now we just take any agent that is connected and has seen in the last minute
-
-            if len(agents) == 0:
-                raise ValueError(f"No implementations found for dependency {dep.key}. Cannot resolve dependency.")
-
-            dep_kwargs[dep.key] = [build_agent_dependency_dict(agent, dep) for agent in agents]
+        else:
+            if dep.auto_resolvable:
+                agents = models.Agent.objects.filter(app__identifier=dep.app_filter, connected=True, last_seen__gt=datetime.now() - timedelta(minutes=1), organization=info.context.request.organization).all()
+                if dep.max_viable_instances is not None:
+                    agents = agents[: dep.max_viable_instances]
+                if dep.min_viable_instances is not None and len(agents) < dep.min_viable_instances:
+                    raise ValueError(f"Not enough agents found for dependency {dep.key}. Required at least {dep.min_viable_instances} but found only {len(agents)}. Please ensure that there are enough agents available to resolve this dependency.")
+                dep_kwargs[dep.key] = [build_agent_dependency_dict(agent, dep) for agent in agents]
+            else:
+                raise ValueError(f"Dependency {dep.key} was not provided with an overwrite, and is not auto resolvable. Please provide a dependency overwrite for this dependency to ensure it can be resolved properly.")
 
     return dep_kwargs
 

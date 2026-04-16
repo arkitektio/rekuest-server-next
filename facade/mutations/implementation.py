@@ -498,6 +498,7 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
                         min_viable_instances=i.min_viable_instances,
                         max_viable_instances=i.max_viable_instances,
                         prefered_instances=i.prefered_instances,
+                        auto_resolvable=i.auto_resolvable,
                     ),
                 )
                 new_deps.append(dep)
