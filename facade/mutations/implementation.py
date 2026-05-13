@@ -293,7 +293,9 @@ def extract_returnports_recursively(
 
 def recursive_create_input_usages(action: models.Action, port: PortInputModel, index: int, key: str, modifiers: list[str]) -> None:
     if port.kind == PortKind.STRUCTURE and port.identifier:
-        structure = models.Structure.objects.get(key=identifier_to_key(port.identifier).lower(), package__key=identifier_to_package_key(port.identifier).lower())
+        package, _ = models.StructurePackage.objects.get_or_create(key=identifier_to_package_key(port.identifier).lower())
+
+        structure, _ = models.Structure.objects.get_or_create(key=identifier_to_key(port.identifier).lower(), package=package)
 
         x = models.InputStructureUsage.objects.update_or_create(
             structure=structure,
@@ -306,7 +308,7 @@ def recursive_create_input_usages(action: models.Action, port: PortInputModel, i
         )
 
     if port.kind == PortKind.INTERFACE and port.identifier:
-        interface = models.Interface.objects.get(key=identifier_to_key(port.identifier).lower(), package__key=identifier_to_package_key(port.identifier).lower())
+        interface, _ = models.Interface.objects.get_or_create(key=identifier_to_key(port.identifier).lower(), package__key=identifier_to_package_key(port.identifier).lower())
 
         x = models.InputInterfaceUsage.objects.update_or_create(
             interface=interface,
@@ -329,7 +331,9 @@ def recursive_create_input_usages(action: models.Action, port: PortInputModel, i
 
 def recursive_create_output_usages(action: models.Action, port: PortInputModel, index: int, key: str, modifiers: list[str]) -> None:
     if port.kind == PortKind.STRUCTURE and port.identifier:
-        structure = models.Structure.objects.get(key=identifier_to_key(port.identifier).lower(), package__key=identifier_to_package_key(port.identifier).lower())
+        package, _ = models.StructurePackage.objects.get_or_create(key=identifier_to_package_key(port.identifier).lower())
+
+        structure, _ = models.Structure.objects.get_or_create(key=identifier_to_key(port.identifier).lower(), package=package)
 
         x = models.OutputStructureUsage.objects.update_or_create(
             structure=structure,
@@ -342,7 +346,7 @@ def recursive_create_output_usages(action: models.Action, port: PortInputModel, 
         )
 
     if port.kind == PortKind.INTERFACE and port.identifier:
-        interface = models.Interface.objects.get(key=identifier_to_key(port.identifier).lower(), package__key=identifier_to_package_key(port.identifier).lower())
+        interface, _ = models.Interface.objects.get_or_create(key=identifier_to_key(port.identifier).lower(), package__key=identifier_to_package_key(port.identifier).lower())
 
         x = models.OutputInterfaceUsage.objects.update_or_create(
             interface=interface,
@@ -474,6 +478,15 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
                 )
                 new_deps.append(dep)
 
+        if input.manipulates:
+            print("Updating manipulates for implementation", implementation.pk, input.manipulates)
+            states = models.State.objects.filter(agent=agent, interface__in=input.manipulates)
+            implementation.manipulates.set(states)
+
+        if input.tracks:
+            implementation.tracks = [t.model_dump() for t in input.tracks]
+            implementation.save()
+
     except models.Implementation.DoesNotExist:
         implementation = models.Implementation.objects.create(
             interface=input.interface,
@@ -502,6 +515,15 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
                     ),
                 )
                 new_deps.append(dep)
+
+        if input.manipulates:
+            print("Updating manipulates for implementation", implementation.pk, input.manipulates)
+            states = models.State.objects.filter(agent=agent, interface__in=input.manipulates)
+            implementation.manipulates.set(states)
+
+        if input.tracks:
+            implementation.tracks = [t.model_dump() for t in input.tracks]
+            implementation.save()
 
     return implementation
 

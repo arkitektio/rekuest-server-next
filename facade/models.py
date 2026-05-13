@@ -903,6 +903,8 @@ class Implementation(models.Model):
     params = models.JSONField(default=dict, help_text="Params for this Implementation")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    tracks = models.JSONField(default=list, help_text="A log of all the assignations that have been provisioned with this implementation, as well as their status and results")
+    manipulates = models.ManyToManyField("State", help_text="Which states does this implementation manipulate?", related_name="manipulated_by")
     dynamic: str = models.BooleanField(help_text="Dynamic Implementations will be able to create new reservations on runtime")
 
     class Meta:

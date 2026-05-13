@@ -173,6 +173,22 @@ class Provides:
     operator: enums.ProvidesOperator = strawberry.field(description="The operator to use for matching the descriptor. This is used when searching for actions based on their descriptors. The operator can be EQUALS, NOT_EQUALS, EXISTS, NOT_EXISTS, GREATER_THAN, LESS_THAN, INCLUDES, NOT_INCLUDES")
 
 
+@pydantic.type(models.WindowModel, description="""A window that is calculated""")
+class Window:
+    window_function: str
+    label: str | None = None
+
+
+@pydantic.type(models.TrackModel, description="""A value that is being tracked over time during the runtime of an action. This is the state of a dependency""")
+class Track:
+    dependency_key: str | None = None
+    state_key: str
+    value_key: str
+    label: str | None = None
+    description: str | None = None
+    windows: list[Window] | None = None
+
+
 @pydantic.type(models.ArgPortModel)
 class ArgPort:
     identifier: scalars.Identifier | None = strawberry.field(

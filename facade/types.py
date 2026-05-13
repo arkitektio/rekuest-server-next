@@ -247,6 +247,7 @@ class Implementation:
     params: rscalars.AnyDefault = strawberry_django.field(description="Arbitrary parameters for the implementation.")
     resolutions: list["Resolution"] = strawberry_django.field(description="The resolved dependencies")
     dependencies: list["Dependency"] = strawberry_django.field(description="Dependencies required by this action.")
+    manipulates: list["State"] = strawberry.field(description="States that this implementation manipulates.")
 
     @strawberry_django.field(description="Constructed name for display, combining interface and agent name.")
     def name(self) -> str:
@@ -260,6 +261,10 @@ class Implementation:
     @strawberry_django.field(description="Tests")
     def tests(self, info: Info) -> list["Implementation"]:
         return []
+
+    @strawberry_django.field(description="List of action demands")
+    def tracks(self) -> list[rtypes.Track]:
+        return [rmodels.TrackModel(**i) for i in self.tracks]
 
     @strawberry_django.field(description="Get the latest completed assignation created by the current user.")
     def my_latest_assignation(self, info: Info) -> Optional["Assignation"]:

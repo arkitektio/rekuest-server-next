@@ -600,6 +600,22 @@ class DefinitionInput:
     )
 
 
+@pydantic.input(models.WindowInputModel, description="""A window that is calculated""")
+class WindowInput:
+    window_function: str
+    label: str | None = None
+
+
+@pydantic.input(models.TrackInputModel, description="""A value that is being tracked over time during the runtime of an action. This is the state of a dependency""")
+class TrackInput:
+    dependency_key: str | None = None
+    state_key: str
+    value_key: str
+    label: str | None = None
+    description: str | None = None
+    windows: list[WindowInput] | None = None
+
+
 @pydantic.input(
     models.ImplementationInputModel,
     description="""A implementation is a blueprint for a action. It is composed of a definition, a list of dependencies, and a list of params.""",
@@ -632,9 +648,17 @@ class ImplementationInput:
         default=None,
         description="The optimistics of the definition. This is used to optimistically set state values when the action is assigned. This is used to provide a better user experience by optimistically setting state",
     )
+    tracks: list[TrackInput] | None = strawberry.field(
+        default=None,
+        description="The tracks of the definition. This is used to track values over time during the runtime of an action. This is the state of a dependency",
+    )
     extension: str | None = strawberry.field(
         default=None,
         description="The extension of the implementation. This is used to group implementations together in the UI and provide a better user experience",
+    )
+    manipulates: list[str] | None = strawberry.field(
+        default=None,
+        description="The states that the implementation manipulates. This is used to identify which states are manipulated by the implementation, and can be use to enhance state safety in the system",
     )
     dependencies: list[AgentDependencyInput] = strawberry.field(default_factory=list)
 

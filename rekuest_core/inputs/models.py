@@ -260,15 +260,31 @@ class DependencyInputModel(BaseModel):
     viable_instances: int | None
 
 
+class WindowInputModel(BaseModel):
+    window_function: str
+    label: str | None = None
+
+
+class TrackInputModel(BaseModel):
+    dependency_key: str | None = None
+    state_key: str
+    value_key: str
+    label: str | None = None
+    description: str | None = None
+    windows: list[WindowInputModel] | None = None
+
+
 class ImplementationInputModel(BaseModel):
     definition: DefinitionInputModel
     dependencies: list[AgentDependencyInputModel] = Field(default_factory=list)
+    tracks: list[TrackInputModel] | None = None
     interface: str
     params: dict[str, Any] | None = None
     instance_id: str | None = None
     dynamic: bool = False
     logo: str | None = None
     locks: list[str] | None = None
+    manipulates: list[str] | None
     extension: str | None = None
 
 
