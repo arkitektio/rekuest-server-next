@@ -7,7 +7,7 @@ workflow of agent registration, task execution, and state management.
 
 import pytest
 from facade.schema import schema
-from facade.models import Agent, Action, StateSchema
+from facade.models import Agent, Action
 from kante.context import HttpContext
 import asyncio
 
@@ -19,7 +19,7 @@ class TestIntegration:
 
     async def test_agent_lifecycle_workflow(self, authenticated_context: HttpContext):
         """Test complete agent lifecycle from registration to deletion."""
-        
+
         # Step 1: Register agent
         ensure_agent_mutation = """
             mutation EnsureAgent($input: AgentInput!) {
@@ -33,17 +33,7 @@ class TestIntegration:
             }
         """
 
-        agent_result = await schema.execute(
-            ensure_agent_mutation,
-            context_value=authenticated_context,
-            variable_values={
-                "input": {
-                    "instanceId": "integration-test-agent",
-                    "name": "Integration Test Agent",
-                    "extensions": ["test-ext"]
-                }
-            }
-        )
+        agent_result = await schema.execute(ensure_agent_mutation, context_value=authenticated_context, variable_values={"input": {"instanceId": "integration-test-agent", "name": "Integration Test Agent", "extensions": ["test-ext"]}})
 
         assert agent_result.data is not None
         agent_id = agent_result.data["ensureAgent"]["id"]
@@ -61,28 +51,14 @@ class TestIntegration:
             }
         """
 
-        query_result = await schema.execute(
-            agent_query,
-            context_value=authenticated_context,
-            variable_values={"id": agent_id}
-        )
+        query_result = await schema.execute(agent_query, context_value=authenticated_context, variable_values={"id": agent_id})
 
         assert query_result.data is not None
         assert query_result.data["agent"]["instanceId"] == "integration-test-agent"
         assert query_result.data["agent"]["extensions"] == ["test-ext"]
 
         # Step 3: Update agent with new extensions
-        update_result = await schema.execute(
-            ensure_agent_mutation,
-            context_value=authenticated_context,
-            variable_values={
-                "input": {
-                    "instanceId": "integration-test-agent",
-                    "name": "Updated Integration Agent",
-                    "extensions": ["test-ext", "new-ext"]
-                }
-            }
-        )
+        update_result = await schema.execute(ensure_agent_mutation, context_value=authenticated_context, variable_values={"input": {"instanceId": "integration-test-agent", "name": "Updated Integration Agent", "extensions": ["test-ext", "new-ext"]}})
 
         assert update_result.data is not None
         assert update_result.data["ensureAgent"]["id"] == agent_id  # Same agent
@@ -96,35 +72,22 @@ class TestIntegration:
             }
         """
 
-        delete_result = await schema.execute(
-            delete_mutation,
-            context_value=authenticated_context,
-            variable_values={
-                "input": {
-                    "id": agent_id
-                }
-            }
-        )
+        delete_result = await schema.execute(delete_mutation, context_value=authenticated_context, variable_values={"input": {"id": agent_id}})
 
         assert delete_result.data is not None
         assert delete_result.data["deleteAgent"] == agent_id
 
         # Step 5: Verify agent is deleted
-        final_query_result = await schema.execute(
-            agent_query,
-            context_value=authenticated_context,
-            variable_values={"id": agent_id}
-        )
+        final_query_result = await schema.execute(agent_query, context_value=authenticated_context, variable_values={"id": agent_id})
 
         assert final_query_result.data is None
         assert final_query_result.errors is not None
 
-    
     async def test_multiple_agents_workflow(self, authenticated_context: HttpContext):
         """Test managing multiple agents simultaneously."""
-        
+
         agent_ids = []
-        
+
         # Step 1: Create multiple agents
         ensure_agent_mutation = """
             mutation EnsureAgent($input: AgentInput!) {
@@ -137,18 +100,8 @@ class TestIntegration:
         """
 
         for i in range(3):
-            result = await schema.execute(
-                ensure_agent_mutation,
-                context_value=authenticated_context,
-                variable_values={
-                    "input": {
-                        "instanceId": f"multi-agent-{i}",
-                        "name": f"Multi Agent {i}",
-                        "extensions": [f"ext-{i}"]
-                    }
-                }
-            )
-            
+            result = await schema.execute(ensure_agent_mutation, context_value=authenticated_context, variable_values={"input": {"instanceId": f"multi-agent-{i}", "name": f"Multi Agent {i}", "extensions": [f"ext-{i}"]}})
+
             assert result.data is not None
             agent_ids.append(result.data["ensureAgent"]["id"])
 
@@ -163,14 +116,11 @@ class TestIntegration:
             }
         """
 
-        all_agents_result = await schema.execute(
-            agents_query,
-            context_value=authenticated_context
-        )
+        all_agents_result = await schema.execute(agents_query, context_value=authenticated_context)
 
         assert all_agents_result.data is not None
         agents = all_agents_result.data["agents"]
-        
+
         # Check that our test agents are in the results
         agent_instance_ids = [agent["instanceId"] for agent in agents]
         for i in range(3):
@@ -184,20 +134,12 @@ class TestIntegration:
         """
 
         for agent_id in agent_ids:
-            delete_result = await schema.execute(
-                delete_mutation,
-                context_value=authenticated_context,
-                variable_values={
-                    "input": {
-                        "id": agent_id
-                    }
-                }
-            )
+            delete_result = await schema.execute(delete_mutation, context_value=authenticated_context, variable_values={"input": {"id": agent_id}})
             assert delete_result.data is not None
 
     async def test_dashboard_and_blok_workflow(self, authenticated_context: HttpContext):
         """Test creating UI components workflow."""
-        
+
         # Step 1: Create a blok
         create_blok_mutation = """
             mutation CreateBlok($input: CreateBlokInput!) {
@@ -212,18 +154,7 @@ class TestIntegration:
             }
         """
 
-        blok_result = await schema.execute(
-            create_blok_mutation,
-            context_value=authenticated_context,
-            variable_values={
-                "input": {
-                    "name": "Integration Test Blok",
-                    "url": "http://example.com/blok",
-                    "actionDemands": [],
-                    "stateDemands": []
-                }
-            }
-        )
+        blok_result = await schema.execute(create_blok_mutation, context_value=authenticated_context, variable_values={"input": {"name": "Integration Test Blok", "url": "http://example.com/blok", "actionDemands": [], "stateDemands": []}})
 
         assert blok_result.data is not None
         blok_id = blok_result.data["createBlok"]["id"]
@@ -238,15 +169,7 @@ class TestIntegration:
             }
         """
 
-        dashboard_result = await schema.execute(
-            create_dashboard_mutation,
-            context_value=authenticated_context,
-            variable_values={
-                "input": {
-                    "name": "Integration Test Dashboard"
-                }
-            }
-        )
+        dashboard_result = await schema.execute(create_dashboard_mutation, context_value=authenticated_context, variable_values={"input": {"name": "Integration Test Dashboard"}})
 
         assert dashboard_result.data is not None
         dashboard_id = dashboard_result.data["createDashboard"]["id"]
@@ -261,11 +184,7 @@ class TestIntegration:
             }
         """
 
-        dashboard_query_result = await schema.execute(
-            dashboard_query,
-            context_value=authenticated_context,
-            variable_values={"id": dashboard_id}
-        )
+        dashboard_query_result = await schema.execute(dashboard_query, context_value=authenticated_context, variable_values={"id": dashboard_id})
 
         assert dashboard_query_result.data is not None
         assert dashboard_query_result.data["dashboard"]["name"] == "Integration Test Dashboard"
@@ -280,18 +199,14 @@ class TestIntegration:
             }
         """
 
-        blok_query_result = await schema.execute(
-            blok_query,
-            context_value=authenticated_context,
-            variable_values={"id": blok_id}
-        )
+        blok_query_result = await schema.execute(blok_query, context_value=authenticated_context, variable_values={"id": blok_id})
 
         assert blok_query_result.data is not None
         assert blok_query_result.data["blok"]["name"] == "Integration Test Blok"
 
     async def test_error_handling_workflow(self, authenticated_context: HttpContext):
         """Test proper error handling in various scenarios."""
-        
+
         # Test 1: Query non-existent agent
         agent_query = """
             query GetAgent($id: ID!) {
@@ -302,11 +217,7 @@ class TestIntegration:
             }
         """
 
-        error_result = await schema.execute(
-            agent_query,
-            context_value=authenticated_context,
-            variable_values={"id": "999999"}
-        )
+        error_result = await schema.execute(agent_query, context_value=authenticated_context, variable_values={"id": "999999"})
 
         assert error_result.data is None
         assert error_result.errors is not None
@@ -329,7 +240,7 @@ class TestIntegration:
                     # Missing required instanceId
                     "name": "Invalid Agent"
                 }
-            }
+            },
         )
 
         assert invalid_result.errors is not None
@@ -341,14 +252,6 @@ class TestIntegration:
             }
         """
 
-        delete_error_result = await schema.execute(
-            delete_mutation,
-            context_value=authenticated_context,
-            variable_values={
-                "input": {
-                    "id": "999999"
-                }
-            }
-        )
+        delete_error_result = await schema.execute(delete_mutation, context_value=authenticated_context, variable_values={"input": {"id": "999999"}})
 
         assert delete_error_result.errors is not None

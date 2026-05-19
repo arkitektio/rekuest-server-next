@@ -214,7 +214,7 @@ class DefinitionInputModel(BaseModel):
 
     key: str
     version: str = "1"
-    description: str = "No description provided"
+    description: str | None = None
     collections: list[str] = Field(default_factory=list)
     package: str | None = None
     name: str

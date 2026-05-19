@@ -8,7 +8,6 @@ authentication and data validation.
 
 import pytest
 from facade.schema import schema
-from facade.models import Agent, Action, Protocol, StateSchema, Blok
 from kante.context import HttpContext
 from authentikate.models import User, Client, Organization
 
@@ -32,10 +31,7 @@ class TestGraphQLQueries:
             }
         """
 
-        result = await schema.execute(
-            query,
-            context_value=authenticated_context
-        )
+        result = await schema.execute(query, context_value=authenticated_context)
 
         assert result.data is not None
         assert "agents" in result.data
@@ -54,10 +50,7 @@ class TestGraphQLQueries:
             }
         """
 
-        result = await schema.execute(
-            query,
-            context_value=authenticated_context
-        )
+        result = await schema.execute(query, context_value=authenticated_context)
 
         assert result.data is not None
         assert "actions" in result.data
@@ -78,10 +71,7 @@ class TestGraphQLQueries:
             }
         """
 
-        result = await schema.execute(
-            query,
-            context_value=authenticated_context
-        )
+        result = await schema.execute(query, context_value=authenticated_context)
 
         assert result.data is not None
         assert "protocols" in result.data
@@ -105,10 +95,7 @@ class TestGraphQLQueries:
             }
         """
 
-        result = await schema.execute(
-            query,
-            context_value=authenticated_context
-        )
+        result = await schema.execute(query, context_value=authenticated_context)
 
         assert result.data is not None
         assert "stateSchemas" in result.data
@@ -129,10 +116,7 @@ class TestGraphQLQueries:
             }
         """
 
-        result = await schema.execute(
-            query,
-            context_value=authenticated_context
-        )
+        result = await schema.execute(query, context_value=authenticated_context)
 
         assert result.data is not None
         assert "bloks" in result.data
@@ -149,10 +133,7 @@ class TestGraphQLQueries:
             }
         """
 
-        result = await schema.execute(
-            query,
-            context_value=authenticated_context
-        )
+        result = await schema.execute(query, context_value=authenticated_context)
 
         assert result.data is not None
         assert "clients" in result.data
@@ -171,16 +152,7 @@ class TestGraphQLQueries:
             }
         """
 
-        create_result = await schema.execute(
-            ensure_agent_mutation,
-            context_value=authenticated_context,
-            variable_values={
-                "input": {
-                    "instanceId": "test-agent-query",
-                    "name": "Test Query Agent"
-                }
-            }
-        )
+        create_result = await schema.execute(ensure_agent_mutation, context_value=authenticated_context, variable_values={"input": {"instanceId": "test-agent-query", "name": "Test Query Agent"}})
 
         assert create_result.data is not None
         agent_id = create_result.data["ensureAgent"]["id"]
@@ -198,11 +170,7 @@ class TestGraphQLQueries:
             }
         """
 
-        result = await schema.execute(
-            query,
-            context_value=authenticated_context,
-            variable_values={"id": agent_id}
-        )
+        result = await schema.execute(query, context_value=authenticated_context, variable_values={"id": agent_id})
 
         assert result.data is not None
         assert "agent" in result.data
@@ -225,7 +193,7 @@ class TestGraphQLQueries:
         result = await schema.execute(
             query,
             context_value=authenticated_context,
-            variable_values={"id": "999999"}  # Non-existent ID
+            variable_values={"id": "999999"},  # Non-existent ID
         )
 
         assert result.data is None
@@ -246,10 +214,7 @@ class TestGraphQLQueries:
             }
         """
 
-        result = await schema.execute(
-            query,
-            context_value=authenticated_context
-        )
+        result = await schema.execute(query, context_value=authenticated_context)
 
         assert result.data is not None
         assert "hardwareRecords" in result.data
