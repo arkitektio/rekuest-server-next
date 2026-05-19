@@ -28,12 +28,11 @@ class TestIntegration:
                     instanceId
                     name
                     connected
-                    extensions
                 }
             }
         """
 
-        agent_result = await schema.execute(ensure_agent_mutation, context_value=authenticated_context, variable_values={"input": {"instanceId": "integration-test-agent", "name": "Integration Test Agent", "extensions": ["test-ext"]}})
+        agent_result = await schema.execute(ensure_agent_mutation, context_value=authenticated_context, variable_values={"input": {"instanceId": "integration-test-agent", "name": "Integration Test Agent"}})
 
         assert agent_result.data is not None
         agent_id = agent_result.data["ensureAgent"]["id"]
@@ -46,7 +45,6 @@ class TestIntegration:
                     id
                     instanceId
                     name
-                    extensions
                 }
             }
         """
@@ -55,15 +53,14 @@ class TestIntegration:
 
         assert query_result.data is not None
         assert query_result.data["agent"]["instanceId"] == "integration-test-agent"
-        assert query_result.data["agent"]["extensions"] == ["test-ext"]
 
-        # Step 3: Update agent with new extensions
-        update_result = await schema.execute(ensure_agent_mutation, context_value=authenticated_context, variable_values={"input": {"instanceId": "integration-test-agent", "name": "Updated Integration Agent", "extensions": ["test-ext", "new-ext"]}})
+        # Step 3: Ensuring the same agent again should be idempotent.
+        update_result = await schema.execute(ensure_agent_mutation, context_value=authenticated_context, variable_values={"input": {"instanceId": "integration-test-agent", "name": "Updated Integration Agent"}})
 
         assert update_result.data is not None
         assert update_result.data["ensureAgent"]["id"] == agent_id  # Same agent
-        assert update_result.data["ensureAgent"]["name"] == "Updated Integration Agent"
-        assert "new-ext" in update_result.data["ensureAgent"]["extensions"]
+        assert update_result.data["ensureAgent"]["name"] == "Integration Test Agent"
+        assert update_result.data["ensureAgent"]["extensions"] == []
 
         # Step 4: Delete the agent
         delete_mutation = """
@@ -100,7 +97,7 @@ class TestIntegration:
         """
 
         for i in range(3):
-            result = await schema.execute(ensure_agent_mutation, context_value=authenticated_context, variable_values={"input": {"instanceId": f"multi-agent-{i}", "name": f"Multi Agent {i}", "extensions": [f"ext-{i}"]}})
+            result = await schema.execute(ensure_agent_mutation, context_value=authenticated_context, variable_values={"input": {"instanceId": f"multi-agent-{i}", "name": f"Multi Agent {i}"}})
 
             assert result.data is not None
             agent_ids.append(result.data["ensureAgent"]["id"])

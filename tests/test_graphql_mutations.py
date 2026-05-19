@@ -7,8 +7,9 @@ authentication, validation, and data persistence.
 """
 
 import pytest
+from asgiref.sync import sync_to_async
 from facade.schema import schema
-from facade.models import Agent, Blok, Dashboard
+from facade.models import Agent, Blok, Dashboard, StateDefinition
 from kante.context import HttpContext
 
 
@@ -25,13 +26,12 @@ class TestGraphQLMutations:
                     id
                     instanceId
                     name
-                    extensions
                     connected
                 }
             }
         """
 
-        result = await schema.execute(mutation, context_value=authenticated_context, variable_values={"input": {"instanceId": "custom-test-agent", "name": "Custom Test Agent", "extensions": ["test-extension-1", "test-extension-2"]}})
+        result = await schema.execute(mutation, context_value=authenticated_context, variable_values={"input": {"instanceId": "custom-test-agent", "name": "Custom Test Agent"}})
 
         assert result.data is not None, f"Errors: {result.errors}"
         assert "ensureAgent" in result.data
@@ -39,7 +39,6 @@ class TestGraphQLMutations:
         agent = result.data["ensureAgent"]
         assert agent["instanceId"] == "custom-test-agent"
         assert agent["name"] == "Custom Test Agent"
-        assert agent["extensions"] == ["test-extension-1", "test-extension-2"]
 
     async def test_ensure_agent_mutation_default_name(self, authenticated_context: HttpContext):
         """Test creating an agent with default name generation."""
@@ -49,7 +48,6 @@ class TestGraphQLMutations:
                     id
                     instanceId
                     name
-                    extensions
                 }
             }
         """
@@ -62,10 +60,9 @@ class TestGraphQLMutations:
         agent = result.data["ensureAgent"]
         assert agent["instanceId"] == "default-name-agent"
         assert agent["name"] is not None  # Should have auto-generated name
-        assert agent["extensions"] == []  # Should default to empty list
 
     async def test_ensure_agent_mutation_duplicate_instance_id(self, authenticated_context: HttpContext):
-        """Test that ensuring agent with same instanceId updates existing record."""
+        """Test that ensuring agent with the same instanceId reuses the existing record."""
         mutation = """
             mutation EnsureAgent($input: AgentInput!) {
                 ensureAgent(input: $input) {
@@ -78,27 +75,38 @@ class TestGraphQLMutations:
         """
 
         # Create first agent
-        result1 = await schema.execute(mutation, context_value=authenticated_context, variable_values={"input": {"instanceId": "duplicate-test", "name": "First Agent", "extensions": ["ext1"]}})
+        result1 = await schema.execute(mutation, context_value=authenticated_context, variable_values={"input": {"instanceId": "duplicate-test", "name": "First Agent"}})
 
         assert result1.data is not None
         first_agent_id = result1.data["ensureAgent"]["id"]
 
-        # Create second agent with same instanceId but different name
-        result2 = await schema.execute(mutation, context_value=authenticated_context, variable_values={"input": {"instanceId": "duplicate-test", "name": "Updated Agent", "extensions": ["ext2"]}})
+        # Ensure the same agent again with a different name hint.
+        result2 = await schema.execute(mutation, context_value=authenticated_context, variable_values={"input": {"instanceId": "duplicate-test", "name": "Updated Agent"}})
 
         assert result2.data is not None
         second_agent_id = result2.data["ensureAgent"]["id"]
 
-        # Should be the same agent (updated, not created)
+        # ensureAgent is idempotent and returns the existing record.
         assert first_agent_id == second_agent_id
-        assert result2.data["ensureAgent"]["name"] == "Updated Agent"
-        assert result2.data["ensureAgent"]["extensions"] == ["ext2"]
+        assert result2.data["ensureAgent"]["name"] == "First Agent"
+        assert result2.data["ensureAgent"]["extensions"] == []
+        assert await sync_to_async(lambda: Agent.objects.filter(instance_id="duplicate-test").count())() == 1
 
-    async def test_create_state_schema_mutation(self, authenticated_context: HttpContext):
-        """Test creating a state schema via mutation."""
-        mutation = """
-            mutation CreateStateSchema($input: CreateStateSchemaInput!) {
-                createStateSchema(input: $input) {
+    async def test_state_definitions_query(self, authenticated_context: HttpContext):
+        """Test that seeded state definitions are exposed via GraphQL."""
+        await sync_to_async(StateDefinition.objects.create)(
+            name="Test State Schema",
+            hash="state-hash-graphql",
+            description="A test state schema",
+            ports=[
+                {"key": "input_port", "kind": "STRING", "identifier": "test.input", "nullable": False, "effects": [], "children": []},
+                {"key": "output_port", "kind": "INT", "identifier": "test.output", "nullable": False, "effects": [], "children": []},
+            ],
+        )
+
+        query = """
+            query GetStateDefinitions {
+                stateDefinitions {
                     id
                     name
                     hash
@@ -112,17 +120,16 @@ class TestGraphQLMutations:
             }
         """
 
-        state_schema_input = {"name": "Test State Schema", "ports": [{"key": "input_port", "kind": "STRING", "identifier": "test.input", "description": "Test input port"}, {"key": "output_port", "kind": "INT", "identifier": "test.output", "description": "Test output port"}]}
-
-        result = await schema.execute(mutation, context_value=authenticated_context, variable_values={"input": {"stateSchema": state_schema_input}})
+        result = await schema.execute(query, context_value=authenticated_context)
 
         assert result.data is not None, f"Errors: {result.errors}"
-        assert "createStateSchema" in result.data
+        assert "stateDefinitions" in result.data
 
-        schema_data = result.data["createStateSchema"]
+        matching_definitions = [item for item in result.data["stateDefinitions"] if item["hash"] == "state-hash-graphql"]
+        assert len(matching_definitions) == 1
+        schema_data = matching_definitions[0]
         assert schema_data["name"] == "Test State Schema"
         assert len(schema_data["ports"]) == 2
-        assert schema_data["hash"] is not None
 
     async def test_create_blok_mutation(self, authenticated_context: HttpContext):
         """Test creating a UI blok via mutation."""

@@ -3,7 +3,7 @@ from .settings import DATABASES, AUTHENTIKATE
 import logging
 
 DATABASES["default"] = {**DATABASES["default"], "NAME": "testdb", "PORT": 5555, "HOST": "localhost", "USER": "test", "PASSWORD": "test"}
-AUTHENTIKATE = {**AUTHENTIKATE, "STATIC_TOKENS": {"test": {"sub": "1"}}}
+AUTHENTIKATE = {**AUTHENTIKATE, "STATIC_TOKENS": {"test": {"sub": "1", "client_id": "oinsoins", "app": "test-app"}}}
 
 
 # For faster test execution, you can uncomment this:

@@ -7,6 +7,8 @@ authentication and data validation.
 """
 
 import pytest
+from asgiref.sync import sync_to_async
+from facade.models import StateDefinition
 from facade.schema import schema
 from kante.context import HttpContext
 from authentikate.models import User, Client, Organization
@@ -78,10 +80,17 @@ class TestGraphQLQueries:
         assert isinstance(result.data["protocols"], list)
 
     async def test_state_schemas_query(self, authenticated_context: HttpContext):
-        """Test fetching all state schemas via GraphQL query."""
+        """Test fetching all state definitions via GraphQL query."""
+        await sync_to_async(StateDefinition.objects.create)(
+            name="Query State Definition",
+            hash="query-state-definition-hash",
+            description="State definition for query testing",
+            ports=[{"key": "output", "kind": "STRING", "identifier": "test.output", "nullable": False, "effects": [], "children": []}],
+        )
+
         query = """
-            query GetStateSchemas {
-                stateSchemas {
+            query GetStateDefinitions {
+                stateDefinitions {
                     id
                     name
                     hash
@@ -98,8 +107,9 @@ class TestGraphQLQueries:
         result = await schema.execute(query, context_value=authenticated_context)
 
         assert result.data is not None
-        assert "stateSchemas" in result.data
-        assert isinstance(result.data["stateSchemas"], list)
+        assert "stateDefinitions" in result.data
+        assert isinstance(result.data["stateDefinitions"], list)
+        assert any(item["hash"] == "query-state-definition-hash" for item in result.data["stateDefinitions"])
 
     async def test_bloks_query(self, authenticated_context: HttpContext):
         """Test fetching all UI bloks via GraphQL query."""
@@ -219,13 +229,3 @@ class TestGraphQLQueries:
         assert result.data is not None
         assert "hardwareRecords" in result.data
         assert isinstance(result.data["hardwareRecords"], list)
-
-    async def test_reservations_query(self, authenticated_context: HttpContext):
-        """Test fetching reservations via GraphQL query."""
-        # Skip this test due to complex database constraints
-        pytest.skip("Reservations require complex setup with Waiter constraints")
-
-    async def test_my_reservations_query(self, authenticated_context: HttpContext):
-        """Test fetching user's reservations via GraphQL query."""
-        # Skip this test due to complex database constraints
-        pytest.skip("Reservations require complex setup with Waiter constraints")

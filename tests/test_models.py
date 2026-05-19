@@ -8,9 +8,52 @@ validation, relationships, and custom methods.
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
-from facade.models import Agent, Registry, Action, Protocol, Blok, Dashboard
-from authentikate.models import User, Client, Organization
+from authentikate.models import App, Client, Device, Organization, Release, User
+from facade.models import Action, Agent, Blok, Dashboard, Protocol, Registry, StateDefinition
 import uuid
+
+
+def create_registry_bundle(prefix: str) -> tuple[User, Client, Organization, Registry]:
+    user = User.objects.create(username=f"{prefix}-user", password="testpass")
+    client = Client.objects.create(client_id=f"{prefix}-client")
+    org = Organization.objects.create(slug=f"{prefix}-org")
+    registry = Registry.objects.create(client=client, user=user, organization=org)
+    return user, client, org, registry
+
+
+def create_agent_for_registry(registry: Registry, user: User, organization: Organization, prefix: str, **overrides) -> Agent:
+    app = App.objects.create(identifier=f"{prefix}-app")
+    release = Release.objects.create(app=app, version="1.0.0")
+    device = Device.objects.create(device_id=f"{prefix}-device")
+
+    agent_data = {
+        "app": app,
+        "hash": f"{prefix}-hash",
+        "release": release,
+        "device": device,
+        "user": user,
+        "registry": registry,
+        "organization": organization,
+    }
+    agent_data.update(overrides)
+
+    return Agent.objects.create(**agent_data)
+
+
+def create_action_for_organization(organization: Organization, prefix: str, **overrides) -> Action:
+    app = App.objects.create(identifier=f"{prefix}-app")
+    action_data = {
+        "app": app,
+        "key": f"{prefix}-key",
+        "version": "1.0.0",
+        "name": f"{prefix} action",
+        "description": f"{prefix} description",
+        "hash": f"{prefix}-hash",
+        "organization": organization,
+    }
+    action_data.update(overrides)
+
+    return Action.objects.create(**action_data)
 
 
 @pytest.mark.django_db(transaction=True)
@@ -19,13 +62,17 @@ class TestModels:
 
     def test_agent_creation(self):
         """Test creating an Agent model instance."""
-        user = User.objects.create(username="testuser", password="testpass")
-        client = Client.objects.create(client_id="test-client")
-        org = Organization.objects.create(slug="test-org")
+        user, _, org, registry = create_registry_bundle("agent-creation")
 
-        registry = Registry.objects.create(client=client, user=user, organization=org)
-
-        agent = Agent.objects.create(name="Test Agent", instance_id="test-instance", registry=registry, extensions=["ext1", "ext2"])
+        agent = create_agent_for_registry(
+            registry=registry,
+            user=user,
+            organization=org,
+            prefix="agent-creation",
+            name="Test Agent",
+            instance_id="test-instance",
+            extensions=["ext1", "ext2"],
+        )
 
         assert agent.name == "Test Agent"
         assert agent.instance_id == "test-instance"
@@ -35,13 +82,14 @@ class TestModels:
 
     def test_agent_default_values(self):
         """Test Agent model default values."""
-        user = User.objects.create(username="testuser2", password="testpass")
-        client = Client.objects.create(client_id="test-client-2")
-        org = Organization.objects.create(slug="test-org-2")
+        user, _, org, registry = create_registry_bundle("agent-defaults")
 
-        registry = Registry.objects.create(client=client, user=user, organization=org)
-
-        agent = Agent.objects.create(registry=registry)
+        agent = create_agent_for_registry(
+            registry=registry,
+            user=user,
+            organization=org,
+            prefix="agent-defaults",
+        )
 
         assert agent.name == "Nana"  # Default name
         assert agent.instance_id == "main"  # Default instance_id
@@ -51,13 +99,15 @@ class TestModels:
 
     def test_agent_str_representation(self):
         """Test Agent model string representation."""
-        user = User.objects.create(username="testuser3", password="testpass")
-        client = Client.objects.create(client_id="test-client-3")
-        org = Organization.objects.create(slug="test-org-3")
+        user, _, org, registry = create_registry_bundle("agent-str")
 
-        registry = Registry.objects.create(client=client, user=user, organization=org)
-
-        agent = Agent.objects.create(name="Test Agent Display", registry=registry)
+        agent = create_agent_for_registry(
+            registry=registry,
+            user=user,
+            organization=org,
+            prefix="agent-str",
+            name="Test Agent Display",
+        )
 
         # String representation should include name and registry info
         str_repr = str(agent)
@@ -82,17 +132,23 @@ class TestModels:
         """Test creating an Action model instance."""
         org = Organization.objects.create(slug="test-org-3")
 
-        action = Action.objects.create(name="Test Action", description="A test action", hash="test-hash-123", organization=org)
+        action = create_action_for_organization(
+            organization=org,
+            prefix="action-creation",
+            name="Test Action",
+            description="A test action",
+            hash="test-hash-123",
+        )
 
         assert action.name == "Test Action"
         assert action.description == "A test action"
         assert action.hash == "test-hash-123"
 
     def test_state_schema_creation(self):
-        """Test creating a StateSchema model instance."""
+        """Test creating a StateDefinition model instance."""
         ports_data = {"input": {"type": "string", "description": "Input port"}, "output": {"type": "string", "description": "Output port"}}
 
-        state_schema = StateSchema.objects.create(name="Test State Schema", hash="state-hash-123", ports=ports_data, description="A test state schema")
+        state_schema = StateDefinition.objects.create(name="Test State Schema", hash="state-hash-123", ports=ports_data, description="A test state schema")
 
         assert state_schema.name == "Test State Schema"
         assert state_schema.hash == "state-hash-123"
@@ -100,12 +156,12 @@ class TestModels:
         assert state_schema.description == "A test state schema"
 
     def test_state_schema_unique_hash_constraint(self):
-        """Test that StateSchema hash must be unique."""
-        StateSchema.objects.create(name="First Schema", hash="unique-hash-456", description="First schema")
+        """Test that StateDefinition hash must be unique."""
+        StateDefinition.objects.create(name="First Schema", hash="unique-hash-456", description="First schema")
 
         # Attempting to create another schema with the same hash should fail
         with pytest.raises(IntegrityError):
-            StateSchema.objects.create(name="Second Schema", hash="unique-hash-456", description="Second schema with same hash")
+            StateDefinition.objects.create(name="Second Schema", hash="unique-hash-456", description="Second schema with same hash")
 
     def test_blok_creation(self):
         """Test creating a Blok model instance."""
@@ -133,16 +189,26 @@ class TestModels:
 
     def test_registry_relationship(self):
         """Test the relationship between Registry and Agent."""
-        user = User.objects.create(username="reltest", password="testpass")
-        client = Client.objects.create(client_id="rel-client")
-        org = Organization.objects.create(slug="rel-org")
-
-        registry = Registry.objects.create(client=client, user=user, organization=org)
+        user, _, org, registry = create_registry_bundle("registry-relationship")
 
         # Create multiple agents for the same registry
-        agent1 = Agent.objects.create(name="Agent 1", instance_id="agent-1", registry=registry)
+        agent1 = create_agent_for_registry(
+            registry=registry,
+            user=user,
+            organization=org,
+            prefix="registry-relationship-1",
+            name="Agent 1",
+            instance_id="agent-1",
+        )
 
-        agent2 = Agent.objects.create(name="Agent 2", instance_id="agent-2", registry=registry)
+        agent2 = create_agent_for_registry(
+            registry=registry,
+            user=user,
+            organization=org,
+            prefix="registry-relationship-2",
+            name="Agent 2",
+            instance_id="agent-2",
+        )
 
         # Test relationship through direct queries
         agent_count = Agent.objects.filter(registry=registry).count()
@@ -159,10 +225,20 @@ class TestModels:
         org = Organization.objects.create(slug="test-org-3")
 
         # Create multiple actions and associate them with the protocol
-        action1 = Action.objects.create(name="Action 1", hash="action1-hash", organization=org)
+        action1 = create_action_for_organization(
+            organization=org,
+            prefix="protocol-action-1",
+            name="Action 1",
+            hash="action1-hash",
+        )
         action1.protocols.add(protocol)
 
-        action2 = Action.objects.create(name="Action 2", hash="action2-hash", organization=org)
+        action2 = create_action_for_organization(
+            organization=org,
+            prefix="protocol-action-2",
+            name="Action 2",
+            hash="action2-hash",
+        )
         action2.protocols.add(protocol)
 
         # Test relationship
@@ -173,13 +249,15 @@ class TestModels:
 
     def test_agent_cascade_delete(self):
         """Test that deleting registry cascades to agents."""
-        user = User.objects.create(username="cascade", password="testpass")
-        client = Client.objects.create(client_id="cascade-client")
-        org = Organization.objects.create(slug="cascade-org")
+        user, _, org, registry = create_registry_bundle("agent-cascade")
 
-        registry = Registry.objects.create(client=client, user=user, organization=org)
-
-        agent = Agent.objects.create(name="To Be Deleted", registry=registry)
+        agent = create_agent_for_registry(
+            registry=registry,
+            user=user,
+            organization=org,
+            prefix="agent-cascade",
+            name="To Be Deleted",
+        )
 
         agent_pk = agent.pk
 
@@ -192,15 +270,23 @@ class TestModels:
     def test_model_meta_options(self):
         """Test model meta options and constraints."""
         # Test that certain fields have expected database constraints
-        user = User.objects.create(username="meta", password="testpass")
-        client = Client.objects.create(client_id="meta-client")
-        org = Organization.objects.create(slug="meta-org")
-
-        registry = Registry.objects.create(client=client, user=user, organization=org)
+        user, _, org, registry = create_registry_bundle("meta")
 
         # Test that unique fields enforce uniqueness at model level
-        agent1 = Agent.objects.create(instance_id="unique-instance", registry=registry)
+        create_agent_for_registry(
+            registry=registry,
+            user=user,
+            organization=org,
+            prefix="meta-1",
+            instance_id="unique-instance",
+        )
 
         # Creating another agent with same instance_id and registry should fail
         with pytest.raises(IntegrityError):
-            Agent.objects.create(instance_id="unique-instance", registry=registry)
+            create_agent_for_registry(
+                registry=registry,
+                user=user,
+                organization=org,
+                prefix="meta-2",
+                instance_id="unique-instance",
+            )
