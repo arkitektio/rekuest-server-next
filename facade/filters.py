@@ -112,6 +112,14 @@ class AgentFilter:
             raise ValueError("Filtering by dependency currently only allowed when the dependency declared an app filter, sorry :( This is coming")
 
     @filter_field
+    def blok_dependency(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+        dep = models.BlokDependency.objects.get(id=value)
+        if dep.app_filter is not UNSET and dep.app_filter is not None:
+            return queryset.filter(**{f"{prefix}app__identifier": dep.app_filter}), Q()
+        else:
+            raise ValueError("Filtering by blok_dependency currently only allowed when the blok_dependency declared an app filter, sorry :( This is coming")
+
+    @filter_field
     def three_d_model(self, info: Info, queryset, value: strawberry.ID, prefix: str):
         dep = models.ThreeDModel.objects.get(id=value)
         if self.app_identifier is not UNSET and self.app_identifier is not None:
@@ -321,6 +329,13 @@ class TestResultFilter:
 
 @strawberry_django.filter_type(models.Dependency)
 class DependencyFilter:
+    @filter_field
+    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+        return queryset.filter(**{f"{prefix}id__in": value}), Q()
+
+
+@strawberry_django.filter_type(models.BlokDependency)
+class BlokDependencyFilter:
     @filter_field
     def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()

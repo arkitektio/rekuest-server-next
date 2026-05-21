@@ -3,7 +3,6 @@ import strawberry_django
 from facade import models, mutations, queries, subscriptions, types
 from kante.types import Info
 from rekuest_core.constants import interface_types
-from rekuest_ui_core.constants import interface_types as uiinterface_types
 from strawberry_django.optimizer import DjangoOptimizerExtension
 from authentikate.strawberry import AuthentikateExtension, AuthExtension, AuthSubscribeExtension
 from typing import cast
@@ -275,7 +274,7 @@ schema = kante.Schema(
         DjangoOptimizerExtension,
         AuthentikateExtension,
     ],
-    types=interface_types + uiinterface_types,
+    types=interface_types,
     config=StrawberryConfig(
         scalar_map={
             **dscalar_map,

@@ -22,6 +22,7 @@ dependencies = [
     "kante>=1.1.1",
     "django-polymorphic>=4.11.2",
     "boto3>=1.42.73",
+    "jsonschema>=4.26.0",
 ]
 
 [dependency-groups]

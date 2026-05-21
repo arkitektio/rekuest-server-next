@@ -14,10 +14,14 @@ def create_space(info: Info, input: inputs.CreateSpaceInput) -> types.Space:
     )
 
     for placement_input in input.placements or []:
+        if not placement_input.agent or not placement_input.model:
+            raise ValueError("Both agent and model must be provided for each placement.")
+
         membership, _ = models.Placement.objects.update_or_create(
             space=x,
             agent_id=placement_input.agent,
             model_id=placement_input.model,
+            blok_id=placement_input.blok,
             defaults=dict(
                 role=placement_input.role or "just a member",
                 affine_matrix=placement_input.affine_matrix,

@@ -21,7 +21,7 @@ from django.urls import include, path
 from health_check.views import HealthCheckView
 from django.views.decorators.csrf import csrf_exempt
 
-t = 2
+t = "22s"
 
 urlpatterns = [
     dynamicpath("admin/", admin.site.urls),

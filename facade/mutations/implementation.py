@@ -472,6 +472,7 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
                     key=i.key,
                     defaults=dict(
                         action_demands=[x.model_dump() for x in i.action_demands] if i.action_demands else [],
+                        state_demands=[x.model_dump() for x in i.state_demands] if i.state_demands else [],
                         app_filter=i.app,
                         version_filter=i.version,
                     ),

@@ -17,8 +17,6 @@ from strawberry import LazyType
 from kante.types import Info
 from pydantic import BaseModel
 from .type_gen import create_stats_type
-from rekuest_ui_core.objects import models as uimodels
-from rekuest_ui_core.objects import types as uitypes
 from strawberry.experimental import pydantic
 from datalayer import types as dtypes
 from facade import loaders
@@ -235,6 +233,10 @@ class Dependency:
     @strawberry_django.field(description="List of action demands")
     def action_demands(self) -> list["ActionDemand"]:
         return [ActionDemandModel(**i) for i in self.action_demands]
+
+    @strawberry_django.field(description="List of state demands")
+    def state_demands(self) -> list["StateDemand"]:
+        return [StateDemandModel(**i) for i in self.state_demands]
 
 
 @strawberry_django.type(models.Implementation, filters=filters.ImplementationFilter, order=filters.ImplementationOrder, pagination=True, description="Represents a concrete implementation of an action.")
@@ -645,11 +647,6 @@ class Dashboard:
     name: str | None
     materialized_bloks: list["MaterializedBlok"]
 
-    @strawberry_django.field()
-    def ui_tree(self) -> uitypes.UITree | None:
-        model = uimodels.UITreeModel(**self.ui_tree) if self.ui_tree else None
-        return model
-
 
 class ActionDemandModel(BaseModel):
     key: str
@@ -728,76 +725,210 @@ class StateDemand:
     )
 
 
+class DynamicValueModel(BaseModel):
+    """Base model for a dynamic value input, which can reference a variable in a Blok state instance.
+
+    Attributes:
+        literal: An optional static fallback literal value, passed as a serialized string or JSON primitive.
+    """
+
+    literal: str | None = None
+    path: str | None = None
+
+
+@pydantic.type(DynamicValueModel, description="A bound state pointer referencing a variable inside a Blok state instance.")
+class DynamicValue:
+    literal: Optional[str] = strawberry.field(default=None, description="A static fallback literal value (passed as a serialized string/JSON primitive).")
+    path: Optional[str] = strawberry.field(default=None, description="JSON Pointer to a variable inside the Blok's isolated data model (e.g., '/microscope/exposure').")
+
+
+class AgentCallModel(BaseModel):
+    """Base model for defining a callback that routes user interactions directly to an Arkitekt Agent via Rekuest.
+
+    Attributes:
+        target_dependency_key: The abstract agent dependency key declared in the Blok manifest (e.g., 'stage_dep').
+        operation_name: The target function name registered on that specific agent's worker thread loop.
+        arguments: An optional list of key-value arguments compiled for the target agent call.
+    """
+
+    dependency: str
+    operation: str
+    arguments: Optional[List["ActionArgumentModel"]] = None
+
+
+@pydantic.type(AgentCallModel, description="Defines a callback that routes user interactions directly to an Arkitekt Agent via Rekuest.")
+class AgentCall:
+    dependency: str = strawberry.field(description="The abstract agent dependency key declared in the Blok manifest (e.g., 'stage_dep').")
+    operation: str = strawberry.field(description="The target function name registered on that specific agent's worker thread loop.")
+    arguments: Optional[List[Annotated["ActionArgument", strawberry.lazy(__name__)]]] = strawberry.field(default=None, description="Key-value arguments map compiled for the target agent call.")
+
+
+class UtilCallModel(BaseModel):
+    operation: str
+    arguments: Optional[List["ActionArgumentModel"]] = None
+
+
+@pydantic.type(UtilCallModel, description="Defines a utility call that can be invoked within the system.")
+class UtilCall:
+    operation: str = strawberry.field(description="The utility function name to invoke.")
+    arguments: Optional[List[Annotated["ActionArgument", strawberry.lazy(__name__)]]] = strawberry.field(default=None, description="Key-value arguments map compiled for the target utility call.")
+
+
+class ActionArgumentModel(BaseModel):
+    """Base model for an action argument input, which can be a static literal or a dynamic state reference.
+
+    Attributes:
+        key: The argument property name.
+        value_literal: An optional static literal string value if not dynamically bound.
+        value_path: An optional JSON Pointer referencing the shared Blok state to inject into this argument slot dynamically.
+    """
+
+    key: str | None = None
+    value_literal: Optional[str | int | float | dict | list] = None
+    value_path: Optional[str] = None
+
+    # Separated nested calls
+    agent_call: Optional["AgentCallModel"] = None
+    util_call: Optional["UtilCallModel"] = None
+
+    value_list: Optional[List["ActionArgumentModel"]] = None
+    value_dict: Optional[List["ActionArgumentModel"]] = None
+
+
+@pydantic.type(ActionArgumentModel, description="A JSON-serializable argument entry for a multi-agent action trigger.")
+class ActionArgument:
+    key: str | None = strawberry.field(default=None, description="The argument property name.")
+    value_literal: Optional[scalars.JSONSerializable] = strawberry.field(default=None, description="Static literal string value if not dynamically bound.")
+    value_path: Optional[str] = strawberry.field(default=None, description="JSON Pointer referencing the shared Blok state to inject into this argument slot dynamically.")
+
+    agent_call: Optional[AgentCall] = strawberry.field(default=None, description="Defines a nested agent call if this argument should trigger an agent interaction.")
+    util_call: Optional[UtilCall] = strawberry.field(default=None, description="Defines a nested utility call if this argument should trigger a system utility interaction.")
+    value_list: Optional[List[Annotated["ActionArgument", strawberry.lazy(__name__)]]] = strawberry.field(default=None, description="Defines a list of values if this argument should be an array.")
+    value_dict: Optional[List[Annotated["ActionArgument", strawberry.lazy(__name__)]]] = strawberry.field(default=None, description="Defines a list of key-value pairs if this argument should be a dictionary.")
+
+
+# ============================================================================
+# 2. Abstract Component Property Bindings
+# ============================================================================
+class ComponentPropModel(BaseModel):
+    """Base model for a single key-value prop configuration for a component layout node.
+
+    Attributes:
+        key: The prop key name matching the target UI catalog constraint.
+        static_value: An optional raw scalar or JSON-stringified literal configuration parameter (e.g., '40x' or True).
+        dynamic_value: An optional reactive state data-binding rule.
+        agent_action: An optional imperative interactive network action callback loop.
+    """
+
+    key: str
+    static_value: Optional[str | int | float | dict] = None
+    dynamic_value: Optional[DynamicValueModel] = None
+
+    # Separated top-level callbacks
+    agent_call: Optional[AgentCallModel] = None
+    util_call: Optional[UtilCallModel] = None
+
+
+@pydantic.type(ComponentPropModel, description="A single key-value prop configuration for a component layout node.")
+class ComponentProp:
+    key: str = strawberry.field(description="The prop key name matching the target UI catalog constraint.")
+
+    # Primitives mapping to standard properties, state paths, or actions
+    static_value: Optional[scalars.JSONSerializable] = strawberry.field(default=None, description="A raw scalar or JSON-stringified literal configuration parameter (e.g. '40x' or True).")
+    dynamic_value: Optional[DynamicValue] = strawberry.field(default=None, description="A reactive state data-binding rule.")
+    agent_call: Optional[AgentCall] = strawberry.field(default=None, description="Defines an imperative interactive network action callback loop if this prop should trigger an agent interaction.")
+    util_call: Optional[UtilCall] = strawberry.field(default=None, description="Defines an imperative interactive network action callback loop if this prop should trigger a system utility interaction.")
+
+
+class ComponentNodeModel(BaseModel):
+    id: str
+    component: str
+    props: Optional[List[ComponentPropModel]] = None
+    children: Optional[List["ComponentNodeModel"]] = None
+
+
+@pydantic.type(ComponentNodeModel, description="An abstract structural visual element inside a Blok blueprint manifest.")
+class ComponentNode:
+    id: str
+    component: str
+    props: Optional[List[ComponentProp]] = strawberry.field(description="Properties or configuration for the component.")
+    children: Optional[List[Annotated["ComponentNode", strawberry.lazy(__name__)]]] = strawberry.field(description="List of child component node IDs.")
+
+
+@strawberry_django.type(models.UICatalog)
+class UICatalog:
+    id: strawberry.ID
+    name: str
+    description: str | None
+
+
 @strawberry_django.type(models.Blok)
 class Blok:
     id: strawberry.ID
     name: str
     description: str | None
     creator: User
-    url: str
+    catalog: UICatalog
     materialized_bloks: list["MaterializedBlok"] = strawberry_django.field(
         description="Materialized bloks that are instances of this blok.",
     )
-
-    @strawberry_django.field(
-        description="Get the actions that this blok can run.",
+    dependencies: list["BlokDependency"] = strawberry_django.field(
+        description="Dependencies that need to be resolved for this blok.",
     )
-    def action_demands(self) -> list[ActionDemand]:
-        return [ActionDemandModel(**action) for action in self.action_demands]
 
-    @strawberry_django.field(
-        description="Get the actions that this blok can run.",
+    @strawberry_django.field(description="List of action demands specified in this blok.")
+    def components(self) -> list[ComponentNode]:
+        return [ComponentNodeModel(**i) for i in self.components]
+
+    @strawberry_django.field(description="List of action demands specified in this blok.")
+    def ui_components(self) -> scalars.Props:
+        return self.components
+
+    @strawberry_django.field(description="List of action demands specified in this blok.")
+    def demo_state(self) -> scalars.Props:
+        return self.demo_state
+
+
+@strawberry_django.type(models.BlokDependency, filters=filters.BlokDependencyFilter, pagination=True, description="Represents a dependency between implementations and actions.")
+class BlokDependency:
+    id: strawberry.ID = strawberry_django.field(description="Unique ID of the dependency.")
+    implementation: "Implementation" = strawberry_django.field(description="The implementation this dependency belongs to.")
+    key: str = strawberry_django.field(description="Optional string identifier or tag for reference.")
+    optional: bool = strawberry_django.field(description="Indicates if the dependency is optional.")
+    description: str | None = strawberry_django.field(description="Optional description of the dependency.")
+    auto_resolvable: bool = strawberry.field(
+        default=False,
+        description="Whether this dependency is auto resolvable or not. If so we will try to automatically resolve it based on the demands specified in the dependency and the capabilities of the available agents in the system. This is used to identify the demand in the system. Attention if any of the dependencies of this agent dependency is not auto resolvable, this dependency will also not be auto resolvable",
     )
-    def state_demands(self) -> list[StateDemand]:
-        return [StateDemandModel(**action) for action in self.state_demands]
-
-    @strawberry_django.field(
-        description="Get the agents that this blok can be implemented against.",
+    app_filter: str | None = strawberry_django.field(
+        default=None,
+        description="Optional filter string to limit which agents can be bound to this dependency based on the app they belong to. The filter string should be in the format 'app_identifier:version' where version can be a specific version or a wildcard '*'. For example, 'my_app:*' would allow any agent belonging to 'my_app' regardless of version, while 'my_app:1.0.0' would only allow agents with that specific version.",
     )
-    def possible_agents(self) -> list[Agent]:
-        from facade import managers
-        from facade.inputs import ActionDemandInputModel, SchemaDemandInputModel
+    version_filter: str | None = strawberry_django.field(
+        default=None,
+        description="Optional filter string to limit which agents can be bound to this dependency based on the version of the app they belong to. The filter string should be in the format 'version' where version can be a specific version or a wildcard '*'. For example, '*' would allow any version, while '1.0.0' would only allow agents with that specific version.",
+    )
+    min_viable_instances: int | None = strawberry_django.field(
+        default=None,
+        description="Minimum number of viable agent instances required to resolve this dependency. This is used in combination with the auto_resolvable field to determine if a dependency can be automatically resolved. If the number of available agent instances that match the filters is less than this number, the dependency will not be considered auto resolvable.",
+    )
+    max_viable_instances: int | None = strawberry_django.field(
+        default=None,
+        description="Maximum number of viable agent instances that can be bound to this dependency. This is used in combination with the auto_resolvable field to determine if a dependency can be automatically resolved. If the number of available agent instances that match the filters is greater than this number, the dependency will not be considered auto resolvable.",
+    )
 
-        queryset = models.Agent.objects
+    @strawberry_django.field(description="List of action demands specified in this dependency.")
+    def singular(self) -> bool:
+        """Whether this dependency is singular or not. A singular dependency is a dependency that can only be resolved to one agent, meaning that if there are multiple implementations that match the filters and demands of this dependency, it will not be considered singular."""
+        return self.min_viable_instances == 1 and (self.max_viable_instances is None or self.max_viable_instances == 1)
 
-        filtered_ids: set[str] = set()
+    @strawberry_django.field(description="List of action demands")
+    def action_demands(self) -> list["ActionDemand"]:
+        return [ActionDemandModel(**i) for i in self.action_demands]
 
-        if self.action_demands:
-            for ports_demand in self.action_demands:
-                new_ids = managers.get_action_ids_by_action_demand(
-                    action_demand=ActionDemandInputModel(**ports_demand),
-                )
-
-                if len(new_ids) == 0:
-                    # There are no actions that match the demand
-                    raise ValueError(f"No actions found that match the given action demands {ports_demand}")
-
-                for new_id in new_ids:
-                    if new_id not in filtered_ids:
-                        filtered_ids.add(new_id)
-
-            queryset = queryset.filter(implementations__action__id__in=filtered_ids)
-
-        filtered_ids: set[str] = set()
-        if self.state_demands:
-            for state_demand in self.state_demands:
-                fitting_schema_ids = managers.get_state_ids_by_demands(
-                    SchemaDemandInputModel(
-                        **state_demand,
-                    ).matches,
-                    model="facade_stateschema",
-                )
-
-                if len(fitting_schema_ids) == 0:
-                    return queryset.none()
-
-                for new_id in fitting_schema_ids:
-                    if new_id not in filtered_ids:
-                        filtered_ids.add(new_id)
-
-            queryset = queryset.filter(states__state_schema__id__in=list(filtered_ids))
-
-        return queryset.distinct()
+    @strawberry_django.field(description="List of state demands")
+    def state_demands(self) -> list["StateDemand"]:
+        return [StateDemandModel(**i) for i in self.state_demands]
 
 
 @strawberry_django.type(models.MaterializedBlok)
@@ -805,16 +936,12 @@ class MaterializedBlok:
     id: strawberry.ID
     dashboard: Dashboard
     blok: Blok
-    agent: Agent
     name: str | None
     description: str | None
     created_at: datetime.datetime
     updated_at: datetime.datetime
-    state_mappings: list["StateMapping"] = strawberry_django.field(
+    agent_mappings: list["BlokAgentMapping"] = strawberry_django.field(
         description="Mappings of states to this materialized blok.",
-    )
-    action_mappings: list["ActionMapping"] = strawberry_django.field(
-        description="Mappings of actions to this materialized blok.",
     )
 
 
@@ -860,23 +987,14 @@ class StateUpdateEvent:
     patches: list[JSONPatch]
 
 
-@strawberry_django.type(models.ActionMapping)
-class ActionMapping:
+@strawberry_django.type(models.BlokAgentMapping)
+class BlokAgentMapping:
     id: strawberry.ID
     key: str
-    implementation: Implementation
+    agent: Agent
+
     materialized_blok: MaterializedBlok
     created_at: datetime.datetime
-    updated_at: datetime.datetime
-
-
-@strawberry_django.type(models.StateMapping)
-class StateMapping:
-    id: strawberry.ID
-    key: str
-    implementation: Implementation
-    state: State
-    crreated_at: datetime.datetime
     updated_at: datetime.datetime
 
 
@@ -1074,6 +1192,7 @@ class Placement:
     id: strawberry.ID
     space: Space
     agent: Agent
+    blok: MaterializedBlok | None
     role: str
     affine_matrix: scalars.Args | None
     model: ThreeDModel | None
