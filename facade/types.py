@@ -395,6 +395,7 @@ class Agent:
     release: Release = strawberry_django.field(description="The release this agent belongs to.")
     placements: list["Placement"] = strawberry_django.field(description="Placements associated with this agent.")
     sessions: list["Session"] = strawberry_django.field(description="Sessions associated with this agent.")
+    agent_mappings: list["BlokAgentMapping"] = strawberry_django.field(description="Blok mappings associated with this agent.")
 
     @strawberry_django.field(description="Fetch a specific implementation by interface.")
     def implementation(self, interface: str) -> Implementation | None:
