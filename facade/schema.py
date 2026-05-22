@@ -231,6 +231,15 @@ class Mutation:
         resolver=datalayer_mutations.request_media_access,
     )
 
+    # Dashboard
+    delete_dashboard = mutation(resolver=mutations.delete_dashboard, description="Delete a dashboard by ID.")
+    update_dashboard = mutation(resolver=mutations.update_dashboard, description="Update properties of a    dashboard such as its name, associated bloks, or organization.")
+
+    # Blok
+    delete_blok = mutation(resolver=mutations.delete_blok, description="Delete a blok by ID.")
+    update_blok = mutation(resolver=mutations.update_blok, description="Update properties of a blok such as its name, description, components, demo state, catalog, or dependencies.")
+    delete_materialized_blok = mutation(resolver=mutations.delete_materialized_blok, description="Delete a materialized blok by ID.")
+    update_materialized_blok = mutation(resolver=mutations.update_materialized_blok, description="Update properties of a materialized blok such as its agent mappings.")
     # Implement Agent
     implement_agent = mutation(resolver=mutations.implement_agent, description="Implement an agent with given states and implementations. This is used to set up an agent with its initial configuration and capabilities.")
 

@@ -645,7 +645,7 @@ class TestResult:
 class Dashboard:
     id: strawberry.ID
     name: str | None
-    materialized_bloks: list["MaterializedBlok"]
+    placements: list["DashboardPlacement"]
 
 
 class ActionDemandModel(BaseModel):
@@ -934,7 +934,6 @@ class BlokDependency:
 @strawberry_django.type(models.MaterializedBlok)
 class MaterializedBlok:
     id: strawberry.ID
-    dashboard: Dashboard
     blok: Blok
     name: str | None
     description: str | None
@@ -942,6 +941,12 @@ class MaterializedBlok:
     updated_at: datetime.datetime
     agent_mappings: list["BlokAgentMapping"] = strawberry_django.field(
         description="Mappings of states to this materialized blok.",
+    )
+    dashboard_placements: list["DashboardPlacement"] = strawberry_django.field(
+        description="Placements of this materialized blok on dashboards.",
+    )
+    placements: list["Placement"] = strawberry_django.field(
+        description="Placements of this materialized blok.",
     )
 
 
@@ -1200,6 +1205,19 @@ class Placement:
     @strawberry_django.field(description="Get the agent associated with this placement.")
     def name(self) -> str:
         return self.agent.name
+
+
+@strawberry_django.type(
+    models.DashboardPlacement,
+    filters=filters.DashboardPlacementFilter,
+    ordering=filters.DashboardPlacementOrder,
+    pagination=True,
+    description="A placement of an agent in a space.",
+)
+class DashboardPlacement:
+    id: strawberry.ID
+    dashboard: Dashboard
+    blok: MaterializedBlok | None
 
 
 @kante.django_type(

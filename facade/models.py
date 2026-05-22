@@ -1504,12 +1504,19 @@ class BlokDependency(models.Model):
 class MaterializedBlok(models.Model):
     """A Blok Implementation is a specific implementation of a Blok"""
 
-    dashboard = models.ForeignKey(Dashboard, on_delete=models.CASCADE, related_name="materialized_bloks")
     blok = models.ForeignKey(Blok, on_delete=models.CASCADE, related_name="materialized_bloks")
     name = models.CharField(max_length=1000, help_text="The name of this Blok Implementation")
     description = models.TextField(help_text="A description for this Blok Implementation")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+
+class DashboardPlacement(models.Model):
+    dashboard = models.ForeignKey(Dashboard, on_delete=models.CASCADE, related_name="placements")
+    blok = models.ForeignKey(MaterializedBlok, on_delete=models.CASCADE, related_name="dashboard_placements")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    position = models.JSONField(help_text="The position of this Blok in the Dashboard (e.g. x and y coordinates)", null=True, blank=True)
 
 
 class BlokAgentMapping(models.Model):

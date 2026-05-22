@@ -372,6 +372,33 @@ class CreateDashboardInput:
     organization: str | None = strawberry.field(default=None, description="The organization ID to associate with the dashboard.")
 
 
+@strawberry.input(description="Input for deleting a dashboard. This is used to delete a dashboard by its ID.")
+class DeleteDashboardInput:
+    id: strawberry.ID = strawberry.field(description="The ID of the dashboard to delete.")
+
+
+@strawberry.input(description="Input for updating a dashboard. This is used to update the properties of a dashboard, such as its name, associated bloks, or organization.")
+class DeleteMaterializedBlokInput:
+    id: strawberry.ID = strawberry.field(description="The ID of the materialized blok to delete.")
+
+
+@strawberry.input(description="Input for updating a materialized blok. This is used to update the properties of a materialized blok, such as its associated agent mappings.")
+class UpdateMaterializedBlokInput:
+    id: strawberry.ID = strawberry.field(description="The ID of the materialized blok to update.")
+    agent_mappings: list[MappedAgentInput] | None = strawberry.field(
+        default=None,
+        description="The list of mapped agents to update the materialized blok with. This is used to update the agent mappings of the materialized blok.",
+    )
+
+
+@strawberry.input(description="Input for updating a dashboard. This is used to update the properties of a dashboard, such as its name, associated bloks, or organization.")
+class UpdateDashboardInput:
+    id: strawberry.ID = strawberry.field(description="The ID of the dashboard to update.")
+    name: str | None = strawberry.field(default=None, description="The new name of the dashboard.")
+    bloks: list[str] | None = strawberry.field(default=None, description="The new list of blok IDs to include in the dashboard. This will replace the existing list if provided.")
+    organization: str | None = strawberry.field(default=None, description="The new organization ID to associate with the dashboard.")
+
+
 @pydantic.input(ReserveInputModel, description="The input for reserving a action.")
 class ReserveInput:
     instance_id: scalars.InstanceId = strawberry.field(description="The instance ID of the waiter")
@@ -1105,6 +1132,28 @@ class CreateBlokInput:
         default=None,
         description="The initial state of the blok. This is used to set the initial state of the blok when it is materialized.",
     )
+
+
+@strawberry.input(description="The input for updating a blok.")
+class UpdateBlokInput:
+    id: strawberry.ID
+    name: str | None = strawberry.field(
+        default=None,
+        description="The name of the blok, used for identification in the system.",
+    )
+    description: str | None = strawberry.field(
+        default=None,
+        description="The description of the blok and its purpose.",
+    )
+    components: list[ComponentNodeInput] | None = strawberry.field(
+        default=None,
+        description="The components of the blok. This is used to update the blok in the system.",
+    )
+
+
+@strawberry.input(description="The input for updating a blok.")
+class DeleteBlokInput:
+    id: strawberry.ID = strawberry.field(description="The blok ID to delete. This is used to identify the blok in the system.")
 
 
 @strawberry.input(description="The input for updating a blok.")
