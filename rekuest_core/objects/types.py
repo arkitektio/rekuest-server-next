@@ -1,5 +1,5 @@
 import datetime
-from typing import Annotated, Optional
+from typing import Annotated, List, Optional
 import strawberry
 import strawberry_django
 from pydantic import BaseModel
@@ -269,3 +269,54 @@ class Definition:
     @strawberry_django.field()
     def returns(self) -> list[ReturnPort]:
         return [models.ReturnPortModel(**i) for i in self.returns]
+
+
+@pydantic.type(models.DynamicValueModel, description="A bound state pointer referencing a variable inside a Blok state instance.")
+class DynamicValue:
+    literal: Optional[str] = strawberry.field(default=None, description="A static fallback literal value (passed as a serialized string/JSON primitive).")
+    path: Optional[str] = strawberry.field(default=None, description="JSON Pointer to a variable inside the Blok's isolated data model (e.g., '/microscope/exposure').")
+
+
+@pydantic.type(models.AgentCallModel, description="Defines a callback that routes user interactions directly to an Arkitekt Agent via Rekuest.")
+class AgentCall:
+    dependency: str = strawberry.field(description="The abstract agent dependency key declared in the Blok manifest (e.g., 'stage_dep').")
+    operation: str = strawberry.field(description="The target function name registered on that specific agent's worker thread loop.")
+    arguments: Optional[List[Annotated["ActionArgument", strawberry.lazy(__name__)]]] = strawberry.field(default=None, description="Key-value arguments map compiled for the target agent call.")
+
+
+@pydantic.type(models.UtilCallModel, description="Defines a utility call that can be invoked within the system.")
+class UtilCall:
+    operation: str = strawberry.field(description="The utility function name to invoke.")
+    arguments: Optional[List[Annotated["ActionArgument", strawberry.lazy(__name__)]]] = strawberry.field(default=None, description="Key-value arguments map compiled for the target utility call.")
+
+
+@pydantic.type(models.ActionArgumentModel, description="A JSON-serializable argument entry for a multi-agent action trigger.")
+class ActionArgument:
+    key: str | None = strawberry.field(default=None, description="The argument property name.")
+    value_literal: Optional[scalars.JSONSerializable] = strawberry.field(default=None, description="Static literal string value if not dynamically bound.")
+    value_path: Optional[str] = strawberry.field(default=None, description="JSON Pointer referencing the shared Blok state to inject into this argument slot dynamically.")
+
+    agent_call: Optional[AgentCall] = strawberry.field(default=None, description="Defines a nested agent call if this argument should trigger an agent interaction.")
+    util_call: Optional[UtilCall] = strawberry.field(default=None, description="Defines a nested utility call if this argument should trigger a system utility interaction.")
+    value_list: Optional[List[Annotated["ActionArgument", strawberry.lazy(__name__)]]] = strawberry.field(default=None, description="Defines a list of values if this argument should be an array.")
+    value_dict: Optional[List[Annotated["ActionArgument", strawberry.lazy(__name__)]]] = strawberry.field(default=None, description="Defines a list of key-value pairs if this argument should be a dictionary.")
+
+
+@pydantic.type(models.ComponentPropModel, description="A single key-value prop configuration for a component layout node.")
+class ComponentProp:
+    key: str = strawberry.field(description="The prop key name matching the target UI catalog constraint.")
+
+    # Primitives mapping to standard properties, state paths, or actions
+    static_value: Optional[scalars.JSONSerializable] = strawberry.field(default=None, description="A raw scalar or JSON-stringified literal configuration parameter (e.g. '40x' or True).")
+    dynamic_value: Optional[DynamicValue] = strawberry.field(default=None, description="A reactive state data-binding rule.")
+    agent_call: Optional[AgentCall] = strawberry.field(default=None, description="Defines an imperative interactive network action callback loop if this prop should trigger an agent interaction.")
+    util_call: Optional[UtilCall] = strawberry.field(default=None, description="Defines an imperative interactive network action callback loop if this prop should trigger a system utility interaction.")
+    declares_value: Optional[str] = strawberry.field(default=None, description="If true, this prop declares a new 'value' in that can be referenced by other props or actions in the same Blok. The value of this field should be the name of the declared value (e.g., 'selected_user').")
+
+
+@pydantic.type(models.ComponentNodeModel, description="An abstract structural visual element inside a Blok blueprint manifest.")
+class ComponentNode:
+    id: str
+    component: str
+    props: Optional[List[ComponentProp]] = strawberry.field(description="Properties or configuration for the component.")
+    children: Optional[List[Annotated["ComponentNode", strawberry.lazy(__name__)]]] = strawberry.field(description="List of child component node IDs.")

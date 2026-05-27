@@ -944,146 +944,6 @@ class DeleteImplementationInput:
     implementation: strawberry.ID = strawberry.field(description="The implementation ID to delete. This is used to identify the implementation in the system.")
 
 
-class DynamicValueInputModel(BaseModel):
-    """Base model for a dynamic value input, which can reference a variable in a Blok state instance.
-
-    Attributes:
-        literal: An optional static fallback literal value, passed as a serialized string or JSON primitive.
-    """
-
-    path: str | None = None
-
-
-@pydantic.input(DynamicValueInputModel, description="A bound state pointer referencing a variable inside a Blok state instance.")
-class DynamicValueInput:
-    path: Optional[str] = strawberry.field(default=None, description="JSON Pointer to a variable inside the Blok's isolated data model (e.g., '/microscope/exposure').")
-
-
-class AgentCallInputModel(BaseModel):
-    """Base model for defining a callback that routes user interactions directly to an Arkitekt Agent via Rekuest.
-
-    Attributes:
-        target_dependency_key: The abstract agent dependency key declared in the Blok manifest (e.g., 'stage_dep').
-        operation_name: The target function name registered on that specific agent's worker thread loop.
-        arguments: An optional list of key-value arguments compiled for the target agent call.
-    """
-
-    dependency: str
-    operation: str
-    arguments: Optional[List["ActionArgumentInputModel"]] = None
-
-
-@pydantic.input(AgentCallInputModel, description="Defines a callback that routes user interactions directly to an Arkitekt Agent via Rekuest.")
-class AgentCallInput:
-    dependency: str = strawberry.field(description="The abstract agent dependency key declared in the Blok manifest (e.g., 'stage_dep').")
-    operation: str = strawberry.field(description="The target function name registered on that specific agent's worker thread loop.")
-    arguments: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = strawberry.field(default=None, description="Key-value arguments map compiled for the target agent call.")
-
-
-class UtilCallInputModel(BaseModel):
-    operation: str
-    arguments: Optional[List["ActionArgumentInputModel"]] = None
-
-
-@pydantic.input(UtilCallInputModel, description="Defines a utility call that can be invoked within the system.")
-class UtilCallInput:
-    operation: str = strawberry.field(description="The utility function name to invoke.")
-    arguments: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = strawberry.field(default=None, description="Key-value arguments map compiled for the target utility call.")
-
-
-class ActionArgumentInputModel(BaseModel):
-    """Base model for an action argument input, which can be a static literal or a dynamic state reference.
-
-    Attributes:
-        key: The argument property name.
-        value_literal: An optional static literal string value if not dynamically bound.
-        value_path: An optional JSON Pointer referencing the shared Blok state to inject into this argument slot dynamically.
-    """
-
-    key: str | None = None
-    value_literal: Optional[str | int | float | dict | list] = None
-    value_path: Optional[str] = None
-
-    # Separated nested calls
-    agent_call: Optional["AgentCallInputModel"] = None
-    util_call: Optional["UtilCallInputModel"] = None
-
-    value_list: Optional[List["ActionArgumentInputModel"]] = None
-    value_dict: Optional[List["ActionArgumentInputModel"]] = None
-
-
-@pydantic.input(ActionArgumentInputModel, description="A JSON-serializable argument entry for a multi-agent action trigger.")
-class ActionArgumentInput:
-    key: str | None = strawberry.field(default=None, description="The argument property name.")
-    value_literal: Optional[scalars.JSONSerializable] = strawberry.field(default=None, description="Static literal string value if not dynamically bound.")
-    value_path: Optional[str] = strawberry.field(default=None, description="JSON Pointer referencing the shared Blok state to inject into this argument slot dynamically.")
-
-    agent_call: Optional[AgentCallInput] = strawberry.field(default=None, description="Defines a nested agent call if this argument should trigger an agent interaction.")
-    util_call: Optional[UtilCallInput] = strawberry.field(default=None, description="Defines a nested utility call if this argument should trigger a system utility interaction.")
-    value_list: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = strawberry.field(default=None, description="Defines a list of values if this argument should be an array.")
-    value_dict: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = strawberry.field(default=None, description="Defines a list of key-value pairs if this argument should be a dictionary.")
-
-
-# ============================================================================
-# 2. Abstract Component Property Bindings
-# ============================================================================
-class ComponentPropInputModel(BaseModel):
-    """Base model for a single key-value prop configuration for a component layout node.
-
-    Attributes:
-        key: The prop key name matching the target UI catalog constraint.
-        static_value: An optional raw scalar or JSON-stringified literal configuration parameter (e.g., '40x' or True).
-        dynamic_value: An optional reactive state data-binding rule.
-        agent_action: An optional imperative interactive network action callback loop.
-    """
-
-    key: str
-    static_value: Optional[str | int | float | dict] = None
-    dynamic_value: Optional[DynamicValueInputModel] = None
-
-    # Separated top-level callbacks
-    agent_call: Optional["AgentCallInputModel"] = None
-    util_call: Optional["UtilCallInputModel"] = None
-
-
-@pydantic.input(ComponentPropInputModel, description="A single key-value prop configuration for a component layout node.")
-class ComponentPropInput:
-    key: str = strawberry.field(description="The prop key name matching the target UI catalog constraint.")
-
-    # Primitives mapping to standard properties, state paths, or actions
-    static_value: Optional[scalars.JSONSerializable] = strawberry.field(default=None, description="A raw scalar or JSON-stringified literal configuration parameter (e.g. '40x' or True).")
-    dynamic_value: Optional[DynamicValueInput] = strawberry.field(default=None, description="A reactive state data-binding rule.")
-    agent_call: Optional[AgentCallInput] = strawberry.field(default=None, description="Defines an imperative interactive network action callback loop if this prop should trigger an agent interaction.")
-    util_call: Optional[UtilCallInput] = strawberry.field(default=None, description="Defines an imperative interactive network action callback loop if this prop should trigger a system utility interaction.")
-
-
-# ============================================================================
-# 3. The Unified Abstract Component Node Input
-# ============================================================================
-class ComponentNodeInputModel(BaseModel):
-    """Base model for an abstract structural visual element inside a Blok blueprint manifest.
-
-    Attributes:
-        id: Unique structural string identifying this node instance inside the flat workspace layout tree.
-        component: The type indicator token matching your Electron app's registered catalog specs (e.g. 'Slider').
-        props: The collection of static values, state pointers, or action endpoints assigned to this component.
-        children: Flat adjacency pointer list mapping out IDs nested inside this specific component layer.
-    """
-
-    id: str
-    component: str
-    props: list[ComponentPropInputModel] | None = None
-    children: list["ComponentNodeInputModel"] | None = None
-
-
-@pydantic.input(ComponentNodeInputModel, description="An abstract structural visual element inside a Blok blueprint manifest.")
-class ComponentNodeInput:
-    id: str = strawberry.field(description="Unique structural string identifying this node instance inside the flat workspace layout tree.")
-    component: str = strawberry.field(description="The type indicator token matching your Electron app's registered catalog specs (e.g. 'Slider').")
-    props: Optional[List[ComponentPropInput]] = strawberry.field(default_factory=list, description="The collection of static values, state pointers, or action endpoints assigned to this component.")
-    children: Optional[List[Annotated["ComponentNodeInput", strawberry.lazy(__name__)]]] = strawberry.field(default=None, description="Flat adjacency pointer list mapping out IDs nested inside this specific component layer.")
-
-
 class CreateBlokInputModel(BaseModel):
     """Base model for creating a Blok, which is a reusable UI component with optional agent interactions.
 
@@ -1101,7 +961,7 @@ class CreateBlokInputModel(BaseModel):
     description: str | None = None
     catalog: str | None = None
     uri: str
-    components: list[ComponentNodeInputModel] | None = None
+    components: list[rimodels.ComponentNodeInputModel] | None = None
     demo_state: dict[str, Any] | None = None
 
 
@@ -1124,7 +984,7 @@ class CreateBlokInput:
         default=None,
         description="The URI of the blok. This can be used to link to the blok in the system.",
     )
-    components: list[ComponentNodeInput] | None = strawberry.field(
+    components: list[ritypes.ComponentNodeInput] | None = strawberry.field(
         default=None,
         description="The schema of the blok. This can be used to validate the blok input and output.",
     )
@@ -1145,7 +1005,7 @@ class UpdateBlokInput:
         default=None,
         description="The description of the blok and its purpose.",
     )
-    components: list[ComponentNodeInput] | None = strawberry.field(
+    components: list[ritypes.ComponentNodeInput] | None = strawberry.field(
         default=None,
         description="The components of the blok. This is used to update the blok in the system.",
     )

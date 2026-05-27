@@ -19,21 +19,6 @@ class Args(object):
 
 
 @strawberry.scalar(description="The `Args` scalar type represents a Dictionary of arguments")
-class JSONSerializable(object):
-    """Strawberry scalar for Args type representing a dictionary of arguments."""
-
-    @staticmethod
-    def serialize(value: Any) -> Any:
-        """Serialize an Args value for output."""
-        return value
-
-    @staticmethod
-    def parse_value(value: Any) -> "Args":
-        """Parse input value into Args type."""
-        return value
-
-
-@strawberry.scalar(description="The `Args` scalar type represents a Dictionary of arguments")
 class UISchema(object):
     """Strawberry scalar for Args type representing a dictionary of arguments."""
 

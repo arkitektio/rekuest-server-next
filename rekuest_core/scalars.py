@@ -3,16 +3,21 @@ import strawberry
 
 Identifier = strawberry.scalar(
     NewType("Identifier", str),
-    description="The `ArrayLike` scalar type represents a reference to a store "
-    "previously created by the user n a datalayer",
+    description="The `ArrayLike` scalar type represents a reference to a store previously created by the user n a datalayer",
+    serialize=lambda v: v,
+    parse_value=lambda v: v,
+)
+
+JSONSerializable = strawberry.scalar(
+    NewType("JSONSerializable", object),
+    description="The `JSONSerializable` scalar type represents a JSON-serializable value.",
     serialize=lambda v: v,
     parse_value=lambda v: v,
 )
 
 AnyDefault = strawberry.scalar(
     NewType("AnyDefault", object),
-    description="The `ArrayLike` scalar type represents a reference to a store "
-    "previously created by the user n a datalayer",
+    description="The `ArrayLike` scalar type represents a reference to a store previously created by the user n a datalayer",
     serialize=lambda v: v,
     parse_value=lambda v: v,
 )
@@ -26,24 +31,21 @@ Arg = strawberry.scalar(
 
 SearchQuery = strawberry.scalar(
     NewType("SearchQuery", str),
-    description="The `ArrayLike` scalar type represents a reference to a store "
-    "previously created by the user n a datalayer",
+    description="The `ArrayLike` scalar type represents a reference to a store previously created by the user n a datalayer",
     serialize=lambda v: v,
     parse_value=lambda v: v,
 )
 
 InstanceID = strawberry.scalar(
     NewType("InstanceId", str),
-    description="The `ArrayLike` scalar type represents a reference to a store "
-    "previously created by the user n a datalayer",
+    description="The `ArrayLike` scalar type represents a reference to a store previously created by the user n a datalayer",
     serialize=lambda v: v,
     parse_value=lambda v: v,
 )
 
 ActionHash = strawberry.scalar(
     NewType("ActionHash", str),
-    description="The `ArrayLike` scalar type represents a reference to a store "
-    "previously created by the user n a datalayer",
+    description="The `ArrayLike` scalar type represents a reference to a store previously created by the user n a datalayer",
     serialize=lambda v: v,
     parse_value=lambda v: v,
 )

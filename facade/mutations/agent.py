@@ -4,8 +4,8 @@ from kante.types import Info
 from facade.mutations.implementation import _create_implementation
 import strawberry
 from facade import types, models, inputs, scalars
-from rekuest_core.inputs.types import StructureInput, InterfaceInput, ImplementationInput, LockImplementationInput, StateImplementationInput
-from rekuest_core.inputs.models import ImplementationInputModel, StateImplementationInputModel, LockImplementationInputModel
+from rekuest_core.inputs.types import BlokImplementationInput, StructureInput, InterfaceInput, ImplementationInput, LockImplementationInput, StateImplementationInput
+from rekuest_core.inputs.models import BlokImplementationInputModel, ImplementationInputModel, StateImplementationInputModel, LockImplementationInputModel
 import logging
 from facade import types, models, inputs, unique
 from pydantic import BaseModel
@@ -73,6 +73,7 @@ class ImplementAgentInputModel(BaseModel):
     states: list[StateImplementationInputModel] | None = None
     implementations: list[ImplementationInputModel] | None = None
     locks: list[LockImplementationInputModel] | None = None
+    bloks: list[BlokImplementationInputModel] | None = None
     hash: str | None = None
     pass
 
@@ -95,6 +96,10 @@ class ImplementAgentInput:
     states: list[StateImplementationInput] | None = strawberry.field(
         default=None,
         description="The states of the agent. This is used to specify the initial states of the agent",
+    )
+    bloks: list[BlokImplementationInput] | None = strawberry.field(
+        default=None,
+        description="The blocks of the agent. This is used to specify the initial blocks of the agent",
     )
     implementations: list[ImplementationInput] | None = strawberry.field(
         default=None,
@@ -182,6 +187,47 @@ def implement_agent(info: Info, input: ImplementAgentInput) -> types.Agent:
         if i["id"] not in created_implementations_id:
             implementation = models.Implementation.objects.get(id=i["id"])
             implementation.delete()
+
+    for blok in input.bloks or []:
+        catalog = models.UICatalog.objects.get_or_create(name=blok.catalog)[0] if blok.catalog else models.UICatalog.objects.get_or_create(name="default")[0]
+
+        x, _ = models.Blok.objects.update_or_create(
+            name=blok.key,
+            defaults=dict(
+                components=[x.model_dump() for x in blok.components] if blok.components else [],
+                description=blok.description,
+                creator=info.context.request.user,
+                catalog=catalog,
+                demo_state=blok.demo_state,
+            ),
+        )
+
+        new_deps = []
+
+        mblok, _ = models.MaterializedBlok.objects.update_or_create(
+            blok=x,
+        )
+
+        if blok.dependencies:
+            for i in blok.dependencies:
+                dep, _ = models.BlokDependency.objects.update_or_create(
+                    blok=x,
+                    key=i.key,
+                    defaults=dict(
+                        action_demands=[x.model_dump() for x in i.action_demands] if i.action_demands else [],
+                        state_demands=[x.model_dump() for x in i.state_demands] if i.state_demands else [],
+                        app_filter=i.app,
+                        version_filter=i.version,
+                    ),
+                )
+                new_deps.append(dep)
+
+                models.BlokAgentMapping.objects.update_or_create(
+                    materialized_blok=mblok,
+                    key=i.key,
+                    dependency=dep,
+                    defaults=dict(agent=agent),
+                )
 
     return agent
 
