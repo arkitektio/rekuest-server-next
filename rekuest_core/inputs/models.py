@@ -284,7 +284,7 @@ class ImplementationInputModel(BaseModel):
     dynamic: bool = False
     logo: str | None = None
     locks: list[str] | None = None
-    manipulates: list[str] | None
+    manipulates: list[str] | None = None
     extension: str | None = None
 
 
@@ -432,6 +432,8 @@ class ComponentNodeInputModel(BaseModel):
 
 
 class BlokImplementationInputModel(BaseModel):
+    "Base model for a Blok implementation manifest, which compiles all necessary information to materialize a Blok instance in the Arkitekt ecosystem."
+
     key: str
     dependencies: list[AgentDependencyInputModel] = Field(default_factory=list, description="The dependencies required by this Blok.")
     components: list[ComponentNodeInputModel]
