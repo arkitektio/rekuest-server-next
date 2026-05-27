@@ -1278,8 +1278,9 @@ class CreatePlacementInput:
     space: str = strawberry.field(description="The ID of the space to create the placement in.")
     role: str | None = strawberry.field(default=None, description="The role for the placement.")
     affine_matrix: list[list[float]] | None = strawberry.field(default=None, description="The affine matrix for the placement.")
-    model: strawberry.ID | None = strawberry.field(default=None, description="The model for the placement.")
+    model: strawberry.ID | None = strawberry.field(default=None, description="The three-dimensional model for the placement.")
     agent: strawberry.ID | None = strawberry.field(default=None, description="The agent ID to create the placement for. If not provided, the placement will be created for the default agent.")
+    materialized_blok: strawberry.ID | None = strawberry.field(default=None, description="A specific blok that should be used to visualize the state of the placement")
 
 
 @pydantic.input(UpdatePlacementInputModel, description="The input for updating a placement.")
@@ -1289,6 +1290,7 @@ class UpdatePlacementInput:
     affine_matrix: list[list[float]] | None = strawberry.field(default=None, description="The new affine matrix for the placement.")
     model: strawberry.ID | None = strawberry.field(default=None, description="The new model for the placement.")
     agent: strawberry.ID | None = strawberry.field(default=None, description="The new agent ID for the placement.")
+    materialized_blok: strawberry.ID | None = strawberry.field(default=None, description="A specific blok that should be used to visualize the state of the placement")
 
 
 class DeletePlacementInputModel(BaseModel):

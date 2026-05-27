@@ -54,9 +54,11 @@ def create_placement(info: Info, input: inputs.CreatePlacementInput) -> types.Pl
     placement, _ = models.Placement.objects.update_or_create(
         space=space,
         agent_id=input.agent,
-        model_id=input.model,
         defaults=dict(
             role="just a member",
+            model_id=input.model,
+            blok_id=input.materialized_blok,
+            affine_matrix=input.affine_matrix,
         ),
     )
 

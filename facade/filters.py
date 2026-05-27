@@ -895,6 +895,26 @@ class PlacementFilter:
         return queryset.filter(**{f"{prefix}name__icontains": value}), Q()
 
 
+@strawberry_django.order(models.MaterializedBlok)
+class MaterializedBlokOrder:
+    created_at: auto
+
+
+@strawberry_django.filter_type(models.MaterializedBlok, description="A way to filter placements (space memberships)")
+class MaterializedBlokFilter:
+    @filter_field(description="Filter by IDs")
+    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
+        return queryset.filter(**{f"{prefix}id__in": value}), Q()
+
+    @filter_field(description="Filter by agent")
+    def agent(self, info: Info, queryset, value: strawberry.ID, prefix: str):
+        return queryset.filter(**{f"{prefix}agent_id": value}), Q()
+
+    @filter_field(description="Search by name")
+    def search(self, info: Info, queryset, value: str | None, prefix: str):
+        return queryset.filter(**{f"{prefix}name__icontains": value}), Q()
+
+
 # Dashboard Placement
 @strawberry_django.filter_type(models.DashboardPlacement, description="A way to filter placements (space memberships)")
 class DashboardPlacementFilter:

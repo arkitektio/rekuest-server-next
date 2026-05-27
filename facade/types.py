@@ -813,7 +813,7 @@ class BlokDependency:
         return [StateDemandModel(**i) for i in self.state_demands]
 
 
-@strawberry_django.type(models.MaterializedBlok)
+@strawberry_django.type(models.MaterializedBlok, filters=filters.MaterializedBlokFilter, pagination=True, ordering=filters.MaterializedBlokOrder, description="A materialized instance of a Blok that can be placed on dashboards and linked to agent states.")
 class MaterializedBlok:
     id: strawberry.ID
     blok: Blok
