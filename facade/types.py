@@ -240,7 +240,7 @@ class Dependency:
         return [StateDemandModel(**i) for i in self.state_demands]
 
 
-@strawberry_django.type(models.Implementation, filters=filters.ImplementationFilter, order=filters.ImplementationOrder, pagination=True, description="Represents a concrete implementation of an action.")
+@strawberry_django.type(models.Implementation, filters=filters.ImplementationFilter, ordering=filters.ImplementationOrder, pagination=True, description="Represents a concrete implementation of an action.")
 class Implementation:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the implementation.")
     interface: str = strawberry_django.field(description="Interface string representing the implementation entrypoint.")

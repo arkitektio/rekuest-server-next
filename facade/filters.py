@@ -13,7 +13,8 @@ from rekuest_core import scalars as rscalars
 from strawberry import auto
 from strawberry_django.filters import FilterLookup
 from strawberry_django.fields.filter_order import filter_field
-from django.db.models import Max, Q
+from django.db.models import Case, IntegerField, Max, Q, Value, When
+from django.utils import timezone
 from strawberry.types import Info
 
 
@@ -775,12 +776,18 @@ class ParamPair:
     value: str
 
 
-@strawberry_django.order(models.Implementation)
+@strawberry_django.order_type(models.Implementation)
 class ImplementationOrder:
     created_at: auto
     started_at: auto
     finished_at: auto
     status: auto
+
+    @strawberry_django.order_field
+    def active(self, value: strawberry_django.Ordering, prefix: str) -> list[str]:
+        if not value:
+            return []
+        return [f"{prefix}agent__connected"]
 
 
 @strawberry_django.filter_type(models.Implementation)
@@ -788,6 +795,14 @@ class ImplementationFilter:
     interface: Optional[FilterLookup[str]]
     action: ImplementationActionFilter | None
     agent: ImplementationAgentFilter | None
+
+    @filter_field
+    def active(self, info: Info, queryset, value: bool, prefix: str):
+        now = timezone.now()
+        if value:
+            return queryset.filter(**{f"{prefix}agent__last_seen__gt": now - datetime.timedelta(minutes=5)}), Q()
+        else:
+            return queryset.filter(**{f"{prefix}agent__last_seen__lte": now - datetime.timedelta(minutes=5)}), Q()
 
     @filter_field
     def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
