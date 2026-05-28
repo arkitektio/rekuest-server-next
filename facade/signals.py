@@ -40,7 +40,16 @@ def agent_post_save(sender, instance: models.Agent = None, created=None, **kwarg
     if instance:
         channels.agent_updated_channel.broadcast(
             channel_events.AgentSignal(create=instance.id) if created else channel_events.AgentSignal(update=instance.id),
-            [f"agents_for_{instance.registry.user.id}"],
+            [f"agents_for_{instance.organization.id}"],
+        )
+
+
+@receiver(post_delete, sender=models.Agent)
+def agent_post_delete(sender, instance: models.Agent = None, **kwargs):
+    if instance:
+        channels.agent_updated_channel.broadcast(
+            channel_events.AgentSignal(delete=instance.id),
+            [f"agents_for_{instance.organization.id}"],
         )
 
 

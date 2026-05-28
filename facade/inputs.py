@@ -341,6 +341,30 @@ class UnblockInput:
     reason: str | None = strawberry.field(default=None, description="The reason for unblocking the agent.")
 
 
+class UpdateAgentInputModel(BaseModel):
+    """Base model for updating an agent.
+
+    Attributes:
+        id: The unique identifier of the agent to update
+        name: The new name for the agent
+    """
+
+    id: str
+    name: str | None = None
+
+
+@pydantic.input(UpdateAgentInputModel, description="The input for updating an agent.")
+class UpdateAgentInput:
+    id: strawberry.ID = strawberry.field(description="The ID of the agent to update.")
+    name: str | None = strawberry.field(default=None, description="The new name for the agent.")
+
+
+@pydantic.input(UnblockInputModel, description="The input for bouncing an agent.")
+class UnblockInput:
+    agent: strawberry.ID = strawberry.field(description="The agent ID to unblock.")
+    reason: str | None = strawberry.field(default=None, description="The reason for unblocking the agent.")
+
+
 class ReserveInputModel(BaseModel):
     """Base model for reserving an action.
 

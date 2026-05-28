@@ -140,6 +140,7 @@ class Action:
     name: str = strawberry_django.field(description="Name of the action.")
     key: str = strawberry_django.field(description="Key of the action, used for grouping and identification.")
     app: App = strawberry_django.field(description="The app this action belongs to.")
+    logo: str | None = strawberry.field(description="An optional icon identifier to represent this Action in the UI (e.g. 'fa-solid fa-dog')")
     version: str = strawberry_django.field(description="Version string of the action.")
     kind: renums.ActionKind = strawberry_django.field(description="The kind or category of the action.")
     stateful: bool = strawberry_django.field(description="Indicates whether the action maintains state.")

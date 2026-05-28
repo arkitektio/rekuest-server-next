@@ -14,7 +14,7 @@ from .action import cleanup_actions
 from .resolution import auto_resolve, create_resolution, update_resolution, delete_resolution
 from .space import create_space, create_placement, update_space, delete_space, update_placement, delete_placement
 from .threed_model import create_threed_model, update_threed_model, delete_threed_model
-from .agent import implement_agent
+from .agent import implement_agent, update_agent
 
 __all__ = [
     "create_foreign_implementation",
@@ -26,6 +26,7 @@ __all__ = [
     "delete_materialized_blok",
     "update_materialized_blok",
     "create_toolbox",
+    "update_agent",
     "bounce",
     "delete_dashboard",
     "update_dashboard",

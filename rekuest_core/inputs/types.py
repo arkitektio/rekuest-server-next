@@ -638,7 +638,7 @@ class ImplementationInput:
     )
     logo: str | None = strawberry.field(
         default=None,
-        description="The logo of the implementation. This is used to display the logo in the UI",
+        description="The logo of the implementation. This is used to display the logo in the UI either it should be 'custom:svg-paths' or a lucide icon name like 'lucide:activity' urls are not supported at the moment",
     )
     locks: list[str] | None = strawberry.field(
         default=None,

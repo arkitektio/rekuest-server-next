@@ -252,6 +252,7 @@ class Action(models.Model):
         default=enums.ActionKindChoices.FUNCTION.value,
         help_text="Function, generator? Will this function generate multiple results?",
     )
+    logo = models.CharField(max_length=1000, blank=True, null=True, help_text="An optional icon identifier to represent this Action in the UI (e.g. 'fa-solid fa-dog')")
     interfaces = models.JSONField(default=list, help_text="Interfaces that we use to interpret the meta data")
     port_groups = models.JSONField(default=list, help_text="Intercae that we use to interpret the meta data")
     name = models.CharField(max_length=1000, help_text="The cleartext name of this Action (e.g. 'Segment Image')", default="Unnamed Action")

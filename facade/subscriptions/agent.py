@@ -4,6 +4,7 @@ from facade import types, models
 from typing import AsyncGenerator
 from facade.channels import agent_updated_channel
 
+
 @strawberry.type
 class AgentChangeEvent:
     update: types.Agent | None = None
@@ -16,12 +17,12 @@ async def agents(
     info: Info,
 ) -> AsyncGenerator[AgentChangeEvent, None]:
     """Join and subscribe to message sent to the given rooms."""
-    
-    user = info.context.request.user
 
-    print("Agent subscription", [f"agents_for_{user.id}"])
+    organization = info.context.request.organization
 
-    async for message in agent_updated_channel.listen(info.context, [f"agents_for_{user.id}"]):
+    print("Agent subscription", [f"agents_for_{organization.id}"])
+
+    async for message in agent_updated_channel.listen(info.context, [f"agents_for_{organization.id}"]):
         print("Message received", message)
         if message.create:
             yield AgentChangeEvent(create=await models.Agent.objects.aget(id=message.create))

@@ -205,6 +205,7 @@ class Mutation:
     pin_agent = mutation(resolver=mutations.pin_agent, description="Pin an agent to the user.")
     pin_implementation = mutation(resolver=mutations.pin_implementation, description="Pin an implementation to the user.")
     delete_agent = mutation(resolver=mutations.delete_agent, description="Delete an agent record.")
+    update_agent = mutation(resolver=mutations.update_agent, description="Update properties of an agent such as its name.")
     create_shortcut = mutation(resolver=mutations.create_shortcut, description="Create a shortcut to an action.")
     delete_shortcut = mutation(resolver=mutations.delete_shortcut, description="Delete a shortcut.")
     create_toolbox = mutation(resolver=mutations.create_toolbox, description="Create a new toolbox with shortcuts.")

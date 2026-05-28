@@ -242,6 +242,14 @@ def pin_agent(info: Info, input: inputs.PinInput) -> types.Agent:
     return agent
 
 
+def update_agent(info: Info, input: inputs.UpdateAgentInput) -> types.Agent:
+    agent = models.Agent.objects.get(id=input.id)
+    if input.name is not None:
+        agent.name = input.name
+    agent.save()
+    return agent
+
+
 def delete_agent(info: Info, input: DeleteAgentInput) -> strawberry.ID:
     agent = models.Agent.objects.get(id=input.id)
     agent.delete()
