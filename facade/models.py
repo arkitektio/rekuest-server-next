@@ -155,8 +155,8 @@ class Toolbox(models.Model):
 
 
 class StructurePackage(models.Model):
-    key: str = models.CharField(max_length=2000, unique=True)
-    description: str = models.CharField(max_length=2000, blank=True, null=True)
+    key = models.CharField(max_length=2000, unique=True)
+    description = models.CharField(max_length=2000, blank=True, null=True)
 
 
 class Interface(models.Model):
@@ -178,8 +178,8 @@ class Interface(models.Model):
 
 class Descriptor(models.Model):
     package = models.ForeignKey(StructurePackage, on_delete=models.CASCADE, related_name="descriptors")
-    key: str = models.CharField(max_length=2000)
-    description: str = models.CharField(max_length=2000, blank=True, null=True)
+    key = models.CharField(max_length=2000)
+    description = models.CharField(max_length=2000, blank=True, null=True)
 
     class Meta:
         constraints = [
@@ -291,11 +291,10 @@ class Action(models.Model):
     args = models.JSONField(default=list, help_text="Inputs for this Action")
     returns = models.JSONField(default=list, help_text="Outputs for this Action")
 
-    # --- NEW CACHE FIELDS FOR FAST FILTERING ---
     arg_count = models.IntegerField(default=0, help_text="Pre-calculated number of root input ports")
     return_count = models.IntegerField(default=0, help_text="Pre-calculated number of root output ports")
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.name}"
 
     class Meta:
@@ -1363,6 +1362,12 @@ class State(models.Model):
     value = models.JSONField(default=dict, help_text=" The current value of this state")
     created_at = models.DateTimeField(auto_now_add=True, help_text="Date this State was first ever written to")
     updated_at = models.DateTimeField(auto_now=True, help_text="Date this State was last updated")
+    retention_policy = models.CharField(
+        max_length=1000,
+        choices=[(tag, tag.value) for tag in enums.RetentionPolicyChoices],
+        default=enums.RetentionPolicyChoices.KEEP_ALL,
+        help_text="The retention policy for this state (e.g. how many patches and snapshots should we keep for this state?)",
+    )
 
     class Meta:
         constraints = [
