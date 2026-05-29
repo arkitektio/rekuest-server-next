@@ -923,7 +923,7 @@ class MaterializedBlokFilter:
 
     @filter_field(description="Filter by agent")
     def agent(self, info: Info, queryset, value: strawberry.ID, prefix: str):
-        return queryset.filter(**{f"{prefix}agent_id": value}), Q()
+        return queryset.filter(**{f"{prefix}agent_mappings__agent_id": value}), Q()
 
     @filter_field(description="Search by name")
     def search(self, info: Info, queryset, value: str | None, prefix: str):
