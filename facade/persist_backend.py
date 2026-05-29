@@ -166,5 +166,19 @@ class ModelPersistBackend:
         logging.info(f"Session init {message.session_id} with data {message}")
         # For now we don't do anything with this, but it could be used to initialize session-specific data
 
+        session, _ = await models.Session.objects.aget_or_create(agent_id=agent_id, session_id=message.session_id)
+
+        for state_name, snapshot in message.states.items():
+            state = await models.State.objects.aget(agent_id=agent_id, interface=state_name)
+            agent = await models.Agent.objects.aget(id=agent_id)
+
+            await models.Snapshot.objects.acreate(
+                session=session,
+                state=state,
+                agent=agent,
+                value=snapshot,
+                global_rev=0,
+            )
+
 
 persist_backend = ModelPersistBackend()
