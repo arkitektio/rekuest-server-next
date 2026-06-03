@@ -159,6 +159,10 @@ class Action:
     organization: "Organization" = strawberry_django.field(description="The organization that owns this action.")
     assignations: list[Annotated["Assignation", strawberry.lazy(__name__)]] = strawberry_django.field(description="Assignations created for this action.")
 
+    @strawberry_django.field(description="Get the latest completed assignation for this action.")
+    def latest_assignation(self) -> Optional["Assignation"]:
+        return models.Assignation.objects.filter(action=self, is_done=True).order_by("-created_at").first()
+
     @strawberry_django.field(description="Retrieve assignations where this action has run.")
     def runs(self) -> list[Annotated["Assignation", strawberry.lazy(__name__)]] | None:
         return models.Assignation.objects.filter(action=self).order_by("-created_at")
