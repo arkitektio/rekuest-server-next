@@ -114,7 +114,6 @@ class PortInputModel(BaseModel):
     nullable: bool = False
     effects: list[EffectInputModel] | None = None
     default: Any | None = None
-    children: list["PortInputModel"] | None = None
     choices: list[ChoiceInputModel] | None = None
 
     @model_validator(mode="after")
@@ -128,6 +127,7 @@ class ArgPortInputModel(PortInputModel):
     default: Any | None = None
     widget: Optional["AssignWidgetInputModel"] = None
     requires: list[RequiresInputModel] | None = None
+    children: Optional[list["ArgPortInputModel"]] = None
 
     @model_validator(mode="after")
     def check_children_for_port(cls, self) -> Self:
@@ -139,6 +139,7 @@ class ArgPortInputModel(PortInputModel):
 class ReturnPortInputModel(PortInputModel):
     widget: Optional["ReturnWidgetInputModel"] = None
     provides: list[ProvidesInputModel] | None = None
+    children: Optional[list["ReturnPortInputModel"]] = None
 
     @model_validator(mode="after")
     def check_children_for_port(cls, self) -> Self:
