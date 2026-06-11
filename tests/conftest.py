@@ -4,11 +4,17 @@ import time
 import boto3
 import psycopg
 import pytest
+import pytest_asyncio
+import redis as sync_redis
 from moto import mock_aws
 
 from authentikate.models import Client, Organization, User, Membership
+from django.conf import settings
 from kante.context import HttpContext, UniversalRequest
-from dokker import local
+from dokker import local, testing
+
+from channels.testing import WebsocketCommunicator
+from facade.consumers.async_consumer import AgentConsumer
 
 
 @pytest.fixture(scope="function")
@@ -41,7 +47,7 @@ def create_bucket2(s3) -> None:
 def backend_stack():
     docker_compose_path = os.path.join(os.path.dirname(__file__), "integration", "docker-compose.yaml")
 
-    with local(docker_compose_path) as e:
+    with testing(docker_compose_path) as e:
         e.inspect()
 
         e.down()
@@ -95,6 +101,44 @@ def authenticated_context(db, backend_stack):
     request.set_membership(membership)  # type: ignore
 
     return HttpContext(request=request, headers={"Authorization": "Bearer test"}, type="http")
+
+
+@pytest.fixture(scope="function")
+def agent_ws_redis(backend_stack):
+    """Start each agent test from a clean redis queue.
+
+    The consumer now reads its redis endpoint from ``settings.AGENT_REDIS_HOST`` /
+    ``AGENT_REDIS_PORT`` (overridden to the published ``localhost:6666`` port in
+    ``settings_test``), so no factory monkeypatching is needed — we just flush the
+    DB so broadcasts from a previous test can't leak.
+    """
+    client = sync_redis.Redis(host=settings.AGENT_REDIS_HOST, port=settings.AGENT_REDIS_PORT)
+    client.flushdb()
+    client.close()
+    yield
+
+
+@pytest_asyncio.fixture(scope="function")
+async def agent_ws(agent_ws_redis):
+    """Factory yielding connected ``WebsocketCommunicator``s, each disconnected on teardown.
+
+    Disconnecting is mandatory: a registered agent spawns two long-lived background
+    tasks (``listen_for_tasks`` and ``heartbeat``) that are only cancelled in
+    ``disconnect``. Leaking them pollutes the async DB connections across tests.
+    """
+    created = []
+
+    async def _connect():
+        communicator = WebsocketCommunicator(AgentConsumer.as_asgi(), "/agi")
+        connected, _ = await communicator.connect()
+        assert connected, "WebsocketCommunicator failed to connect to AgentConsumer"
+        created.append(communicator)
+        return communicator
+
+    yield _connect
+
+    for communicator in created:
+        await communicator.disconnect()
 
 
 @pytest.fixture(scope="function")

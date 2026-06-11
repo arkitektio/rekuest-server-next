@@ -17,3 +17,8 @@ DATABASE_ROUTERS = []
 
 # Use in-memory channel layer for tests instead of Redis
 CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
+
+# Point the agent queue at the published dokker redis port (see
+# tests/integration/docker-compose.yaml). Replaces the old redis-factory monkeypatch.
+AGENT_REDIS_HOST = "localhost"
+AGENT_REDIS_PORT = 6666

@@ -34,6 +34,10 @@ AGENT_DISCONNECTED_TIMEOUT = 20
 AGENT_HEARTBEAT_INTERVAL = 10
 AGENT_HEARTBEAT_RESPONSE_TIMEOUT = 5
 
+# Redis endpoint the agent queue (broadcast -> agent delivery) talks to.
+AGENT_REDIS_HOST = conf.redis.host
+AGENT_REDIS_PORT = conf.redis.port
+
 
 AGENT_HEARTBEAT_NOT_RESPONDED_CODE = 3001
 
