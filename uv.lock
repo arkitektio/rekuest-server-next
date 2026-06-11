@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.12, <4"
 
 [[package]]
@@ -739,7 +739,7 @@ wheels = [
 
 [[package]]
 name = "dokker"
-version = "2.3.0"
+version = "2.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -747,9 +747,9 @@ dependencies = [
     { name = "koil" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f9/cc/396acef6a85fa9d19f3193ceed890fce08e4ecb4880c5675395fcce560b6/dokker-2.3.0.tar.gz", hash = "sha256:a08d427c9db5a5266ffa91a8f6ebcf39fbc534ea971a1da0d4f0e160cc7a2103", size = 16448, upload-time = "2025-07-24T10:19:15.546Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/77/c5/05305ef07ee88a1e163df105d0fba0360ffe478c35235255fde3bb32e1dc/dokker-2.4.0.tar.gz", hash = "sha256:759632f702299931c447ad762fd4a53187e30bdeb4fb03fdeda9622825c8d62b", size = 22946, upload-time = "2026-06-09T15:30:13.086Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/55/56/5678ae614a78b17bd736adbba4373b27cc3eb7d9fb7d98d070361f4c1d16/dokker-2.3.0-py3-none-any.whl", hash = "sha256:307ef20ebaf5a3014f32b503e629957b112b1466888bdf8ae05a39dcb523cc00", size = 21725, upload-time = "2025-07-24T10:19:14.351Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/af/870e55023fe498b6af470048744b76144a70832f5e64b42f06a712b73814/dokker-2.4.0-py3-none-any.whl", hash = "sha256:35e28345b679027708520bd3a28d7ae482f856aaafafa1cd7fd8b4d7a112783c", size = 28618, upload-time = "2026-06-09T15:30:13.949Z" },
 ]
 
 [[package]]
@@ -893,15 +893,6 @@ wheels = [
 ]
 
 [[package]]
-name = "janus"
-version = "1.2.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d8/1f/5100f13bc13e24a041f60757b097b3c7c31cf8a08c1c1ef1f1caa2516f22/janus-1.2.0.tar.gz", hash = "sha256:c03475c3e10e042f2a08d31a7a894df2a2a95845ff794b7265e7e9c10a425e5d", size = 21534, upload-time = "2024-12-12T23:59:54.797Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d0/d6/6b3ac4df8d0e928521fe7d49cff8f3274b5012975ec0bdbb968ae50531aa/janus-1.2.0-py3-none-any.whl", hash = "sha256:3fa91456c00caed4905821a911e95c69d41306e463ea8da72c76c7a096abc698", size = 11674, upload-time = "2024-12-12T23:59:52.327Z" },
-]
-
-[[package]]
 name = "jinja2"
 version = "3.1.6"
 source = { registry = "https://pypi.org/simple" }
@@ -999,15 +990,14 @@ wheels = [
 
 [[package]]
 name = "koil"
-version = "2.5.3"
+version = "3.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "janus" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c6/bb/74284dbe91bbc197a7ef27f53ff7ebdfd45644884c4a26b2b707d203db68/koil-2.5.3.tar.gz", hash = "sha256:159b18168b4f8a826de4c03a649e1d955f57513cabef46cc93dfaeb37cf39985", size = 15848, upload-time = "2026-04-02T15:26:16.422Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f6/f2/c803075854fda0c08201a280358a694206b4dcbc1c1f19981eec73b0f107/koil-3.3.1.tar.gz", hash = "sha256:18415e55b9f87651127db9aed284fca5bdfdd8d9c5fa9e44b0acdfdccf7fccf6", size = 40936, upload-time = "2026-06-11T14:59:26.835Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f3/38/3a0aa88b9c919861adcf296fad719828ed87179bb892ce61af582423add2/koil-2.5.3-py3-none-any.whl", hash = "sha256:d71fbef7c80ee3943ebd76235b4cf9a26ed700a249381fd54b01341b39f1faf1", size = 19398, upload-time = "2026-04-02T15:26:17.345Z" },
+    { url = "https://files.pythonhosted.org/packages/64/0b/af9f50f28c16a5378f23096766a7983b0904026fad24eee09a1b1eb17265/koil-3.3.1-py3-none-any.whl", hash = "sha256:603bb640c85bb70e9c9f08bbb90b2bf3196c8e15a3f287d79525539d5e34c3ab", size = 47270, upload-time = "2026-06-11T14:59:27.885Z" },
 ]
 
 [[package]]
@@ -1779,7 +1769,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "django-stubs", specifier = ">=6.0.1" },
-    { name = "dokker", specifier = ">=2.3.0" },
+    { name = "dokker", specifier = ">=2.4" },
     { name = "moto", specifier = ">=5.1.22" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-asyncio", specifier = ">=1.3.0" },

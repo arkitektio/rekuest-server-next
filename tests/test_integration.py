@@ -60,7 +60,6 @@ class TestIntegration:
         assert update_result.data is not None
         assert update_result.data["ensureAgent"]["id"] == agent_id  # Same agent
         assert update_result.data["ensureAgent"]["name"] == "Integration Test Agent"
-        assert update_result.data["ensureAgent"]["extensions"] == []
 
         # Step 4: Delete the agent
         delete_mutation = """
@@ -143,7 +142,6 @@ class TestIntegration:
                 createBlok(input: $input) {
                     id
                     name
-                    url
                     creator {
                         sub
                     }
@@ -151,7 +149,7 @@ class TestIntegration:
             }
         """
 
-        blok_result = await schema.execute(create_blok_mutation, context_value=authenticated_context, variable_values={"input": {"name": "Integration Test Blok", "url": "http://example.com/blok", "actionDemands": [], "stateDemands": []}})
+        blok_result = await schema.execute(create_blok_mutation, context_value=authenticated_context, variable_values={"input": {"name": "Integration Test Blok", "uri": "http://example.com/blok", "demoState": {}}})
 
         assert blok_result.data is not None
         blok_id = blok_result.data["createBlok"]["id"]

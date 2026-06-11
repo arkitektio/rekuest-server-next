@@ -176,8 +176,8 @@ class TestModels:
         assert blok.name == "Test Blok"
         assert blok.description == "A test UI blok"
         assert blok.creator == user
-        assert blok.action_demands == []
-        assert blok.state_demands == []
+        assert blok.components == []
+        assert blok.demo_state == {}
 
     def test_dashboard_creation(self):
         """Test creating a Dashboard model instance."""

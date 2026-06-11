@@ -139,7 +139,6 @@ class TestGraphQLMutations:
                     id
                     name
                     description
-                    url
                     creator {
                         sub
                     }
@@ -147,7 +146,7 @@ class TestGraphQLMutations:
             }
         """
 
-        result = await schema.execute(mutation, context_value=authenticated_context, variable_values={"input": {"name": "Test UI Blok", "url": "http://example.com/blok", "actionDemands": [], "description": "A test UI component", "stateDemands": []}})
+        result = await schema.execute(mutation, context_value=authenticated_context, variable_values={"input": {"name": "Test UI Blok", "uri": "http://example.com/blok", "description": "A test UI component", "demoState": {}}})
 
         assert result.data is not None, f"Errors: {result.errors}"
         assert "createBlok" in result.data

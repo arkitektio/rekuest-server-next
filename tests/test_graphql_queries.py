@@ -118,7 +118,6 @@ class TestGraphQLQueries:
                 bloks {
                     id
                     name
-                    url
                     creator {
                         sub
                     }

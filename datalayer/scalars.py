@@ -10,5 +10,12 @@ MediaLike = strawberry.scalar(
     parse_value=lambda v: v,  # Implement your parsing logic here
 )
 
+ArrayLike = strawberry.scalar(
+    NewType("ArrayLike", list),
+    description="A type representing an array-like structure, which can be a list or any iterable.",
+    serialize=lambda v: v,  # Implement your serialization logic here
+    parse_value=lambda v: v,  # Implement your parsing logic here
+)
+
 
 scalar_map = {MediaLike: MediaLike}
