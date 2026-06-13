@@ -44,28 +44,12 @@ def extract_structure_recursively(structures: list[str], definition: PortInputMo
         extract_structure_recursively(structures, port)
 
 
-def extract_structures(definition: DefinitionInputModel) -> list[str]:
-    structures = []
-    for port in definition.args + definition.returns:
-        extract_structure_recursively(structures, port)
-
-    return list(set(structures))
-
-
 def extract_interfaces_recursively(interfaces: list[str], definition: PortInputModel):
     if definition.identifier and definition.kind == PortKind.INTERFACE:
         interfaces.append(definition.identifier)
 
     for port in definition.children or []:
         extract_interfaces_recursively(interfaces, port)
-
-
-def extract_interfaces(definition: DefinitionInputModel) -> list[str]:
-    interfaces = []
-    for port in definition.args + definition.returns:
-        extract_interfaces_recursively(interfaces, port)
-
-    return list(set(interfaces))
 
 
 def identifier_to_key(identifier: str) -> str:

@@ -1,0 +1,197 @@
+from authentikate.models import Organization, Release
+from django.contrib.auth import get_user_model
+from django.db import models
+from rekuest_core.inputs.models import ActionDependencyInputModel
+
+from facade import enums
+
+
+class Dependency(models.Model):
+    """A Dependency
+
+    Dependencies are predeclared dependencies for functions
+    that will only ever rely on a specific set of functionality
+
+    Functions that declare dependencies CANNOT dynamically
+    reserve new functionality.
+
+
+    """
+
+    implementation = models.ForeignKey(
+        "Implementation",
+        on_delete=models.CASCADE,
+        help_text="The implementation that has this dependency",
+        related_name="dependencies",
+    )
+    key = models.CharField(
+        max_length=2000,
+        help_text="A reference for this dependency",
+    )
+    action_demands = models.JSONField(
+        default=list,
+        help_text="The action demands this dependency has to meet",
+    )
+    state_demands = models.JSONField(
+        default=list,
+        help_text="The state demands this dependency has to meet",
+    )
+    auto_resolvable = models.BooleanField(
+        default=False,
+        help_text="If this dependency is auto resolvable, the system will try to automatically bind any agent that the user can assign to this dependency. If False, the user will have to manually bind an agent to this dependency before it can be used.",
+    )
+    app_filter = models.CharField(
+        max_length=2000,
+        null=True,
+        blank=True,
+        help_text="If set, only Agents of this app will be able to be assigned to this dependency.",
+    )
+    version_filter = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        help_text="If set, only Agents of this version will be able to be assigned to this dependency",
+    )
+
+    optional = models.BooleanField(default=False, help_text="Is this dependency optional")
+    description = models.TextField(null=True, blank=True, help_text="A description for this dependency")
+    created_at = models.DateTimeField(auto_created=True, auto_now_add=True)
+    min_viable_instances = models.IntegerField(
+        null=True,
+        help_text="The minimal viable instance count for this dependency",
+    )
+    max_viable_instances = models.IntegerField(
+        null=True,
+        help_text="The maximal viable instance count for this dependency",
+    )
+
+    prefered_instances = models.IntegerField(
+        null=True,
+        help_text="The prefered instance count for this dependency",
+    )
+    assign_policy = models.CharField(
+        max_length=1000,
+        choices=[(tag, tag.value) for tag in enums.AssignPolicy],
+        default=enums.AssignPolicy.AUTOMATIC,
+        help_text="The assign policy for this dependency",
+    )
+
+    def get_action_demands(self):
+        return [ActionDependencyInputModel(**demand) for demand in self.action_demands]
+
+
+class Resolution(models.Model):
+    resolved_at = models.DateTimeField(auto_created=True, auto_now_add=True)
+    # Preset Logic
+    name = models.CharField(max_length=200, null=True, blank=True, help_text="If set, this is a named preset (e.g. 'Standard Zeiss Config')")
+    is_template = models.BooleanField(default=False, help_text="If True, this resolution appears in search results for other users to reuse.")
+
+    implementation = models.ForeignKey("Implementation", on_delete=models.CASCADE, related_name="resolutions", help_text="The specific Implementation that this tree is configuring dependencies for.")
+    creator = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.CASCADE,
+        related_name="created_resolutions",
+        help_text="The user that created this Resolution",
+    )
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="resolutions",
+        help_text="The organization this Resolution belongs to",
+    )
+
+
+class ResolvedDependency(models.Model):
+    # The Parent Scope
+
+    resolution = models.ForeignKey(Resolution, on_delete=models.CASCADE, related_name="resolved_dependencies", help_text="The resolution scope this choice belongs to")
+    dependency = models.ForeignKey(Dependency, on_delete=models.SET_NULL, null=True, blank=True, help_text="The dependency this choice is fulfilling")
+
+    # The Requirement & The Choice
+    key = models.CharField(max_length=2000)  # Matches Dependency.key
+    resolution_key = models.CharField(max_length=2000, null=True, blank=True, help_text="An optional key to identify this resolution in the context of its parent resolution")
+    implementation = models.ForeignKey(
+        "Implementation",
+        on_delete=models.PROTECT,  # Don't delete history if a tool is removed
+        help_text="The tool chosen to fulfill the dependency",
+    )
+
+    # The Recursive Link (The Sub-Tree)
+    # If the chosen implementation has dependencies itself, this is where they are configured and stored
+    down_stream_resolution = models.ForeignKey(Resolution, on_delete=models.CASCADE, null=True, blank=True, related_name="upstream_dependencies", help_text="The configuration tree for THIS implementation's dependencies")
+
+
+class Implementation(models.Model):
+    """A Implementation is a conceptual implementation of A Action. It represents its implementation as well as its performance"""
+
+    release = models.ForeignKey(Release, on_delete=models.CASCADE, related_name="implementations", help_text="The release this implementation belongs to (implementations are part of a release and are NOT associated only with an app)")
+    interface = models.CharField(max_length=1000, help_text="Interface (think Function)")
+    action = models.ForeignKey(
+        "Action",
+        on_delete=models.CASCADE,
+        help_text="The action this implementation is implementatig",
+        related_name="implementations",
+    )
+    agent = models.ForeignKey(
+        "Agent",
+        on_delete=models.CASCADE,
+        help_text="The associated registry for this Implementation",
+        related_name="implementations",
+    )
+    name = models.CharField(
+        max_length=1000,
+        default="Unnamed",
+        help_text="A name for this Implementation",
+    )
+    pinned_by = models.ManyToManyField(
+        get_user_model(),
+        related_name="pinned_implementations",
+        blank=True,
+        help_text="The users that pinned this Agent",
+    )
+    extensions = models.JSONField(
+        max_length=2000,
+        default=list,
+        help_text="The attached extensions for this Implementation",
+    )
+    policy = models.JSONField(
+        max_length=2000,
+        default=dict,
+        help_text="The attached policy for this implementation",
+    )
+    higher_order_for = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="lower_order_implementations",
+        help_text="If this implementation is a higher order implementation, this field links to the lower order implementation it is wrapping (the implementation will actually get the params, the implementation and the args of this)",
+    )
+    extension = models.CharField(
+        max_length=1000,
+        default="default",
+        help_text="If this implementation is an extension of another implementation, this field links to the extension point (the implementation will actually get the params, the implementation and the args of this)",
+    )
+
+    params = models.JSONField(default=dict, help_text="Params for this Implementation")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    tracks = models.JSONField(default=list, help_text="A log of all the assignations that have been provisioned with this implementation, as well as their status and results")
+    manipulates = models.ManyToManyField("State", help_text="Which states does this implementation manipulate?", related_name="manipulated_by")
+    dynamic: str = models.BooleanField(help_text="Dynamic Implementations will be able to create new reservations on runtime")
+
+    class Meta:
+        permissions = [("providable", "Can provide this implementation")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["interface", "agent"],
+                name="A implementation has unique reachable versions for every action it trys to implement",
+            ),
+            models.UniqueConstraint(
+                fields=["action", "agent"],
+                name="An Agent can only have one implementation for the same Action",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.action} implemented by {self.agent}"

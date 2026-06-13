@@ -6,24 +6,24 @@ import strawberry
 
 def create_blok(info: Info, input: inputs.CreateBlokInput) -> types.Blok:
 
-    input = input.to_pydantic()
+    model = input.to_pydantic()
 
-    catalog = models.UICatalog.objects.get_or_create(name=input.catalog)[0] if input.catalog else models.UICatalog.objects.get_or_create(name="default")[0]
+    catalog = models.UICatalog.objects.get_or_create(name=model.catalog)[0] if model.catalog else models.UICatalog.objects.get_or_create(name="default")[0]
 
     x, _ = models.Blok.objects.update_or_create(
-        name=input.name,
+        name=model.name,
         defaults=dict(
-            components=[x.model_dump() for x in input.components] if input.components else [],
-            description=input.description,
+            components=[x.model_dump() for x in model.components] if model.components else [],
+            description=model.description,
             creator=info.context.request.user,
             catalog=catalog,
-            demo_state=input.demo_state,
+            demo_state=model.demo_state,
         ),
     )
 
     new_deps = []
-    if input.dependencies:
-        for i in input.dependencies:
+    if model.dependencies:
+        for i in model.dependencies:
             dep, _ = models.BlokDependency.objects.update_or_create(
                 blok=x,
                 key=i.key,

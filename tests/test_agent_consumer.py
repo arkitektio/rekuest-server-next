@@ -97,7 +97,7 @@ async def _seed_agent(instance_id, token=TEST_TOKEN, blocked=False):
     Uses the same authentikate expansion the consumer uses, so the derived
     Registry matches and ``on_register`` finds (rather than creates) the agent.
     """
-    decoded = authenticate_token_or_none(token)
+    decoded = await authenticate_token_or_none(token)
     user = await aexpand_user_from_token(decoded)
     client = await aexpand_client_from_token(decoded)
     organization = await aexpand_organization_from_token(decoded)

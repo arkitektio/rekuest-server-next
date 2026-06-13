@@ -146,7 +146,7 @@ class TestGraphQLMutations:
             }
         """
 
-        result = await schema.execute(mutation, context_value=authenticated_context, variable_values={"input": {"name": "Test UI Blok", "uri": "http://example.com/blok", "description": "A test UI component", "demoState": {}}})
+        result = await schema.execute(mutation, context_value=authenticated_context, variable_values={"input": {"name": "Test UI Blok", "description": "A test UI component", "demoState": {}}})
 
         assert result.data is not None, f"Errors: {result.errors}"
         assert "createBlok" in result.data
@@ -230,6 +230,7 @@ class TestGraphQLMutations:
 
         # Create a context without authentication
         from kante.context import HttpContext, UniversalRequest
+        from strawberry.http.temporal_response import TemporalResponse
 
         unauthenticated_context = HttpContext(
             request=UniversalRequest(
@@ -238,6 +239,7 @@ class TestGraphQLMutations:
                 _user=None,
                 _organization=None,
             ),
+            response=TemporalResponse(),
             headers={},
             type="http",
         )

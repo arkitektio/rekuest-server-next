@@ -149,7 +149,7 @@ class TestIntegration:
             }
         """
 
-        blok_result = await schema.execute(create_blok_mutation, context_value=authenticated_context, variable_values={"input": {"name": "Integration Test Blok", "uri": "http://example.com/blok", "demoState": {}}})
+        blok_result = await schema.execute(create_blok_mutation, context_value=authenticated_context, variable_values={"input": {"name": "Integration Test Blok", "demoState": {}}})
 
         assert blok_result.data is not None
         blok_id = blok_result.data["createBlok"]["id"]

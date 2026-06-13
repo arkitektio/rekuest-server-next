@@ -50,7 +50,7 @@ async def default_authenticator(register: messages.Register) -> "models.Agent":
     That is pinned behaviour — do not "fix" it here without updating
     ``test_register_for_uncreated_agent_is_rejected``.
     """
-    token = authenticate_token_or_none(register.token)
+    token = await authenticate_token_or_none(register.token)
     if not token:
         raise ValueError("Invalid token")
 

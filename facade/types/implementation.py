@@ -1,0 +1,62 @@
+"""The Implementation GraphQL type."""
+
+from __future__ import annotations
+
+from typing import Optional
+
+import strawberry
+import strawberry_django
+from kante.types import Info
+from rekuest_core import scalars as rscalars
+from rekuest_core.objects import models as rmodels
+from rekuest_core.objects import types as rtypes
+
+from facade import filters, models
+from facade.types.base import build_prescoped_queryset
+
+
+@strawberry_django.type(models.Implementation, filters=filters.ImplementationFilter, ordering=filters.ImplementationOrder, pagination=True, description="Represents a concrete implementation of an action.")
+class Implementation:
+    id: strawberry.ID = strawberry_django.field(description="Unique ID of the implementation.")
+    interface: str = strawberry_django.field(description="Interface string representing the implementation entrypoint.")
+    extension: str = strawberry_django.field(description="Extension or module name.")
+    agent: "Agent" = strawberry_django.field(description="Agent running this implementation.")
+    action: "Action" = strawberry_django.field(description="The action this implements.")
+    params: rscalars.AnyDefault = strawberry_django.field(description="Arbitrary parameters for the implementation.")
+    resolutions: list["Resolution"] = strawberry_django.field(description="The resolved dependencies")
+    dependencies: list["Dependency"] = strawberry_django.field(description="Dependencies required by this action.")
+    manipulates: list["State"] = strawberry.field(description="States that this implementation manipulates.")
+
+    @strawberry_django.field(description="Constructed name for display, combining interface and agent name.")
+    def name(self) -> str:
+        return self.interface + "@" + self.agent.name
+
+    @strawberry_django.field(description="Check if this implementation is pinned by the current user.")
+    def pinned(self, info: Info) -> bool:
+        user = info.context.request.user
+        return self.pinned_by.filter(id=user.id).exists()
+
+    @strawberry_django.field(description="Tests")
+    def tests(self, info: Info) -> list["Implementation"]:
+        return []
+
+    @strawberry_django.field(description="List of action demands")
+    def tracks(self) -> list[rtypes.Track]:
+        return [rmodels.TrackModel(**i) for i in self.tracks]
+
+    @strawberry_django.field(description="Get the latest completed assignation created by the current user.")
+    def my_latest_assignation(self, info: Info) -> Optional["Assignation"]:
+        user = info.context.request.user
+        return (
+            self.assignations.filter(
+                implementation=self.id,
+                is_done=True,
+                waiter__registry__user=user,
+            )
+            .order_by("-created_at")
+            .first()
+        )
+
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="action__organization")

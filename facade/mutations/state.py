@@ -8,10 +8,6 @@ import strawberry
 logger = logging.getLogger(__name__)
 
 
-def underscore(s: str) -> str:
-    return s.replace(" ", "_").replace("-", "_").lower()
-
-
 def log_patches(info: Info, input: inputs.LogPatchesInput) -> strawberry.ID:
     model = input.to_pydantic()
 

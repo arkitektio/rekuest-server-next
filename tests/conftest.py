@@ -11,6 +11,7 @@ from moto import mock_aws
 from authentikate.models import Client, Organization, User, Membership
 from django.conf import settings
 from kante.context import HttpContext, UniversalRequest
+from strawberry.http.temporal_response import TemporalResponse
 from dokker import local, testing
 
 from channels.testing import WebsocketCommunicator
@@ -100,7 +101,7 @@ def authenticated_context(db, backend_stack):
     )
     request.set_membership(membership)  # type: ignore
 
-    return HttpContext(request=request, headers={"Authorization": "Bearer test"}, type="http")
+    return HttpContext(request=request, response=TemporalResponse(), headers={"Authorization": "Bearer test"}, type="http")
 
 
 @pytest.fixture(scope="function")
@@ -159,4 +160,4 @@ def simple_api_context(db, backend_stack) -> HttpContext:
     )
     request.set_membership(membership)  # type: ignore
 
-    return HttpContext(request=request, headers={"Authorization": "Bearer test"}, type="http")
+    return HttpContext(request=request, response=TemporalResponse(), headers={"Authorization": "Bearer test"}, type="http")
