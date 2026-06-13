@@ -31,7 +31,7 @@ class SessionBoundary:
 @kante.django_type(
     models.Session,
     filters=filters.SessionFilter,
-    order=filters.SessionOrder,
+    ordering=filters.SessionOrder,
     pagination=True,
     description="A session representing a continuous interaction of an agent with the system.",
 )

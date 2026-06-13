@@ -12,7 +12,7 @@ from strawberry_django.fields.filter_order import filter_field
 from facade import models
 
 
-@strawberry_django.order(models.Session)
+@strawberry_django.order_type(models.Session)
 class SessionOrder:
     started_at: auto
     ended_at: auto

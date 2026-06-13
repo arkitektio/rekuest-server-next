@@ -14,7 +14,7 @@ from strawberry_django.fields.filter_order import filter_field
 from facade import enums, models, scalars
 
 
-@strawberry_django.order(models.Assignation)
+@strawberry_django.order_type(models.Assignation)
 class AssignationOrder:
     created_at: auto
     started_at: auto
@@ -67,7 +67,7 @@ class AssignationFilter:
         return queryset.filter(**{f"{prefix}agent_id": value}), Q()
 
 
-@strawberry_django.order(models.AssignationEvent)
+@strawberry_django.order_type(models.AssignationEvent)
 class AssignationEventOrder:
     created_at: auto
 

@@ -12,7 +12,7 @@ from strawberry_django.fields.filter_order import filter_field
 from facade import models
 
 
-@strawberry_django.order(models.MaterializedBlok)
+@strawberry_django.order_type(models.MaterializedBlok)
 class MaterializedBlokOrder:
     created_at: auto
 

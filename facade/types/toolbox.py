@@ -20,14 +20,14 @@ class Collection:
     actions: list["Action"] = strawberry_django.field(description="Actions included in this collection.")
 
 
-@strawberry_django.type(models.Protocol, filters=filters.ProtocolFilter, pagination=True, order=filters.ProtocolOrder, description="A set of related actions forming a protocol.")
+@strawberry_django.type(models.Protocol, filters=filters.ProtocolFilter, pagination=True, ordering=filters.ProtocolOrder, description="A set of related actions forming a protocol.")
 class Protocol:
     id: strawberry.ID = strawberry_django.field(description="Protocol ID.")
     name: str = strawberry_django.field(description="Name of the protocol.")
     actions: list["Action"] = strawberry_django.field(description="Associated actions.")
 
 
-@strawberry_django.type(models.Toolbox, filters=filters.ToolboxFilter, pagination=True, order=filters.ToolboxOrder, description="A collection of shortcuts grouped as a toolbox.")
+@strawberry_django.type(models.Toolbox, filters=filters.ToolboxFilter, pagination=True, ordering=filters.ToolboxOrder, description="A collection of shortcuts grouped as a toolbox.")
 class Toolbox:
     id: strawberry.ID = strawberry_django.field(description="Toolbox ID.")
     name: str = strawberry_django.field(description="Name of the toolbox.")
@@ -35,7 +35,7 @@ class Toolbox:
     shortcuts: list["Shortcut"] = strawberry_django.field(description="List of shortcuts in this toolbox.")
 
 
-@strawberry_django.type(models.Shortcut, filters=filters.ShortcutFilter, pagination=True, order=filters.ShortcutOrder, description="Shortcut to an action with preset arguments.")
+@strawberry_django.type(models.Shortcut, filters=filters.ShortcutFilter, pagination=True, ordering=filters.ShortcutOrder, description="Shortcut to an action with preset arguments.")
 class Shortcut:
     id: strawberry.ID = strawberry_django.field(description="Shortcut ID.")
     name: str = strawberry_django.field(description="Name of the shortcut.")

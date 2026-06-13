@@ -31,7 +31,7 @@ class DashboardPlacementFilter:
         return queryset.filter(**{f"{prefix}name__icontains": value}), Q()
 
 
-@strawberry_django.order(models.DashboardPlacement)
+@strawberry_django.order_type(models.DashboardPlacement)
 class DashboardPlacementOrder:
     role: auto
     created_at: auto

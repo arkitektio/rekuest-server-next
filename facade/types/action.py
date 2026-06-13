@@ -18,7 +18,7 @@ from facade.type_gen import create_stats_type
 from facade.types.base import build_prescoped_queryset, build_prescoper
 
 
-@strawberry_django.type(models.Action, filters=filters.ActionFilter, pagination=True, order=filters.ActionOrder, description="Represents an executable action in the system.")
+@strawberry_django.type(models.Action, filters=filters.ActionFilter, pagination=True, ordering=filters.ActionOrder, description="Represents an executable action in the system.")
 class Action:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the action.")
     hash: rscalars.ActionHash = strawberry_django.field(description="Unique hash identifying the action definition.")

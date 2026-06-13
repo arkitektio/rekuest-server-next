@@ -24,7 +24,7 @@ class UserFilter:
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
 
-@strawberry_django.order(User)
+@strawberry_django.order_type(User)
 class UserOrder:
     name: auto
     email: auto
@@ -32,7 +32,7 @@ class UserOrder:
     last_login: auto
 
 
-@strawberry_django.order(Organization, description="A way to order registries")
+@strawberry_django.order_type(Organization, description="A way to order registries")
 class OrganizationOrder:
     slug: auto
 
@@ -46,7 +46,7 @@ class OrganizationFilter:
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
 
-@strawberry_django.order(Client, description="A way to order apps")
+@strawberry_django.order_type(Client, description="A way to order apps")
 class ClientOrder:
     defined_at: auto
 

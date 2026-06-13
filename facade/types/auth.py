@@ -10,7 +10,7 @@ from authentikate import models as auth_models
 from facade import filters, models
 
 
-@kante.django_type(auth_models.User, filters=filters.UserFilter, pagination=True, order=filters.UserOrder, description="Represents an authenticated user.")
+@kante.django_type(auth_models.User, filters=filters.UserFilter, pagination=True, ordering=filters.UserOrder, description="Represents an authenticated user.")
 class User:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the user.")
     sub: strawberry.ID = strawberry_django.field(description="The subject identifier of the user.")
@@ -35,7 +35,7 @@ class Release:
     version: str = strawberry_django.field(description="Version string of the release.")
 
 
-@strawberry_django.type(auth_models.Client, filters=filters.ClientFilter, pagination=True, order=filters.ClientOrder, description="Represents a registered OAuth2 client.")
+@strawberry_django.type(auth_models.Client, filters=filters.ClientFilter, pagination=True, ordering=filters.ClientOrder, description="Represents a registered OAuth2 client.")
 class Client:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the client.")
     name: str = strawberry_django.field(description="Name of the client.")
@@ -44,7 +44,7 @@ class Client:
     device: Device | None = strawberry_django.field(description="Device associated with the client.")
 
 
-@strawberry_django.type(auth_models.Organization, filters=filters.OrganizationFilter, pagination=True, order=filters.OrganizationOrder, description="Represents an organization in the system.")
+@strawberry_django.type(auth_models.Organization, filters=filters.OrganizationFilter, pagination=True, ordering=filters.OrganizationOrder, description="Represents an organization in the system.")
 class Organization:
     slug: str = strawberry_django.field(description="Slug of the organization.")
 

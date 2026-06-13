@@ -12,7 +12,7 @@ from strawberry_django.fields.filter_order import filter_field
 from facade import models
 
 
-@strawberry_django.order(models.ThreeDModel)
+@strawberry_django.order_type(models.ThreeDModel)
 class ThreeDModelOrder:
     created_at: auto
     updated_at: auto
@@ -30,7 +30,7 @@ class ThreeDModelFilter:
         return queryset.filter(**{f"{prefix}name__icontains": value}), Q()
 
 
-@strawberry_django.order(models.Space)
+@strawberry_django.order_type(models.Space)
 class SpaceOrder:
     created_at: auto
     updated_at: auto

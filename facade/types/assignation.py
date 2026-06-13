@@ -15,7 +15,7 @@ from facade.types.base import build_prescoped_queryset, build_prescoper
 from facade.types.dependency import ResolvedAgentDependency
 
 
-@strawberry_django.type(models.Assignation, filters=filters.AssignationFilter, order=filters.AssignationOrder, pagination=True, description="Tracks the assignment of an implementation to a specific task.")
+@strawberry_django.type(models.Assignation, filters=filters.AssignationFilter, ordering=filters.AssignationOrder, pagination=True, description="Tracks the assignment of an implementation to a specific task.")
 class Assignation:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the assignation.")
     reference: str | None = strawberry_django.field(description="Optional external reference for tracking.")
@@ -77,7 +77,7 @@ AssignationStats, AssignationStatsResolver = create_stats_type(
 )
 
 
-@strawberry_django.type(models.AssignationEvent, filters=filters.AssignationEventFilter, order=filters.AssignationEventOrder, pagination=True, description="An event that occurred during an assignation.")
+@strawberry_django.type(models.AssignationEvent, filters=filters.AssignationEventFilter, ordering=filters.AssignationEventOrder, pagination=True, description="An event that occurred during an assignation.")
 class AssignationEvent:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the event.")
     name: str = strawberry_django.field(description="Name of the event.")

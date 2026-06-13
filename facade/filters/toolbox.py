@@ -16,17 +16,17 @@ from strawberry_django.filters import FilterLookup
 from facade import inputs, managers, models
 
 
-@strawberry_django.order(models.Protocol)
+@strawberry_django.order_type(models.Protocol)
 class ProtocolOrder:
     name: auto
 
 
-@strawberry_django.order(models.Shortcut)
+@strawberry_django.order_type(models.Shortcut)
 class ShortcutOrder:
     name: auto
 
 
-@strawberry_django.order(models.Toolbox)
+@strawberry_django.order_type(models.Toolbox)
 class ToolboxOrder:
     name: auto
 

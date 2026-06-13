@@ -14,7 +14,7 @@ from facade import filters, models, scalars
 @strawberry_django.type(
     models.ThreeDModel,
     filters=filters.ThreeDModelFilter,
-    order=filters.ThreeDModelOrder,
+    ordering=filters.ThreeDModelOrder,
     pagination=True,
     description="A 3D model file.",
 )
@@ -32,7 +32,7 @@ class ThreeDModel:
 @strawberry_django.type(
     models.Space,
     filters=filters.SpaceFilter,
-    order=filters.SpaceOrder,
+    ordering=filters.SpaceOrder,
     pagination=True,
     description="A space where agents can interact.",
 )

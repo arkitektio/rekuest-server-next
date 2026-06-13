@@ -144,7 +144,7 @@ class AgentFilter:
         return queryset.filter(**{f"{prefix}device__device_id": value}), Q()
 
 
-@strawberry_django.order(models.Agent)
+@strawberry_django.order_type(models.Agent)
 class AgentOrder:
     last_seen: auto
 

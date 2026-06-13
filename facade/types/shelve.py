@@ -10,7 +10,7 @@ import strawberry_django
 from facade import filters, models
 
 
-@strawberry_django.type(models.MemoryShelve, filters=filters.MemoryShelveFilter, order=filters.MemoryShelveOrder, pagination=True, description="A shelve for storing memory-based resources on an agent.")
+@strawberry_django.type(models.MemoryShelve, filters=filters.MemoryShelveFilter, ordering=filters.MemoryShelveOrder, pagination=True, description="A shelve for storing memory-based resources on an agent.")
 class MemoryShelve:
     id: strawberry.ID = strawberry_django.field(description="ID of the memory shelve.")
     agent: "Agent" = strawberry_django.field(description="Agent that owns this memory shelve.")

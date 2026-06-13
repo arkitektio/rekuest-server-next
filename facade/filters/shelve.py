@@ -28,7 +28,7 @@ class MemoryShelveFilter:
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
 
-@strawberry_django.order(models.MemoryShelve)
+@strawberry_django.order_type(models.MemoryShelve)
 class MemoryShelveOrder:
     name: auto
 

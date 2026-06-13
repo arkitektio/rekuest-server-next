@@ -17,15 +17,16 @@ from strawberry_django.filters import FilterLookup
 from facade import inputs, managers, models
 
 
-@strawberry_django.order(models.Action)
+@strawberry_django.order_type(models.Action)
 class ActionOrder:
     defined_at: auto
-    used_at: auto
 
-    def filter_used_at(self, queryset, info):
-        if self.used_at is None:
-            return queryset
-        return queryset.annotate(latest_assignation_time=Max("assignation__created_at")).order_by("-latest_assignation_time")
+    @strawberry_django.order_field
+    def used_at(self, info: Info, queryset, value: strawberry_django.Ordering, prefix: str):
+        if not value:
+            return queryset, []
+        queryset = queryset.annotate(latest_assignation_time=Max(f"{prefix}assignation__created_at"))
+        return queryset, [value.resolve("latest_assignation_time")]
 
 
 @strawberry_django.filter_type(models.Action)

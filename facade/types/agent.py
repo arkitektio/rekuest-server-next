@@ -25,7 +25,7 @@ class HardwareRecord:
     agent: "Agent" = strawberry_django.field(description="The agent to which this hardware belongs.")
 
 
-@strawberry_django.type(models.Agent, filters=filters.AgentFilter, order=filters.AgentOrder, pagination=True, description="Represents a compute agent that can execute implementations.")
+@strawberry_django.type(models.Agent, filters=filters.AgentFilter, ordering=filters.AgentOrder, pagination=True, description="Represents a compute agent that can execute implementations.")
 class Agent:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the agent.")
     hash: str = strawberry_django.field(description="Hash representing the agent's definition for change detection.")
