@@ -312,4 +312,4 @@ class ComponentNodeModel(BaseModel):
     children: Optional[List["ComponentNodeModel"]] = None
 
 
-SearchAssignWidgetModel.update_forward_refs()
+SearchAssignWidgetModel.model_rebuild()

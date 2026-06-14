@@ -10,10 +10,9 @@ behaviour is unit-testable with fakes — no docker, no DB, no monkeypatching.
 """
 
 import asyncio
-import datetime
 import json
 import logging
-from typing import Awaitable, Callable, List, Optional
+from typing import Awaitable, Callable, Optional
 
 from authentikate.expand import (
     aexpand_client_from_token,
@@ -22,6 +21,7 @@ from authentikate.expand import (
 )
 from authentikate.utils import authenticate_token_or_none
 from django.conf import settings
+from django.utils import timezone
 from pydantic import BaseModel, Field
 
 from facade import codes, messages, models
@@ -101,7 +101,6 @@ class AgentProtocol:
         )
 
         self.agent: Optional["models.Agent"] = None
-        self.assignations: List["models.Assignation"] = []
         self.received_initial_payload = False
         self.heartbeat_future: Optional[asyncio.Future] = None
         self.listen_task: Optional[asyncio.Task] = None
@@ -148,7 +147,7 @@ class AgentProtocol:
             else:
                 await self.dispatch(payload.message)
         except Exception:
-            logger.error("Unkown in consumer", exc_info=True)
+            logger.error("Unknown error handling agent message", exc_info=True)
             await self.close(codes.FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE)
 
     async def dispatch(self, message: messages.FromAgentMessage) -> None:
@@ -192,14 +191,14 @@ class AgentProtocol:
             await self.close(codes.AGENT_IS_BLOCKED_CODE)
             return
 
-        self.assignations = await self.backend.on_agent_connected(self.agent.pk)
+        assignations = await self.backend.on_agent_connected(self.agent.pk)
         self.heartbeat_future = None
 
         await self.send_to_agent_message(
             messages.Init(
                 instance_id=self.agent.instance_id,
                 agent=str(self.agent.pk),
-                inquiries=[messages.AssignInquiry(assignation=str(a.pk)) for a in self.assignations],
+                inquiries=[messages.AssignInquiry(assignation=str(a.pk)) for a in assignations],
             )
         )
 
@@ -221,8 +220,8 @@ class AgentProtocol:
             logger.error("Received heartbeat without future, possible race condition.")
 
         self.agent.connected = True
-        self.agent.last_seen = datetime.datetime.now()
-        await self.agent.asave()
+        self.agent.last_seen = timezone.now()
+        await self.agent.asave(update_fields=["connected", "last_seen"])
 
     async def heartbeat(self, agent_id: str) -> None:
         """Periodically ping the agent and close if it stops answering."""
@@ -250,7 +249,7 @@ class AgentProtocol:
                     # Deliver first, then ack — so a crash mid-delivery leaves the
                     # message recoverable (at-least-once), matching the original.
                     await self._send(task)
-                    await self.queue.ack(task)
+                    await self.queue.ack(agent_id, task)
         except asyncio.CancelledError:
             return
 

@@ -60,14 +60,14 @@ def build_dependency_dict(implementation: models.Implementation, info: Info, dep
                 if not dep.auto_resolvable:
                     raise ValueError(f"Dependency {dep.key} is not auto resolvable, but was provided with an overwrite that has auto_resolve set to true. Please either set auto_resolve to false for this dependency overwrite, or make the dependency auto resolvable in the system.")
 
-                agents = models.Agent.objects.filter(app__identifier=dep.app_filter, connected=True, last_seen__gt=datetime.now() - timedelta(minutes=1), organization=info.context.request.organization).all()
+                agents = models.Agent.objects.filter(app__identifier=dep.app_filter, connected=True, last_seen__gt=datetime.now(timezone.utc) - timedelta(minutes=1), organization=info.context.request.organization).all()
                 if dep.max_viable_instances is not None:
                     agents = agents[: dep.max_viable_instances]
                 if dep.min_viable_instances is not None and len(agents) < dep.min_viable_instances:
                     raise ValueError(f"Not enough agents found for dependency {dep.key}. Required at least {dep.min_viable_instances} but found only {len(agents)}. Please ensure that there are enough agents available to resolve this dependency.")
 
             else:
-                agents = models.Agent.objects.filter(pk__in=[agent_id.agent for agent_id in overwrite.mapped_agents], connected=True, last_seen__gt=datetime.now() - timedelta(minutes=1)).all()
+                agents = models.Agent.objects.filter(pk__in=[agent_id.agent for agent_id in overwrite.mapped_agents], connected=True, last_seen__gt=datetime.now(timezone.utc) - timedelta(minutes=1)).all()
                 if dep.max_viable_instances is not None:
                     agents = agents[: dep.max_viable_instances]
                 if dep.min_viable_instances is not None and len(agents) < dep.min_viable_instances:
@@ -77,7 +77,7 @@ def build_dependency_dict(implementation: models.Implementation, info: Info, dep
             continue
         else:
             if dep.auto_resolvable:
-                agents = models.Agent.objects.filter(app__identifier=dep.app_filter, connected=True, last_seen__gt=datetime.now() - timedelta(minutes=1), organization=info.context.request.organization).all()
+                agents = models.Agent.objects.filter(app__identifier=dep.app_filter, connected=True, last_seen__gt=datetime.now(timezone.utc) - timedelta(minutes=1), organization=info.context.request.organization).all()
                 if dep.max_viable_instances is not None:
                     agents = agents[: dep.max_viable_instances]
                 if dep.min_viable_instances is not None and len(agents) < dep.min_viable_instances:
@@ -256,7 +256,7 @@ class RedisControllBackend(ControllBackend):
         elif input.action:
             reservation = None
             action = models.Action.objects.get(id=input.action)
-            implementation = models.Implementation.objects.filter(action=action, agent__connected=True, agent__last_seen__gt=datetime.now() - timedelta(minutes=1)).first()
+            implementation = models.Implementation.objects.filter(action=action, agent__connected=True, agent__last_seen__gt=datetime.now(timezone.utc) - timedelta(minutes=1)).first()
             if not implementation:
                 raise ValueError(f"No active implementation found for action {action.name}")
 

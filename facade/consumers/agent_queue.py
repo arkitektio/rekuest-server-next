@@ -13,14 +13,34 @@ monkeypatching the ``redis``/``redis.asyncio`` factories.
 import abc
 import asyncio
 from collections import defaultdict
-from typing import DefaultDict, Optional
+from typing import DefaultDict, Dict, Optional, Tuple
 
 import redis
 import redis.asyncio as aredis
 from django.conf import settings
 
 QUEUE_SUFFIX = "_my_queue"
-PROCESSING_QUEUE = "processing_queue"
+PROCESSING_SUFFIX = "_processing"
+
+
+def _processing_key(agent_id: str) -> str:
+    """The per-agent in-flight list — scopes ``ack``/recovery to one agent."""
+    return f"{agent_id}{PROCESSING_SUFFIX}"
+
+
+# Reuse one sync connection pool per (host, port) across all the short-lived
+# ``RedisAgentQueue`` instances that ``broadcast`` creates — otherwise every
+# pushed message would open and tear down a fresh TCP connection.
+_sync_pools: Dict[Tuple[str, int], "redis.ConnectionPool"] = {}
+
+
+def _sync_pool(host: str, port: int) -> "redis.ConnectionPool":
+    key = (host, port)
+    pool = _sync_pools.get(key)
+    if pool is None:
+        pool = redis.ConnectionPool(host=host, port=port)
+        _sync_pools[key] = pool
+    return pool
 
 
 class AgentQueue(abc.ABC):
@@ -45,8 +65,11 @@ class AgentQueue(abc.ABC):
         """
 
     @abc.abstractmethod
-    async def ack(self, message: str) -> None:
-        """Acknowledge a message returned by ``pop`` (remove it from in-flight)."""
+    async def ack(self, agent_id: str, message: str) -> None:
+        """Acknowledge a message returned by ``pop`` (remove it from in-flight).
+
+        ``agent_id`` scopes the removal to that agent's in-flight area.
+        """
 
     @abc.abstractmethod
     async def close(self) -> None:
@@ -54,7 +77,7 @@ class AgentQueue(abc.ABC):
 
 
 class RedisAgentQueue(AgentQueue):
-    """Redis-backed queue reproducing the original ``lpush``/``brpoplpush`` flow."""
+    """Redis-backed queue reproducing the original ``lpush``/``blmove`` flow."""
 
     def __init__(self, host: str, port: int) -> None:
         self.host = host
@@ -66,32 +89,30 @@ class RedisAgentQueue(AgentQueue):
         return cls(host=settings.AGENT_REDIS_HOST, port=settings.AGENT_REDIS_PORT)
 
     def push(self, agent_id: str, message_json: str) -> None:
-        connection = redis.Redis(host=self.host, port=self.port)
-        try:
-            connection.lpush(f"{agent_id}{QUEUE_SUFFIX}", message_json)
-        finally:
-            connection.close()
+        # Pooled connection: returned to the pool on use, not torn down per call.
+        connection = redis.Redis(connection_pool=_sync_pool(self.host, self.port))
+        connection.lpush(f"{agent_id}{QUEUE_SUFFIX}", message_json)
 
     async def pop(self, agent_id: str) -> Optional[str]:
         if self._async_connection is None:
-            self._async_connection = aredis.Redis(
-                host=self.host, port=self.port, auto_close_connection_pool=True
-            )
+            self._async_connection = aredis.Redis(host=self.host, port=self.port)
 
-        # Move into the processing queue but leave it there; ``ack`` removes it
-        # only after the caller has delivered the message.
-        task = await self._async_connection.brpoplpush(f"{agent_id}{QUEUE_SUFFIX}", PROCESSING_QUEUE)
+        # Move into this agent's processing list but leave it there; ``ack``
+        # removes it only after the caller has delivered the message.
+        task = await self._async_connection.blmove(
+            f"{agent_id}{QUEUE_SUFFIX}", _processing_key(agent_id), timeout=0, src="RIGHT", dest="LEFT"
+        )
         if task is None:
             return None
         return task.decode("utf-8")
 
-    async def ack(self, message: str) -> None:
+    async def ack(self, agent_id: str, message: str) -> None:
         if self._async_connection is not None:
-            await self._async_connection.lrem(PROCESSING_QUEUE, 0, message)
+            await self._async_connection.lrem(_processing_key(agent_id), 0, message)
 
     async def close(self) -> None:
         if self._async_connection is not None:
-            await self._async_connection.close()
+            await self._async_connection.aclose()
             self._async_connection = None
 
 
@@ -107,7 +128,7 @@ class InMemoryAgentQueue(AgentQueue):
     async def pop(self, agent_id: str) -> Optional[str]:
         return await self._queues[agent_id].get()
 
-    async def ack(self, message: str) -> None:
+    async def ack(self, agent_id: str, message: str) -> None:
         # ``asyncio.Queue.get`` already removed the item; nothing to do.
         return None
 

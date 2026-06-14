@@ -167,6 +167,31 @@ def _build_assignation(prefix):
     )
 
 
+def _build_unimplemented_assignation_for_agent(agent_pk, prefix):
+    """An unfinished assignation owned directly by ``agent`` with NO implementation.
+
+    Exercises the disconnect path: such rows are found by the direct ``agent`` FK
+    but would be missed by an ``implementation__agent`` filter (implementation is
+    null). Guards the B1 fix in ``ModelPersistBackend.on_agent_disconnected``.
+    """
+    agent = Agent.objects.get(pk=agent_pk)
+    app = App.objects.create(identifier=f"{prefix}-app")
+    action = Action.objects.create(
+        app=app, key=f"{prefix}-key", version="1.0.0", name=f"{prefix} action",
+        description=f"{prefix} description", hash=f"{prefix}-action-hash", organization=agent.organization,
+    )
+    waiter = Waiter.objects.create(registry=agent.registry, instance_id=f"{prefix}-waiter")
+
+    return Assignation.objects.create(
+        waiter=waiter,
+        action=action,
+        agent=agent,
+        implementation=None,
+        latest_event_kind=enums.AssignationEventKind.ASSIGN,
+        latest_instruct_kind=enums.AssignationInstructChoices.ASSIGN,
+    )
+
+
 def _build_state_for_agent(agent_pk, interface, prefix):
     """Create a State (and its definition) attached to an existing agent."""
     definition = StateDefinition.objects.create(
@@ -176,6 +201,7 @@ def _build_state_for_agent(agent_pk, interface, prefix):
 
 
 build_assignation = sync_to_async(_build_assignation)
+build_unimplemented_assignation_for_agent = sync_to_async(_build_unimplemented_assignation_for_agent)
 build_state_for_agent = sync_to_async(_build_state_for_agent)
 
 
@@ -257,6 +283,26 @@ class TestAgentProtocol:
 
         agent = await Agent.objects.aget(pk=agent_pk)
         assert agent.connected is False
+
+    async def test_disconnect_marks_unimplemented_assignation(self, agent_ws):
+        # Regression (B1): an unfinished assignation owned directly by the agent
+        # but with a null implementation must still get a DISCONNECTED event on
+        # disconnect. The handler previously filtered by ``implementation__agent``
+        # and silently skipped these rows.
+        agent = await _seed_agent("disconnect-unimpl-agent")
+        assignation = await build_unimplemented_assignation_for_agent(agent.pk, "disc-unimpl")
+
+        communicator = await agent_ws()
+        await register(communicator, instance_id="disconnect-unimpl-agent")
+        await communicator.disconnect()
+
+        events = [
+            e
+            async for e in AssignationEvent.objects.filter(
+                assignation_id=assignation.pk, kind=enums.AssignationEventKind.DISCONNECTED
+            )
+        ]
+        assert len(events) == 1
 
     async def test_register_for_uncreated_agent_is_rejected(self, agent_ws):
         # Pins current behavior: on_register can only *find* an agent — its
@@ -459,7 +505,7 @@ class FakeAgent:
         self.last_seen = None
         self.saves = 0
 
-    async def asave(self):
+    async def asave(self, **kwargs):
         self.saves += 1
 
 
@@ -657,7 +703,7 @@ class TestAgentProtocolUnit:
         agent = FakeAgent()
         release = asyncio.Event()
 
-        async def blocking_asave():
+        async def blocking_asave(**kwargs):
             await release.wait()
 
         agent.asave = blocking_asave

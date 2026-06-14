@@ -1,6 +1,6 @@
 from typing import List
 from facade import models, enums, messages
-import datetime
+from django.utils import timezone
 import logging
 
 
@@ -8,38 +8,32 @@ class ModelPersistBackend:
     async def on_agent_disconnected(self, agent_id: str) -> None:
         agent = await models.Agent.objects.aget(id=agent_id)
         agent.connected = False
-        agent.last_seen = datetime.datetime.now()
-        print(f"Agent {agent} disconnected")
+        agent.last_seen = timezone.now()
+        await agent.asave(update_fields=["connected", "last_seen"])
 
-        await agent.asave()
-
-        async for ass in models.Assignation.objects.filter(implementation__agent=agent, is_done=False).all():
+        # Same predicate as ``on_agent_connected`` (direct ``agent`` FK): an
+        # assignation may have a null/reassigned implementation, so filtering by
+        # ``implementation__agent`` would silently skip work this agent owns.
+        async for ass in models.Assignation.objects.filter(agent_id=agent_id, is_done=False).all():
             await models.AssignationEvent.objects.acreate(
                 assignation=ass,
                 kind=enums.AssignationEventKind.DISCONNECTED,
                 message="Agent disconnected. Fate unknown",
             )
-            await ass.asave()
+            ass.latest_event_kind = enums.AssignationEventKind.DISCONNECTED
+            await ass.asave(update_fields=["latest_event_kind"])
 
     async def on_agent_connected(self, agent_id: str) -> List[models.Assignation]:
         agent = await models.Agent.objects.aget(id=agent_id)
         agent.connected = True
-        agent.last_seen = datetime.datetime.now()
-        await agent.asave()
+        agent.last_seen = timezone.now()
+        await agent.asave(update_fields=["connected", "last_seen"])
 
         assignations = []
         async for i in models.Assignation.objects.filter(agent=agent, is_done=False).all():
             assignations.append(i)
 
         return assignations
-
-    async def on_agent_heartbeat(self, agent_id: str) -> None:
-        logging.debug(f"On agent Heartbeat {agent_id}")
-        x = await models.Agent.objects.aget(id=agent_id)
-        x.connected = True
-        x.last_seen = datetime.datetime.now()
-
-        await x.asave()
 
     async def on_agent_log(self, agent_id: str, message: messages.LogEvent) -> None:
         logging.info(f"Log Assignation {message}")
@@ -69,9 +63,9 @@ class ModelPersistBackend:
 
         x = await models.Assignation.objects.aget(id=message.assignation)
         x.is_done = True
-        x.finished_at = datetime.datetime.now()
+        x.finished_at = timezone.now()
         x.latest_event_kind = enums.AssignationEventKind.DONE
-        await x.asave()
+        await x.asave(update_fields=["is_done", "finished_at", "latest_event_kind"])
 
     async def on_agent_cancelled(self, agent_id: str, message: messages.CancelledEvent) -> None:
         logging.info(f"Critical Assignation {message}")
@@ -83,9 +77,9 @@ class ModelPersistBackend:
 
         x = await models.Assignation.objects.aget(id=message.assignation)
         x.is_done = True
-        x.finished_at = datetime.datetime.now()
+        x.finished_at = timezone.now()
         x.latest_event_kind = enums.AssignationEventKind.CANCELLED
-        await x.asave()
+        await x.asave(update_fields=["is_done", "finished_at", "latest_event_kind"])
 
     async def on_agent_error(self, agent_id: str, message: messages.ErrorEvent) -> None:
         logging.info(f"Critical Assignation {message}")
@@ -98,9 +92,9 @@ class ModelPersistBackend:
 
         x = await models.Assignation.objects.aget(id=message.assignation)
         x.is_done = True
-        x.finished_at = datetime.datetime.now()
+        x.finished_at = timezone.now()
         x.latest_event_kind = enums.AssignationEventKind.ERROR
-        await x.asave()
+        await x.asave(update_fields=["is_done", "finished_at", "latest_event_kind"])
 
     async def on_agent_critical(self, agent_id: str, message: messages.CriticalEvent) -> None:
         logging.info(f"Criticial Assignation {message}")
@@ -113,9 +107,9 @@ class ModelPersistBackend:
 
         x = await models.Assignation.objects.aget(id=message.assignation)
         x.is_done = True
-        x.finished_at = datetime.datetime.now()
+        x.finished_at = timezone.now()
         x.latest_event_kind = enums.AssignationEventKind.CRITICAL
-        await x.asave()
+        await x.asave(update_fields=["is_done", "finished_at", "latest_event_kind"])
 
     async def on_agent_progress(self, agent_id: str, message: messages.ProgressEvent) -> None:
         logging.info(f"Progress Assignation {message}")
@@ -149,10 +143,10 @@ class ModelPersistBackend:
         logging.info(f"Log Snapshot for Assignation {agent_id}")
 
         session, _ = await models.Session.objects.aget_or_create(agent_id=agent_id, session_id=message.session_id)
+        agent = await models.Agent.objects.aget(id=agent_id)
 
         for state_name, snapshot in message.snapshots.items():
             state = await models.State.objects.aget(agent_id=agent_id, interface=state_name)
-            agent = await models.Agent.objects.aget(id=agent_id)
 
             await models.Snapshot.objects.acreate(
                 session=session,
@@ -167,10 +161,10 @@ class ModelPersistBackend:
         # For now we don't do anything with this, but it could be used to initialize session-specific data
 
         session, _ = await models.Session.objects.aget_or_create(agent_id=agent_id, session_id=message.session_id)
+        agent = await models.Agent.objects.aget(id=agent_id)
 
         for state_name, snapshot in message.states.items():
             state = await models.State.objects.aget(agent_id=agent_id, interface=state_name)
-            agent = await models.Agent.objects.aget(id=agent_id)
 
             await models.Snapshot.objects.acreate(
                 session=session,

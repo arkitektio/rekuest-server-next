@@ -1,4 +1,5 @@
 import datetime
+from django.utils import timezone
 import uuid
 
 from authentikate.models import App, Device, Organization, Release, User
@@ -120,7 +121,7 @@ class Agent(models.Model):
 
     @property
     def is_active(self):
-        return self.connected and self.last_seen > datetime.datetime.now() - datetime.timedelta(minutes=5)
+        return self.connected and self.last_seen > timezone.now() - datetime.timedelta(minutes=5)
 
 
 class FilesystemShelve(models.Model):
