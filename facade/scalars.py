@@ -1,78 +1,44 @@
-from typing import Any, NewType
+from typing import NewType
 
 import strawberry
 
 
-@strawberry.scalar(description="The `Args` scalar type represents a Dictionary of arguments")
-class Args(object):
-    """Strawberry scalar for Args type representing a dictionary of arguments."""
-
-    @staticmethod
-    def serialize(value: Any) -> Any:
-        """Serialize an Args value for output."""
-        return value
-
-    @staticmethod
-    def parse_value(value: Any) -> "Args":
-        """Parse input value into Args type."""
-        return value
+Args = NewType("Args", object)
+UISchema = NewType("UISchema", object)
+Props = NewType("Props", object)
+SearchQuery = NewType("SearchQuery", str)
+InstanceId = NewType("InstanceId", str)
 
 
-@strawberry.scalar(description="The `Args` scalar type represents a Dictionary of arguments")
-class UISchema(object):
-    """Strawberry scalar for Args type representing a dictionary of arguments."""
-
-    @staticmethod
-    def serialize(value: Any) -> Any:
-        """Serialize an Args value for output."""
-        return value
-
-    @staticmethod
-    def parse_value(value: Any) -> "Args":
-        """Parse input value into Args type."""
-        return value
-
-
-@strawberry.scalar(description="The `Args` scalar type represents a Dictionary of arguments")
-class Props(object):
-    """Strawberry scalar for Args type representing a dictionary of arguments."""
-
-    @staticmethod
-    def serialize(value: Any) -> Any:
-        """Serialize an Args value for output."""
-        return value
-
-    @staticmethod
-    def parse_value(value: Any) -> "Args":
-        """Parse input value into Args type."""
-        return value
-
-
-@strawberry.scalar(description="The `SearchQuery` scalar type represents a search query string")
-class SearchQuery(str):
-    """Strawberry scalar for SearchQuery type representing a search query string."""
-
-    @staticmethod
-    def serialize(value: Any) -> str:
-        """Serialize a SearchQuery value for output."""
-        return str(value)
-
-    @staticmethod
-    def parse_value(value: str) -> str:
-        """Parse input value into SearchQuery type."""
-        return value
-
-
-@strawberry.scalar(description="The `InstanceID` scalar type represents a unique instance identifier")
-class InstanceId(str):
-    """Strawberry scalar for InstanceID type representing a unique instance identifier."""
-
-    @staticmethod
-    def serialize(value: Any) -> str:
-        """Serialize an InstanceID value for output."""
-        return str(value)
-
-    @staticmethod
-    def parse_value(value: str) -> str:
-        """Parse input value into InstanceID type."""
-        return value
+scalar_map = {
+    Args: strawberry.scalar(
+        name="Args",
+        description="The `Args` scalar type represents a Dictionary of arguments",
+        serialize=lambda v: v,
+        parse_value=lambda v: v,
+    ),
+    UISchema: strawberry.scalar(
+        name="UISchema",
+        description="The `Args` scalar type represents a Dictionary of arguments",
+        serialize=lambda v: v,
+        parse_value=lambda v: v,
+    ),
+    Props: strawberry.scalar(
+        name="Props",
+        description="The `Args` scalar type represents a Dictionary of arguments",
+        serialize=lambda v: v,
+        parse_value=lambda v: v,
+    ),
+    SearchQuery: strawberry.scalar(
+        name="SearchQuery",
+        description="The `SearchQuery` scalar type represents a search query string",
+        serialize=lambda v: str(v),
+        parse_value=lambda v: v,
+    ),
+    InstanceId: strawberry.scalar(
+        name="InstanceId",
+        description="The `InstanceID` scalar type represents a unique instance identifier",
+        serialize=lambda v: str(v),
+        parse_value=lambda v: v,
+    ),
+}

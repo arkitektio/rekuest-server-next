@@ -8,6 +8,8 @@ from authentikate.strawberry import AuthentikateExtension, AuthExtension, AuthSu
 from typing import cast
 from datalayer import mutations as datalayer_mutations
 from datalayer.scalars import scalar_map as dscalar_map
+from rekuest_core.scalars import scalar_map as rscalar_map
+from facade.scalars import scalar_map as fscalar_map
 import kante
 from strawberry.schema.config import StrawberryConfig
 
@@ -288,6 +290,8 @@ schema = kante.Schema(
     config=StrawberryConfig(
         scalar_map={
             **dscalar_map,
+            **rscalar_map,
+            **fscalar_map,
         },
     ),
     # We really need to register
