@@ -518,9 +518,8 @@ def create_implementation(info: Info, input: inputs.CreateImplementationInput) -
 
     agent, _ = models.Agent.objects.update_or_create(
         registry=registry,
-        instance_id=input.instance_id or "default",
         defaults=dict(
-            name=f"{str(registry.pk)} on {input.instance_id}",
+            name=f"{str(registry.pk)}",
             release=info.context.request.client.release,
             app=info.context.request.client.release.app,
         ),

@@ -74,12 +74,10 @@ class CreateImplementationInputModel(BaseModel):
 
     Attributes:
         implementation: Implementation configuration data
-        instance_id: Instance ID of the agent this implementation belongs to
         extension: Extension that manages this implementation
     """
 
     implementation: rimodels.ImplementationInputModel
-    instance_id: str
     extension: str
 
 
@@ -88,12 +86,10 @@ class CreateForeignImplementationInputModel(BaseModel):
 
     Attributes:
         implementation: Implementation configuration data
-        instance_id: Instance ID of the agent to create implementation in
         extension: Extension that manages this implementation
     """
 
     implementation: rimodels.ImplementationInputModel
-    instance_id: str
     extension: str
 
 
@@ -103,7 +99,6 @@ class CreateForeignImplementationInputModel(BaseModel):
 )
 class CreateImplementationInput:
     implementation: ritypes.ImplementationInput = strawberry.field(description="The implementation to create. This is used to identify the implementation in the system.")
-    instance_id: scalars.InstanceId = strawberry.field(description="The instance ID of the agent that this implementation belongs to.")
     extension: str = strawberry.field(description="The extension that manages this implementation")
 
 

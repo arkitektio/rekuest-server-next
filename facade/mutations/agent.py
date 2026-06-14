@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 @strawberry.input
 class AgentInput:
-    instance_id: scalars.InstanceId = strawberry.field(description="The instance ID of the agent. This is used to identify the agent in the system.")
     name: str | None = strawberry.field(
         default=None,
         description="The name of the agent. This is used to identify the agent in the system.",
@@ -39,9 +38,8 @@ def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
 
     agent, _ = models.Agent.objects.get_or_create(
         registry=registry,
-        instance_id=input.instance_id or "default",
         defaults=dict(
-            name=input.name or f"{str(registry.pk)} on {input.instance_id}",
+            name=input.name or f"{str(registry.pk)}",
             app=info.context.request.client.release.app,
             organization=info.context.request.organization,
             user=info.context.request.user,
@@ -67,7 +65,6 @@ def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
 
 
 class ImplementAgentInputModel(BaseModel):
-    instance_id: str
     name: str | None = None
     extensions: list[str] | None = None
     states: list[StateImplementationInputModel] | None = None
@@ -80,7 +77,6 @@ class ImplementAgentInputModel(BaseModel):
 
 @kante.pydantic_input(ImplementAgentInputModel, description="Implement an agent with the given implementations, states and locks. This will create the agent if it doesn't exist and update it if it does exist.")
 class ImplementAgentInput:
-    instance_id: scalars.InstanceId = strawberry.field(description="The instance ID of the agent. This is used to identify the agent in the system.")
     name: str | None = strawberry.field(
         default=None,
         description="The name of the agent. This is used to identify the agent in the system.",
@@ -122,9 +118,8 @@ def implement_agent(info: Info, input: ImplementAgentInput) -> types.Agent:
 
     agent, _ = models.Agent.objects.update_or_create(
         registry=registry,
-        instance_id=input.instance_id or "default",
         defaults=dict(
-            name=input.name or f"{str(registry.pk)} on {input.instance_id}",
+            name=input.name or f"{str(registry.pk)}",
             app=info.context.request.client.release.app,
             organization=info.context.request.organization,
             user=info.context.request.user,

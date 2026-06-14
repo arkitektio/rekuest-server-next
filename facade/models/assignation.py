@@ -10,7 +10,6 @@ from facade import enums
 class Assignation(models.Model):
     """A constant log of a tasks transition through finding a Action, Implementation and finally Pod , also a store for its results"""
 
-    waiter = models.ForeignKey("Waiter", on_delete=models.CASCADE, help_text="Which Waiter assigned this?")
     reservation = models.ForeignKey(
         "Reservation",
         on_delete=models.CASCADE,
@@ -85,11 +84,10 @@ class Assignation(models.Model):
     )
     args = models.JSONField(blank=True, null=True, help_text="The Args", default=dict)
     dependencies = models.JSONField(blank=True, null=True, help_text="The Args", default=dict)
-    waiter = models.ForeignKey(
-        "Waiter",
+    registry = models.ForeignKey(
+        "Registry",
         on_delete=models.CASCADE,
-        max_length=1000,
-        help_text="This Assignation app",
+        help_text="The registry (client/user/organization) that created this Assignation",
         null=True,
         blank=True,
         related_name="assignations",
@@ -174,14 +172,13 @@ class AssignationEvent(models.Model):
 
 
 class AssignationInstruct(models.Model):
-    waiter = models.ForeignKey(
-        "Waiter",
+    registry = models.ForeignKey(
+        "Registry",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        max_length=1000,
-        help_text="Which Waiter created this Instruction (if any?)",
-        related_name="instructions",
+        help_text="Which registry created this Instruction (if any?)",
+        related_name="assignation_instructs",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     assignation = models.ForeignKey(

@@ -32,7 +32,7 @@ class Assignation:
     latest_event_kind: enums.AssignationEventKind = strawberry.field(description="Type of the latest event.")
     latest_instruct_kind: enums.AssignationInstructKind = strawberry.field(description="Last instruction type.")
     status_message: str | None = strawberry_django.field(description="Current status message.")
-    waiter: "Waiter" = strawberry.field(description="Waiter responsible for this assignation.")
+    registry: Optional["Registry"] = strawberry.field(description="Registry that created this assignation.")
     created_at: datetime.datetime = strawberry_django.field(description="Creation timestamp.")
     updated_at: datetime.datetime = strawberry_django.field(description="Last update timestamp.")
     finished_at: datetime.datetime | None = strawberry.field(description="Timestamp when the assignation was finished.")

@@ -89,13 +89,9 @@ def build_dependency_dict(implementation: models.Implementation, info: Info, dep
     return dep_kwargs
 
 
-def get_waiter_for_context(info: Info, instance_id: str) -> None:
-    # TODO: HASH THIS FOR EASIER RETRIEVAL
-
+def get_registry_for_context(info: Info) -> models.Registry:
     registry, _ = models.Registry.objects.get_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
-
-    waiter, _ = models.Waiter.objects.get_or_create(registry=registry, instance_id=instance_id, defaults=dict(name="default"))
-    return waiter
+    return registry
 
 
 # TODO: Implement this for nested structures and interfaces as well
@@ -164,11 +160,11 @@ class RedisControllBackend(ControllBackend):
             if len(implementations) == 0:
                 raise ValueError("No implementations found for this action. Cannot reserve.")
 
-        waiter = get_waiter_for_context(info, input.instance_id)
+        registry = get_registry_for_context(info)
 
         res, created = models.Reservation.objects.update_or_create(
             reference=input.reference,
-            waiter=waiter,
+            registry=registry,
             defaults=dict(
                 title=input.title,
                 binds=input.binds.dict() if input.binds else None,
@@ -209,7 +205,7 @@ class RedisControllBackend(ControllBackend):
         agent = None
         dependency_dict = None
 
-        waiter = get_waiter_for_context(info, input.instance_id)
+        registry = get_registry_for_context(info)
 
         if input.dependency:
             assert input.method, "Method key must be provided when assigning to a dependency"
@@ -316,7 +312,7 @@ class RedisControllBackend(ControllBackend):
             latest_instruct_kind=enums.AssignationInstructKind.ASSIGN,
             hooks=input.hooks or [],
             dependencies=dependency_dict,
-            waiter=waiter,
+            registry=registry,
             ephemeral=input.ephemeral if input.ephemeral is not None else False,
         )
 

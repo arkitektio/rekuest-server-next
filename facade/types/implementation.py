@@ -51,7 +51,7 @@ class Implementation:
             self.assignations.filter(
                 implementation=self.id,
                 is_done=True,
-                waiter__registry__user=user,
+                registry__user=user,
             )
             .order_by("-created_at")
             .first()

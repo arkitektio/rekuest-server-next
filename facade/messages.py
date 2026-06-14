@@ -486,8 +486,9 @@ class Register(Message):
     """
 
     type: Literal[FromAgentMessageType.REGISTER] = FromAgentMessageType.REGISTER
-    instance_id: str
     token: str
+    force: bool = False
+    """If another connection is already registered for this agent, kick it and take over."""
 
 
 class ProtocolError(Message):
@@ -505,7 +506,6 @@ class Init(Message):
     """
 
     type: Literal[ToAgentMessageType.INIT] = ToAgentMessageType.INIT
-    instance_id: str
     agent: str
     inquiries: list[AssignInquiry] = []
 

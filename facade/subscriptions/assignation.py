@@ -1,6 +1,6 @@
 from kante.types import Info
 import strawberry
-from facade import types, models, scalars
+from facade import types, models
 from typing import AsyncGenerator
 from facade.channels import assignation_event_channel, child_assignation_channel
 
@@ -8,15 +8,12 @@ from facade.channels import assignation_event_channel, child_assignation_channel
 async def assignation_events(
     self,
     info: Info,
-    instance_id: scalars.InstanceId,
 ) -> AsyncGenerator[types.AssignationEvent, None]:
     """Join and subscribe to message sent to the given rooms."""
 
     registry, _ = await models.Registry.objects.aget_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
 
-    waiter, _ = await models.Waiter.objects.aget_or_create(registry=registry, instance_id=instance_id, defaults=dict(name="default"))
-
-    async for message in assignation_event_channel(info.context, [f"waiter_{waiter.id}"]):
+    async for message in assignation_event_channel(info.context, [f"ass_registry_{registry.id}"]):
         yield await models.AssignationEvent.objects.aget(id=message)
 
 
@@ -29,7 +26,6 @@ class AssignationChangeEvent:
 async def assignations(
     self,
     info: Info,
-    instance_id: scalars.InstanceId,
 ) -> AsyncGenerator[AssignationChangeEvent, None]:
     """Join and subscribe to message sent to the given rooms."""
 
@@ -38,9 +34,7 @@ async def assignations(
 
     registry, _ = await models.Registry.objects.aget_or_create(client=client, user=user, organization=info.context.request.organization)
 
-    waiter, _ = await models.Waiter.objects.aget_or_create(registry=registry, instance_id=instance_id, defaults=dict(name="default"))
-
-    async for message in assignation_event_channel.listen(info.context, [f"ass_waiter_{waiter.id}"]):
+    async for message in assignation_event_channel.listen(info.context, [f"ass_registry_{registry.id}"]):
         if message.create:
             ass = await models.Assignation.objects.aget(id=message.create)
             yield AssignationChangeEvent(create=ass, event=None)

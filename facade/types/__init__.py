@@ -32,7 +32,7 @@ from . import (
     toolbox,
 )
 from .action import Action, ActionStats, ActionStatsResolver
-from .agent import Agent, AgentEvent, HardwareRecord, Waiter
+from .agent import Agent, AgentEvent, HardwareRecord
 from .assignation import (
     Assignation,
     AssignationEvent,
@@ -120,7 +120,6 @@ __all__ = [
     "Implementation",
     "HardwareRecord",
     "Agent",
-    "Waiter",
     "AgentEvent",
     "MemoryShelve",
     "FilesystemShelve",

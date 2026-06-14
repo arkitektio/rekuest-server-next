@@ -19,9 +19,8 @@ def log_patches(info: Info, input: inputs.LogPatchesInput) -> strawberry.ID:
 
     agent, _ = models.Agent.objects.get_or_create(
         registry=registry,
-        instance_id=model.instance_id or "default",
         defaults=dict(
-            name=f"{str(registry.pk)} on {model.instance_id}",
+            name=f"{str(registry.pk)}",
         ),
     )
 
@@ -67,9 +66,8 @@ def log_snapshot(info: Info, input: inputs.LogSnapshotInput) -> strawberry.ID:
 
     agent, _ = models.Agent.objects.get_or_create(
         registry=registry,
-        instance_id=model.instance_id or "default",
         defaults=dict(
-            name=f"{str(registry.pk)} on {model.instance_id}",
+            name=f"{str(registry.pk)}",
         ),
     )
 

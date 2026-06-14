@@ -23,7 +23,6 @@ def implementation_at(
 
 async def my_implementation_at(
     info: Info,
-    instance_id: str,
     action_id: strawberry.ID | None = None,
     interface: str | None = None,
 ) -> types.Implementation:
@@ -37,7 +36,6 @@ async def my_implementation_at(
 
     agent, _ = await models.Agent.objects.aget_or_create(
         registry=registry,
-        instance_id=instance_id,
     )
 
     if action_id:

@@ -13,8 +13,6 @@ from facade import enums, models
 
 @strawberry_django.filter_type(models.Reservation, description="A way to filter reservations")
 class ReservationFilter:
-    waiter: WaiterFilter | None
-
     @filter_field
     def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()

@@ -56,9 +56,14 @@ class Agent(models.Model):
         on_delete=models.CASCADE,
         help_text="The user this Agent belongs to",
     )
-    instance_id = models.CharField(default="main", max_length=1000)
     installed_at = models.DateTimeField(auto_created=True, auto_now_add=True)
     unique = models.CharField(max_length=1000, default=uuid.uuid4, help_text="The Channel we are listening to")
+    active_connection_id = models.CharField(
+        max_length=1000,
+        null=True,
+        blank=True,
+        help_text="Identifies the websocket connection currently owning this Agent. Used to reject/displace duplicate connections and to guard disconnect handling against a displaced connection.",
+    )
     on_instance = models.CharField(
         max_length=1000,
         help_text="The Instance this Agent is running on",
@@ -107,8 +112,8 @@ class Agent(models.Model):
         permissions = [("can_provide_on", "Can provide on this Agent")]
         constraints = [
             models.UniqueConstraint(
-                fields=["registry", "instance_id"],
-                name="No multiple Agents for same App and User allowed on same identifier",
+                fields=["registry"],
+                name="one_agent_per_registry",
             )
         ]
 
@@ -259,36 +264,3 @@ class HardwareRecord(models.Model):
     cpu_frequency = models.FloatField(default=0)
 
 
-class Waiter(models.Model):
-    name = models.CharField(max_length=2000, help_text="This waiters Name", default="Nana")
-    instance_id = models.CharField(default="main", max_length=1000)
-    installed_at = models.DateTimeField(auto_created=True, auto_now_add=True)
-    unique = models.CharField(max_length=1000, default=uuid.uuid4, help_text="The Channel we are listening to")
-    latest_event = TextChoicesField(
-        max_length=1000,
-        choices_enum=enums.WaiterStatusChoices,
-        default=enums.WaiterStatusChoices.VANILLA,
-        help_text="The Status of this Waiter",
-    )
-    registry = models.ForeignKey(
-        "Registry",
-        on_delete=models.CASCADE,
-        help_text="The provide might be limited to a instance like ImageJ belonging to a specific person. Is nullable for backend users",
-        null=True,
-        related_name="waiters",
-    )
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["registry", "instance_id"],
-                name="No multiple Waiters for same App and User allowed on same instance_id",
-            )
-        ]
-
-    def __str__(self):
-        return f"Waiter {self.registry} on {self.instance_id}"
-
-    @property
-    def queue(self):
-        return f"waiter_{self.unique}"

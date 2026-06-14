@@ -12,6 +12,7 @@ behaviour is unit-testable with fakes — no docker, no DB, no monkeypatching.
 import asyncio
 import json
 import logging
+import uuid
 from typing import Awaitable, Callable, Optional
 
 from authentikate.expand import (
@@ -33,6 +34,18 @@ logger = logging.getLogger(__name__)
 SendCallable = Callable[[str], Awaitable[None]]
 CloseCallable = Callable[[int], Awaitable[None]]
 Authenticator = Callable[[messages.Register], Awaitable["models.Agent"]]
+# Wired by the adapter so the protocol can join the agent's connection group and
+# displace other live connections — both are no-ops by default (unit tests).
+RegisterConnectionCallable = Callable[[str], Awaitable[None]]
+KickOthersCallable = Callable[[], Awaitable[None]]
+
+
+async def _noop_register_connection(agent_id: str) -> None:
+    return None
+
+
+async def _noop_kick_others() -> None:
+    return None
 
 
 class FromAgentPayload(BaseModel):
@@ -66,9 +79,8 @@ async def default_authenticator(register: messages.Register) -> "models.Agent":
 
     agent, _ = await models.Agent.objects.aget_or_create(
         registry=registry,
-        instance_id=register.instance_id or "default",
         defaults=dict(
-            name=f"{str(registry.pk)} on {register.instance_id}",
+            name=f"{str(registry.pk)}",
         ),
     )
     return agent
@@ -85,6 +97,9 @@ class AgentProtocol:
         queue: AgentQueue,
         backend=persist_backend,
         authenticator: Authenticator = default_authenticator,
+        register_connection: RegisterConnectionCallable = _noop_register_connection,
+        kick_others: KickOthersCallable = _noop_kick_others,
+        connection_id: Optional[str] = None,
         heartbeat_interval: Optional[float] = None,
         heartbeat_timeout: Optional[float] = None,
     ) -> None:
@@ -93,6 +108,11 @@ class AgentProtocol:
         self.queue = queue
         self.backend = backend
         self.authenticator = authenticator
+        self.register_connection = register_connection
+        self.kick_others = kick_others
+        # Identifies this connection so the backend can tell, on disconnect,
+        # whether we are still the agent's active connection or were displaced.
+        self.connection_id = connection_id or str(uuid.uuid4())
         self.heartbeat_interval = (
             heartbeat_interval if heartbeat_interval is not None else settings.AGENT_HEARTBEAT_INTERVAL
         )
@@ -191,12 +211,32 @@ class AgentProtocol:
             await self.close(codes.AGENT_IS_BLOCKED_CODE)
             return
 
-        assignations = await self.backend.on_agent_connected(self.agent.pk)
+        # Conflict handling: only one live connection per agent. If the agent is
+        # already connected, reject this connection unless ``force`` is set — in
+        # which case displace the incumbent and take over.
+        was_connected = self.agent.connected
+        if was_connected and not register.force:
+            await self.send_to_agent_message(
+                messages.ProtocolError(error="Another connection is already registered for this agent. Reconnect with force to take over.")
+            )
+            await self.close(codes.AGENT_ALREADY_CONNECTED_CODE)
+            return
+
+        # Join the agent's connection group first (so we can later be kicked).
+        await self.register_connection(self.agent.pk)
+
+        # Claim ownership (sets ``active_connection_id`` to us) BEFORE displacing the
+        # incumbent. Order matters: the displaced connection's disconnect handler is
+        # guarded on ``active_connection_id`` — if we kicked before claiming, it could
+        # still see itself as active and wrongly mark the agent disconnected.
+        assignations = await self.backend.on_agent_connected(self.agent.pk, self.connection_id)
+        if was_connected and register.force:
+            await self.kick_others()
+
         self.heartbeat_future = None
 
         await self.send_to_agent_message(
             messages.Init(
-                instance_id=self.agent.instance_id,
                 agent=str(self.agent.pk),
                 inquiries=[messages.AssignInquiry(assignation=str(a.pk)) for a in assignations],
             )
@@ -267,6 +307,6 @@ class AgentProtocol:
                 logger.error("Error cancelling agent task", exc_info=True)
 
         if self.agent is not None:
-            await self.backend.on_agent_disconnected(self.agent.pk)
+            await self.backend.on_agent_disconnected(self.agent.pk, self.connection_id)
 
         await self.queue.close()

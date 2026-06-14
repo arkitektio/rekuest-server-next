@@ -25,7 +25,6 @@ from .agent import (
     Lock,
     MemoryDrawer,
     MemoryShelve,
-    Waiter,
 )
 from .assignation import (
     AgentEvent,
@@ -104,7 +103,6 @@ __all__ = [
     "MemoryShelve",
     "MemoryDrawer",
     "HardwareRecord",
-    "Waiter",
     # implementation
     "Dependency",
     "Resolution",

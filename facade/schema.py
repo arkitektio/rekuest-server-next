@@ -69,7 +69,7 @@ class Query:
     tasks: list[types.Assignation] = field(description="All tasks.")
     resolved_implementations = field(resolver=queries.resolved_implementations, description="Fetch resolved dependencies for a resolution.")
 
-    agent: types.Agent = field(resolver=queries.agent, description="Fetch a specific agent by ID or by app, version, device_id and instance_id.")
+    agent: types.Agent = field(resolver=queries.agent, description="Fetch a specific agent by ID or by app, version and device_id.")
 
     spaces: list[types.Space] = field(description="List all spaces.")
     space: types.Space = field(description="Fetch a specific space by ID.")

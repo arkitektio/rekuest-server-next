@@ -9,7 +9,6 @@ def agent(
     app: str | None = None,
     version: str | None = None,
     device_id: str | None = None,
-    instance_id: str | None = None,
 ) -> types.Agent:
     if id:
         return models.Agent.objects.get(id=id)
@@ -26,15 +25,12 @@ def agent(
         if device_id:
             agents = agents.filter(device_id=device_id)
 
-        if instance_id:
-            agents = agents.filter(instance_id=instance_id)
-
         if agents.count() == 1:
             return agents.first()
         elif agents.count() > 1:
-            raise ValueError("Multiple agents found with the provided app, version, device_id and instance_id. Please provide the agent id to identify the agent.")
+            raise ValueError("Multiple agents found with the provided app, version and device_id. Please provide the agent id to identify the agent.")
         else:
-            raise ValueError("No agent found  found for {app} with version {version}, device_id {device_id} and instance_id {instance_id}".format(app=app, version=version, device_id=device_id, instance_id=instance_id))
+            raise ValueError("No agent found for {app} with version {version} and device_id {device_id}".format(app=app, version=version, device_id=device_id))
 
     else:
-        raise ValueError("You need to provide either the agent id or the app, version, device_id and instance_id to identify the agent")
+        raise ValueError("You need to provide either the agent id or the app, version and device_id to identify the agent")

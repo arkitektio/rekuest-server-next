@@ -1,4 +1,4 @@
-"""Agent, waiter, hardware record and agent event types."""
+"""Agent, hardware record and agent event types."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from django.conf import settings
 from django.utils import timezone
 from kante.types import Info
 
-from facade import enums, filters, models, scalars
+from facade import enums, filters, models
 from facade.types.base import build_prescoped_queryset
 
 
@@ -29,7 +29,6 @@ class HardwareRecord:
 class Agent:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the agent.")
     hash: str = strawberry_django.field(description="Hash representing the agent's definition for change detection.")
-    instance_id: scalars.InstanceId = strawberry_django.field(description="Unique instance identifier on the agent.")
     registry: "Registry" = strawberry_django.field(description="Registry entry this agent belongs to.")
     hardware_records: list[HardwareRecord] = strawberry_django.field(description="Historical records of agent's hardware.")
     device: Device = strawberry_django.field(description="Device associated with the agent.")
@@ -76,13 +75,6 @@ class Agent:
     @strawberry_django.field(description="Get the count of implementations available on this agent.")
     def blocked(self) -> bool:
         return self.blocked
-
-
-@strawberry_django.type(models.Waiter, filters=filters.WaiterFilter, pagination=True, description="Entity that waits for the completion of assignations.")
-class Waiter:
-    id: strawberry.ID = strawberry_django.field(description="Unique ID of the waiter.")
-    instance_id: scalars.InstanceId = strawberry_django.field(description="Instance ID associated with the waiter.")
-    registry: "Registry" = strawberry_django.field(description="Registry the waiter belongs to.")
 
 
 @strawberry_django.type(models.AgentEvent, filters=filters.AssignationEventFilter, pagination=True, description="Event representing agent status or lifecycle change.")

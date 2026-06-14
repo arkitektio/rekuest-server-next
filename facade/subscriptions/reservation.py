@@ -1,6 +1,6 @@
 from kante.types import Info
 import strawberry
-from facade import types, models, scalars
+from facade import types, models
 from typing import AsyncGenerator
 from facade.channels import (
     reservation_channel,
@@ -16,7 +16,6 @@ class ReservationSubscription:
 async def reservations(
     self,
     info: Info,
-    instance_id: scalars.InstanceId,
 ) -> AsyncGenerator[types.Reservation, None]:
     """Join and subscribe to message sent to the given rooms."""
 
@@ -25,8 +24,6 @@ async def reservations(
 
     registry, _ = await models.Registry.objects.aget_or_create(client=client, user=user, organization=info.context.request.organization)
 
-    waiter, _ = await models.Waiter.objects.aget_or_create(registry=registry, instance_id=instance_id, defaults=dict(name="default"))
-
-    async for message in reservation_channel.listen(info.context, [f"res_waiter_{waiter.id}"]):
+    async for message in reservation_channel.listen(info.context, [f"res_registry_{registry.id}"]):
         continue
         yield await models.Reservation.objects.aget(id=message)

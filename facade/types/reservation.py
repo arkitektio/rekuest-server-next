@@ -15,7 +15,7 @@ from facade import enums, filters, models
 class Reservation:
     id: strawberry.ID = strawberry_django.field(description="ID of the reservation.")
     name: str = strawberry_django.field(description="Name of the reservation.")
-    waiter: "Waiter" = strawberry_django.field(description="Waiter associated with the reservation.")
+    registry: Optional["Registry"] = strawberry_django.field(description="Registry that created the reservation.")
     title: str | None = strawberry_django.field(description="Optional title.")
     action: "Action" = strawberry_django.field(description="Action this reservation is for.")
     updated_at: datetime.datetime = strawberry_django.field(description="Last update timestamp.")

@@ -18,7 +18,6 @@ class ReserveInputModel(BaseModel):
 
     Attributes:
         reference: Unique reference identifier for the reservation
-        instance_id: Instance identifier of the waiter (defaults to "default")
         action: Optional action ID to reserve
         implementation: Optional implementation ID for direct implementation reservation
         title: Optional title for the reservation
@@ -28,7 +27,6 @@ class ReserveInputModel(BaseModel):
     """
 
     reference: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    instance_id: str = Field(default="default")
     action: str | None = None
     implementation: str | None = None
     title: str | None = None
@@ -39,7 +37,6 @@ class ReserveInputModel(BaseModel):
 
 @pydantic.input(ReserveInputModel, description="The input for reserving a action.")
 class ReserveInput:
-    instance_id: scalars.InstanceId = strawberry.field(description="The instance ID of the waiter")
     action: strawberry.ID | None = strawberry.field(default=None, description="The action ID to reserve")
     implementation: strawberry.ID | None = strawberry.field(
         default=None,
@@ -88,7 +85,6 @@ class AssignInputModel(BaseModel):
     """Base model for assigning arguments to an action.
 
     Attributes:
-        instance_id: Instance identifier of the waiter
         action: Optional action ID to assign to
         implementation: Optional implementation ID for direct assignment
         agent: Optional agent ID for direct assignment
@@ -106,7 +102,6 @@ class AssignInputModel(BaseModel):
         step: Whether the assignation should step to breakpoints
     """
 
-    instance_id: str
     action: str | None = None
     dependency: str | None = None
     resolution: str | None = None  # if assining to a implementation with dependencies
@@ -131,7 +126,6 @@ class AssignInputModel(BaseModel):
 
 @pydantic.input(AssignInputModel, description="The input for assigning args to a action.")
 class AssignInput:
-    instance_id: scalars.InstanceId = strawberry.field(default="default", description="The instance ID of the waiter")
     action: strawberry.ID | None = strawberry.field(default=None, description="The action ID to assign to")
     implementation: strawberry.ID | None = strawberry.field(
         default=None,

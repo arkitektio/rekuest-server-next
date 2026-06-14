@@ -5,8 +5,16 @@ import logging
 
 
 class ModelPersistBackend:
-    async def on_agent_disconnected(self, agent_id: str) -> None:
+    async def on_agent_disconnected(self, agent_id: str, connection_id: str | None = None) -> None:
         agent = await models.Agent.objects.aget(id=agent_id)
+
+        # Generation guard: if a newer connection has already taken over this
+        # agent (``active_connection_id`` no longer points at us), this is a
+        # displaced connection shutting down. Do NOT flip ``connected`` off or
+        # mark assignations disconnected — the new owner is authoritative.
+        if connection_id is not None and agent.active_connection_id != connection_id:
+            return
+
         agent.connected = False
         agent.last_seen = timezone.now()
         await agent.asave(update_fields=["connected", "last_seen"])
@@ -23,11 +31,12 @@ class ModelPersistBackend:
             ass.latest_event_kind = enums.AssignationEventKind.DISCONNECTED
             await ass.asave(update_fields=["latest_event_kind"])
 
-    async def on_agent_connected(self, agent_id: str) -> List[models.Assignation]:
+    async def on_agent_connected(self, agent_id: str, connection_id: str | None = None) -> List[models.Assignation]:
         agent = await models.Agent.objects.aget(id=agent_id)
         agent.connected = True
         agent.last_seen = timezone.now()
-        await agent.asave(update_fields=["connected", "last_seen"])
+        agent.active_connection_id = connection_id
+        await agent.asave(update_fields=["connected", "last_seen", "active_connection_id"])
 
         assignations = []
         async for i in models.Assignation.objects.filter(agent=agent, is_done=False).all():

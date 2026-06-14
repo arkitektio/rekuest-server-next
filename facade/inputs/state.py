@@ -57,12 +57,10 @@ class LogPatchesInputModel(BaseModel):
     """Base model for logging state events.
 
     Attributes:
-        instance_id: The instance ID of the state
         interface: The interface of the state
         value: The value of the state event
     """
 
-    instance_id: str
     patches: list[PatchInputModel]
 
 
@@ -71,7 +69,6 @@ class LogPatchesInputModel(BaseModel):
     description="The input for logging state patches.",
 )
 class LogPatchesInput:
-    instance_id: str = strawberry.field(description="The instance ID of the state. This is used to identify the state in the system.")
     patches: list[PatchInput] = strawberry.field(description="The list of patches applied to the state. This is used to log the changes made to the state.")
 
 
@@ -79,12 +76,10 @@ class LogSnapshotInputModel(BaseModel):
     """Base model for logging state snapshots.
 
     Attributes:
-        instance_id: The instance ID of the state
         interface: The interface of the state
         value: The value of the state snapshot
     """
 
-    instance_id: str
     interface: str
     value: Any
 
@@ -94,5 +89,4 @@ class LogSnapshotInputModel(BaseModel):
     description="The input for logging state snapshots.",
 )
 class LogSnapshotInput:
-    instance_id: str = strawberry.field(description="The instance ID of the state. This is used to identify the state in the system.")
     value: rscalars.AnyDefault = strawberry.field(description="The value of the state snapshot (index by state_keys). This is used to log the current state of the system.")

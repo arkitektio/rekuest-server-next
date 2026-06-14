@@ -1,4 +1,4 @@
-"""Filters and orders for agents, waiters, hardware and implementation-agents."""
+"""Filters and orders for agents, hardware and implementation-agents."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from strawberry import UNSET, auto
 from strawberry.types import Info
 from strawberry_django.fields.filter_order import filter_field
 
-from facade import inputs, managers, models, scalars
+from facade import inputs, managers, models
 
 
 @strawberry_django.filter_type(models.Agent, description="A way to filter agents")
@@ -30,10 +30,6 @@ class AgentFilter:
     @filter_field(description="Filter by client ID of the app the agent is registered to")
     def client_id(self, info: Info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}registry__client__client_id": value}), Q()
-
-    @filter_field(description="Filter by instance ID of the agent")
-    def instance_id(self, info: Info, queryset, value: str, prefix: str):
-        return queryset.filter(**{f"{prefix}instance_id": value}), Q()
 
     @filter_field(description="Filter by IDs of the agents")
     def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
@@ -149,15 +145,6 @@ class AgentOrder:
     last_seen: auto
 
 
-@strawberry_django.filter_type(models.Waiter, description="A way to filter waiters")
-class WaiterFilter:
-    instance_id: scalars.InstanceId
-
-    @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
-        return queryset.filter(**{f"{prefix}id__in": value}), Q()
-
-
 @strawberry_django.filter_type(models.HardwareRecord)
 class HardwareRecordFilter:
     @filter_field
@@ -178,10 +165,6 @@ class ImplementationAgentFilter:
     @filter_field
     def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
-
-    @filter_field
-    def instance_id(self, info: Info, queryset, value: str, prefix: str):
-        return queryset.filter(**{f"{prefix}instance_id": value}), Q()
 
     @filter_field
     def extensions(self, info: Info, queryset, value: list[str], prefix: str):

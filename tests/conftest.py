@@ -140,24 +140,3 @@ async def agent_ws(agent_ws_redis):
 
     for communicator in created:
         await communicator.disconnect()
-
-
-@pytest.fixture(scope="function")
-def simple_api_context(db, backend_stack) -> HttpContext:
-    user, _ = User.objects.get_or_create(username="fart", password="123456789", sub="1")
-    client, _ = Client.objects.get_or_create(client_id="oinsoins")
-    org, _ = Organization.objects.get_or_create(slug="test-organization")
-    membership, _ = Membership.objects.get_or_create(
-        user=user,
-        organization=org,
-    )
-
-    request = UniversalRequest(
-        _extensions={"token": "test"},
-        _client=client,  # type: ignore
-        _user=user,  # type: ignore
-        _organization=org,  # type: ignore
-    )
-    request.set_membership(membership)  # type: ignore
-
-    return HttpContext(request=request, response=TemporalResponse(), headers={"Authorization": "Bearer test"}, type="http")

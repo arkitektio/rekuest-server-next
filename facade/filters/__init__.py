@@ -2,9 +2,8 @@
 
 This ``__init__`` re-exports every public filter/order so the established
 ``from facade import filters`` / ``filters.X`` access keeps working. Submodules use
-``from __future__ import annotations`` and the cross-referenced filters (e.g.
-``WaiterFilter`` used by ``ReservationFilter``) are injected into each submodule's
-namespace below, so nested filter references resolve at schema-build time.
+``from __future__ import annotations`` and cross-referenced filters are injected into
+each submodule's namespace below, so nested filter references resolve at schema-build time.
 """
 
 from . import (
@@ -31,7 +30,6 @@ from .agent import (
     AgentOrder,
     HardwareRecordFilter,
     ImplementationAgentFilter,
-    WaiterFilter,
 )
 from .assignation import (
     AssignationEventFilter,
@@ -109,7 +107,6 @@ __all__ = [
     "ClientFilter",
     "AgentFilter",
     "AgentOrder",
-    "WaiterFilter",
     "HardwareRecordFilter",
     "ImplementationAgentFilter",
     "FilesystemShelveFilter",

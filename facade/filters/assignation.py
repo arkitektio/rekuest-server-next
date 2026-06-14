@@ -11,7 +11,7 @@ from strawberry import auto
 from strawberry.types import Info
 from strawberry_django.fields.filter_order import filter_field
 
-from facade import enums, models, scalars
+from facade import enums, models
 
 
 @strawberry_django.order_type(models.Assignation)
@@ -33,10 +33,6 @@ class AssignationFilter:
     @filter_field
     def status(self, info: Info, queryset, value: list[enums.AssignationStatus], prefix: str):
         return queryset.filter(**{f"{prefix}status__in": value}), Q()
-
-    @filter_field
-    def instance_id(self, info: Info, queryset, value: scalars.InstanceId, prefix: str):
-        return queryset.filter(**{f"{prefix}reservation__waiter__instance_id": value}), Q()
 
     @filter_field
     def client_id(self, info: Info, queryset, value: strawberry.ID, prefix: str):
