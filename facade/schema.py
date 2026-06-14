@@ -196,6 +196,7 @@ class Mutation:
     reserve = mutation(resolver=mutations.reserve, description="Reserve an implementation for future use.")
     unreserve = mutation(resolver=mutations.unreserve, description="Release a reserved implementation.")
     delete_implementation = mutation(resolver=mutations.delete_implementation, description="Delete a registered implementation.")
+    set_higher_order = mutation(resolver=mutations.set_higher_order, description="Mark an implementation as a higher-order wrapper of a lower implementation, with a projection config.")
     ensure_agent = mutation(resolver=mutations.ensure_agent, description="Ensure agent record exists or is up to date.")
     create_test_case = mutation(resolver=mutations.create_test_case, description="Create a new test case.")
     create_test_result = mutation(resolver=mutations.create_test_result, description="Create a test result record.")

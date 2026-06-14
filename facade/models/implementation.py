@@ -167,6 +167,19 @@ class Implementation(models.Model):
         related_name="lower_order_implementations",
         help_text="If this implementation is a higher order implementation, this field links to the lower order implementation it is wrapping (the implementation will actually get the params, the implementation and the args of this)",
     )
+    higher_order_config = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "Projection config for a higher-order implementation (only meaningful when "
+            "``higher_order_for`` is set). Describes how this wrapper's bound params + caller args + "
+            "caller dependencies are remapped onto the wrapped (lower) implementation, and how the "
+            "lower implementation's returns are unfolded back. Keys: ``bound`` (dict spread as the "
+            "lower impl's named args), ``args_key`` (the lower arg port the remaining caller args are "
+            "packed under), ``arg_map`` (explicit per-port arg remap), ``dependency_map`` (lower dep "
+            "key -> source), ``return_map`` (lower return key -> wrapper return key)."
+        ),
+    )
     extension = models.CharField(
         max_length=1000,
         default="default",

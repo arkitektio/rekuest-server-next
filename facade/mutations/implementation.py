@@ -9,7 +9,9 @@ from facade.unique import assert_non_statefullness, infer_action_scope
 from kante.types import Info
 from rekuest_core.inputs.models import ArgPortInputModel, DefinitionInputModel, ImplementationInputModel, PortInputModel, RequiresInputModel, ProvidesInputModel, ReturnPortInputModel
 from rekuest_core.enums import PortKind, ProvidesOperator, RequiresOperator
+from rekuest_core import scalars as rscalars
 from authentikate.vars import get_user, get_client
+from facade.higher_order import validate_dependency_coverage, validate_higher_order_pairing
 import typing as t
 
 logger = logging.getLogger(__name__)
@@ -526,6 +528,45 @@ def create_implementation(info: Info, input: inputs.CreateImplementationInput) -
     )
 
     return _create_implementation(input.implementation, agent, input.extension)
+
+
+@strawberry.input(description="Mark an existing implementation as a higher-order wrapper of a lower implementation.")
+class SetHigherOrderInput:
+    implementation: strawberry.ID = strawberry.field(description="The wrapper implementation to mark as higher-order.")
+    lower_implementation: strawberry.ID = strawberry.field(description="The lower implementation it wraps.")
+    config: rscalars.AnyDefault | None = strawberry.field(default=None, description="Projection config: bound params + arg/dependency/return maps (see Implementation.higher_order_config).")
+
+
+def set_higher_order(info: Info, input: SetHigherOrderInput) -> types.Implementation:
+    """Link a wrapper implementation to the lower implementation it wraps, with a projection config.
+
+    Validates the pairing up front: no self-wrap, no nested wrappers, the action kinds must agree,
+    and every lower dependency slot must be covered by a bound dep or one of the wrapper's *declared*
+    dependencies (so the caller knows what to pass).
+    """
+    higher = models.Implementation.objects.get(id=input.implementation)
+    lower = models.Implementation.objects.get(id=input.lower_implementation)
+
+    if higher.pk == lower.pk:
+        raise ValueError("An implementation cannot wrap itself")
+
+    config = input.config or {}
+
+    validate_higher_order_pairing(
+        higher.action.kind,
+        lower.action.kind,
+        lower_is_higher_order=lower.higher_order_for_id is not None,
+    )
+    validate_dependency_coverage(
+        config,
+        lower_dependency_keys=[d.key for d in lower.dependencies.all()],
+        declared_h_dependency_keys=[d.key for d in higher.dependencies.all()],
+    )
+
+    higher.higher_order_for = lower
+    higher.higher_order_config = config
+    higher.save()
+    return higher
 
 
 def create_foreign_implementation(info: Info, input: inputs.CreateForeignImplementationInput) -> types.Implementation:

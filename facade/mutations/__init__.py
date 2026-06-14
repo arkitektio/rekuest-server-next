@@ -1,4 +1,4 @@
-from .implementation import create_foreign_implementation, create_implementation, delete_implementation, pin_implementation
+from .implementation import create_foreign_implementation, create_implementation, delete_implementation, pin_implementation, set_higher_order
 from .postman import reserve, unreserve, assign, pause, resume, step, ack, cancel, interrupt, collect, bounce, kick, block, unblock
 from .test import create_test_case, create_test_result
 from .memory_shelve import shelve_in_memory_drawer, unshelve_memory_drawer
@@ -55,6 +55,7 @@ __all__ = [
     "update_threed_model",
     "delete_threed_model",
     "pin_implementation",
+    "set_higher_order",
     "block",
     "create_shortcut",
     "delete_shortcut",

@@ -26,6 +26,9 @@ class Implementation:
     resolutions: list["Resolution"] = strawberry_django.field(description="The resolved dependencies")
     dependencies: list["Dependency"] = strawberry_django.field(description="Dependencies required by this action.")
     manipulates: list["State"] = strawberry.field(description="States that this implementation manipulates.")
+    higher_order_for: Optional["Implementation"] = strawberry_django.field(description="If this is a higher-order (wrapper) implementation, the lower implementation it wraps.")
+    lower_order_implementations: list["Implementation"] = strawberry_django.field(description="The higher-order implementations that wrap this implementation.")
+    higher_order_config: rscalars.AnyDefault = strawberry_django.field(description="Projection config (bound params, arg/dependency/return maps) when this is a higher-order implementation.")
 
     @strawberry_django.field(description="Constructed name for display, combining interface and agent name.")
     def name(self) -> str:

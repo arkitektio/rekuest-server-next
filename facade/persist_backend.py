@@ -1,10 +1,55 @@
-from typing import List
+from typing import List, Optional
 from facade import models, enums, messages
+from facade.higher_order import project_returns
 from django.utils import timezone
 import logging
 
+_TERMINAL_KINDS = (
+    enums.AssignationEventKind.DONE,
+    enums.AssignationEventKind.CANCELLED,
+    enums.AssignationEventKind.ERROR,
+    enums.AssignationEventKind.CRITICAL,
+)
+
 
 class ModelPersistBackend:
+    async def _unfold_to_higher_order(self, child_assignation_id: str, kind, returns: Optional[dict] = None, message: Optional[str] = None) -> None:
+        """If this assignation is the child of a higher-order wrapper, re-emit a mapped event on it.
+
+        The lower implementation runs on a child assignation; the user watches the wrapper. So we
+        project the child's returns back onto the wrapper's return ports and emit the corresponding
+        event on the wrapper (linked via ``delegated_to``), which the subscription layer broadcasts.
+        Non-higher-order children (hooks, dependency sub-assignments) are ignored.
+        """
+        try:
+            child = await models.Assignation.objects.select_related("parent", "parent__implementation").aget(id=child_assignation_id)
+        except models.Assignation.DoesNotExist:
+            return
+
+        parent = child.parent
+        if parent is None:
+            return
+        parent_impl = parent.implementation
+        if parent_impl is None or parent_impl.higher_order_for_id is None:
+            return  # not a higher-order child
+
+        config = parent_impl.higher_order_config or {}
+
+        event_kwargs = dict(assignation=parent, kind=kind, delegated_to=child)
+        if kind == enums.AssignationEventKind.YIELD:
+            event_kwargs["returns"] = project_returns(config, returns)
+        if message is not None:
+            event_kwargs["message"] = message
+        await models.AssignationEvent.objects.acreate(**event_kwargs)
+
+        parent.latest_event_kind = kind
+        update_fields = ["latest_event_kind"]
+        if kind in _TERMINAL_KINDS:
+            parent.is_done = True
+            parent.finished_at = timezone.now()
+            update_fields += ["is_done", "finished_at"]
+        await parent.asave(update_fields=update_fields)
+
     async def on_agent_disconnected(self, agent_id: str, connection_id: str | None = None) -> None:
         agent = await models.Agent.objects.aget(id=agent_id)
 
@@ -61,6 +106,7 @@ class ModelPersistBackend:
             kind=enums.AssignationEventKind.YIELD,
             returns=message.returns,
         )
+        await self._unfold_to_higher_order(message.assignation, enums.AssignationEventKind.YIELD, returns=message.returns)
 
     async def on_agent_done(self, agent_id: str, message: messages.DoneEvent) -> None:
         logging.info(f"Critical Assignation {message}")
@@ -75,6 +121,7 @@ class ModelPersistBackend:
         x.finished_at = timezone.now()
         x.latest_event_kind = enums.AssignationEventKind.DONE
         await x.asave(update_fields=["is_done", "finished_at", "latest_event_kind"])
+        await self._unfold_to_higher_order(message.assignation, enums.AssignationEventKind.DONE)
 
     async def on_agent_cancelled(self, agent_id: str, message: messages.CancelledEvent) -> None:
         logging.info(f"Critical Assignation {message}")
@@ -89,6 +136,7 @@ class ModelPersistBackend:
         x.finished_at = timezone.now()
         x.latest_event_kind = enums.AssignationEventKind.CANCELLED
         await x.asave(update_fields=["is_done", "finished_at", "latest_event_kind"])
+        await self._unfold_to_higher_order(message.assignation, enums.AssignationEventKind.CANCELLED)
 
     async def on_agent_error(self, agent_id: str, message: messages.ErrorEvent) -> None:
         logging.info(f"Critical Assignation {message}")
@@ -104,6 +152,7 @@ class ModelPersistBackend:
         x.finished_at = timezone.now()
         x.latest_event_kind = enums.AssignationEventKind.ERROR
         await x.asave(update_fields=["is_done", "finished_at", "latest_event_kind"])
+        await self._unfold_to_higher_order(message.assignation, enums.AssignationEventKind.ERROR, message=message.error)
 
     async def on_agent_critical(self, agent_id: str, message: messages.CriticalEvent) -> None:
         logging.info(f"Criticial Assignation {message}")
@@ -119,6 +168,7 @@ class ModelPersistBackend:
         x.finished_at = timezone.now()
         x.latest_event_kind = enums.AssignationEventKind.CRITICAL
         await x.asave(update_fields=["is_done", "finished_at", "latest_event_kind"])
+        await self._unfold_to_higher_order(message.assignation, enums.AssignationEventKind.CRITICAL, message=message.error)
 
     async def on_agent_progress(self, agent_id: str, message: messages.ProgressEvent) -> None:
         logging.info(f"Progress Assignation {message}")

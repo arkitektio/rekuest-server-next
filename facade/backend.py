@@ -5,6 +5,7 @@ from typing import Dict, List, Protocol, Any
 
 from facade import enums, inputs, models, types, messages
 from facade.consumers.async_consumer import AgentConsumer
+from facade.higher_order import build_lower_args, build_lower_dependencies
 from kante.types import Info
 from authentikate.vars import get_user, get_client
 import logging
@@ -193,6 +194,17 @@ class RedisControllBackend(ControllBackend):
                 assignation=str(assignation.id),
             ),
         )
+
+        # Forward cancellation to child assignations — e.g. the lower assignation a
+        # higher-order wrapper delegated to, which runs the real work on another agent.
+        for child in models.Assignation.objects.filter(parent_id=assignation.id, is_done=False):
+            AgentConsumer.broadcast(
+                child.agent.id,
+                message=messages.Cancel(
+                    assignation=str(child.id),
+                ),
+            )
+
         return assignation
 
     def assign(self, info: Info, input: inputs.AssignInputModel) -> models.Assignation:
@@ -263,9 +275,12 @@ class RedisControllBackend(ControllBackend):
             implementation = models.Implementation.objects.get(id=input.implementation)
             action = implementation.action
             agent = implementation.agent
-            assert agent.connected, "Agent is not connected"
-            assert agent.last_seen, "Agent last seen time is not set"
-            assert agent.last_seen > datetime.now(timezone.utc) - timedelta(minutes=1), "Agent is not connected"
+            # A higher-order implementation is virtual — its own agent need not be connected;
+            # only the resolved lower agent matters (checked in ``_assign_higher_order``).
+            if implementation.higher_order_for_id is None:
+                assert agent.connected, "Agent is not connected"
+                assert agent.last_seen, "Agent last seen time is not set"
+                assert agent.last_seen > datetime.now(timezone.utc) - timedelta(minutes=1), "Agent is not connected"
 
         elif input.action_hash:
             reservation = None
@@ -286,6 +301,11 @@ class RedisControllBackend(ControllBackend):
 
         if not action:
             raise ValueError("Could not determine action for this assignation")
+
+        # Higher-order implementations are orchestrated server-side: the wrapper assignation
+        # is virtual and a child assignation runs the resolved lower implementation.
+        if implementation is not None and implementation.higher_order_for_id is not None:
+            return self._assign_higher_order(info, input, implementation, registry)
 
         acted_on = acted_on_from_args(input.args, action)
 
@@ -349,6 +369,95 @@ class RedisControllBackend(ControllBackend):
                     )
 
         return assignation
+
+    def _assign_higher_order(self, info: Info, input: inputs.AssignInputModel, higher: models.Implementation, registry: models.Registry) -> models.Assignation:
+        """Orchestrate a higher-order assignation: remap args/deps, run a child on the lower agent.
+
+        The wrapper (``higher``) assignation is virtual — it is never broadcast to an agent.
+        A child assignation runs the resolved lower implementation; its yields/done are unfolded
+        back onto the wrapper in ``persist_backend`` (see the higher-order return path).
+        """
+        config = higher.higher_order_config or {}
+        lower = higher.higher_order_for
+        lower_action = lower.action
+
+        # MVP: no nesting. A wrapper may not wrap another wrapper.
+        if lower.higher_order_for_id is not None:
+            raise ValueError("Nested higher-order implementations are not supported yet")
+
+        # Resolve a connected agent implementing the lower action (cross-agent resolution).
+        lower_impl = models.Implementation.objects.filter(
+            action=lower_action,
+            agent__connected=True,
+            agent__last_seen__gt=datetime.now(timezone.utc) - timedelta(minutes=1),
+        ).first()
+        if not lower_impl:
+            raise ValueError(f"No active implementation found for lower action {lower_action.name}")
+        lower_agent = lower_impl.agent
+
+        # Resolve the wrapper's declared dependencies from the caller, then project both the
+        # args and the dependencies onto the lower implementation.
+        higher_dependencies = build_dependency_dict(higher, info, input.dependencies or [])
+        lower_args = build_lower_args(config, input.args)
+        lower_dependencies = build_lower_dependencies(config, higher_dependencies)
+
+        reference = input.reference or self.create_message_id()
+
+        # The user-facing wrapper assignation — created but NOT broadcast.
+        higher_assignation = models.Assignation.objects.create(
+            action=higher.action,
+            args=input.args,
+            reference=reference,
+            parent_id=input.parent,
+            agent=higher.agent,
+            acted_on=acted_on_from_args(input.args, higher.action),
+            capture=input.capture if input.capture is not None else False,
+            implementation=higher,
+            is_done=False,
+            latest_event_kind=enums.AssignationEventKind.ASSIGN,
+            latest_instruct_kind=enums.AssignationInstructKind.ASSIGN,
+            hooks=input.hooks or [],
+            dependencies=higher_dependencies,
+            registry=registry,
+            ephemeral=input.ephemeral if input.ephemeral is not None else False,
+        )
+
+        # The child assignation that actually runs on the resolved lower agent.
+        lower_assignation = models.Assignation.objects.create(
+            action=lower_action,
+            args=lower_args,
+            reference=self.create_message_id(),
+            parent=higher_assignation,
+            root=higher_assignation.root or higher_assignation,
+            agent=lower_agent,
+            acted_on=acted_on_from_args(lower_args, lower_action),
+            capture=False,
+            implementation=lower_impl,
+            is_done=False,
+            latest_event_kind=enums.AssignationEventKind.ASSIGN,
+            latest_instruct_kind=enums.AssignationInstructKind.ASSIGN,
+            dependencies=lower_dependencies,
+            registry=registry,
+        )
+
+        AgentConsumer.broadcast(
+            lower_agent.pk,
+            message=messages.Assign(
+                assignation=str(lower_assignation.pk),
+                args=lower_args,
+                user=str(info.context.request.user.sub),
+                app=str(info.context.request.client.client_id),
+                org=str(info.context.request.organization.slug) if info.context.request.organization else None,
+                reference=lower_assignation.reference,
+                capture=False,
+                resolution=None,
+                interface=lower_impl.interface,
+                extension=lower_impl.extension,
+                action=str(lower_action.hash),
+            ),
+        )
+
+        return higher_assignation
 
     def resume(self, info: Info, input: inputs.ResumeInputModel) -> models.Assignation:
         assignation = models.Assignation.objects.get(id=input.assignation)
