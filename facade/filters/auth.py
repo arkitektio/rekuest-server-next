@@ -61,7 +61,7 @@ class ClientFilter:
 
     @filter_field
     def has_implementations_for(self, info: Info, queryset, value: list[rscalars.ActionHash], prefix: str):
-        return queryset.filter(**{f"{prefix}registry__agents__implementations__action__hash__in": value}).distinct(), Q()
+        return queryset.filter(**{f"{prefix}agents__implementations__action__hash__in": value}).distinct(), Q()
 
     @filter_field
     def mine(self, info: Info, queryset, value: bool, prefix: str):

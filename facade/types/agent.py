@@ -29,7 +29,9 @@ class HardwareRecord:
 class Agent:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the agent.")
     hash: str = strawberry_django.field(description="Hash representing the agent's definition for change detection.")
-    registry: "Registry" = strawberry_django.field(description="Registry entry this agent belongs to.")
+    client: "Client" = strawberry_django.field(description="The client (app instance) this agent runs as.")
+    user: "User" = strawberry_django.field(description="The user this agent belongs to.")
+    organization: "Organization" = strawberry_django.field(description="The organization this agent belongs to.")
     hardware_records: list[HardwareRecord] = strawberry_django.field(description="Historical records of agent's hardware.")
     device: Device = strawberry_django.field(description="Device associated with the agent.")
     user: User = strawberry_django.field(description="User associated with the agent.")
@@ -69,7 +71,7 @@ class Agent:
 
     @classmethod
     def get_queryset(cls, queryset, info, **kwargs):
-        return build_prescoped_queryset(info, queryset, field="registry__organization")
+        return build_prescoped_queryset(info, queryset, field="organization")
 
     @strawberry_django.field(description="Get the count of implementations available on this agent.")
     def blocked(self) -> bool:

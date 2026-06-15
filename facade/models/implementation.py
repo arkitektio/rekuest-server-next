@@ -135,7 +135,7 @@ class Implementation(models.Model):
     agent = models.ForeignKey(
         "Agent",
         on_delete=models.CASCADE,
-        help_text="The associated registry for this Implementation",
+        help_text="The associated agent for this Implementation",
         related_name="implementations",
     )
     name = models.CharField(

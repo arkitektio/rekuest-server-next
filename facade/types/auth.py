@@ -49,10 +49,9 @@ class Organization:
     slug: str = strawberry_django.field(description="Slug of the organization.")
 
 
-@strawberry_django.type(models.Registry, description="Links a user and a client for registry tracking.")
-class Registry:
-    id: strawberry.ID = strawberry_django.field(description="Unique identifier for the registry.")
+@strawberry_django.type(models.Caller, description="The (client, user, organization) identity that requests work.")
+class Caller:
+    id: strawberry.ID = strawberry_django.field(description="Unique identifier for the caller.")
     client: Client = strawberry_django.field(description="The associated client.")
     user: User = strawberry_django.field(description="The associated user.")
-    organization: Organization = strawberry_django.field(description="The organization this registry belongs to.")
-    agents: list["Agent"] = strawberry_django.field(description="Agents registered under this registry.")
+    organization: Organization = strawberry_django.field(description="The organization this caller belongs to.")

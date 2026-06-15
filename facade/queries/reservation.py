@@ -10,14 +10,14 @@ logger = logging.getLogger(__name__)
 def myreservations(
     info: Info,
 ) -> types.Action:
-    registry, _ = models.Registry.objects.get_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
+    caller, _ = models.Caller.objects.get_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
 
-    return models.Reservation.objects.filter(registry=registry).all
+    return models.Reservation.objects.filter(caller=caller).all
 
 
 def reservations(
     info: Info,
 ) -> list[types.Reservation]:
-    registry, _ = models.Registry.objects.get_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
+    caller, _ = models.Caller.objects.get_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
 
-    return models.Reservation.objects.filter(registry=registry)
+    return models.Reservation.objects.filter(caller=caller)

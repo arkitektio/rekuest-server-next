@@ -29,7 +29,7 @@ class AgentFilter:
 
     @filter_field(description="Filter by client ID of the app the agent is registered to")
     def client_id(self, info: Info, queryset, value: str, prefix: str):
-        return queryset.filter(**{f"{prefix}registry__client__client_id": value}), Q()
+        return queryset.filter(**{f"{prefix}client__client_id": value}), Q()
 
     @filter_field(description="Filter by IDs of the agents")
     def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
@@ -156,7 +156,7 @@ class HardwareRecordFilter:
 class ImplementationAgentFilter:
     @filter_field
     def client_id(self, info: Info, queryset, value: str, prefix: str):
-        return queryset.filter(**{f"{prefix}registry__app__client_id": value}), Q()
+        return queryset.filter(**{f"{prefix}client__client_id": value}), Q()
 
     @filter_field
     def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):

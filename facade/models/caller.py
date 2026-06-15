@@ -2,12 +2,12 @@ from authentikate.models import Client, Organization, User
 from django.db import models
 
 
-class Registry(models.Model):
-    """A registry is an app that is bound to a specific user on the
-    backend.
+class Caller(models.Model):
+    """The (client, user, organization) identity that *requests* work.
 
-    It is the root type for all agents and waiters that are
-    created by this app.
+    A Caller is derived from the auth token on every authenticated request and is the
+    requestor identity for assignations and reservations. It is independent of an Agent
+    (the provider runtime): a pure frontend caller has a Caller but no Agent.
 
     """
 
@@ -20,14 +20,14 @@ class Registry(models.Model):
     organization = models.ForeignKey(
         Organization,
         on_delete=models.CASCADE,
-        help_text="The Organization this Registry belongs to",
+        help_text="The Organization this Caller belongs to",
     )
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
                 fields=["client", "user", "organization"],
-                name="No multiple Registries for same App and User in the same organization allowed",
+                name="No multiple Callers for same App and User in the same organization allowed",
             )
         ]
 

@@ -71,16 +71,12 @@ async def default_authenticator(register: messages.Register) -> "models.Agent":
     client = await aexpand_client_from_token(token)
     organization = await aexpand_organization_from_token(token)
 
-    registry, _ = await models.Registry.objects.aget_or_create(
+    agent, _ = await models.Agent.objects.aget_or_create(
         client=client,
         user=user,
         organization=organization,
-    )
-
-    agent, _ = await models.Agent.objects.aget_or_create(
-        registry=registry,
         defaults=dict(
-            name=f"{str(registry.pk)}",
+            name=f"{client.client_id}",
         ),
     )
     return agent

@@ -2,7 +2,7 @@ import datetime
 from django.utils import timezone
 import uuid
 
-from authentikate.models import App, Device, Organization, Release, User
+from authentikate.models import App, Client, Device, Organization, Release, User
 from django.contrib.auth import get_user_model
 from django.db import models
 from django_choices_field import TextChoicesField
@@ -86,12 +86,11 @@ class Agent(models.Model):
         blank=True,
         help_text="The users that pinned this Agent",
     )
-    registry = models.ForeignKey(
-        "Registry",
+    client = models.ForeignKey(
+        Client,
         on_delete=models.CASCADE,
-        help_text="The provide might be limited to a instance like ImageJ belonging to a specific person. Is nullable for backend users",
-        null=True,
         related_name="agents",
+        help_text="The client (app instance) this Agent runs as",
     )
     organization = models.ForeignKey(
         Organization,
@@ -107,8 +106,8 @@ class Agent(models.Model):
         permissions = [("can_provide_on", "Can provide on this Agent")]
         constraints = [
             models.UniqueConstraint(
-                fields=["registry"],
-                name="one_agent_per_registry",
+                fields=["client", "user", "organization"],
+                name="one_agent_per_client_user_organization",
             )
         ]
 

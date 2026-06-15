@@ -32,7 +32,7 @@ class Assignation:
     latest_event_kind: enums.AssignationEventKind = strawberry.field(description="Type of the latest event.")
     latest_instruct_kind: enums.AssignationInstructKind = strawberry.field(description="Last instruction type.")
     status_message: str | None = strawberry_django.field(description="Current status message.")
-    registry: Optional["Registry"] = strawberry.field(description="Registry that created this assignation.")
+    caller: Optional["Caller"] = strawberry.field(description="Caller that created this assignation.")
     created_at: datetime.datetime = strawberry_django.field(description="Creation timestamp.")
     updated_at: datetime.datetime = strawberry_django.field(description="Last update timestamp.")
     finished_at: datetime.datetime | None = strawberry.field(description="Timestamp when the assignation was finished.")
@@ -73,7 +73,7 @@ AssignationStats, AssignationStatsResolver = create_stats_type(
         "created_at": "created_at",
     },
     allowed_datetime_fields={"created_at": "created_at"},
-    prescope=build_prescoper(field="agent__registry__organization"),
+    prescope=build_prescoper(field="agent__organization"),
 )
 
 

@@ -56,7 +56,7 @@ from .implementation import (
     Resolution,
     ResolvedDependency,
 )
-from .registry import Registry
+from .caller import Caller
 from .reservation import Reservation
 from .state import (
     HistoricalState,
@@ -71,8 +71,8 @@ from .testcase import TestCase, TestResult
 from .threed import Placement, Space, ThreeDModel
 
 __all__ = [
-    # registry
-    "Registry",
+    # caller
+    "Caller",
     # catalog
     "Collection",
     "Protocol",

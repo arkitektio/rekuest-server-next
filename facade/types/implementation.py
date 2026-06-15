@@ -53,7 +53,7 @@ class Implementation:
             self.assignations.filter(
                 implementation=self.id,
                 is_done=True,
-                registry__user=user,
+                caller__user=user,
             )
             .order_by("-created_at")
             .first()

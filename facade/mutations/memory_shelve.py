@@ -20,12 +20,12 @@ class ShelveInMemoryDrawerInput:
 
 
 def shelve_in_memory_drawer(info: Info, input: ShelveInMemoryDrawerInput) -> types.MemoryDrawer:
-    registry, _ = models.Registry.objects.update_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
-
     agent, _ = models.Agent.objects.update_or_create(
-        registry=registry,
+        client=info.context.request.client,
+        user=info.context.request.user,
+        organization=info.context.request.organization,
         defaults=dict(
-            name=f"{str(registry)}",
+            name=f"{info.context.request.client.client_id}",
         ),
     )
 
@@ -56,12 +56,12 @@ class UnshelveMemoryDrawerInput:
 
 
 def unshelve_memory_drawer(info: Info, input: UnshelveMemoryDrawerInput) -> strawberry.ID:
-    registry, _ = models.Registry.objects.update_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
-
     agent, _ = models.Agent.objects.update_or_create(
-        registry=registry,
+        client=info.context.request.client,
+        user=info.context.request.user,
+        organization=info.context.request.organization,
         defaults=dict(
-            name=f"{str(registry)}",
+            name=f"{info.context.request.client.client_id}",
         ),
     )
 

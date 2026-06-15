@@ -11,7 +11,7 @@ def auto_resolve(info: Info, implementation: models.Implementation, resolution: 
 
     for dependency in implementation.dependencies.all():
         print(f"Resolving, {dependency}")
-        agentsqs = models.Agent.objects.filter(registry__organization=info.context.request.organization)
+        agentsqs = models.Agent.objects.filter(organization=info.context.request.organization)
 
         matched_ids: dict[str, list[int]] = {}
 

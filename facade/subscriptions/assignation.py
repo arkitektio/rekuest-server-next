@@ -11,9 +11,9 @@ async def assignation_events(
 ) -> AsyncGenerator[types.AssignationEvent, None]:
     """Join and subscribe to message sent to the given rooms."""
 
-    registry, _ = await models.Registry.objects.aget_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
+    caller, _ = await models.Caller.objects.aget_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
 
-    async for message in assignation_event_channel(info.context, [f"ass_registry_{registry.id}"]):
+    async for message in assignation_event_channel(info.context, [f"ass_caller_{caller.id}"]):
         yield await models.AssignationEvent.objects.aget(id=message)
 
 
@@ -32,9 +32,9 @@ async def assignations(
     user = info.context.request.user
     client = info.context.request.client
 
-    registry, _ = await models.Registry.objects.aget_or_create(client=client, user=user, organization=info.context.request.organization)
+    caller, _ = await models.Caller.objects.aget_or_create(client=client, user=user, organization=info.context.request.organization)
 
-    async for message in assignation_event_channel.listen(info.context, [f"ass_registry_{registry.id}"]):
+    async for message in assignation_event_channel.listen(info.context, [f"ass_caller_{caller.id}"]):
         if message.create:
             ass = await models.Assignation.objects.aget(id=message.create)
             yield AssignationChangeEvent(create=ass, event=None)

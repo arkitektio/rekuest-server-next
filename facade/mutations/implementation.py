@@ -301,7 +301,7 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
             version=version,
             app=app,
             hash=hash,
-            organization=agent.registry.organization,
+            organization=agent.organization,
             description=definition.description or "No description",
             args=[i.model_dump() for i in definition.args],
             scope=scope,
@@ -327,7 +327,7 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
 
     if definition.collections:
         for collection_name in definition.collections:
-            c, _ = models.Collection.objects.get_or_create(name=collection_name, defaults=dict(creator=agent.registry.user, organization=agent.registry.organization))
+            c, _ = models.Collection.objects.get_or_create(name=collection_name, defaults=dict(creator=agent.user, organization=agent.organization))
             action.collections.add(c)
 
     logger.info(f"Created {action}")
@@ -346,7 +346,7 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
 
         implementation.action = action
         implementation.params = input.params or {}
-        implementation.release = agent.registry.client.release
+        implementation.release = agent.release
         implementation.save()
 
         new_deps = []
@@ -377,7 +377,7 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
     except models.Implementation.DoesNotExist:
         implementation = models.Implementation.objects.create(
             interface=input.interface,
-            release=agent.registry.client.release,
+            release=agent.release,
             action=action,
             agent=agent,
             dynamic=input.dynamic,
@@ -416,12 +416,12 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
 
 
 def create_implementation(info: Info, input: inputs.CreateImplementationInput) -> types.Implementation:
-    registry, _ = models.Registry.objects.update_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
-
     agent, _ = models.Agent.objects.update_or_create(
-        registry=registry,
+        client=info.context.request.client,
+        user=info.context.request.user,
+        organization=info.context.request.organization,
         defaults=dict(
-            name=f"{str(registry.pk)}",
+            name=f"{info.context.request.client.client_id}",
             release=info.context.request.client.release,
             app=info.context.request.client.release.app,
         ),

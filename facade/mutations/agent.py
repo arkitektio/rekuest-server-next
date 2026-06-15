@@ -30,19 +30,13 @@ class DeleteAgentInput:
 def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
     # TODO: Hasch this
 
-    registry, _ = models.Registry.objects.update_or_create(
+    agent, _ = models.Agent.objects.get_or_create(
         client=info.context.request.client,
         user=info.context.request.user,
         organization=info.context.request.organization,
-    )
-
-    agent, _ = models.Agent.objects.get_or_create(
-        registry=registry,
         defaults=dict(
-            name=input.name or f"{str(registry.pk)}",
+            name=input.name or f"{info.context.request.client.client_id}",
             app=info.context.request.client.release.app,
-            organization=info.context.request.organization,
-            user=info.context.request.user,
             release=info.context.request.client.release,
             device=info.context.request.client.device,
         ),
@@ -105,19 +99,13 @@ class ImplementAgentInput:
 def implement_agent(info: Info, input: ImplementAgentInput) -> types.Agent:
     input = input.to_pydantic()
 
-    registry, _ = models.Registry.objects.update_or_create(
+    agent, _ = models.Agent.objects.update_or_create(
         client=info.context.request.client,
         user=info.context.request.user,
         organization=info.context.request.organization,
-    )
-
-    agent, _ = models.Agent.objects.update_or_create(
-        registry=registry,
         defaults=dict(
-            name=input.name or f"{str(registry.pk)}",
+            name=input.name or f"{info.context.request.client.client_id}",
             app=info.context.request.client.release.app,
-            organization=info.context.request.organization,
-            user=info.context.request.user,
             release=info.context.request.client.release,
             device=info.context.request.client.device,
             hash=input.hash or str(uuid.uuid4()),

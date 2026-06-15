@@ -11,16 +11,12 @@ logger = logging.getLogger(__name__)
 def log_patches(info: Info, input: inputs.LogPatchesInput) -> strawberry.ID:
     model = input.to_pydantic()
 
-    registry, _ = models.Registry.objects.get_or_create(
+    agent, _ = models.Agent.objects.get_or_create(
         client=info.context.request.client,
         user=info.context.request.user,
         organization=info.context.request.organization,
-    )
-
-    agent, _ = models.Agent.objects.get_or_create(
-        registry=registry,
         defaults=dict(
-            name=f"{str(registry.pk)}",
+            name=f"{info.context.request.client.client_id}",
         ),
     )
 
@@ -58,16 +54,12 @@ def log_patches(info: Info, input: inputs.LogPatchesInput) -> strawberry.ID:
 def log_snapshot(info: Info, input: inputs.LogSnapshotInput) -> strawberry.ID:
     model = input.to_pydantic()
 
-    registry, _ = models.Registry.objects.get_or_create(
+    agent, _ = models.Agent.objects.get_or_create(
         client=info.context.request.client,
         user=info.context.request.user,
         organization=info.context.request.organization,
-    )
-
-    agent, _ = models.Agent.objects.get_or_create(
-        registry=registry,
         defaults=dict(
-            name=f"{str(registry.pk)}",
+            name=f"{info.context.request.client.client_id}",
         ),
     )
 

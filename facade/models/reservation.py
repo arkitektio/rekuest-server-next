@@ -57,12 +57,12 @@ class Reservation(models.Model):
         related_name="caused_reservations",
     )
 
-    registry = models.ForeignKey(
-        "Registry",
+    caller = models.ForeignKey(
+        "Caller",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        help_text="Which registry created this Reservation (if any?)",
+        help_text="Which caller created this Reservation (if any?)",
         related_name="reservations",
     )
 

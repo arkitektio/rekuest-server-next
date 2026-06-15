@@ -27,14 +27,10 @@ async def my_implementation_at(
 ) -> types.Implementation:
     # TODO: Hasch this
 
-    registry, _ = await models.Registry.objects.aget_or_create(
+    agent, _ = await models.Agent.objects.aget_or_create(
         client=info.context.request.client,
         user=info.context.request.user,
         organization=info.context.request.organization,
-    )
-
-    agent, _ = await models.Agent.objects.aget_or_create(
-        registry=registry,
     )
 
     if action_id:

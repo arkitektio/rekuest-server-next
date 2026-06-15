@@ -55,10 +55,10 @@ def agent_post_delete(sender, instance: models.Agent = None, **kwargs):
 
 @receiver(post_save, sender=models.Assignation)
 def ass_post_save(sender, instance: models.Assignation = None, created=None, **kwargs):
-    if created and instance.registry_id:
+    if created and instance.caller_id:
         channels.assignation_event_channel.broadcast(
             channel_events.AssignationEventCreatedEvent(create=str(instance.id)),
-            [f"ass_registry_{instance.registry_id}"],
+            [f"ass_caller_{instance.caller_id}"],
         )
 
     if instance.parent:
@@ -77,10 +77,10 @@ def ass_post_save(sender, instance: models.Assignation = None, created=None, **k
 @receiver(post_save, sender=models.AssignationEvent)
 def ass_event_post_save(sender, instance: models.AssignationEvent = None, created=None, **kwargs):
     logger.info("Assignation Event received")
-    if instance.assignation.registry_id:
+    if instance.assignation.caller_id:
         channels.assignation_event_channel.broadcast(
             channel_events.AssignationEventCreatedEvent(event=instance.id),
-            [f"ass_registry_{instance.assignation.registry_id}"],
+            [f"ass_caller_{instance.assignation.caller_id}"],
         )
 
 
@@ -88,7 +88,7 @@ def ass_event_post_save(sender, instance: models.AssignationEvent = None, create
 def res_post_save(sender, instance: models.Reservation = None, created=None, **kwargs):
     if created:
         pass
-        # reservation_broadcast(instance.id, [f"res_registry_{instance.registry_id}"])
+        # reservation_broadcast(instance.id, [f"res_caller_{instance.caller_id}"])
 
 
 @receiver(post_save, sender=models.Implementation)

@@ -84,10 +84,10 @@ class Assignation(models.Model):
     )
     args = models.JSONField(blank=True, null=True, help_text="The Args", default=dict)
     dependencies = models.JSONField(blank=True, null=True, help_text="The Args", default=dict)
-    registry = models.ForeignKey(
-        "Registry",
+    caller = models.ForeignKey(
+        "Caller",
         on_delete=models.CASCADE,
-        help_text="The registry (client/user/organization) that created this Assignation",
+        help_text="The caller (client/user/organization) that created this Assignation",
         null=True,
         blank=True,
         related_name="assignations",
@@ -172,12 +172,12 @@ class AssignationEvent(models.Model):
 
 
 class AssignationInstruct(models.Model):
-    registry = models.ForeignKey(
-        "Registry",
+    caller = models.ForeignKey(
+        "Caller",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        help_text="Which registry created this Instruction (if any?)",
+        help_text="Which caller created this Instruction (if any?)",
         related_name="assignation_instructs",
     )
     created_at = models.DateTimeField(auto_now_add=True)

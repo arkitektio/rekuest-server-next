@@ -90,9 +90,9 @@ def build_dependency_dict(implementation: models.Implementation, info: Info, dep
     return dep_kwargs
 
 
-def get_registry_for_context(info: Info) -> models.Registry:
-    registry, _ = models.Registry.objects.get_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
-    return registry
+def get_caller_for_context(info: Info) -> models.Caller:
+    caller, _ = models.Caller.objects.get_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
+    return caller
 
 
 # TODO: Implement this for nested structures and interfaces as well
@@ -161,11 +161,11 @@ class RedisControllBackend(ControllBackend):
             if len(implementations) == 0:
                 raise ValueError("No implementations found for this action. Cannot reserve.")
 
-        registry = get_registry_for_context(info)
+        caller = get_caller_for_context(info)
 
         res, created = models.Reservation.objects.update_or_create(
             reference=input.reference,
-            registry=registry,
+            caller=caller,
             defaults=dict(
                 title=input.title,
                 binds=input.binds.dict() if input.binds else None,
@@ -217,7 +217,7 @@ class RedisControllBackend(ControllBackend):
         agent = None
         dependency_dict = None
 
-        registry = get_registry_for_context(info)
+        caller = get_caller_for_context(info)
 
         if input.dependency:
             assert input.method, "Method key must be provided when assigning to a dependency"
@@ -305,7 +305,7 @@ class RedisControllBackend(ControllBackend):
         # Higher-order implementations are orchestrated server-side: the wrapper assignation
         # is virtual and a child assignation runs the resolved lower implementation.
         if implementation is not None and implementation.higher_order_for_id is not None:
-            return self._assign_higher_order(info, input, implementation, registry)
+            return self._assign_higher_order(info, input, implementation, caller)
 
         acted_on = acted_on_from_args(input.args, action)
 
@@ -332,7 +332,7 @@ class RedisControllBackend(ControllBackend):
             latest_instruct_kind=enums.AssignationInstructKind.ASSIGN,
             hooks=input.hooks or [],
             dependencies=dependency_dict,
-            registry=registry,
+            caller=caller,
             ephemeral=input.ephemeral if input.ephemeral is not None else False,
         )
 
@@ -369,7 +369,7 @@ class RedisControllBackend(ControllBackend):
 
         return assignation
 
-    def _assign_higher_order(self, info: Info, input: inputs.AssignInputModel, higher: models.Implementation, registry: models.Registry) -> models.Assignation:
+    def _assign_higher_order(self, info: Info, input: inputs.AssignInputModel, higher: models.Implementation, caller: models.Caller) -> models.Assignation:
         """Orchestrate a higher-order assignation: remap args/deps, run a child on the lower agent.
 
         The wrapper (``higher``) assignation is virtual — it is never broadcast to an agent.
@@ -417,7 +417,7 @@ class RedisControllBackend(ControllBackend):
             latest_instruct_kind=enums.AssignationInstructKind.ASSIGN,
             hooks=input.hooks or [],
             dependencies=higher_dependencies,
-            registry=registry,
+            caller=caller,
             ephemeral=input.ephemeral if input.ephemeral is not None else False,
         )
 
@@ -436,7 +436,7 @@ class RedisControllBackend(ControllBackend):
             latest_event_kind=enums.AssignationEventKind.ASSIGN,
             latest_instruct_kind=enums.AssignationInstructKind.ASSIGN,
             dependencies=lower_dependencies,
-            registry=registry,
+            caller=caller,
         )
 
         AgentConsumer.broadcast(

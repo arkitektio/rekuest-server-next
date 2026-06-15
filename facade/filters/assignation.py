@@ -36,7 +36,7 @@ class AssignationFilter:
 
     @filter_field
     def client_id(self, info: Info, queryset, value: strawberry.ID, prefix: str):
-        return queryset.filter(**{f"{prefix}agent__registry__client__client_id": value}), Q()
+        return queryset.filter(**{f"{prefix}agent__client__client_id": value}), Q()
 
     @filter_field
     def state(self, info: Info, queryset, value: list[enums.AssignationEventKind], prefix: str):

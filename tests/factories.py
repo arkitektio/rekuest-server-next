@@ -25,8 +25,8 @@ from facade.models import (
     Action,
     Agent,
     Assignation,
+    Caller,
     Implementation,
-    Registry,
     State,
     StateDefinition,
 )
@@ -37,26 +37,25 @@ TEST_TOKEN = "test"
 # --------------------------------------------------------------------------- #
 # Sync model builders (used by the model tests)
 # --------------------------------------------------------------------------- #
-def create_registry_bundle(prefix: str) -> tuple[User, Client, Organization, Registry]:
+def create_registry_bundle(prefix: str) -> tuple[User, Client, Organization, Caller]:
     user = User.objects.create(username=f"{prefix}-user", password="testpass")
     client = Client.objects.create(client_id=f"{prefix}-client")
     org = Organization.objects.create(slug=f"{prefix}-org")
-    registry = Registry.objects.create(client=client, user=user, organization=org)
-    return user, client, org, registry
+    caller = Caller.objects.create(client=client, user=user, organization=org)
+    return user, client, org, caller
 
 
-def create_agent_for_registry(registry: Registry, user: User, organization: Organization, prefix: str, **overrides) -> Agent:
-    app = App.objects.create(identifier=f"{prefix}-app")
-    release = Release.objects.create(app=app, version="1.0.0")
+def create_agent_for_registry(registry: Caller, user: User, organization: Organization, prefix: str, **overrides) -> Agent:
+    release = Release.objects.create(app=App.objects.create(identifier=f"{prefix}-app"), version="1.0.0")
     device = Device.objects.create(device_id=f"{prefix}-device")
 
     agent_data = {
-        "app": app,
+        "app": release.app,
         "hash": f"{prefix}-hash",
         "release": release,
         "device": device,
         "user": user,
-        "registry": registry,
+        "client": registry.client,
         "organization": organization,
     }
     agent_data.update(overrides)
@@ -87,24 +86,25 @@ async def seed_agent(instance_id, token=TEST_TOKEN, blocked=False):
     """Pre-create the agent the consumer will look up for ``token``.
 
     Uses the same authentikate expansion the consumer uses, so the derived
-    Registry matches and ``on_register`` finds (rather than creates) the agent.
+    (client, user, organization) matches and ``on_register`` finds (rather than creates) the agent.
     ``instance_id`` is only a label used to make seeded rows distinguishable.
     """
     decoded = await authenticate_token_or_none(token)
     user = await aexpand_user_from_token(decoded)
     client = await aexpand_client_from_token(decoded)
     organization = await aexpand_organization_from_token(decoded)
-    registry, _ = await Registry.objects.aget_or_create(client=client, user=user, organization=organization)
 
     app, _ = await App.objects.aget_or_create(identifier="ws-test-app")
     release, _ = await Release.objects.aget_or_create(app=app, version="1.0.0")
     device, _ = await Device.objects.aget_or_create(device_id="ws-test-device")
 
     agent, _ = await Agent.objects.aupdate_or_create(
-        registry=registry,
+        client=client,
+        user=user,
+        organization=organization,
         defaults=dict(
-            app=app, release=release, device=device, user=user,
-            organization=organization, hash=f"{instance_id}-hash", blocked=blocked,
+            app=app, release=release, device=device,
+            hash=f"{instance_id}-hash", blocked=blocked,
         ),
     )
     return agent
@@ -122,14 +122,14 @@ def _build_assignation(prefix):
     user = User.objects.create(username=f"{prefix}-user", password="x", sub=f"{prefix}-sub")
     client = Client.objects.create(client_id=f"{prefix}-client")
     org = Organization.objects.create(slug=f"{prefix}-org")
-    registry = Registry.objects.create(client=client, user=user, organization=org)
+    caller = Caller.objects.create(client=client, user=user, organization=org)
 
     app = App.objects.create(identifier=f"{prefix}-app")
     release = Release.objects.create(app=app, version="1.0.0")
     device = Device.objects.create(device_id=f"{prefix}-device")
     agent = Agent.objects.create(
         app=app, hash=f"{prefix}-hash", release=release, device=device,
-        user=user, registry=registry, organization=org,
+        user=user, client=client, organization=org,
     )
 
     action = Action.objects.create(
@@ -141,7 +141,7 @@ def _build_assignation(prefix):
     )
 
     return Assignation.objects.create(
-        registry=registry,
+        caller=caller,
         action=action,
         agent=agent,
         implementation=implementation,
@@ -164,7 +164,7 @@ def _build_unimplemented_assignation_for_agent(agent_pk, prefix):
         description=f"{prefix} description", hash=f"{prefix}-action-hash", organization=agent.organization,
     )
     return Assignation.objects.create(
-        registry=agent.registry,
+        caller=None,
         action=action,
         agent=agent,
         implementation=None,

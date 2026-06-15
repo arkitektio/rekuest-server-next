@@ -40,7 +40,7 @@ from .assignation import (
     AssignationStats,
     AssignationStatsResolver,
 )
-from .auth import App, Client, Device, Organization, Registry, Release, User
+from .auth import App, Caller, Client, Device, Organization, Release, User
 from .base import build_prescoped_queryset, build_prescoper
 from .blok import Blok, BlokAgentMapping, BlokDependency, MaterializedBlok
 from .dashboard import Dashboard, DashboardPlacement, UICatalog
@@ -104,7 +104,7 @@ __all__ = [
     "Release",
     "Client",
     "Organization",
-    "Registry",
+    "Caller",
     "Collection",
     "Protocol",
     "Toolbox",
