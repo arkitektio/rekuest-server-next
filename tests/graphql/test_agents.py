@@ -106,7 +106,6 @@ class TestGraphQLAgents:
         # ensureAgent is idempotent and returns the existing record.
         assert first_agent_id == second_agent_id
         assert result2.data["ensureAgent"]["name"] == "First Agent"
-        assert result2.data["ensureAgent"]["extensions"] == []
         assert await sync_to_async(Agent.objects.count)() == 1
 
     async def test_delete_agent_mutation(self, authenticated_context: HttpContext):

@@ -179,7 +179,6 @@ class Query:
 @strawberry.type(description="Root mutation type for executing write operations on the API.")
 class Mutation:
     create_implementation = mutation(resolver=mutations.create_implementation, description="Create a new implementation entry.")
-    create_foreign_implementation = mutation(resolver=mutations.create_foreign_implementation, description="Register an external implementation.")
     ack = mutation(resolver=mutations.ack, description="Acknowledge an assignation.")
     bounce = mutation(resolver=mutations.bounce, description="Bounce an agent so it reconnects.")
     kick = mutation(resolver=mutations.kick, description="Kick an agent to force disconnect. It will fail and not reconnect.")

@@ -35,17 +35,13 @@ class AgentFilter:
     def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
-    @filter_field(description="Filter by extensions of the agents")
-    def extensions(self, info: Info, queryset, value: list[str], prefix: str):
-        return queryset.filter(**{f"{prefix}extensions__contains": value}), Q()
-
     @filter_field(description="Filter by implementations of the agents")
     def has_implementations(self, info: Info, queryset, value: list[str], prefix: str):
         return queryset.filter(**{f"{prefix}implementations__action__hash__in": value}), Q()
 
     @filter_field(description="Filter by states of the agents")
     def has_states(self, info: Info, queryset, value: list[str], prefix: str):
-        return queryset.filter(**{f"{prefix}states__state_schema__hash__in": value}), Q()
+        return queryset.filter(**{f"{prefix}states__definition__hash__in": value}), Q()
 
     @filter_field(description="Filter by pinned agents")
     def pinned(self, info: Info, queryset, value: bool, prefix: str):
@@ -121,7 +117,7 @@ class AgentFilter:
                 if new_id not in filtered_ids:
                     filtered_ids.add(new_id)
 
-        return queryset.filter(**{f"{prefix}states__state_schema__id__in": list(filtered_ids)}), Q()
+        return queryset.filter(**{f"{prefix}states__definition__id__in": list(filtered_ids)}), Q()
 
     @filter_field(description="Filter by user ID")
     def user(self, info: Info, queryset, value: strawberry.ID, prefix: str):
@@ -167,13 +163,9 @@ class ImplementationAgentFilter:
         return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
     @filter_field
-    def extensions(self, info: Info, queryset, value: list[str], prefix: str):
-        return queryset.filter(**{f"{prefix}extensions__contains": value}), Q()
-
-    @filter_field
     def has_implementations(self, info: Info, queryset, value: list[str], prefix: str):
         return queryset.filter(**{f"{prefix}implementations__action__hash__in": value}), Q()
 
     @filter_field
     def has_states(self, info: Info, queryset, value: list[str], prefix: str):
-        return queryset.filter(**{f"{prefix}states__state_schema__hash__in": value}), Q()
+        return queryset.filter(**{f"{prefix}states__definition__hash__in": value}), Q()

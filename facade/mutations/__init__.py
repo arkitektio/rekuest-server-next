@@ -1,4 +1,4 @@
-from .implementation import create_foreign_implementation, create_implementation, delete_implementation, pin_implementation, set_higher_order
+from .implementation import create_implementation, delete_implementation, pin_implementation, set_higher_order
 from .postman import reserve, unreserve, assign, pause, resume, step, ack, cancel, interrupt, collect, bounce, kick, block, unblock
 from .test import create_test_case, create_test_result
 from .memory_shelve import shelve_in_memory_drawer, unshelve_memory_drawer
@@ -17,7 +17,6 @@ from .threed_model import create_threed_model, update_threed_model, delete_three
 from .agent import implement_agent, update_agent
 
 __all__ = [
-    "create_foreign_implementation",
     "create_implementation",
     "delete_threed_model",
     "create_threed_model",

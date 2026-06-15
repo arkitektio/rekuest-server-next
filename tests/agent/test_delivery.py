@@ -19,7 +19,7 @@ class TestAgentDelivery:
         agent_pk = init["agent"]
 
         assign = messages.Assign(
-            interface="iface", extension="default", assignation=str(uuid.uuid4()),
+            interface="iface", assignation=str(uuid.uuid4()),
             args={"a": 1}, user="1", app="test-app", action="some-action",
         )
         # broadcast() lpushes to the agent's redis queue; listen_for_tasks relays it.

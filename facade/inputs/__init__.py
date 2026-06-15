@@ -68,8 +68,6 @@ from .dependency import (
 )
 from .implementation import (
     ActionDemandInput,
-    CreateForeignImplementationInput,
-    CreateForeignImplementationInputModel,
     CreateImplementationInput,
     CreateImplementationInputModel,
     DeleteImplementationInput,
@@ -178,8 +176,6 @@ __all__ = [
     "UpdateResolutionInputModel",
     # implementation
     "ActionDemandInput",
-    "CreateForeignImplementationInput",
-    "CreateForeignImplementationInputModel",
     "CreateImplementationInput",
     "CreateImplementationInputModel",
     "DeleteImplementationInput",

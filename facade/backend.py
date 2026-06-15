@@ -350,7 +350,6 @@ class RedisControllBackend(ControllBackend):
                 capture=input.capture if input.capture is not None else False,
                 resolution=str(resolution.pk) if resolution else None,
                 interface=implementation.interface,
-                extension=implementation.extension,
                 action=str(implementation.action.hash),
             ),
         )
@@ -452,7 +451,6 @@ class RedisControllBackend(ControllBackend):
                 capture=False,
                 resolution=None,
                 interface=lower_impl.interface,
-                extension=lower_impl.extension,
                 action=str(lower_action.hash),
             ),
         )

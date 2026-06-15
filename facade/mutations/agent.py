@@ -66,7 +66,6 @@ def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
 
 class ImplementAgentInputModel(BaseModel):
     name: str | None = None
-    extensions: list[str] | None = None
     states: list[StateImplementationInputModel] | None = None
     implementations: list[ImplementationInputModel] | None = None
     locks: list[LockImplementationInputModel] | None = None
@@ -80,10 +79,6 @@ class ImplementAgentInput:
     name: str | None = strawberry.field(
         default=None,
         description="The name of the agent. This is used to identify the agent in the system.",
-    )
-    extensions: list[str] | None = strawberry.field(
-        default=None,
-        description="The extensions of the agent. This is used to identify the agent in the system.",
     )
     locks: list[LockImplementationInput] | None = strawberry.field(
         default=None,

@@ -108,10 +108,10 @@ def state_for(
 
     if demand and demand.matches:
         state_ids = managers.get_state_ids_by_demands(demand.matches)
-        return models.State.objects.get(agent=agent_inst, id__in=state_ids)
+        return models.State.objects.get(agent=agent_inst, definition__id__in=state_ids)
 
     if state_hash:
-        return models.State.objects.get(agent=agent_inst, state_schema__hash=state_hash)
+        return models.State.objects.get(agent=agent_inst, definition__hash=state_hash)
 
     raise ValueError("Either state_hash or a valid demand must be provided")
 

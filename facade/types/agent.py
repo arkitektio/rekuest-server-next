@@ -38,7 +38,6 @@ class Agent:
     file_system_shelves: list["FilesystemShelve"] = strawberry_django.field(description="Filesystem shelves available on the agent.")
     last_seen: datetime.datetime | None = strawberry_django.field(description="Last timestamp this agent was seen.")
     connected: bool = strawberry_django.field(description="Is the agent currently connected.")
-    extensions: list[str] = strawberry_django.field(description="List of installed agent extensions.")
     name: str = strawberry_django.field(description="Agent name.")
     states: list["State"] = strawberry_django.field(description="Current and historical states associated with the agent.")
     kind: enums.AgentKind = strawberry_django.field(description="Kind of the agent.")

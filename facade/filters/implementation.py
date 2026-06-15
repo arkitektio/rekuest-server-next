@@ -44,6 +44,7 @@ class ImplementationActionFilter:
                 force_length=ports_demand.force_length,
                 force_non_nullable_length=ports_demand.force_non_nullable_length,
                 force_structure_length=ports_demand.force_structure_length,
+                organization_id=info.context.request.organization.id,
             )
 
             if filtered_ids is None:
@@ -100,10 +101,6 @@ class ImplementationFilter:
     @filter_field
     def action_hash(self, info: Info, queryset, value: rscalars.ActionHash, prefix: str):
         return queryset.filter(**{f"{prefix}action__hash": value}), Q()
-
-    @filter_field
-    def extension(self, info: Info, queryset, value: str, prefix: str):
-        return queryset.filter(**{f"{prefix}extension": value}), Q()
 
     @filter_field
     def parameters(self, info: Info, queryset, value: list[ParamPair], prefix: str):

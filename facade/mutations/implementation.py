@@ -4,11 +4,12 @@ import logging
 
 import strawberry
 from facade import inputs, models, types
+from facade.descriptors import compile_descriptors_to_jsonpath, compile_returndescriptors_to_jsonpath
 from facade.protocol import infer_protocols
 from facade.unique import assert_non_statefullness, infer_action_scope
 from kante.types import Info
-from rekuest_core.inputs.models import ArgPortInputModel, DefinitionInputModel, ImplementationInputModel, PortInputModel, RequiresInputModel, ProvidesInputModel, ReturnPortInputModel
-from rekuest_core.enums import PortKind, ProvidesOperator, RequiresOperator
+from rekuest_core.inputs.models import ArgPortInputModel, DefinitionInputModel, ImplementationInputModel, PortInputModel, ReturnPortInputModel
+from rekuest_core.enums import PortKind
 from rekuest_core import scalars as rscalars
 from authentikate.vars import get_user, get_client
 from facade.higher_order import validate_dependency_coverage, validate_higher_order_pairing
@@ -73,124 +74,6 @@ def identifier_to_package_key(identifier: str) -> str:
         raise ValueError(f"Identifier {identifier} does not contain a package part")
 
 
-def compile_descriptors_to_jsonpath(descriptors: list[RequiresInputModel] | None) -> str | None:
-    """
-    Translates Pydantic descriptor models into a valid PostgreSQL JSONPath string.
-    Returns None if no descriptors exist, which allows Django to save NULL to the DB.
-    """
-    if not descriptors:
-        return None
-
-    path_conditions = []
-
-    for desc in descriptors:
-        # Standardize the key path (e.g., 'axes.c' becomes '$.axes.c')
-        # If they already put '$.', don't duplicate it.
-        pg_path = desc.key if desc.key.startswith("$.") else f"$.{desc.key}"
-
-        # PRO-TIP: json.dumps natively formats Python True to 'true',
-        # strings to '"string"', and ints to '1' (Perfect for JSONPath).
-        formatted_val = json.dumps(desc.value)
-
-        # Extract string value from enum (handles both standard Enum and Django TextChoices)
-        op = desc.operator
-
-        # Map the operators to PG JSONPath Syntax
-        if op == RequiresOperator.MATCHES:
-            # In PG JSONPath, exists() returns a boolean based on path existence.
-            # We check if the user asked for exists=True or exists=False
-            if desc.value is True:
-                path_conditions.append(f"exists({pg_path})")
-            else:
-                path_conditions.append(f"!(exists({pg_path}))")
-
-        elif op == RequiresOperator.MATCHES:
-            path_conditions.append(f"{pg_path} == {formatted_val}")
-
-        elif op == RequiresOperator.EQUALS:
-            path_conditions.append(f"{pg_path} == {formatted_val}")
-
-        elif op == RequiresOperator.NOT_EQUALS:
-            path_conditions.append(f"{pg_path} != {formatted_val}")
-
-        elif op == RequiresOperator.GTE:
-            path_conditions.append(f"{pg_path} >= {formatted_val}")
-
-        elif op == RequiresOperator.LTE:
-            path_conditions.append(f"{pg_path} <= {formatted_val}")
-
-        elif op == RequiresOperator.CONTAINS:
-            # JSONPath array inclusion. e.g., $.tags[*] == "brain"
-            path_conditions.append(f"{pg_path}[*] == {formatted_val}")
-
-        elif op == RequiresOperator.IN:
-            # JSONPath array inclusion. e.g., $.tags[*] IN ["brain", "neural"]
-            path_conditions.append(f"{pg_path} IN {formatted_val}")
-
-        else:
-            raise ValueError(f"Unsupported JSONPath operator: {op}")
-
-    # Join all the constraints using the logical AND operator for JSONPath
-    return " && ".join(path_conditions)
-
-
-def compile_returndescriptors_to_jsonpath(descriptors: list[ProvidesInputModel] | None) -> str | None:
-    """
-    Translates Pydantic descriptor models into a valid PostgreSQL JSONPath string.
-    Returns None if no descriptors exist, which allows Django to save NULL to the DB.
-    """
-    if not descriptors:
-        return None
-
-    path_conditions = []
-
-    for desc in descriptors:
-        # Standardize the key path (e.g., 'axes.c' becomes '$.axes.c')
-        # If they already put '$.', don't duplicate it.
-        pg_path = desc.key if desc.key.startswith("$.") else f"$.{desc.key}"
-
-        # PRO-TIP: json.dumps natively formats Python True to 'true',
-        # strings to '"string"', and ints to '1' (Perfect for JSONPath).
-        formatted_val = json.dumps(desc.value)
-
-        # Extract string value from enum (handles both standard Enum and Django TextChoices)
-        op = desc.operator
-
-        # Map the operators to PG JSONPath Syntax
-        if op == ProvidesOperator.EXISTS:
-            # In PG JSONPath, exists() returns a boolean based on path existence.
-            # We check if the user asked for exists=True or exists=False
-            if desc.value is True:
-                path_conditions.append(f"exists({pg_path})")
-            else:
-                path_conditions.append(f"!(exists({pg_path}))")
-
-        elif op == ProvidesOperator.MATCHES:
-            path_conditions.append(f"{pg_path} == {formatted_val}")
-
-        elif op == ProvidesOperator.EQUALS:
-            path_conditions.append(f"{pg_path} == {formatted_val}")
-
-        elif op == ProvidesOperator.NOT_EQUALS:
-            path_conditions.append(f"{pg_path} != {formatted_val}")
-
-        elif op == ProvidesOperator.GTE:
-            path_conditions.append(f"{pg_path} >= {formatted_val}")
-
-        elif op == ProvidesOperator.LTE:
-            path_conditions.append(f"{pg_path} <= {formatted_val}")
-
-        elif op == ProvidesOperator.CONTAINS:
-            # JSONPath array inclusion. e.g., $.tags[*] == "brain"
-            path_conditions.append(f"{pg_path}[*] == {formatted_val}")
-
-        else:
-            raise ValueError(f"Unsupported JSONPath operator: {op}")
-
-    # Join all the constraints using the logical AND operator for JSONPath
-    return " && ".join(path_conditions)
-
-
 # =========================================================
 # 2. THE RECURSIVE PORT EXTRACTOR (The Relational Engine Builder)
 # =========================================================
@@ -210,8 +93,8 @@ def extract_ports_recursively(
     # 1. Build the Semantic Materialized Path (e.g., "options.advanced.mask")
     current_path = f"{parent_path}.{port_data.key}" if parent_path else port_data.key
 
-    # 2. Extract Descriptors safely (children might be base PortInputModels without requires/provides)
-    descriptors = getattr(port_data, "requires", None) or getattr(port_data, "provides", None) or []
+    # 2. Extract the input-side descriptors (children might be base PortInputModels without requires)
+    descriptors = getattr(port_data, "requires", None) or []
     compiled_path = compile_descriptors_to_jsonpath(descriptors)
 
     # 3. Create and Save the Current Port
@@ -253,8 +136,8 @@ def extract_returnports_recursively(
     # 1. Build the Semantic Materialized Path (e.g., "options.advanced.mask")
     current_path = f"{parent_path}.{port_data.key}" if parent_path else port_data.key
 
-    # 2. Extract Descriptors safely (children might be base PortInputModels without requires/provides)
-    descriptors = getattr(port_data, "requires", None) or getattr(port_data, "provides", None) or []
+    # 2. Extract the output-side descriptors (children might be base PortInputModels without provides)
+    descriptors = getattr(port_data, "provides", None) or []
     compiled_path = compile_returndescriptors_to_jsonpath(descriptors)
 
     # 3. Create and Save the Current Port
@@ -361,6 +244,28 @@ def create_usages(action: models.Action, definition: DefinitionInputModel) -> No
         recursive_create_output_usages(action, port, i, port.key, [])
 
 
+def rebuild_relational_ports(action: models.Action, definition: DefinitionInputModel) -> None:
+    """Replace the relational ArgPort/ReturnPort rows for ``action`` from its definition.
+
+    Existing rows are deleted first because this runs on every (re)registration; without
+    the purge, reconnecting agents would accumulate duplicate ports that the matching layer
+    would then double-count. Also refreshes the pre-calculated root-port counts on the Action.
+    """
+    # CASCADE on the self-referential ``parent`` FK removes nested children too.
+    action.arg_ports.all().delete()
+    action.return_ports.all().delete()
+
+    for idx, arg in enumerate(definition.args or []):
+        extract_ports_recursively(port_data=arg, action_instance=action, index=idx)
+
+    for idx, ret in enumerate(definition.returns or []):
+        extract_returnports_recursively(port_data=ret, action_instance=action, index=idx)
+
+    action.arg_count = len(definition.args or [])
+    action.return_count = len(definition.returns or [])
+    action.save(update_fields=["arg_count", "return_count"])
+
+
 def _create_implementation(input: ImplementationInputModel, agent: models.Agent) -> models.Implementation:
     definition = input.definition
 
@@ -407,15 +312,10 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
             name=definition.name,
         )
 
-    # 2. Build the Relational ArgPorts (The Micro-Filtering Engine)
-    if definition.args:
-        for idx, arg in enumerate(definition.args):
-            extract_ports_recursively(port_data=arg, action_instance=action, index=idx)
-
-    # 3. Build the Relational ReturnPorts (The Micro-Filtering Engine)
-    if definition.returns:
-        for idx, ret in enumerate(definition.returns):
-            extract_returnports_recursively(port_data=ret, action_instance=action, index=idx)
+    # 2. (Re)build the relational ArgPort/ReturnPort rows (The Micro-Filtering Engine that
+    #    the matching layer queries). This runs on every (re)registration, so we must clear
+    #    the previous rows first to avoid accumulating duplicate/stale ports.
+    rebuild_relational_ports(action, definition)
 
     create_usages(action, definition)
     protocols = infer_protocols(definition)
@@ -527,7 +427,7 @@ def create_implementation(info: Info, input: inputs.CreateImplementationInput) -
         ),
     )
 
-    return _create_implementation(input.implementation, agent, input.extension)
+    return _create_implementation(input.implementation, agent)
 
 
 @strawberry.input(description="Mark an existing implementation as a higher-order wrapper of a lower implementation.")
@@ -567,14 +467,6 @@ def set_higher_order(info: Info, input: SetHigherOrderInput) -> types.Implementa
     higher.higher_order_config = config
     higher.save()
     return higher
-
-
-def create_foreign_implementation(info: Info, input: inputs.CreateForeignImplementationInput) -> types.Implementation:
-    agent = models.Agent.objects.get(id=input.agent)
-
-    assert input.extension in agent.extensions, f"Extension {input.extension} not supported by agent {agent}"
-
-    return _create_implementation(input.implementation, agent, input.extension)
 
 
 def delete_implementation(info: Info, input: inputs.DeleteImplementationInput) -> str:

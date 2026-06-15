@@ -74,23 +74,9 @@ class CreateImplementationInputModel(BaseModel):
 
     Attributes:
         implementation: Implementation configuration data
-        extension: Extension that manages this implementation
     """
 
     implementation: rimodels.ImplementationInputModel
-    extension: str
-
-
-class CreateForeignImplementationInputModel(BaseModel):
-    """Base model for creating an implementation in another agent's extension.
-
-    Attributes:
-        implementation: Implementation configuration data
-        extension: Extension that manages this implementation
-    """
-
-    implementation: rimodels.ImplementationInputModel
-    extension: str
 
 
 @pydantic.input(
@@ -99,17 +85,6 @@ class CreateForeignImplementationInputModel(BaseModel):
 )
 class CreateImplementationInput:
     implementation: ritypes.ImplementationInput = strawberry.field(description="The implementation to create. This is used to identify the implementation in the system.")
-    extension: str = strawberry.field(description="The extension that manages this implementation")
-
-
-@pydantic.input(
-    CreateForeignImplementationInputModel,
-    description="The input for creating a implementation in another agents extension.",
-)
-class CreateForeignImplementationInput:
-    implementation: ritypes.ImplementationInput = strawberry.field(description="The implementation to create. This is used to identify the implementation in the system.")
-    agent: strawberry.ID = strawberry.field(description="The agent ID to create the implementation in. This is used to identify the agent in the system.")
-    extension: str = strawberry.field(description="The extension that manages this implementation")
 
 
 class DeleteImplementationInputModel(BaseModel):

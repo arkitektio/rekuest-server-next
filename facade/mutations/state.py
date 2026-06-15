@@ -29,7 +29,7 @@ def log_patches(info: Info, input: inputs.LogPatchesInput) -> strawberry.ID:
 
     for patch in model.patches:
         if patch.state_name not in gotten_states:
-            state = models.State.objects.get(interface=patch.state_name, agent=agent, state_schema__name=patch.state_name)
+            state = models.State.objects.get(interface=patch.state_name, agent=agent, definition__name=patch.state_name)
             gotten_states[patch.state_name] = state
 
         if patch.correlation_id and patch.correlation_id not in gotten_assignations:
@@ -76,7 +76,7 @@ def log_snapshot(info: Info, input: inputs.LogSnapshotInput) -> strawberry.ID:
 
     for patch in model.patches:
         if patch.state_name not in gotten_states:
-            state = models.State.objects.get(interface=patch.state_name, agent=agent, state_schema__name=patch.state_name)
+            state = models.State.objects.get(interface=patch.state_name, agent=agent, definition__name=patch.state_name)
             gotten_states[patch.state_name] = state
 
         if patch.correlation_id and patch.correlation_id not in gotten_assignations:

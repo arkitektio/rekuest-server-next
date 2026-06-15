@@ -149,11 +149,6 @@ class Implementation(models.Model):
         blank=True,
         help_text="The users that pinned this Agent",
     )
-    extensions = models.JSONField(
-        max_length=2000,
-        default=list,
-        help_text="The attached extensions for this Implementation",
-    )
     policy = models.JSONField(
         max_length=2000,
         default=dict,
@@ -180,12 +175,6 @@ class Implementation(models.Model):
             "key -> source), ``return_map`` (lower return key -> wrapper return key)."
         ),
     )
-    extension = models.CharField(
-        max_length=1000,
-        default="default",
-        help_text="If this implementation is an extension of another implementation, this field links to the extension point (the implementation will actually get the params, the implementation and the args of this)",
-    )
-
     params = models.JSONField(default=dict, help_text="Params for this Implementation")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -42,11 +42,6 @@ class Agent(models.Model):
     release = models.ForeignKey(Release, on_delete=models.CASCADE, related_name="agents", help_text="The release this agent belongs to (agents are part of a release and are NOT associated only with an app)")
     device = models.ForeignKey(Device, on_delete=models.CASCADE, related_name="agents", help_text="The device this agent belongs to (agents are part of a device and are NOT associated only with an app or release)")
     name = models.CharField(max_length=2000, help_text="This providers Name", default="Nana")
-    extensions = models.JSONField(
-        max_length=2000,
-        default=list,
-        help_text="The extensions for this Agent",
-    )
     health_check_interval = models.IntegerField(
         default=60 * 5,
         help_text="How often should this agent be checked for its health. Defaults to 5 mins",

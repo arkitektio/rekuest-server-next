@@ -22,12 +22,10 @@ class TestAgentModels:
             organization=org,
             prefix="agent-creation",
             name="Test Agent",
-            extensions=["ext1", "ext2"],
         )
 
         assert agent.name == "Test Agent"
         assert agent.registry == registry
-        assert agent.extensions == ["ext1", "ext2"]
         assert agent.unique is not None  # Should have auto-generated UUID
 
     def test_agent_default_values(self):
@@ -42,7 +40,6 @@ class TestAgentModels:
         )
 
         assert agent.name == "Nana"  # Default name
-        assert agent.extensions == []  # Default empty list
         assert agent.health_check_interval == 300  # 5 minutes in seconds
         assert agent.on_instance == "all"
 

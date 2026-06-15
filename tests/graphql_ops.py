@@ -1,8 +1,8 @@
 """Shared GraphQL operation strings used across the GraphQL and integration tests.
 
-Selection sets are deliberate supersets (e.g. agent ops also fetch ``connected`` /
-``extensions``); selecting an extra field is harmless and lets one constant serve
-every call site that previously inlined a near-identical operation.
+Selection sets are deliberate supersets (e.g. agent ops also fetch ``connected``);
+selecting an extra field is harmless and lets one constant serve every call site that
+previously inlined a near-identical operation.
 """
 
 ENSURE_AGENT = """
@@ -11,7 +11,6 @@ ENSURE_AGENT = """
             id
             name
             connected
-            extensions
         }
     }
 """
@@ -22,7 +21,6 @@ GET_AGENT = """
             id
             name
             connected
-            extensions
         }
     }
 """
@@ -33,7 +31,6 @@ GET_AGENTS = """
             id
             name
             connected
-            extensions
         }
     }
 """

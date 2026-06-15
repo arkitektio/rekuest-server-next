@@ -55,6 +55,7 @@ class ActionFilter:
                 force_length=ports_demand.force_length,
                 force_non_nullable_length=ports_demand.force_non_nullable_length,
                 force_structure_length=ports_demand.force_structure_length,
+                organization_id=info.context.request.organization.id,
             )
 
             if filtered_ids is None:

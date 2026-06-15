@@ -286,7 +286,6 @@ class ImplementationInputModel(BaseModel):
     logo: str | None = None
     locks: list[str] | None = None
     manipulates: list[str] | None = None
-    extension: str | None = None
 
 
 class StateDefinitionInputModel(BaseModel):

@@ -652,10 +652,6 @@ class ImplementationInput:
         default=None,
         description="The tracks of the definition. This is used to track values over time during the runtime of an action. This is the state of a dependency",
     )
-    extension: str | None = strawberry.field(
-        default=None,
-        description="The extension of the implementation. This is used to group implementations together in the UI and provide a better user experience",
-    )
     manipulates: list[str] | None = strawberry.field(
         default=None,
         description="The states that the implementation manipulates. This is used to identify which states are manipulated by the implementation, and can be use to enhance state safety in the system",

@@ -96,7 +96,6 @@ class Assign(Message):
 
     type: Literal[ToAgentMessageType.ASSIGN] = ToAgentMessageType.ASSIGN
     interface: str = Field(description="The registered interface")
-    extension: str = Field(description="The extension that registered the interface")
     reservation: Optional[str] = Field(default=None, description="The reservation id if assigned through that")
     step: bool | None = Field(default=None, description="Whether to step the assignation or not")
     assignation: str = Field(description="The assignation id")
@@ -123,7 +122,7 @@ class Assign(Message):
     @property
     def actor_id(self) -> str:
         """The actor id is the id of the actor that will be used to run this assignation"""
-        return f"{self.extension}.{self.interface}"
+        return self.interface
 
 
 class Step(Message):

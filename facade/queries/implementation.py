@@ -6,7 +6,6 @@ from kante.types import Info
 def implementation_at(
     info: Info,
     agent: strawberry.ID,
-    extension: str | None = None,
     interface: str | None = None,
     action_hash: str | None = None,
     demand: inputs.ActionDemandInput | None = None,
@@ -18,7 +17,7 @@ def implementation_at(
         action_ids = managers.get_action_ids_by_action_demand(demand)
         return models.Implementation.objects.get(agent_id=agent, action_id__in=action_ids)
 
-    return models.Implementation.objects.get(agent_id=agent, extension=extension, interface=interface)
+    return models.Implementation.objects.get(agent_id=agent, interface=interface)
 
 
 async def my_implementation_at(

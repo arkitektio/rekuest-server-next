@@ -19,7 +19,6 @@ from facade.types.base import build_prescoped_queryset
 class Implementation:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the implementation.")
     interface: str = strawberry_django.field(description="Interface string representing the implementation entrypoint.")
-    extension: str = strawberry_django.field(description="Extension or module name.")
     agent: "Agent" = strawberry_django.field(description="Agent running this implementation.")
     action: "Action" = strawberry_django.field(description="The action this implements.")
     params: rscalars.AnyDefault = strawberry_django.field(description="Arbitrary parameters for the implementation.")
