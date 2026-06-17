@@ -21,10 +21,16 @@ You can find the interactive documentation for the API [here](https://arkitekt.l
 ## Rekuest Design
 
 Rekuest itself is designed as a stateless service (in order to be able to scale horizontally), and
-interfaces with proven open-source technologies, such as [Redis](https://redis.io/) and [RabbitMQ](https://www.rabbitmq.com/).
-to route tasks to the appropriate apps. The following diagram shows the high-level design of Rekuest:
+interfaces with proven open-source technologies, such as [Redis](https://redis.io/) and
+[PostgreSQL](https://www.postgresql.org/), to route tasks to the appropriate apps. The following
+diagram shows the high-level design of Rekuest:
 
 ![Rekuest Design](./docs/schema.png)
+
+> **📐 Architecture documentation.** For a structured, in-depth explanation of the major elements of
+> the service — the Caller/Agent identity model, the relational action-matching engine, the
+> assignation lifecycle, the agent WebSocket protocol, the realtime layer, and higher-order
+> implementations — see **[`docs/design/`](./docs/design/README.md)**.
 
 ## Developmental Notices
 

@@ -1,411 +1,249 @@
 # Rekuest Server API Documentation
 
+> **Looking for the architecture / the "why"?** See the design docs in
+> [`design/`](design/README.md). This file is the GraphQL **API reference**; the authoritative,
+> always-current surface is the live schema via GraphQL introspection (the playground at
+> `/graphql`).
+
 ## Overview
 
-Rekuest is a central repository service for managing computational tasks and agents in the Arkitekt ecosystem. It provides a GraphQL API for registering agents, defining actions, managing task execution, and handling state management.
+Rekuest is the central broker of the Arkitekt ecosystem. It provides a GraphQL API (with WebSocket
+subscriptions) for registering agents, defining actions, routing task execution, and managing agent
+state. See [`design/README.md`](design/README.md) for the end-to-end picture.
 
 ## Architecture
 
-Rekuest follows a microservices architecture designed for horizontal scalability:
+- **GraphQL + WebSocket facade** — a single schema serves HTTP queries/mutations and realtime
+  subscriptions; agents connect over a separate WebSocket at `/agi`.
+- **PostgreSQL** for persistent storage. The relational port-matching engine uses Postgres-specific
+  `jsonb_path_match`/JSONPath, so Postgres is required (SQLite is not sufficient for matching).
+- **Redis** for both the realtime channel layer (subscription fan-out) and the hand-rolled agent
+  delivery queue (work survives an agent being briefly offline).
+- Horizontally scalable: the GraphQL/WS workers are stateless; shared state lives in Postgres and
+  Redis.
 
-- **Stateless Service**: The core Rekuest service is stateless and can be scaled horizontally
-- **Message Brokers**: Uses Redis and optionally RabbitMQ for task routing and real-time communication
-- **Database**: PostgreSQL for persistent storage (SQLite for development/testing)
-- **GraphQL API**: Single endpoint for all operations with real-time subscriptions
+> Historical note: older docs mention RabbitMQ. The current implementation routes work through Redis
+> and the Channels layer; there is no hard RabbitMQ dependency.
 
 ## Core Concepts
 
-### Agents
-Agents are computational entities that can execute tasks. They register with Rekuest and provide information about their capabilities.
+See [`design/identity.md`](design/identity.md) and [`design/domain-model.md`](design/domain-model.md)
+for detail. In brief:
 
-- **Registry**: Each agent belongs to a registry tied to a specific user/client/organization
-- **Instance ID**: Unique identifier for the agent instance
-- **Extensions**: List of capabilities/plugins the agent supports
-- **States**: Current status and configuration of the agent
+### Identity — Caller and Agent
+Every authenticated request carries a `(client, user, organization)` triple.
 
-### Actions
-Actions are abstract representations of computational tasks that agents can perform.
+- **Caller** — that triple acting as a **requestor** (who asks for work). Owns assignations and
+  reservations; keys the realtime channel `ass_caller_{id}`. A frontend has a Caller and no Agent.
+- **Agent** — that triple plus an `app`/`release`/`device`, acting as a **provider** (who executes
+  work). Connects over the WebSocket and runs implementations.
 
-- **Hash**: Unique identifier based on the action's signature
-- **Protocols**: Groups of related actions
-- **Implementations**: Concrete realizations of actions by specific agents
-- **Ports**: Input/output specifications using typed data structures
+### Actions and Implementations
+- **Action** — an abstract, versioned function contract (`app`, `key`, `version`, `hash`, typed
+  `args`/`returns` ports).
+- **Implementation** — binds an Action to an Agent via an `interface`. Carries bound `params`,
+  dependencies, and optional higher-order wrapping.
 
 ### Reservations and Assignations
-- **Reservations**: Claims on agent resources for future task execution
-- **Assignations**: Active task executions with lifecycle management
+- **Reservation** — a standing pool of implementations for an action, routed by a strategy.
+- **Assignation** — one task execution: the central log, stamped with the caller, routed to an
+  agent, accumulating `AssignationEvent`s. See
+  [`design/assignation-lifecycle.md`](design/assignation-lifecycle.md).
 
-### State Management
-- **State Schemas**: Define the structure of agent states
-- **States**: Current values of agent configurations
-- **Persistence**: States can be stored and retrieved across sessions
+### State management
+- **StateDefinition** — the schema for a kind of agent state.
+- **State** / **Patch** / **Snapshot** — current value, incremental JSON-Patch history, and
+  checkpoints, with a `global_rev` revision counter.
 
 ## GraphQL API Reference
 
+> Field names below match the current schema (`facade/schema.py`). Selection sets are illustrative —
+> use introspection for the full set of fields and input arguments.
+
 ### Queries
 
-#### Agent Queries
 ```graphql
-# Get all agents
-query GetAgents {
+# List compute agents (organization-scoped)
+query Agents {
   agents {
     id
-    instanceId
     name
     connected
-    extensions
-    lastSeen
+    client { clientId }
+    user { username }
+    organization { slug }
   }
 }
 
-# Get specific agent
-query GetAgent($id: ID!) {
+# Fetch one agent by ID (or by app/version/device_id)
+query Agent($id: ID!) {
   agent(id: $id) {
     id
-    instanceId
     name
-    connected
-    registry {
-      client {
-        clientId
-      }
-      user {
-        username
-      }
-    }
+    active
+    implementations { id interface action { name } }
   }
+}
+
+# List / fetch actions
+query Actions {
+  actions { id name description hash kind }
+}
+
+# Registered implementations
+query Implementations {
+  implementations { id interface agent { id name } action { id name } }
+}
+
+# Assignations (filtered to the calling caller)
+query Assignations {
+  assignations { id reference latestEventKind isDone }
+}
+
+# State schemas and current state
+query StateDefinitions {
+  stateDefinitions { id name hash ports }
 }
 ```
 
-#### Action Queries
-```graphql
-# Get all actions
-query GetActions {
-  actions {
-    id
-    name
-    description
-    hash
-    protocols {
-      name
-    }
-  }
-}
-
-# Get specific action
-query GetAction($id: ID!) {
-  action: action(interface: $interface) {
-    id
-    name
-    description
-    args
-    returns
-  }
-}
-```
-
-#### State Queries
-```graphql
-# Get state schemas
-query GetStateSchemas {
-  stateSchemas {
-    id
-    name
-    description
-    hash
-    ports
-  }
-}
-
-# Get states for an agent
-query GetStatesForAgent($instanceId: String!) {
-  stateFor(instanceId: $instanceId) {
-    id
-    value
-    schema {
-      name
-    }
-  }
-}
-```
+State is read with `state_for` / `checkout` / `checkout_agent` and the revision-aware queries
+(`state_at_global_rev`, `snapshots_around_rev`, `forward_events_after_rev`, …). See
+[`design/realtime.md`](design/realtime.md) for the snapshot-then-stream model.
 
 ### Mutations
 
-#### Agent Management
 ```graphql
-# Register or update an agent
+# Ensure an agent record exists / is up to date (creates the row agents register against)
 mutation EnsureAgent($input: AgentInput!) {
-  ensureAgent(input: $input) {
-    id
-    instanceId
-    name
-    extensions
-  }
+  ensureAgent(input: $input) { id name }
 }
 
-# Delete an agent
-mutation DeleteAgent($input: DeleteAgentInput!) {
-  deleteAgent(input: $input)
-}
-```
-
-#### Task Management
-```graphql
-# Reserve an implementation
-mutation Reserve($input: ReserveInput!) {
-  reserve(input: $input) {
-    id
-    node
-    hash
-  }
-}
-
-# Assign a task
+# Assign a task. Provide exactly one routing target: action, implementation,
+# reservation, actionHash, or a dependency (+ method/parent). Plus args, hooks, etc.
 mutation Assign($input: AssignInput!) {
-  assign(input: $input) {
-    id
-    args
-    status
-  }
+  assign(input: $input) { id reference latestEventKind }
 }
 
-# Cancel a task
-mutation Cancel($input: CancelInput!) {
-  cancel(input: $input) {
-    id
-    status
-  }
+# Reserve a pool of implementations for an action
+mutation Reserve($input: ReserveInput!) {
+  reserve(input: $input) { id }
 }
+
+# Steer a running assignation
+mutation Cancel($input: CancelInput!)   { cancel(input: $input)   { id latestInstructKind } }
+mutation Pause($input: PauseInput!)     { pause(input: $input)    { id } }
+mutation Resume($input: ResumeInput!)   { resume(input: $input)   { id } }
+mutation Interrupt($input: InterruptInput!) { interrupt(input: $input) { id } }
 ```
 
-#### State Management
-```graphql
-# Create a state schema
-mutation CreateStateSchema($input: CreateStateSchemaInput!) {
-  createStateSchema(input: $input) {
-    id
-    name
-    hash
-    ports
-  }
-}
-
-# Set state value
-mutation SetState($input: SetStateInput!) {
-  setState(input: $input) {
-    id
-    value
-    schema {
-      name
-    }
-  }
-}
-
-# Update state
-mutation UpdateState($input: UpdateStateInput!) {
-  updateState(input: $input) {
-    id
-    value
-  }
-}
-```
+Other notable mutations (see `facade/schema.py` for the full list): `create_implementation`,
+`delete_implementation`, `set_higher_order`, `implement_agent`, `block`/`unblock`, `bounce`/`kick`,
+`pin_agent`/`pin_implementation`, `update_agent`/`delete_agent`, `auto_resolve` and
+`create/update/delete_resolution`, `log_patches`/`log_snapshot`, plus the Blok/Dashboard/Toolbox/3D
+families.
 
 ### Subscriptions
 
-#### Real-time Updates
 ```graphql
-# Subscribe to agent events
-subscription AgentEvents($instanceId: String!) {
-  agentEvent(instanceId: $instanceId) {
-    type
-    agent {
-      id
-      connected
-    }
-  }
+# Updates on the caller's own assignations
+subscription Assignations {
+  assignations { create { id latestEventKind } event { id kind progress } }
 }
 
-# Subscribe to assignation updates
-subscription AssignationUpdates($assignation: ID!) {
-  assignationEvent(assignation: $assignation) {
-    type
-    assignation {
-      id
-      status
-      progress
-    }
-  }
+# Agent connection/status changes within the organization
+subscription Agents {
+  agents { create update delete }
+}
+
+# Watch a state: current snapshot, then a stream of patches
+subscription WatchState($stateId: ID!) {
+  watchState(stateId: $stateId) { __typename }
 }
 ```
 
-## Input Types
-
-### AgentInput
-```graphql
-input AgentInput {
-  instanceId: String!
-  name: String
-  extensions: [String!]
-}
-```
-
-### ReserveInput
-```graphql
-input ReserveInput {
-  node: ID!
-  hash: String!
-  params: GenericScalar
-}
-```
-
-### AssignInput
-```graphql
-input AssignInput {
-  node: ID!
-  args: [GenericScalar!]!
-  hooks: [AssignHookInput!]
-}
-```
+Other streams: `assignation_events`, `child_assignations`, `reservations`, `implementations` /
+`implementation_change`, `state_update_events`, `latest_patches`, `watch_agent`, `new_actions`.
 
 ## Authentication
 
-All API operations require authentication via the Authentikate system:
+All operations require authentication via the [Authentikate](https://github.com/arkitektio) system:
 
-1. **Token-based**: Use Bearer tokens in the Authorization header
-2. **Client Registration**: Clients must be registered in the system
-3. **User Context**: Operations are performed in the context of the authenticated user
-4. **Organization Scope**: Resources are scoped to the user's organization
+1. **Token-based** — Bearer JWT in the `Authorization` header.
+2. **Client registration** — clients must be registered.
+3. **Identity triple** — the token expands to `(client, user, organization)`; operations run in that
+   context (this is what becomes the Caller / Agent identity).
+4. **Organization scope** — resources are scoped to the user's organization via
+   `build_prescoped_queryset` (`facade/types/base.py`).
 
-### Example Authentication
 ```http
 POST /graphql
 Authorization: Bearer YOUR_JWT_TOKEN
 Content-Type: application/json
 
-{
-  "query": "query { agents { id name } }"
-}
+{ "query": "query { agents { id name } }" }
 ```
+
+Agents authenticate the same way over the WebSocket — the first frame is a `Register` carrying the
+token; see [`design/agent-protocol.md`](design/agent-protocol.md).
 
 ## Error Handling
 
-The API uses GraphQL error conventions:
+Standard GraphQL errors:
 
 ```json
 {
   "data": null,
   "errors": [
-    {
-      "message": "Agent not found",
-      "locations": [{"line": 2, "column": 3}],
-      "path": ["agent"]
-    }
+    { "message": "Agent not found", "locations": [{"line": 2, "column": 3}], "path": ["agent"] }
   ]
 }
 ```
 
-### Common Error Types
-- **ValidationError**: Invalid input data
-- **NotFound**: Requested resource doesn't exist
-- **PermissionDenied**: Insufficient permissions
-- **AuthenticationRequired**: Missing or invalid authentication
+Common categories: validation errors (bad input), not-found, permission denied, and authentication
+required.
 
 ## Development Setup
 
 ### Prerequisites
 - Python 3.12+
-- PostgreSQL (or SQLite for development)
+- PostgreSQL (required for action matching)
 - Redis
-- Node.js (for frontend development)
 
 ### Installation
 ```bash
-# Clone the repository
 git clone https://github.com/arkitektio/rekuest-server-next.git
 cd rekuest-server-next
-
-# Install dependencies
-pip install -e .
-
-# Set up environment variables
-cp .env.example .env
-
-# Run migrations
+uv sync                      # or: pip install -e ".[dev]"
+cp config.yaml.example config.yaml
 python manage.py migrate
-
-# Start the development server
 python manage.py runserver
 ```
 
 ### Testing
 ```bash
-# Run all tests
-python -m pytest
-
-# Run specific test file
-python -m pytest tests/test_graphql_queries.py
-
-# Run with coverage
-python -m pytest --cov=facade
+# Postgres + Redis come up via the tests' docker-compose fixture; do not pre-start them.
+uv run pytest tests/ --ignore=tests/test_integration.py
 ```
 
+See [`DEVELOPMENT.md`](DEVELOPMENT.md) for the full workflow.
+
 ### GraphQL Playground
-Visit `http://localhost:8000/graphql` to access the interactive GraphQL playground for testing queries and exploring the schema.
+Visit `http://localhost:8000/graphql` to explore the schema and run queries interactively.
 
 ## Production Deployment
 
-### Docker
-```bash
-# Build the container
-docker build -t rekuest-server .
+### Environment
+- `DATABASE_URL` — PostgreSQL connection
+- `REDIS_URL` / `AGENT_REDIS_HOST` / `AGENT_REDIS_PORT` — Redis for channels + agent queue
+- `SECRET_KEY`, `DEBUG=false`, `ALLOWED_HOSTS`
 
-# Run with docker-compose
-docker-compose up -d
-```
+### Scaling
+- Run multiple stateless GraphQL/WS workers behind a load balancer.
+- Use PostgreSQL with connection pooling; consider Redis HA for the channel layer and queue.
 
-### Environment Variables
-- `DATABASE_URL`: PostgreSQL connection string
-- `REDIS_URL`: Redis connection string
-- `SECRET_KEY`: Django secret key
-- `DEBUG`: Set to `false` in production
-- `ALLOWED_HOSTS`: Comma-separated list of allowed hosts
+## Performance & Security
 
-### Scaling Considerations
-- **Horizontal Scaling**: Multiple Rekuest instances can run behind a load balancer
-- **Database**: Use PostgreSQL with connection pooling
-- **Redis**: Consider Redis Cluster for high availability
-- **Message Queue**: RabbitMQ for reliable task distribution
-
-## Performance Optimization
-
-### Database Optimization
-- Use database indexes on frequently queried fields
-- Implement query optimization with select_related/prefetch_related
-- Consider read replicas for read-heavy workloads
-
-### Caching
-- Redis caching for frequently accessed data
-- GraphQL query result caching
-- Agent state caching for quick lookups
-
-### Monitoring
-- Use Django's built-in logging
-- Implement health checks via `/health/` endpoint
-- Monitor GraphQL query performance
-- Track agent connectivity and task completion rates
-
-## Security
-
-### Best Practices
-- Always use HTTPS in production
-- Validate all input data
-- Implement rate limiting
-- Regular security updates
-- Database query timeout limits
-- Proper error message sanitization
-
-### Access Control
-- Role-based permissions
-- Organization-level isolation
-- Agent ownership validation
-- Resource access logging
+- Use `select_related`/`prefetch_related` (the `DjangoOptimizerExtension` is enabled) and the
+  relational port indexes for matching (see [`design/action-matching.md`](design/action-matching.md)).
+- Always use HTTPS in production, validate input, scope by organization, and sanitize error
+  messages. Access is role/organization-scoped and agent ownership is validated.
