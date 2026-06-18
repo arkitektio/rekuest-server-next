@@ -286,6 +286,8 @@ class ImplementationInputModel(BaseModel):
     logo: str | None = None
     locks: list[str] | None = None
     manipulates: list[str] | None = None
+    needs_token: bool = True
+    provenance_audience: list[str] | None = None
 
 
 class StateDefinitionInputModel(BaseModel):

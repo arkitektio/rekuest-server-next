@@ -118,6 +118,10 @@ class Assign(Message):
     org: Optional[str] = Field(default=None, description="The org that the user currently belongs to")
     app: str = Field(description="The assinging app")
     action: str = Field(description="The action that triggered this assignation.")
+    token: Optional[str] = Field(
+        default=None,
+        description="An opaque, signed provenance token attesting who caused this assignation and with which inputs. The agent forwards it untouched to downstream services; it does not validate it. None when the implementation opts out of provenance (needs_token=False).",
+    )
 
     @property
     def actor_id(self) -> str:

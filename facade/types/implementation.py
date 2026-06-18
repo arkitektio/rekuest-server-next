@@ -28,6 +28,8 @@ class Implementation:
     higher_order_for: Optional["Implementation"] = strawberry_django.field(description="If this is a higher-order (wrapper) implementation, the lower implementation it wraps.")
     lower_order_implementations: list["Implementation"] = strawberry_django.field(description="The higher-order implementations that wrap this implementation.")
     higher_order_config: rscalars.AnyDefault = strawberry_django.field(description="Projection config (bound params, arg/dependency/return maps) when this is a higher-order implementation.")
+    needs_token: bool = strawberry_django.field(description="Whether a signed provenance token is minted when this implementation is assigned.")
+    provenance_audience: Optional[list[str]] = strawberry_django.field(description="Declared audience for the provenance token's `aud`, or null to derive it at dispatch.")
 
     @strawberry_django.field(description="Constructed name for display, combining interface and agent name.")
     def name(self) -> str:

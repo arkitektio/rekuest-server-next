@@ -6,6 +6,7 @@ from typing import Dict, List, Protocol, Any
 from facade import enums, inputs, models, types, messages
 from facade.consumers.async_consumer import AgentConsumer
 from facade.higher_order import build_lower_args, build_lower_dependencies
+from facade.provenance import mint_token_for_assignation
 from kante.types import Info
 from authentikate.vars import get_user, get_client
 import logging
@@ -338,6 +339,8 @@ class RedisControllBackend(ControllBackend):
 
         action = implementation.action
 
+        token = mint_token_for_assignation(assignation, info)
+
         AgentConsumer.broadcast(
             assignation.agent.pk,
             message=messages.Assign(
@@ -351,6 +354,7 @@ class RedisControllBackend(ControllBackend):
                 resolution=str(resolution.pk) if resolution else None,
                 interface=implementation.interface,
                 action=str(implementation.action.hash),
+                token=token,
             ),
         )
         if input.hooks:
@@ -439,6 +443,8 @@ class RedisControllBackend(ControllBackend):
             caller=caller,
         )
 
+        token = mint_token_for_assignation(lower_assignation, info)
+
         AgentConsumer.broadcast(
             lower_agent.pk,
             message=messages.Assign(
@@ -452,6 +458,7 @@ class RedisControllBackend(ControllBackend):
                 resolution=None,
                 interface=lower_impl.interface,
                 action=str(lower_action.hash),
+                token=token,
             ),
         )
 

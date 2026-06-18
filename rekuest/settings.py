@@ -82,6 +82,24 @@ AUTHENTIKATE = {
 }
 
 
+# Provenance issuer section
+#
+# Rekuest mints a signed (EdDSA / Ed25519) provenance JWT at dispatch and publishes
+# the verifying key at the JWKS endpoint (see ``rekuest/urls.py``). Loaded from the
+# ``provenance`` block of config.yaml; sensible defaults keep dispatch working even
+# when the block is absent (an ephemeral keypair is generated, see facade/provenance/keys.py).
+_prov = conf.get("provenance", {}) or {}
+PROVENANCE = {
+    "ISSUER": _prov.get("issuer", "rekuest"),
+    "KID": _prov.get("kid", "rekuest-prov-1"),
+    "PRIVATE_KEY": _prov.get("private_key", None),
+    "PUBLIC_KEY": _prov.get("public_key", None),
+    "TOKEN_TTL_SECONDS": int(_prov.get("token_ttl_seconds", 3600)),
+    "HUMAN_ROLES": list(_prov.get("human_roles", []) or []),
+    "STRICT": bool(_prov.get("strict", False)),
+}
+
+
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
     "guardian.backends.ObjectPermissionBackend",

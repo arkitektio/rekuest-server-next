@@ -13,6 +13,7 @@ from rekuest_core.enums import PortKind
 from rekuest_core import scalars as rscalars
 from authentikate.vars import get_user, get_client
 from facade.higher_order import validate_dependency_coverage, validate_higher_order_pairing
+from facade.provenance import audience as provenance_audience
 import typing as t
 
 logger = logging.getLogger(__name__)
@@ -333,6 +334,14 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
     logger.info(f"Created {action}")
     action.save()
 
+    # Resolve the provenance audience once, at registration: an explicit declaration
+    # wins, otherwise derive it from the action's structure ports (e.g. @mikro/image
+    # -> mikro). Persisted on the implementation so dispatch never recomputes it.
+    if input.provenance_audience is not None:
+        resolved_audience = input.provenance_audience
+    else:
+        resolved_audience = provenance_audience.derive_from_action(action) or None
+
     try:
         implementation = models.Implementation.objects.get(
             interface=input.interface,
@@ -347,6 +356,8 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
         implementation.action = action
         implementation.params = input.params or {}
         implementation.release = agent.release
+        implementation.needs_token = input.needs_token
+        implementation.provenance_audience = resolved_audience
         implementation.save()
 
         new_deps = []
@@ -382,6 +393,8 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
             agent=agent,
             dynamic=input.dynamic,
             params=input.params or {},
+            needs_token=input.needs_token,
+            provenance_audience=resolved_audience,
         )
 
         new_deps = []

@@ -96,6 +96,9 @@ Start at the top and follow the flow of a request:
    them.
 7. **[higher-order.md](higher-order.md)** — higher-order implementations (one implementation
    wrapping another) and server-side event unfolding.
+8. **[provenance.md](provenance.md)** — Rekuest as the provenance authority: the signed
+   attestation token minted at dispatch, its claim vocabulary, the human-root invariant, and the
+   JWKS endpoint downstream services verify against.
 
 ## The one-paragraph mental model
 

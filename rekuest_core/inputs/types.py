@@ -656,6 +656,14 @@ class ImplementationInput:
         default=None,
         description="The states that the implementation manipulates. This is used to identify which states are manipulated by the implementation, and can be use to enhance state safety in the system",
     )
+    needs_token: bool = strawberry.field(
+        default=True,
+        description="Whether Rekuest should mint a signed provenance token when this implementation is assigned. Default true (provenance-by-default); set false for trivial/internal tasks that never produce external provenance.",
+    )
+    provenance_audience: list[str] | None = strawberry.field(
+        default=None,
+        description="The downstream service(s) the provenance token should be scoped to (the token's `aud`). If omitted, Rekuest derives the audience from the structures the assignment acts on.",
+    )
     dependencies: list[AgentDependencyInput] = strawberry.field(default_factory=list)
 
 
