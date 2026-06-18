@@ -276,8 +276,9 @@ class RedisControllBackend(ControllBackend):
             implementation = models.Implementation.objects.get(id=input.implementation)
             action = implementation.action
             agent = implementation.agent
-            # A higher-order implementation is virtual — its own agent need not be connected;
-            # only the resolved lower agent matters (checked in ``_assign_higher_order``).
+            # A higher-order wrapper is virtual; its agent (== the lower implementation's
+            # agent, by the co-location rule) is connectivity-checked in ``_assign_higher_order``,
+            # which raises a ValueError. Skip the assert here so that path owns the check.
             if implementation.higher_order_for_id is None:
                 assert agent.connected, "Agent is not connected"
                 assert agent.last_seen, "Agent last seen time is not set"
@@ -381,22 +382,17 @@ class RedisControllBackend(ControllBackend):
         back onto the wrapper in ``persist_backend`` (see the higher-order return path).
         """
         config = higher.higher_order_config or {}
-        lower = higher.higher_order_for
-        lower_action = lower.action
 
-        # MVP: no nesting. A wrapper may not wrap another wrapper.
-        if lower.higher_order_for_id is not None:
-            raise ValueError("Nested higher-order implementations are not supported yet")
-
-        # Resolve a connected agent implementing the lower action (cross-agent resolution).
-        lower_impl = models.Implementation.objects.filter(
-            action=lower_action,
-            agent__connected=True,
-            agent__last_seen__gt=datetime.now(timezone.utc) - timedelta(minutes=1),
-        ).first()
-        if not lower_impl:
-            raise ValueError(f"No active implementation found for lower action {lower_action.name}")
+        # A higher-order implementation is bound to the agent that owns its lower
+        # implementation (enforced at link time in ``set_higher_order``), so the wrapped
+        # impl and its agent are deterministic — no cross-agent resolution needed.
+        lower_impl = higher.higher_order_for
+        lower_action = lower_impl.action
         lower_agent = lower_impl.agent
+
+        # The wrapper's agent IS the executing agent — it must be connected and live.
+        if not (lower_agent.connected and lower_agent.last_seen and lower_agent.last_seen > datetime.now(timezone.utc) - timedelta(minutes=1)):
+            raise ValueError(f"Agent for lower implementation {lower_impl.interface} is not connected")
 
         # Resolve the wrapper's declared dependencies from the caller, then project both the
         # args and the dependencies onto the lower implementation.

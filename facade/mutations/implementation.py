@@ -463,6 +463,12 @@ def set_higher_order(info: Info, input: SetHigherOrderInput) -> types.Implementa
     if higher.pk == lower.pk:
         raise ValueError("An implementation cannot wrap itself")
 
+    # A higher-order implementation is always bound to the agent that owns the lower
+    # implementation it wraps — the wrapper is virtual and its child runs on that agent.
+    # Cross-agent wrapping is not supported: register the wrapper on the lower's agent.
+    if higher.agent_id != lower.agent_id:
+        raise ValueError("A higher-order implementation must be on the same agent as the lower implementation it wraps. Register the wrapper on the lower implementation's agent.")
+
     config = input.config or {}
 
     validate_higher_order_pairing(
