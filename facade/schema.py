@@ -44,8 +44,6 @@ class Query:
     implementations: list[types.Implementation] = field(description="All registered implementations.")
     test_results: list[types.TestResult] = field(description="Test results associated with test cases.")
     test_cases: list[types.TestCase] = field(description="All test cases.")
-    reservations: list[types.Reservation] = field(resolver=queries.reservations, description="List of all reservations.")
-    myreservations: list[types.Reservation] = field(resolver=queries.myreservations, description="Reservations made by the current user.")
     shortcuts: list[types.Shortcut] = field(description="List of shortcuts.")
     toolboxes: list[types.Toolbox] = field(description="List of toolboxes containing shortcuts.")
     action = field(resolver=queries.action, description="Fetch a specific action.")
@@ -163,10 +161,6 @@ class Query:
     def test_result(self, info: Info, id: strawberry.ID) -> types.TestResult:
         return cast(types.TestResult, models.TestResult.objects.get(id=id))
 
-    @field(description="Retrieve reservation by ID.")
-    def reservation(self, info: Info, id: strawberry.ID) -> types.Reservation:
-        return cast(types.Reservation, models.Reservation.objects.get(id=id))
-
     @field(description="Get implementation by ID.")
     def implementation(self, info: Info, id: strawberry.ID) -> types.Implementation:
         return cast(types.Implementation, models.Implementation.objects.get(id=id))
@@ -192,8 +186,6 @@ class Mutation:
     reinit = mutation(resolver=mutations.reinit, description="Reinitialize the assignation or agent.")
     block = mutation(resolver=mutations.block, description="Block an agent from connecting.")
     unblock = mutation(resolver=mutations.unblock, description="Unblock a previously blocked agent.")
-    reserve = mutation(resolver=mutations.reserve, description="Reserve an implementation for future use.")
-    unreserve = mutation(resolver=mutations.unreserve, description="Release a reserved implementation.")
     delete_implementation = mutation(resolver=mutations.delete_implementation, description="Delete a registered implementation.")
     set_higher_order = mutation(resolver=mutations.set_higher_order, description="Mark an implementation as a higher-order wrapper of a lower implementation, with a projection config.")
     ensure_agent = mutation(resolver=mutations.ensure_agent, description="Ensure agent record exists or is up to date.")
@@ -266,7 +258,6 @@ class Mutation:
 class Subscription:
     new_actions = subscription(resolver=subscriptions.new_actions, description="Subscribe to notifications when new actions are created.")
     assignations = subscription(resolver=subscriptions.assignations, description="Subscribe to updates on assignations.")
-    reservations = subscription(resolver=subscriptions.reservations, description="Subscribe to updates on reservations.")
     assignation_events = subscription(resolver=subscriptions.assignation_events, description="Subscribe to events related to assignations.")
     agents = subscription(resolver=subscriptions.agents, description="Subscribe to updates on agent connections and statuses.")
     implementation_change = subscription(resolver=subscriptions.implementation_change, description="Subscribe to changes in implementations.")

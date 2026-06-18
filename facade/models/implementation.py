@@ -180,7 +180,7 @@ class Implementation(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     tracks = models.JSONField(default=list, help_text="A log of all the assignations that have been provisioned with this implementation, as well as their status and results")
     manipulates = models.ManyToManyField("State", help_text="Which states does this implementation manipulate?", related_name="manipulated_by")
-    dynamic: str = models.BooleanField(help_text="Dynamic Implementations will be able to create new reservations on runtime")
+    dynamic: str = models.BooleanField(help_text="Dynamic Implementations will be able to create new assignations on runtime")
     needs_token = models.BooleanField(
         default=True,
         help_text="Whether Rekuest mints a signed provenance token when this implementation is assigned. Default true (provenance-by-default); false skips minting for trivial/internal tasks.",

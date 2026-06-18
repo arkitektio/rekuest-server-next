@@ -1,63 +1,14 @@
-"""Inputs for reservations, assignations and the postman lifecycle controls."""
+"""Inputs for assignations and the postman lifecycle controls."""
 
 from typing import Any
 
 import strawberry
-import uuid
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from rekuest_core import scalars as rscalars
-from rekuest_core.inputs import models as rimodels
 from strawberry.experimental import pydantic
 
 from facade import enums, scalars
 from facade.inputs.dependency import ResolvedDependencyInput, ResolvedDependencyInputModel
-
-
-class ReserveInputModel(BaseModel):
-    """Base model for reserving an action.
-
-    Attributes:
-        reference: Unique reference identifier for the reservation
-        action: Optional action ID to reserve
-        implementation: Optional implementation ID for direct implementation reservation
-        title: Optional title for the reservation
-        hash: Optional hash for reservation identification
-        binds: Optional binds configuration for the reservation
-        assignation_id: Optional assignation ID associated with the reservation
-    """
-
-    reference: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    action: str | None = None
-    implementation: str | None = None
-    title: str | None = None
-    hash: str | None = None
-    binds: rimodels.BindsInputModel | None = None
-    assignation_id: str | None = None
-
-
-@pydantic.input(ReserveInputModel, description="The input for reserving a action.")
-class ReserveInput:
-    action: strawberry.ID | None = strawberry.field(default=None, description="The action ID to reserve")
-    implementation: strawberry.ID | None = strawberry.field(
-        default=None,
-        description="The implementation ID to reserve when directly reserving a implementation",
-    )
-    title: str | None = strawberry.field(
-        default=None,
-        description="The title of the reservation. This is used to identify the reservation in the system.",
-    )
-    hash: rscalars.ActionHash | None = strawberry.field(
-        default=None,
-        description="The hash of the reservation. This is used to identify the reservation in the system.",
-    )
-    reference: str | None = strawberry.field(
-        default=None,
-        description="The reference of the reservation. This is used to identify the reservation in the system.",
-    )
-    assignation_id: strawberry.ID | None = strawberry.field(
-        default=None,
-        description="The assignation ID of the reservation. This is used to identify the reservation in the system.",
-    )
 
 
 class HookInputModel(BaseModel):
@@ -89,7 +40,6 @@ class AssignInputModel(BaseModel):
         implementation: Optional implementation ID for direct assignment
         agent: Optional agent ID for direct assignment
         action_hash: Optional hash of the action for identification
-        reservation: Optional reservation ID to assign to
         interface: Optional interface of the implementation
         hooks: Optional list of hooks for the assignation
         args: Dictionary of arguments/ports and values
@@ -109,7 +59,6 @@ class AssignInputModel(BaseModel):
     agent: str | None = None
     action_hash: str | None = None
     method: str | None = None
-    reservation: str | None = None
     interface: str | None = None
     hooks: list[HookInputModel] | None = None
     args: dict[str, Any]
@@ -152,10 +101,6 @@ class AssignInput:
     hooks: list[HookInput] | None = strawberry.field(
         default_factory=list,
         description="The hooks of the assignation. This is used to identify the assignation in the system.",
-    )
-    reservation: strawberry.ID | None = strawberry.field(
-        default=None,
-        description="The reservation ID to assign to. This is used to identify the reservation in the system.",
     )
     capture: bool = strawberry.field(
         default=False,

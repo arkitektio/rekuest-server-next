@@ -24,8 +24,6 @@ class AssignationOrder:
 
 @strawberry_django.filter_type(models.Assignation)
 class AssignationFilter:
-    reservation: ReservationFilter | None
-
     @filter_field
     def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
         return queryset.filter(**{f"{prefix}id__in": value}), Q()

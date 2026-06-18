@@ -3,8 +3,8 @@
 This ``__init__`` re-exports every public type so the established
 ``from facade import types`` / ``types.X`` access keeps working.
 
-Because the types densely cross-reference each other (e.g. ``Action`` references
-``Reservation``, ``Agent`` references ``Assignation``), the submodules use
+Because the types densely cross-reference each other (e.g. ``Agent`` references
+``Assignation``), the submodules use
 ``from __future__ import annotations`` so no annotation is evaluated at import
 time (avoiding import cycles). At the bottom of this module every public type is
 injected into each submodule's globals, so that the string forward references
@@ -22,7 +22,6 @@ from . import (
     demand,
     dependency,
     implementation,
-    reservation,
     session,
     shelve,
     state,
@@ -62,7 +61,6 @@ from .dependency import (
     Resolution,
 )
 from .implementation import Implementation
-from .reservation import Reservation
 from .session import Session, SessionBoundary, TaskBoundary
 from .shelve import FileDrawer, FilesystemShelve, MemoryDrawer, MemoryShelve
 from .state import (
@@ -125,7 +123,6 @@ __all__ = [
     "FilesystemShelve",
     "FileDrawer",
     "MemoryDrawer",
-    "Reservation",
     "Assignation",
     "AssignationStats",
     "AssignationStatsResolver",
@@ -175,7 +172,6 @@ _SUBMODULES = (
     demand,
     dependency,
     implementation,
-    reservation,
     session,
     shelve,
     state,

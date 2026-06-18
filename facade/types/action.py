@@ -39,7 +39,6 @@ class Action:
     interfaces: list[str] = strawberry_django.field(description="Interfaces implemented by the action.")
     protocols: list["Protocol"] = strawberry_django.field(description="Protocols associated with the action.")
     defined_at: datetime.datetime = strawberry_django.field(description="Timestamp when the action was defined.")
-    reservations: list["Reservation"] | None = strawberry_django.field(description="Reservations related to this action.")
     test_cases: list["TestCase"] | None = strawberry_django.field(description="Test cases for this action.")
     organization: "Organization" = strawberry_django.field(description="The organization that owns this action.")
     assignations: list["Assignation"] = strawberry_django.field(description="Assignations created for this action.")

@@ -16,7 +16,6 @@ from . import (
     dashboard,
     dependency,
     implementation,
-    reservation,
     session,
     shelve,
     structure,
@@ -59,7 +58,6 @@ from .implementation import (
     ImplementationFilter,
     ImplementationOrder,
 )
-from .reservation import ReservationFilter
 from .session import SessionFilter, SessionOrder
 from .shelve import (
     FileDrawerFilter,
@@ -114,7 +112,6 @@ __all__ = [
     "MemoryShelveOrder",
     "FileDrawerFilter",
     "MemoryDrawerFilter",
-    "ReservationFilter",
     "AssignationOrder",
     "AssignationFilter",
     "AssignationEventOrder",
@@ -171,7 +168,6 @@ _SUBMODULES = (
     dashboard,
     dependency,
     implementation,
-    reservation,
     session,
     shelve,
     structure,

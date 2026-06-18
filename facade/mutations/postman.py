@@ -8,22 +8,6 @@ from kante.types import Info
 logger = logging.getLogger(__name__)
 
 
-def reserve(info: Info, input: inputs.ReserveInput) -> types.Reservation:
-    return controll_backend.reserve(info, input)
-
-
-@strawberry.input
-class UnreserveInput:
-    reservation: strawberry.ID
-
-
-def unreserve(info: Info, input: UnreserveInput) -> str:
-    reservation = models.Reservation.objects.get(id=input.reservation)
-    reservation.delete()
-
-    return input.reservation
-
-
 def assign(info: Info, input: inputs.AssignInput) -> types.Assignation:
     model = input.to_pydantic()
     return controll_backend.assign(info, model)

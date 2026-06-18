@@ -6,7 +6,7 @@ class Caller(models.Model):
     """The (client, user, organization) identity that *requests* work.
 
     A Caller is derived from the auth token on every authenticated request and is the
-    requestor identity for assignations and reservations. It is independent of an Agent
+    requestor identity for assignations. It is independent of an Agent
     (the provider runtime): a pure frontend caller has a Caller but no Agent.
 
     """

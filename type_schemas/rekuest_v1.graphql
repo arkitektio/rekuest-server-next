@@ -303,16 +303,6 @@ type Query {
   ): [TestCase!]!
 
   """
-  List of all reservations.
-  """
-  reservations(instanceId: InstanceId = null): [Reservation!]!
-
-  """
-  Reservations made by the current user.
-  """
-  myreservations(instanceId: InstanceId = null): [Reservation!]!
-
-  """
   List of shortcuts.
   """
   shortcuts(
@@ -377,7 +367,6 @@ type Query {
   """
   action(
     id: ID = null
-    reservation: ID = null
     assignation: ID = null
     implementation: ID = null
     agent: ID = null
@@ -488,11 +477,6 @@ type Query {
   Get test result by ID.
   """
   testResult(id: ID!): TestResult!
-
-  """
-  Retrieve reservation by ID.
-  """
-  reservation(id: ID!): Reservation!
 
   """
   Get implementation by ID.
@@ -1111,14 +1095,6 @@ type Action {
   definedAt: DateTime!
 
   """
-  Reservations related to this action.
-  """
-  reservations(
-    filters: ReservationFilter
-    pagination: OffsetPaginationInput
-  ): [Reservation!]
-
-  """
   Test cases for this action.
   """
   testCases(
@@ -1328,84 +1304,6 @@ input ProtocolOrder {
 }
 
 """
-Reservation for planned assignment of implementations.
-"""
-type Reservation {
-  """
-  ID of the reservation.
-  """
-  id: ID!
-
-  """
-  Name of the reservation.
-  """
-  name: String!
-
-  """
-  Waiter associated with the reservation.
-  """
-  waiter: Waiter!
-
-  """
-  Optional title.
-  """
-  title: String
-
-  """
-  Action this reservation is for.
-  """
-  action: Action!
-
-  """
-  Last update timestamp.
-  """
-  updatedAt: DateTime!
-
-  """
-  Reference string for identification.
-  """
-  reference: String!
-
-  """
-  Available implementations for the reservation.
-  """
-  implementations(
-    filters: ImplementationFilter
-    pagination: OffsetPaginationInput
-  ): [Implementation!]!
-
-  """
-  Bind configuration for the reservation.
-  """
-  binds: Binds
-
-  """
-  Dependency that triggered the reservation.
-  """
-  causingDependency: Dependency
-
-  """
-  Reservation strategy applied.
-  """
-  strategy: ReservationStrategy!
-
-  """
-  Is the reservation currently viable.
-  """
-  viable: Boolean!
-
-  """
-  Did the reservation succeed.
-  """
-  happy: Boolean!
-
-  """
-  Chosen implementation.
-  """
-  implementation: Implementation
-}
-
-"""
 Entity that waits for the completion of assignations.
 """
 type Waiter {
@@ -1507,31 +1405,6 @@ enum DescriptorOperator {
 }
 
 """
-The pattern of assignment of the reservation
-"""
-enum ReservationStrategy {
-  RANDOM
-  ROUND_ROBIN
-  LEAST_BUSY
-  LEAST_TIME
-  LEAST_LOAD
-  DIRECT
-}
-
-"""
-A way to filter reservations
-"""
-input ReservationFilter {
-  waiter: WaiterFilter
-  ids: [ID!]
-  status: [ReservationStatus!]
-  AND: ReservationFilter
-  OR: ReservationFilter
-  NOT: ReservationFilter
-  DISTINCT: Boolean
-}
-
-"""
 A way to filter waiters
 """
 input WaiterFilter {
@@ -1541,15 +1414,6 @@ input WaiterFilter {
   OR: WaiterFilter
   NOT: WaiterFilter
   DISTINCT: Boolean
-}
-
-enum ReservationStatus {
-  ACTIVE
-  INACTIVE
-  UNHAPPY
-  HAPPY
-  UNCONNECTED
-  ENDED
 }
 
 """
@@ -1694,11 +1558,6 @@ type Assignation {
   parent: Assignation
 
   """
-  Reservation that caused this assignation.
-  """
-  reservation: Reservation
-
-  """
   Action assigned.
   """
   action: Action!
@@ -1802,7 +1661,6 @@ enum AssignationInstructKind {
 }
 
 input AssignationFilter {
-  reservation: ReservationFilter
   ids: [ID!]
   status: [AssignationStatus!]
   instanceId: InstanceId
@@ -2419,16 +2277,6 @@ type Mutation {
   reinit(input: ReInitInput!): String!
 
   """
-  Reserve an implementation for future use.
-  """
-  reserve(input: ReserveInput!): Reservation!
-
-  """
-  Release a reserved implementation.
-  """
-  unreserve(input: UnreserveInput!): String!
-
-  """
   Delete a registered implementation.
   """
   deleteImplementation(input: DeleteImplementationInput!): String!
@@ -2769,7 +2617,6 @@ input AssignInput {
   implementation: ID = null
   agent: ID = null
   actionHash: ActionHash = null
-  reservation: ID = null
   interface: String = null
   hooks: [HookInput!] = null
   args: Args!
@@ -2841,28 +2688,10 @@ input ReInitInput {
   agent: ID = null
 }
 
-"""
-The input for reserving a action.
-"""
-input ReserveInput {
-  reference: String = "3ef48101-7bb5-4ed8-be50-c431b8418c4c"
-  instanceId: InstanceId! = "default"
-  action: ID = null
-  implementation: ID = null
-  title: String = null
-  hash: ActionHash = null
-  binds: BindsInput = null
-  assignationId: ID = null
-}
-
 input BindsInput {
   implementations: [String!]
   clients: [String!]
   desiredInstances: Int! = 1
-}
-
-input UnreserveInput {
-  reservation: ID!
 }
 
 """
@@ -3127,11 +2956,6 @@ type Subscription {
   Subscribe to updates on assignations.
   """
   assignations(instanceId: InstanceId!): AssignationChangeEvent!
-
-  """
-  Subscribe to updates on reservations.
-  """
-  reservations(instanceId: InstanceId!): Reservation!
 
   """
   Subscribe to events related to assignations.

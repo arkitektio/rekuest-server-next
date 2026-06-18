@@ -10,14 +10,6 @@ from facade import enums
 class Assignation(models.Model):
     """A constant log of a tasks transition through finding a Action, Implementation and finally Pod , also a store for its results"""
 
-    reservation = models.ForeignKey(
-        "Reservation",
-        on_delete=models.CASCADE,
-        help_text="Was this assigned through a reservation?",
-        related_name="assignations",
-        blank=True,
-        null=True,
-    )
     acted_on = ArrayField(base_field=models.CharField(max_length=1000), help_text="Which structures were acted on in this assignation", default=list)
     implementation = models.ForeignKey(
         "Implementation",
@@ -123,7 +115,7 @@ class Assignation(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.latest_event_kind} for {self.reservation}"
+        return f"{self.latest_event_kind} for {self.action_id}"
 
     class Meta:
         pass
@@ -133,7 +125,7 @@ class AssignationEvent(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     assignation = models.ForeignKey(
         Assignation,
-        help_text="The reservation this log item belongs to",
+        help_text="The assignation this log item belongs to",
         related_name="events",
         on_delete=models.CASCADE,
     )
@@ -183,7 +175,7 @@ class AssignationInstruct(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     assignation = models.ForeignKey(
         Assignation,
-        help_text="The reservation this log item belongs to",
+        help_text="The assignation this log item belongs to",
         related_name="instructs",
         on_delete=models.CASCADE,
     )

@@ -30,11 +30,6 @@ def action_singal(sender, instance=None, created=None, **kwargs):
             channels.action_channel.broadcast(channel_events.ActionSignal(update=instance.id), [f"actions_{instance.organization.id}"])
 
 
-@receiver(post_save, sender=models.Reservation)
-def reservation_signal(sender, instance=None, **kwargs):
-    logger.info("Reservation received!")
-
-
 @receiver(post_save, sender=models.Agent)
 def agent_post_save(sender, instance: models.Agent = None, created=None, **kwargs):
     if instance:
@@ -82,13 +77,6 @@ def ass_event_post_save(sender, instance: models.AssignationEvent = None, create
             channel_events.AssignationEventCreatedEvent(event=instance.id),
             [f"ass_caller_{instance.assignation.caller_id}"],
         )
-
-
-@receiver(post_save, sender=models.Reservation)
-def res_post_save(sender, instance: models.Reservation = None, created=None, **kwargs):
-    if created:
-        pass
-        # reservation_broadcast(instance.id, [f"res_caller_{instance.caller_id}"])
 
 
 @receiver(post_save, sender=models.Implementation)

@@ -22,7 +22,7 @@ class AssignationEventChoices(TextChoices):
 
     """
 
-    QUEUED = "QUEUED", "Queued (Assignation was queued for a reservation)"
+    QUEUED = "QUEUED", "Queued (Assignation was queued)"
     BOUND = "BOUND", "Bound (Assignation was bound to an Agent)"
     ASSIGN = "ASSIGN", "Assign (Agent accepted the Assignation)"
     UNASSIGN = "UNASSIGN", "Unassign (Agent received the Assignation)"

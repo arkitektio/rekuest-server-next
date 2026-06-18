@@ -1,7 +1,6 @@
 from .assignation import assignations
 from .event import event
 from .action import action
-from .reservation import myreservations, reservations
 from .implementation import implementation_at, my_implementation_at, resolved_implementations
 from .state import (
     state_for,
@@ -21,10 +20,8 @@ __all__ = [
     "assignations",
     "action",
     "event",
-    "myreservations",
     "implementation_at",
     "my_implementation_at",
-    "reservations",
     "checkout_agent",
     "state_for",
     "task_boundaries",

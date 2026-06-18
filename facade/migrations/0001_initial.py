@@ -9,6 +9,21 @@ from django.conf import settings
 from django.db import migrations, models
 
 
+class ReservationStrategyChoices(models.TextChoices):
+    """Historical enum for the removed Reservation model.
+
+    The Reservation concept has been removed from the application, but this migration
+    must remain self-contained so the historical schema can still be reconstructed.
+    """
+
+    RANDOM = "RANDOM", "Random"
+    ROUND_ROBIN = "ROUND_ROBIN", "Round Robin"
+    LEAST_BUSY = "LEAST_BUSY", "Least Busy"
+    LEAST_TIME = "LEAST_TIME", "Least Time"
+    LEAST_LOAD = "LEAST_LOAD", "Least Load"
+    DIRECT = "DIRECT", "Direct"
+
+
 class Migration(migrations.Migration):
 
     initial = True
@@ -419,7 +434,7 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('unique', models.UUIDField(default=uuid.uuid4, help_text='A Unique identifier for this Topic', unique=True)),
                 ('saved_args', models.JSONField(default=dict)),
-                ('strategy', django_choices_field.fields.TextChoicesField(choices=[('RANDOM', 'Random (Assignation is assigned to a random Provision)'), ('ROUND_ROBIN', 'Round Robin (Assignation is assigned to the next Provision)'), ('LEAST_BUSY', 'Least Busy (Assignation is assigned to the least busy Provision)'), ('LEAST_TIME', 'Least Time (Assignation is assigned to the Provision with the least time left)'), ('LEAST_LOAD', 'Least Load (Assignation is assigned to the Provision with the least load)'), ('DIRECT', 'Direct (Assignation is assigned to a direct Provision)')], choices_enum=facade.enums.ReservationStrategyChoices, default='RANDOM', help_text='The Strategy of this Reservation', max_length=1000)),
+                ('strategy', django_choices_field.fields.TextChoicesField(choices=[('RANDOM', 'Random (Assignation is assigned to a random Provision)'), ('ROUND_ROBIN', 'Round Robin (Assignation is assigned to the next Provision)'), ('LEAST_BUSY', 'Least Busy (Assignation is assigned to the least busy Provision)'), ('LEAST_TIME', 'Least Time (Assignation is assigned to the Provision with the least time left)'), ('LEAST_LOAD', 'Least Load (Assignation is assigned to the Provision with the least load)'), ('DIRECT', 'Direct (Assignation is assigned to a direct Provision)')], choices_enum=ReservationStrategyChoices, default='RANDOM', help_text='The Strategy of this Reservation', max_length=1000)),
                 ('allow_auto_request', models.BooleanField(default=False, help_text='Allow automatic requests for this reservation')),
                 ('reference', models.CharField(blank=True, help_text='A Short Hand Way to identify this reservation for the creating app', max_length=200, null=True)),
                 ('title', models.CharField(blank=True, help_text='A Short Hand Way to identify this reservation for you', max_length=200, null=True)),

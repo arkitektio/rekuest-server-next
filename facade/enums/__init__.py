@@ -24,14 +24,6 @@ from .assignation import (
 )
 from .dashboard import PanelKind, PanelKindChoices
 from .log import LogLevel, LogLevelChoices
-from .reservation import (
-    ReservationEventChoices,
-    ReservationEventKind,
-    ReservationStatus,
-    ReservationStatusChoices,
-    ReservationStrategy,
-    ReservationStrategyChoices,
-)
 from .state import JSONPatchOperation, RetentionPolicyChoices
 
 __all__ = [
@@ -61,13 +53,6 @@ __all__ = [
     # log
     "LogLevel",
     "LogLevelChoices",
-    # reservation
-    "ReservationEventChoices",
-    "ReservationEventKind",
-    "ReservationStatus",
-    "ReservationStatusChoices",
-    "ReservationStrategy",
-    "ReservationStrategyChoices",
     # state
     "JSONPatchOperation",
     "RetentionPolicyChoices",

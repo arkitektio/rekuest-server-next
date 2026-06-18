@@ -20,7 +20,4 @@ state_update_channel = build_channel(DBEvent, "state_update_event_broadcast")
 patch_channel = build_channel(PatchEvent)
 
 
-reservation_channel = build_channel(DBEvent, "reservation_event_broadcast")
-
-
 state_update_channel = build_channel(StateUpdateEvent)

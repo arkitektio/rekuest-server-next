@@ -57,7 +57,6 @@ from .implementation import (
     ResolvedDependency,
 )
 from .caller import Caller
-from .reservation import Reservation
 from .state import (
     HistoricalState,
     Patch,
@@ -108,8 +107,6 @@ __all__ = [
     "Resolution",
     "ResolvedDependency",
     "Implementation",
-    # reservation
-    "Reservation",
     # assignation
     "Assignation",
     "AssignationEvent",

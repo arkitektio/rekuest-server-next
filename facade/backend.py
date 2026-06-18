@@ -17,8 +17,6 @@ class ControllBackend(Protocol):
 
     def interrupt(self, info: Info, input: inputs.InterruptInputModel) -> types.Assignation: ...
 
-    def reserve(self, info: Info, input: inputs.ReserveInputModel) -> types.Reservation: ...
-
     def cancel(self, info: Info, input: inputs.CancelInputModel) -> types.Assignation: ...
 
     def assign(self, info: Info, input: inputs.AssignInputModel) -> types.Assignation: ...
@@ -144,46 +142,6 @@ class RedisControllBackend(ControllBackend):
 
         return parent
 
-    def reserve(self, info: Info, input: inputs.ReserveInputModel) -> models.Reservation:
-        if input.action is None and input.implementation is None:
-            raise ValueError("Either action or implementation must be provided")
-
-        if input.implementation:
-            # We provided a implementation and are creating a reservation with just that
-            # implementation
-            implementation = models.Implementation.objects.get(id=input.implementation)
-            action = implementation.action
-            implementations = [implementation]
-        if input.action:
-            # We provided a action and are creating a reservation with all implementations
-            # for that action at this time
-            action = models.Action.objects.get(id=input.action)
-            implementations = models.Implementation.objects.filter(action=action).all()
-            if len(implementations) == 0:
-                raise ValueError("No implementations found for this action. Cannot reserve.")
-
-        caller = get_caller_for_context(info)
-
-        res, created = models.Reservation.objects.update_or_create(
-            reference=input.reference,
-            caller=caller,
-            defaults=dict(
-                title=input.title,
-                binds=input.binds.dict() if input.binds else None,
-                causing_assignation_id=input.assignation_id,
-                action=action,
-                strategy=enums.ReservationStrategy.ROUND_ROBIN,
-            ),
-        )
-
-        # TODO: Find really the best fitting provision
-
-        res.implementations.set(implementations)
-
-        # TODO: Cache the reservation in the redis cache and make it available for the assignation
-
-        return res
-
     def cancel(self, input: inputs.CancelInputModel) -> models.Assignation:
         assignation = models.Assignation.objects.get(id=input.assignation)
         assignation.latest_event_kind = enums.AssignationStatus.CANCELLED
@@ -211,7 +169,6 @@ class RedisControllBackend(ControllBackend):
     def assign(self, info: Info, input: inputs.AssignInputModel) -> models.Assignation:
         # TODO: Check if function is cached and was
 
-        reservation = None
         action = None
         implementation = None
         resolution = None
@@ -251,19 +208,7 @@ class RedisControllBackend(ControllBackend):
             action = implementation.action
             agent = implementation.agent
 
-        elif input.reservation:
-            # TODO: Retrieve the reservation in the redis cache wth the provision keys set
-            # this should be done in the redis cache to allow for super fast retrieval,
-            # especially when using the ephemeral flag
-            reservation = models.Reservation.objects.prefetch_related("provisions").get(id=input.reservation)
-            action = reservation.action
-            implementation = choice(reservation.implementations.all())
-            if not implementation:
-                raise ValueError("No implementation matchable for this reservation")
-            agent = implementation.agent
-
         elif input.action:
-            reservation = None
             action = models.Action.objects.get(id=input.action)
             implementation = models.Implementation.objects.filter(action=action, agent__connected=True, agent__last_seen__gt=datetime.now(timezone.utc) - timedelta(minutes=1)).first()
             if not implementation:
@@ -272,7 +217,6 @@ class RedisControllBackend(ControllBackend):
             agent = implementation.agent
 
         elif input.implementation:
-            reservation = None
             implementation = models.Implementation.objects.get(id=input.implementation)
             action = implementation.action
             agent = implementation.agent
@@ -285,7 +229,6 @@ class RedisControllBackend(ControllBackend):
                 assert agent.last_seen > datetime.now(timezone.utc) - timedelta(minutes=1), "Agent is not connected"
 
         elif input.action_hash:
-            reservation = None
             action = models.Action.objects.get(hash=input.action_hash, organization=info.context.request.organization)
             implementation = models.Implementation.objects.filter(action=action, agent__connected=True).first()
             if not implementation:
@@ -293,7 +236,6 @@ class RedisControllBackend(ControllBackend):
             agent = implementation.agent
 
         elif input.implementation:
-            reservation = None
             implementation = models.Implementation.objects.get(id=input.implementation)
             action = implementation.action
             agent = implementation.agent
@@ -317,7 +259,6 @@ class RedisControllBackend(ControllBackend):
 
         # TODO: if ephemeral is set, we should not store the assignation in the database
         assignation = models.Assignation.objects.create(
-            reservation=reservation,
             action=action,
             args=input.args,
             reference=reference,

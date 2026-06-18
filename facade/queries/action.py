@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 def action(
     info: Info,
     id: strawberry.ID | None = None,
-    reservation: strawberry.ID | None = None,
     assignation: strawberry.ID | None = None,
     implementation: strawberry.ID | None = None,
     agent: strawberry.ID | None = None,
@@ -20,10 +19,8 @@ def action(
     hash: rscalars.ActionHash | None = None,
     matching: rinputs.ActionDependencyInput | None = None,
 ) -> types.Action:
-    if reservation:
-        return models.Reservation.objects.get(id=reservation).action
     if assignation:
-        return models.Assignation.objects.get(id=assignation).reservation.action
+        return models.Assignation.objects.get(id=assignation).action
     if implementation:
         return models.Implementation.objects.get(id=implementation).action
 

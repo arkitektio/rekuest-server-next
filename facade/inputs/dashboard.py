@@ -3,7 +3,7 @@
 import strawberry
 
 
-@strawberry.input(description="Input for reserving an action. This is used to reserve an action for a waiter instance, optionally specifying the action or implementation to reserve, along with additional metadata for the reservation.")
+@strawberry.input(description="Input for creating a dashboard, optionally specifying its name, the bloks to include, and the owning organization.")
 class CreateDashboardInput:
     name: str = strawberry.field(description="The name of the dashboard.")
     bloks: list[str] = strawberry.field(default_factory=list, description="The list of blok IDs to include in the dashboard.")
