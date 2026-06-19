@@ -656,8 +656,8 @@ class ImplementationInput:
         default=None,
         description="The states that the implementation manipulates. This is used to identify which states are manipulated by the implementation, and can be use to enhance state safety in the system",
     )
-    no_token: bool | None = strawberry.field(
-        default=None,
+    needs_token: bool = strawberry.field(
+        default=True,
         description="Whether Rekuest should mint a signed provenance token when this implementation is assigned. Default true (provenance-by-default); set false for trivial/internal tasks that never produce external provenance.",
     )
     provenance_audience: list[str] | None = strawberry.field(
