@@ -5,7 +5,7 @@ through Django Channels' ``WebsocketCommunicator`` against real Postgres and rea
 Redis (both started by the ``backend_stack`` dokker fixture in ``conftest.py``).
 
 ``default_authenticator`` only *finds* an existing agent — its ``aget_or_create``
-create-branch omits the required ``app``/``release``/``device`` columns, so
+create-branch omits the required ``app``/``release`` columns, so
 brand-new agents cannot be created over the socket. In normal operation the agent
 is created first via the ``ensureAgent`` GraphQL mutation and then connects;
 ``seed_agent`` reproduces that by pre-creating the agent against the exact identity
@@ -128,7 +128,7 @@ class TestAgentProtocol:
     async def test_register_for_uncreated_agent_is_rejected(self, agent_ws):
         # Pins current behavior: on_register can only *find* an agent — its
         # aget_or_create create-branch omits required NOT NULL columns
-        # (app/release/device), so registering without a pre-created agent raises
+        # (app/release), so registering without a pre-created agent raises
         # and the consumer closes with the schema-mismatch code. If the consumer's
         # create-branch is ever fixed, this test should flip to assert a successful
         # Init instead.

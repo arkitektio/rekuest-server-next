@@ -133,7 +133,7 @@ class AgentFilter:
 
     @filter_field(description="Filter based on device")
     def device_id(self, info: Info, queryset, value: strawberry.ID, prefix: str):
-        return queryset.filter(**{f"{prefix}device__device_id": value}), Q()
+        return queryset.filter(**{f"{prefix}client__device__device_id": value}), Q()
 
 
 @strawberry_django.order_type(models.Agent)

@@ -48,12 +48,13 @@ def create_registry_bundle(prefix: str) -> tuple[User, Client, Organization, Cal
 def create_agent_for_registry(registry: Caller, user: User, organization: Organization, prefix: str, **overrides) -> Agent:
     release = Release.objects.create(app=App.objects.create(identifier=f"{prefix}-app"), version="1.0.0")
     device = Device.objects.create(device_id=f"{prefix}-device")
+    registry.client.device = device
+    registry.client.save()
 
     agent_data = {
         "app": release.app,
         "hash": f"{prefix}-hash",
         "release": release,
-        "device": device,
         "user": user,
         "client": registry.client,
         "organization": organization,
@@ -97,13 +98,15 @@ async def seed_agent(instance_id, token=TEST_TOKEN, blocked=False):
     app, _ = await App.objects.aget_or_create(identifier="ws-test-app")
     release, _ = await Release.objects.aget_or_create(app=app, version="1.0.0")
     device, _ = await Device.objects.aget_or_create(device_id="ws-test-device")
+    client.device = device
+    await client.asave()
 
     agent, _ = await Agent.objects.aupdate_or_create(
         client=client,
         user=user,
         organization=organization,
         defaults=dict(
-            app=app, release=release, device=device,
+            app=app, release=release,
             hash=f"{instance_id}-hash", blocked=blocked,
         ),
     )
@@ -120,15 +123,15 @@ def _build_assignation(prefix):
     so this graph is independent of the agent that streams the events.
     """
     user = User.objects.create(username=f"{prefix}-user", password="x", sub=f"{prefix}-sub")
-    client = Client.objects.create(client_id=f"{prefix}-client")
+    device = Device.objects.create(device_id=f"{prefix}-device")
+    client = Client.objects.create(client_id=f"{prefix}-client", device=device)
     org = Organization.objects.create(slug=f"{prefix}-org")
     caller = Caller.objects.create(client=client, user=user, organization=org)
 
     app = App.objects.create(identifier=f"{prefix}-app")
     release = Release.objects.create(app=app, version="1.0.0")
-    device = Device.objects.create(device_id=f"{prefix}-device")
     agent = Agent.objects.create(
-        app=app, hash=f"{prefix}-hash", release=release, device=device,
+        app=app, hash=f"{prefix}-hash", release=release,
         user=user, client=client, organization=org,
     )
 

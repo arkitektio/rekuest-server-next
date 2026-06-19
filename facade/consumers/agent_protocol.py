@@ -58,7 +58,7 @@ async def default_authenticator(register: messages.Register) -> "models.Agent":
     """Resolve a ``Register`` to its ``Agent`` via the token identity.
 
     NOTE: the ``aget_or_create`` create-branch omits the required
-    ``app``/``release``/``device`` columns, so this can only *find* an
+    ``app``/``release`` columns, so this can only *find* an
     already-created agent (created out-of-band via the ``ensureAgent`` mutation).
     That is pinned behaviour — do not "fix" it here without updating
     ``test_register_for_uncreated_agent_is_rejected``.

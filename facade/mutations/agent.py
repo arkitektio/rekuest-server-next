@@ -38,7 +38,6 @@ def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
             name=input.name or f"{info.context.request.client.client_id}",
             app=info.context.request.client.release.app,
             release=info.context.request.client.release,
-            device=info.context.request.client.device,
         ),
     )
 
@@ -107,7 +106,6 @@ def implement_agent(info: Info, input: ImplementAgentInput) -> types.Agent:
             name=input.name or f"{info.context.request.client.client_id}",
             app=info.context.request.client.release.app,
             release=info.context.request.client.release,
-            device=info.context.request.client.device,
             hash=input.hash or str(uuid.uuid4()),
         ),
     )

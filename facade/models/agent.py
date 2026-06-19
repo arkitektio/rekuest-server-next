@@ -2,7 +2,7 @@ import datetime
 from django.utils import timezone
 import uuid
 
-from authentikate.models import App, Client, Device, Organization, Release, User
+from authentikate.models import App, Client, Organization, Release, User
 from django.contrib.auth import get_user_model
 from django.db import models
 from django_choices_field import TextChoicesField
@@ -40,7 +40,6 @@ class Agent(models.Model):
     )
     hash = models.CharField(max_length=1000, help_text="The hash of the Agent (comparing the hash can be used to check if the agent has changed in a definition way)")
     release = models.ForeignKey(Release, on_delete=models.CASCADE, related_name="agents", help_text="The release this agent belongs to (agents are part of a release and are NOT associated only with an app)")
-    device = models.ForeignKey(Device, on_delete=models.CASCADE, related_name="agents", help_text="The device this agent belongs to (agents are part of a device and are NOT associated only with an app or release)")
     name = models.CharField(max_length=2000, help_text="This providers Name", default="Nana")
     health_check_interval = models.IntegerField(
         default=60 * 5,

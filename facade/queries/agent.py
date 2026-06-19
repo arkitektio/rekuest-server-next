@@ -23,7 +23,7 @@ def agent(
             agents = agents.filter(version=version)
 
         if device_id:
-            agents = agents.filter(device_id=device_id)
+            agents = agents.filter(client__device__device_id=device_id)
 
         if agents.count() == 1:
             return agents.first()
