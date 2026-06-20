@@ -69,6 +69,39 @@ class ActionFilter:
         return queryset.filter(**{f"{prefix}id__in": filtered_ids}), Q()
 
     @filter_field
+    def object_demands(self, info: Info, queryset, value: list[inputs.ObjectDemandInput], prefix: str):
+        """Filter to actions whose ports accept the given concrete runtime objects.
+
+        Like ``demands`` but each match carries the object's runtime ``descriptors``, which are
+        evaluated against the port's compiled ``requires`` micro-constraint — so this keeps only
+        actions a real object can actually be passed to, not merely structurally-compatible ones.
+        """
+        if len(value) == 0:
+            return queryset, Q()
+
+        filtered_ids = None
+
+        for object_demand in value:
+            new_ids = managers.get_action_ids_by_demands(
+                object_demand.matches,
+                type=object_demand.kind.value,
+                force_length=object_demand.force_length,
+                force_non_nullable_length=object_demand.force_non_nullable_length,
+                force_structure_length=object_demand.force_structure_length,
+                organization_id=info.context.request.organization.id,
+            )
+
+            if filtered_ids is None:
+                filtered_ids = set(new_ids)
+            else:
+                filtered_ids = filtered_ids.intersection(new_ids)
+
+        if filtered_ids is None:
+            return queryset, Q()
+
+        return queryset.filter(**{f"{prefix}id__in": filtered_ids}), Q()
+
+    @filter_field
     def protocols(self, info: Info, queryset, value: list[str], prefix: str):
         return queryset.filter(**{f"{prefix}protocols__name__in": value}), Q()
 

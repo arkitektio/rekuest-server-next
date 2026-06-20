@@ -70,6 +70,9 @@ from .implementation import (
     CreateImplementationInputModel,
     DeleteImplementationInput,
     DeleteImplementationInputModel,
+    DescriptorInput,
+    ObjectDemandInput,
+    ObjectMatchInput,
     PortDemandInput,
     SchemaDemandInput,
 )
@@ -172,6 +175,9 @@ __all__ = [
     "UpdateResolutionInputModel",
     # implementation
     "ActionDemandInput",
+    "DescriptorInput",
+    "ObjectDemandInput",
+    "ObjectMatchInput",
     "CreateImplementationInput",
     "CreateImplementationInputModel",
     "DeleteImplementationInput",

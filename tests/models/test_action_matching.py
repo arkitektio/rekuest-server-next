@@ -17,9 +17,15 @@ from rekuest_core.enums import PortKind
 from tests.factories import create_action_for_organization, create_registry_bundle
 
 
-def pm(at=None, key=None, kind=None, identifier=None, object=None, nullable=None, children=None):
-    """Build a PortMatchInput-shaped object (attribute access is all the manager needs)."""
-    return SimpleNamespace(at=at, key=key, kind=kind, identifier=identifier, object=object, nullable=nullable, children=children)
+def pm(at=None, key=None, kind=None, identifier=None, descriptors=None, nullable=None, children=None):
+    """Build a match-shaped object (attribute access is all the manager needs).
+
+    ``descriptors`` is given as a plain ``{key: value}`` dict for brevity and expanded to the
+    ``[{key, value}]`` shape the runtime matcher (ObjectMatchInput) consumes; omitting it yields a
+    purely structural (PortMatchInput-style) match.
+    """
+    descriptor_list = [SimpleNamespace(key=k, value=v) for k, v in (descriptors or {}).items()] or None
+    return SimpleNamespace(at=at, key=key, kind=kind, identifier=identifier, descriptors=descriptor_list, nullable=nullable, children=children)
 
 
 def action_demand(hash=None, name=None, arg_matches=None, return_matches=None, force_arg_length=None, force_return_length=None):
@@ -123,7 +129,7 @@ def test_nullable_macro_match(catalog):
 def test_micro_constraint_satisfied(catalog):
     # object satisfies a1's requires (axes == "c"); a2 has no requires so it always matches.
     ids = managers.get_action_ids_by_demands(
-        [pm(identifier="@mikro/image", object={"axes": "c"})], type="args"
+        [pm(identifier="@mikro/image", descriptors={"axes": "c"})], type="args"
     )
     assert set(ids) == {catalog.a1.id, catalog.a2.id, catalog.a3.id}
 
@@ -131,7 +137,7 @@ def test_micro_constraint_satisfied(catalog):
 def test_micro_constraint_rejected(catalog):
     # object violates a1/a3's requires (axes != "c"); a2 (no requires) still matches.
     ids = managers.get_action_ids_by_demands(
-        [pm(identifier="@mikro/image", object={"axes": "z"})], type="args"
+        [pm(identifier="@mikro/image", descriptors={"axes": "z"})], type="args"
     )
     assert set(ids) == {catalog.a2.id}
 
@@ -175,7 +181,7 @@ def test_organization_isolation(catalog):
 
 def test_action_demand_combines_args_and_returns(catalog):
     demand = action_demand(
-        arg_matches=[pm(kind=PortKind.STRUCTURE, object={"axes": "c"})],
+        arg_matches=[pm(kind=PortKind.STRUCTURE, descriptors={"axes": "c"})],
         return_matches=[pm(kind=PortKind.INT)],
     )
     ids = managers.get_action_ids_by_action_demand(demand, organization_id=catalog.org1.id)

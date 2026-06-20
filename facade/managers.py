@@ -5,9 +5,14 @@ import typing as t
 from django.db import connection
 
 from rekuest_core.inputs.types import PortMatchInput
-from .inputs import ActionDemandInput
+from .inputs import ActionDemandInput, ObjectMatchInput
 
 qt = re.compile(r"@(?P<package>[^\/]*)\/(?P<interface>[^\/]*)")
+
+# A match is duck-typed: the type-level ``PortMatchInput`` (structural only), the runtime
+# ``ObjectMatchInput`` (structural + ``descriptors``), and test ``SimpleNamespace`` stand-ins are
+# all accepted — only attribute access is used.
+MatchInput = t.Union[PortMatchInput, ObjectMatchInput]
 
 
 # =========================================================================
@@ -28,14 +33,18 @@ PORT_TABLE = {"args": "facade_argport", "returns": "facade_returnport"}
 
 
 def _build_match_exists(
-    match: PortMatchInput,
+    match: MatchInput,
     table: str,
     action_alias: str,
     parent_alias: str | None,
     id_path: str,
     params: dict[str, t.Any],
 ) -> str:
-    """Build one correlated ``EXISTS`` clause for a single ``PortMatchInput``.
+    """Build one correlated ``EXISTS`` clause for a single match.
+
+    Accepts both the type-level ``PortMatchInput`` (structural targeting only) and the runtime
+    ``ObjectMatchInput`` (same structural fields plus ``descriptors``) — the two are handled
+    uniformly via attribute access; only the descriptor branch differs.
 
     Root matches correlate to the outer action row (``action_id = <action>.id`` and
     ``parent_id IS NULL``); nested matches correlate to their parent port row
@@ -75,13 +84,17 @@ def _build_match_exists(
         params[key] = match.nullable
         conditions.append(f"{alias}.nullable = %({key})s")
 
-    if match.object is not None:
-        # Micro-constraint: the port's compiled requires/provides JSONPath must be
-        # satisfied by the candidate descriptor object. A NULL compiled_jsonpath means
-        # the port declares no constraints, so it accepts any object. ``silent => true``
-        # makes structurally-invalid evaluations return NULL instead of raising.
+    descriptors = getattr(match, "descriptors", None)
+    if descriptors:
+        # Micro-constraint: the port's compiled requires/provides JSONPath must be satisfied by
+        # the candidate object, assembled here from the runtime descriptor key/value pairs
+        # (duplicate keys: last wins). A NULL compiled_jsonpath means the port declares no
+        # constraints, so it accepts any object. ``silent => true`` makes structurally-invalid
+        # evaluations return NULL instead of raising. Type-level PortMatchInput carries no
+        # descriptors, so this branch is skipped and the match stays purely structural.
+        candidate_object = {descriptor.key: descriptor.value for descriptor in descriptors}
         key = f"obj_{id_path}"
-        params[key] = json.dumps(match.object)
+        params[key] = json.dumps(candidate_object)
         conditions.append(
             f"({alias}.compiled_jsonpath IS NULL OR "
             f"jsonb_path_match(%({key})s::jsonb, {alias}.compiled_jsonpath::jsonpath, '{{}}'::jsonb, true))"
@@ -112,7 +125,7 @@ def _execute_ids(sql: str, params: dict[str, t.Any]) -> list[t.Any]:
 
 
 def get_action_ids_by_demands(
-    demands: list[PortMatchInput] | None = None,
+    demands: t.Sequence[MatchInput] | None = None,
     type: t.Literal["args", "returns"] = "args",
     force_length: t.Optional[int] = None,
     force_non_nullable_length: t.Optional[int] = None,
@@ -213,7 +226,7 @@ def get_action_ids_by_action_demand(
 
 
 def get_implementation_ids_by_demands(
-    demands: list[PortMatchInput] | None = None,
+    demands: t.Sequence[MatchInput] | None = None,
     type: t.Literal["args", "returns"] = "args",
     force_length: t.Optional[int] = None,
     force_non_nullable_length: t.Optional[int] = None,
@@ -234,7 +247,7 @@ def get_implementation_ids_by_demands(
 
 def filter_actions_by_demands(
     qs: t.Any,
-    demands: list[PortMatchInput] | None = None,
+    demands: t.Sequence[MatchInput] | None = None,
     type: t.Literal["args", "returns"] = "args",
     force_length: t.Optional[int] = None,
     force_non_nullable_length: t.Optional[int] = None,
@@ -262,7 +275,7 @@ def filter_actions_by_demands(
 # =========================================================================
 
 
-def build_child_recursively(item: PortMatchInput, prefix, value_path, parts, params):
+def build_child_recursively(item: MatchInput, prefix, value_path, parts, params):
     if item.key:
         parts.append(f"{prefix}->>'key' = %({value_path}_key)s")
         params[f"{value_path}_key"] = item.key
@@ -276,7 +289,7 @@ def build_child_recursively(item: PortMatchInput, prefix, value_path, parts, par
         params[f"{value_path}_identifier"] = item.identifier
 
 
-def build_sql_for_item_recursive(item: PortMatchInput, index: int, at_value: int | None = None, prefix: str = "arg"):
+def build_sql_for_item_recursive(item: MatchInput, index: int, at_value: int | None = None, prefix: str = "arg"):
     sql_parts = []
     params = {}
 
@@ -314,7 +327,7 @@ def build_sql_for_item_recursive(item: PortMatchInput, index: int, at_value: int
 
 
 def _json_scan_params(
-    search_params: list[PortMatchInput] | None,
+    search_params: t.Sequence[MatchInput] | None,
     type: t.Literal["args", "returns"] = "args",
     force_length: t.Optional[int] = None,
     force_non_nullable_length: t.Optional[int] = None,
@@ -349,7 +362,7 @@ def _json_scan_params(
 
 
 def _json_scan_ids(
-    demands: list[PortMatchInput] | None = None,
+    demands: t.Sequence[MatchInput] | None = None,
     type: t.Literal["args", "returns"] = "args",
     force_length: t.Optional[int] = None,
     force_non_nullable_length: t.Optional[int] = None,
@@ -368,7 +381,7 @@ def _json_scan_ids(
 
 
 def build_state_params(
-    search_params: list[PortMatchInput] | None,
+    search_params: t.Sequence[MatchInput] | None,
     model: str = "facade_statedefinition",
 ):
     individual_queries = []
@@ -388,7 +401,7 @@ def build_state_params(
 
 
 def get_state_ids_by_demands(
-    matches: list[PortMatchInput] | None = None,
+    matches: t.Sequence[MatchInput] | None = None,
     model: str = "facade_statedefinition",
 ) -> list[t.Any]:
     full_sql, all_params = build_state_params(matches, model=model)

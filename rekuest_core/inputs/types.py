@@ -378,10 +378,6 @@ class PortMatchInput:
         default=None,
         description="The identifier of the port to match. ",
     )
-    object: scalars.Arg | None = strawberry.field(
-        default=None,
-        description="The object of the port to match. This is used for adanved pattern matching based on the exact object descriptors of the object. i.e { x: 1, y: 2} ",
-    )
     nullable: bool | None = strawberry.field(
         default=None,
         description="Whether the port is nullable. ",

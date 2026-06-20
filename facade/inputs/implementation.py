@@ -1,13 +1,16 @@
 """Inputs for implementations and action/schema/port demands."""
 
+from typing import Annotated, Optional
+
 import strawberry
 from pydantic import BaseModel
+from rekuest_core import enums as renums
 from rekuest_core import scalars as rscalars
 from rekuest_core.inputs import models as rimodels
 from rekuest_core.inputs import types as ritypes
 from strawberry.experimental import pydantic
 
-from facade import enums, scalars
+from facade import enums
 
 
 @strawberry.input(description="The input for creating a port demand.")
@@ -30,6 +33,55 @@ class PortDemandInput:
     force_structure_length: int | None = strawberry.field(
         default=None,
         description="Require that the action has a specific number of structure ports. This is used to identify the demand in the system.",
+    )
+
+
+@strawberry.input(description="A single runtime descriptor key/value pair carried by a candidate object.")
+class DescriptorInput:
+    key: str = strawberry.field(description="The descriptor key, e.g. 'axes'.")
+    value: rscalars.Arg = strawberry.field(description="The descriptor value. Any JSON-serializable value.")
+
+
+@strawberry.input(
+    description="""A match against a concrete runtime object.
+
+    Mirrors the structural targeting of ``PortMatchInput`` (at / key / kind / identifier /
+    nullable / children) but additionally carries the object's runtime ``descriptors``. The
+    descriptors are evaluated against a port's compiled ``requires`` micro-constraint, so this
+    finds actions a concrete object can actually be passed to (not just structurally compatible).
+    """,
+)
+class ObjectMatchInput:
+    at: int | None = strawberry.field(default=None, description="The index of the port to match.")
+    key: str | None = strawberry.field(default=None, description="The key of the port to match.")
+    kind: renums.PortKind | None = strawberry.field(default=None, description="The kind of the port to match.")
+    identifier: str | None = strawberry.field(default=None, description="The identifier of the port to match.")
+    nullable: bool | None = strawberry.field(default=None, description="Whether the port is nullable.")
+    descriptors: list[DescriptorInput] | None = strawberry.field(
+        default=None,
+        description="The runtime descriptors of the candidate object, matched against the port's compiled requires.",
+    )
+    children: Optional[list[Annotated["ObjectMatchInput", strawberry.lazy(__name__)]]] = strawberry.field(
+        default=None,
+        description="The matches for the children of the port to match.",
+    )
+
+
+@strawberry.input(description="A demand expressed as concrete runtime objects to find actions that accept them.")
+class ObjectDemandInput:
+    kind: enums.DemandKind = strawberry.field(description="The kind of the demand. You can ask for args or returns.")
+    matches: list[ObjectMatchInput] | None = strawberry.field(default=None, description="The object matches of the demand.")
+    force_length: int | None = strawberry.field(
+        default=None,
+        description="Require that the action has a specific number of ports.",
+    )
+    force_non_nullable_length: int | None = strawberry.field(
+        default=None,
+        description="Require that the action has a specific number of non-nullable ports.",
+    )
+    force_structure_length: int | None = strawberry.field(
+        default=None,
+        description="Require that the action has a specific number of structure ports.",
     )
 
 

@@ -40,8 +40,9 @@ def _definition():
 
 
 def _arg_object_demand(identifier, obj):
-    """An ActionDemandInput-shaped object asserting a single arg's descriptor object."""
-    match = SimpleNamespace(at=None, key=None, kind=None, identifier=identifier, object=obj, nullable=None, children=None)
+    """An ActionDemandInput-shaped object asserting a single arg's runtime descriptors."""
+    descriptors = [SimpleNamespace(key=k, value=v) for k, v in obj.items()]
+    match = SimpleNamespace(at=None, key=None, kind=None, identifier=identifier, descriptors=descriptors, nullable=None, children=None)
     return SimpleNamespace(
         hash=None, name=None, force_arg_length=None, force_return_length=None,
         arg_matches=[match], return_matches=None,
