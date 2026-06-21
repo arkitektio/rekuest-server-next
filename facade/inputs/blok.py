@@ -3,7 +3,7 @@
 from typing import Any
 
 import strawberry
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from rekuest_core.inputs import models as rimodels
 from rekuest_core.inputs import types as ritypes
 from strawberry.experimental import pydantic
@@ -38,37 +38,37 @@ class CreateBlokInputModel(BaseModel):
         components: An optional list of component nodes defining the Blok's visual structure and behavior.
     """
 
-    name: str
-    dependencies: list[rimodels.AgentDependencyInputModel] | None = None
-    description: str | None = None
-    catalog: str | None = None
-    components: list[rimodels.ComponentNodeInputModel] | None = None
-    demo_state: dict[str, Any] | None = None
+    name: str = Field(description="The name of the Blok, used for identification in the system.")
+    dependencies: list[rimodels.AgentDependencyInputModel] | None = Field(
+        default=None,
+        description="The dependencies of the blok. This is used to identify the blok in the system.",
+    )
+    description: str | None = Field(
+        default=None,
+        description="The description of the blok. This can described the blok and its purpose.",
+    )
+    catalog: str | None = Field(
+        default=None,
+        description="The universal id",
+    )
+    components: list[rimodels.ComponentNodeInputModel] | None = Field(
+        default=None,
+        description="The schema of the blok. This can be used to validate the blok input and output.",
+    )
+    demo_state: dict[str, Any] | None = Field(
+        default=None,
+        description="The initial state of the blok. This is used to set the initial state of the blok when it is materialized.",
+    )
 
 
 @pydantic.input(CreateBlokInputModel, description="The input for creating a blok.")
 class CreateBlokInput:
     name: str
-    dependencies: list[ritypes.AgentDependencyInput] | None = strawberry.field(
-        default=None,
-        description="The dependencies of the blok. This is used to identify the blok in the system.",
-    )
-    description: str | None = strawberry.field(
-        default=None,
-        description="The description of the blok. This can described the blok and its purpose.",
-    )
-    catalog: str | None = strawberry.field(
-        default=None,
-        description="The universal id",
-    )
-    components: list[ritypes.ComponentNodeInput] | None = strawberry.field(
-        default=None,
-        description="The schema of the blok. This can be used to validate the blok input and output.",
-    )
-    demo_state: scalars.Args | None = strawberry.field(
-        default=None,
-        description="The initial state of the blok. This is used to set the initial state of the blok when it is materialized.",
-    )
+    dependencies: list[ritypes.AgentDependencyInput] | None = None
+    description: str | None = None
+    catalog: str | None = None
+    components: list[ritypes.ComponentNodeInput] | None = None
+    demo_state: scalars.Args | None = None
 
 
 @strawberry.input(description="The input for updating a blok.")

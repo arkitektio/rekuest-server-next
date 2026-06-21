@@ -3,7 +3,7 @@
 from typing import Annotated, Optional
 
 import strawberry
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from rekuest_core import enums as renums
 from rekuest_core import scalars as rscalars
 from rekuest_core.inputs import models as rimodels
@@ -128,7 +128,7 @@ class CreateImplementationInputModel(BaseModel):
         implementation: Implementation configuration data
     """
 
-    implementation: rimodels.ImplementationInputModel
+    implementation: rimodels.ImplementationInputModel = Field(description="The implementation to create. This is used to identify the implementation in the system.")
 
 
 @pydantic.input(
@@ -136,7 +136,7 @@ class CreateImplementationInputModel(BaseModel):
     description="The input for creating a implementation.",
 )
 class CreateImplementationInput:
-    implementation: ritypes.ImplementationInput = strawberry.field(description="The implementation to create. This is used to identify the implementation in the system.")
+    implementation: ritypes.ImplementationInput
 
 
 class DeleteImplementationInputModel(BaseModel):
@@ -146,7 +146,7 @@ class DeleteImplementationInputModel(BaseModel):
         implementation: ID of the implementation to delete
     """
 
-    implementation: str
+    implementation: str = Field(description="The implementation ID to delete. This is used to identify the implementation in the system.")
 
 
 @pydantic.input(
@@ -154,4 +154,4 @@ class DeleteImplementationInputModel(BaseModel):
     description="The input for deleting a implementation.",
 )
 class DeleteImplementationInput:
-    implementation: strawberry.ID = strawberry.field(description="The implementation ID to delete. This is used to identify the implementation in the system.")
+    implementation: strawberry.ID

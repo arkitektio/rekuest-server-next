@@ -104,11 +104,3 @@ class AssignationEventKind(str, Enum):
     INTERUPTED = ("INTERUPTED",)
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"
-
-
-@strawberry.enum
-class AssignPolicy(str, Enum):
-    AUTOMATIC = "AUTOMATIC"
-    ROUND_ROBIN = "ROUND_ROBIN"
-    LEAST_BUSY = "LEAST_BUSY"
-    FASTEST_RESPONSE = "FASTEST_RESPONSE"

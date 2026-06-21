@@ -2,61 +2,62 @@
 
 import strawberry
 from datalayer import scalars as dscalars
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from strawberry.experimental import pydantic
 
 
 class CreateThreeDModelInputModel(BaseModel):
-    name: str
-    description: str | None = None
-    media: str
+    name: str = Field(description="The name of the 3D model.")
+    description: str | None = Field(default=None, description="A description of the 3D model.")
+    media: str = Field(description="The media store file for the 3D model.")
 
 
 @pydantic.input(CreateThreeDModelInputModel, description="The input for creating a 3D model.")
 class CreateThreeDModelInput:
-    name: str = strawberry.field(description="The name of the 3D model.")
-    description: str | None = strawberry.field(default=None, description="A description of the 3D model.")
-    media: dscalars.MediaLike = strawberry.field(description="The media store file for the 3D model.")
+    name: str
+    description: str | None = None
+    media: dscalars.MediaLike
 
 
 class UpdateThreeDModelInputModel(BaseModel):
-    id: str
-    name: str | None = None
-    description: str | None = None
-    media: str | None = None
+    id: str = Field(description="The ID of the 3D model to update.")
+    name: str | None = Field(default=None, description="The new name of the 3D model.")
+    description: str | None = Field(default=None, description="The new description of the 3D model.")
+    media: str | None = Field(default=None, description="The new media store file ID for the 3D model.")
 
 
 @pydantic.input(UpdateThreeDModelInputModel, description="The input for updating a 3D model.")
 class UpdateThreeDModelInput:
-    id: strawberry.ID = strawberry.field(description="The ID of the 3D model to update.")
-    name: str | None = strawberry.field(default=None, description="The new name of the 3D model.")
-    description: str | None = strawberry.field(default=None, description="The new description of the 3D model.")
-    media: strawberry.ID | None = strawberry.field(default=None, description="The new media store file ID for the 3D model.")
+    id: strawberry.ID
+    name: str | None = None
+    description: str | None = None
+    media: strawberry.ID | None = None
 
 
 class PlacementInputModel(BaseModel):
-    role: str | None = None
-    affine_matrix: list[list[float]] | None = None
-    model: str | None = None
-    agent: str | None = None
+    role: str | None = Field(default=None, description="The role of the placement. This is used to identify the placement in the system.")
+    affine_matrix: list[list[float]] | None = Field(default=None, description="The affine matrix for the placement. This is used to identify the placement in the system.")
+    model: str | None = Field(default=None, description="The 3D model ID for the placement. This is used to identify the 3D model in the system.")
+    agent: str | None = Field(default=None, description="The agent ID for the placement. This is used to identify the agent in the system.")
+    blok: str | None = Field(default=None, description="A specific blok that should be used to visualize the state of the placement.")
 
 
 class DeleteThreeDModelInputModel(BaseModel):
-    id: str
+    id: str = Field(description="The ID of the 3D model to delete.")
 
 
 @pydantic.input(PlacementInputModel, description="The input for creating or updating a placement.")
 class PlacementInput:
-    role: str | None = strawberry.field(default=None, description="The role of the placement. This is used to identify the placement in the system.")
-    affine_matrix: list[list[float]] | None = strawberry.field(default=None, description="The affine matrix for the placement. This is used to identify the placement in the system.")
-    model: strawberry.ID | None = strawberry.field(default=None, description="The 3D model ID for the placement. This is used to identify the 3D model in the system.")
-    agent: strawberry.ID | None = strawberry.field(default=None, description="The agent ID for the placement. This is used to identify the agent in the system.")
-    blok: strawberry.ID | None = strawberry.field(default=None, description="A specific blok that should be used to visualize the state of the placement")
+    role: str | None = None
+    affine_matrix: list[list[float]] | None = None
+    model: strawberry.ID | None = None
+    agent: strawberry.ID | None = None
+    blok: strawberry.ID | None = None
 
 
 @pydantic.input(DeleteThreeDModelInputModel, description="The input for deleting a 3D model.")
 class DeleteThreeDModelInput:
-    id: strawberry.ID = strawberry.field(description="The ID of the 3D model to delete.")
+    id: strawberry.ID
 
 
 class CreateSpaceInputModel(BaseModel):
@@ -70,8 +71,8 @@ class CreateSpaceInputModel(BaseModel):
         url: URL associated with the resolution
     """
 
-    name: str
-    placements: list[PlacementInputModel] | None = None
+    name: str = Field(description="The name of the space. This is used to identify the space in the system.")
+    placements: list[PlacementInputModel] | None = Field(default=None, description="The placements to create in the space. This is used to identify the placements in the system.")
 
 
 @pydantic.input(
@@ -79,63 +80,63 @@ class CreateSpaceInputModel(BaseModel):
     description="The input for creating a space.",
 )
 class CreateSpaceInput:
-    name: str = strawberry.field(description="The name of the space. This is used to identify the space in the system.")
-    placements: list[PlacementInput] | None = strawberry.field(default=None, description="The placements to create in the space. This is used to identify the placements in the system.")
+    name: str
+    placements: list[PlacementInput] | None = None
 
 
 class UpdateSpaceInputModel(BaseModel):
-    id: str
-    name: str | None = None
-    description: str | None = None
+    id: str = Field(description="The ID of the space to update.")
+    name: str | None = Field(default=None, description="The new name of the space.")
+    description: str | None = Field(default=None, description="The new description of the space.")
 
 
 @pydantic.input(UpdateSpaceInputModel, description="The input for updating a space.")
 class UpdateSpaceInput:
-    id: strawberry.ID = strawberry.field(description="The ID of the space to update.")
-    name: str | None = strawberry.field(default=None, description="The new name of the space.")
-    description: str | None = strawberry.field(default=None, description="The new description of the space.")
+    id: strawberry.ID
+    name: str | None = None
+    description: str | None = None
 
 
 class DeleteSpaceInputModel(BaseModel):
-    id: str
+    id: str = Field(description="The ID of the space to delete.")
 
 
 @pydantic.input(DeleteSpaceInputModel, description="The input for deleting a space.")
 class DeleteSpaceInput:
-    id: strawberry.ID = strawberry.field(description="The ID of the space to delete.")
+    id: strawberry.ID
 
 
 class CreatePlacementInputModel(PlacementInputModel):
-    space: str
-    pass
+    space: str = Field(description="The ID of the space to create the placement in.")
+    materialized_blok: str | None = Field(default=None, description="A specific blok that should be used to visualize the state of the placement.")
 
 
 class UpdatePlacementInputModel(PlacementInputModel):
-    id: str
+    id: str = Field(description="The ID of the placement to update.")
 
 
 @pydantic.input(CreatePlacementInputModel, description="The input for creating a placement.")
 class CreatePlacementInput:
-    space: str = strawberry.field(description="The ID of the space to create the placement in.")
-    role: str | None = strawberry.field(default=None, description="The role for the placement.")
-    affine_matrix: list[list[float]] | None = strawberry.field(default=None, description="The affine matrix for the placement.")
-    model: strawberry.ID | None = strawberry.field(default=None, description="The three-dimensional model for the placement.")
-    agent: strawberry.ID | None = strawberry.field(default=None, description="The agent ID to create the placement for. If not provided, the placement will be created for the default agent.")
-    materialized_blok: strawberry.ID | None = strawberry.field(default=None, description="A specific blok that should be used to visualize the state of the placement")
+    space: str
+    role: str | None = None
+    affine_matrix: list[list[float]] | None = None
+    model: strawberry.ID | None = None
+    agent: strawberry.ID | None = None
+    materialized_blok: strawberry.ID | None = None
 
 
 @pydantic.input(UpdatePlacementInputModel, description="The input for updating a placement.")
 class UpdatePlacementInput:
-    id: strawberry.ID = strawberry.field(description="The ID of the placement to update.")
-    role: str | None = strawberry.field(default=None, description="The new role for the placement.")
-    affine_matrix: list[list[float]] | None = strawberry.field(default=None, description="The new affine matrix for the placement.")
-    model: strawberry.ID | None = strawberry.field(default=None, description="The new model for the placement.")
+    id: strawberry.ID
+    role: str | None = None
+    affine_matrix: list[list[float]] | None = None
+    model: strawberry.ID | None = None
 
 
 class DeletePlacementInputModel(BaseModel):
-    id: str
+    id: str = Field(description="The ID of the placement to delete.")
 
 
 @pydantic.input(DeletePlacementInputModel, description="The input for deleting a placement.")
 class DeletePlacementInput:
-    id: strawberry.ID = strawberry.field(description="The ID of the placement to delete.")
+    id: strawberry.ID

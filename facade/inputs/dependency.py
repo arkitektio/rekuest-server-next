@@ -1,19 +1,22 @@
 """Inputs for dependency mapping and resolution."""
 
 import strawberry
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from strawberry.experimental import pydantic
 
 
 class MappedAgentInputModel(BaseModel):
-    key: str
-    agent: str
+    key: str = Field(description="The key of the agent to map. This is used to identify the agent in the system.")
+    agent: str = Field(description="The agent ID to map the actions to. This is used to identify the agent in the system.")
 
 
 class ResolvedDependencyInputModel(BaseModel):
-    key: str
-    mapped_agents: list[MappedAgentInputModel]
-    auto_resolve: bool = False
+    key: str = Field(description="The key of the dependency to map. This is used to identify the dependency in the system.")
+    mapped_agents: list[MappedAgentInputModel] = Field(description="The list of mapped agents to map to implementations in agents. This is used to identify the mapped agents in the system.")
+    auto_resolve: bool = Field(
+        default=False,
+        description="Whether this dependency should be automatically resolved by the system. If true, the system will attempt to find a agent that can resolve this dependency and assign it to the action when the action is assigned. This is used to enable automatic resolution of dependencies without requiring the user to specify a specific agent for the dependency.",
+    )
 
 
 @pydantic.input(
@@ -21,8 +24,8 @@ class ResolvedDependencyInputModel(BaseModel):
     description="The input for mapping actions to implementations in a agent.",
 )
 class MappedAgentInput:
-    key: str = strawberry.field(description="The key of the agent to map. This is used to identify the agent in the system.")
-    agent: strawberry.ID = strawberry.field(description="The agent ID to map the actions to. This is used to identify the agent in the system.")
+    key: str
+    agent: strawberry.ID
 
 
 @pydantic.input(
@@ -30,12 +33,9 @@ class MappedAgentInput:
     description="The input for mapping dependencies to implementations in a agent.",
 )
 class ResolvedDependencyInput:
-    key: str = strawberry.field(description="The key of the dependency to map. This is used to identify the dependency in the system.")
-    mapped_agents: list[MappedAgentInput] = strawberry.field(description="The list of mapped agents to map to implementations in agents. This is used to identify the mapped agents in the system.")
-    auto_resolve: bool = strawberry.field(
-        default=False,
-        description="Whether this dependency should be automatically resolved by the system. If true, the system will attempt to find a agent that can resolve this dependency and assign it to the action when the action is assigned. This is used to enable automatic resolution of dependencies without requiring the user to specify a specific agent for the dependency.",
-    )
+    key: str
+    mapped_agents: list[MappedAgentInput]
+    auto_resolve: bool = False
 
 
 @strawberry.input
@@ -54,9 +54,12 @@ class UpdateResolutionInputModel(BaseModel):
         url: URL associated with the resolution
     """
 
-    id: str
-    name: str
-    resolved_dependencies: list[ResolvedDependencyInputModel] | None = None
+    id: str = Field(description="The ID of the resolution. This is used to identify the resolution in the system.")
+    name: str = Field(description="The name of the resolution. This is used to identify the resolution in the system.")
+    resolved_dependencies: list[ResolvedDependencyInputModel] | None = Field(
+        default=None,
+        description="The resolved dependencies of the resolution. All other fields will be replaced.",
+    )
 
 
 @pydantic.input(
@@ -64,12 +67,9 @@ class UpdateResolutionInputModel(BaseModel):
     description="The input for creating a resolution.",
 )
 class UpdateResolutionInput:
-    id: strawberry.ID = strawberry.field(description="The ID of the resolution. This is used to identify the resolution in the system.")
-    name: str = strawberry.field(description="The name of the resolution. This is used to identify the resolution in the system.")
-    resolved_dependencies: list[ResolvedDependencyInput] | None = strawberry.field(
-        default=None,
-        description="The resolved dependencies of the resolution. All other fields will be replaced.",
-    )
+    id: strawberry.ID
+    name: str
+    resolved_dependencies: list[ResolvedDependencyInput] | None = None
 
 
 class CreateResolutionInputModel(BaseModel):
@@ -83,9 +83,13 @@ class CreateResolutionInputModel(BaseModel):
         url: URL associated with the resolution
     """
 
-    key: str
-    name: str
-    resolved_dependencies: list[ResolvedDependencyInputModel] | None = None
+    key: str = Field(description="The key of the resolution. This is used to identify the resolution in the system.")
+    implementation: str = Field(description="The implementation ID of the resolution. This is used to identify the resolution in the system.")
+    name: str = Field(description="The name of the resolution. This is used to identify the resolution in the system.")
+    resolved_dependencies: list[ResolvedDependencyInputModel] | None = Field(
+        default=None,
+        description="The resolved dependencies of the resolution. This is used to identify the resolution in the system.",
+    )
 
 
 @pydantic.input(
@@ -93,13 +97,10 @@ class CreateResolutionInputModel(BaseModel):
     description="The input for creating a resolution.",
 )
 class CreateResolutionInput:
-    key: str = strawberry.field(description="The key of the resolution. This is used to identify the resolution in the system.")
-    implementation: strawberry.ID = strawberry.field(description="The implementation ID of the resolution. This is used to identify the resolution in the system.")
-    name: str = strawberry.field(description="The name of the resolution. This is used to identify the resolution in the system.")
-    resolved_dependencies: list[ResolvedDependencyInput] | None = strawberry.field(
-        default=None,
-        description="The resolved dependencies of the resolution. This is used to identify the resolution in the system.",
-    )
+    key: str
+    implementation: strawberry.ID
+    name: str
+    resolved_dependencies: list[ResolvedDependencyInput] | None = None
 
 
 class DeleteResolutionInputModel(BaseModel):
@@ -109,7 +110,7 @@ class DeleteResolutionInputModel(BaseModel):
         id: The unique identifier of the resolution to delete
     """
 
-    id: str
+    id: str = Field(description="The ID of the resolution to delete.")
 
 
 @pydantic.input(
@@ -117,4 +118,4 @@ class DeleteResolutionInputModel(BaseModel):
     description="The input for deleting a resolution.",
 )
 class DeleteResolutionInput:
-    id: strawberry.ID = strawberry.field(description="The ID of the resolution to delete.")
+    id: strawberry.ID

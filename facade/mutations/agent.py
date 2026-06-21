@@ -8,7 +8,7 @@ from rekuest_core.inputs.types import BlokImplementationInput, StructureInput, I
 from rekuest_core.inputs.models import BlokImplementationInputModel, ImplementationInputModel, StateImplementationInputModel, LockImplementationInputModel
 import logging
 from facade import types, models, inputs, unique
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import kante
 
 logger = logging.getLogger(__name__)
@@ -58,41 +58,23 @@ def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
 
 
 class ImplementAgentInputModel(BaseModel):
-    name: str | None = None
-    states: list[StateImplementationInputModel] | None = None
-    implementations: list[ImplementationInputModel] | None = None
-    locks: list[LockImplementationInputModel] | None = None
-    bloks: list[BlokImplementationInputModel] | None = None
-    hash: str | None = None
+    name: str | None = Field(default=None, description="The name of the agent. This is used to identify the agent in the system.")
+    states: list[StateImplementationInputModel] | None = Field(default=None, description="The states of the agent. This is used to specify the initial states of the agent")
+    implementations: list[ImplementationInputModel] | None = Field(default=None, description="The implementations of the agent. This is used to specify the initial implementations of the agent")
+    locks: list[LockImplementationInputModel] | None = Field(default=None, description="The locks of the agent. This is used to specify which resources the agent needs to run")
+    bloks: list[BlokImplementationInputModel] | None = Field(default=None, description="The blocks of the agent. This is used to specify the initial blocks of the agent")
+    hash: str | None = Field(default=None, description="A unique hash of the agent definition. An agent can use this hash to check if its definition has changed and if it needs to update its implementations and states. This is used to optimize the update process by only updating the implementations and states that have changed.")
     pass
 
 
 @kante.pydantic_input(ImplementAgentInputModel, description="Implement an agent with the given implementations, states and locks. This will create the agent if it doesn't exist and update it if it does exist.")
 class ImplementAgentInput:
-    name: str | None = strawberry.field(
-        default=None,
-        description="The name of the agent. This is used to identify the agent in the system.",
-    )
-    locks: list[LockImplementationInput] | None = strawberry.field(
-        default=None,
-        description="The locks of the agent. This is used to specify which resources the agent needs to run",
-    )
-    states: list[StateImplementationInput] | None = strawberry.field(
-        default=None,
-        description="The states of the agent. This is used to specify the initial states of the agent",
-    )
-    bloks: list[BlokImplementationInput] | None = strawberry.field(
-        default=None,
-        description="The blocks of the agent. This is used to specify the initial blocks of the agent",
-    )
-    implementations: list[ImplementationInput] | None = strawberry.field(
-        default=None,
-        description="The implementations of the agent. This is used to specify the initial implementations of the agent",
-    )
-    hash: str | None = strawberry.field(
-        default=None,
-        description="A unique hash of the agent definition. An agent can use this hash to check if its definition has changed and if it needs to update its implementations and states. This is used to optimize the update process by only updating the implementations and states that have changed.",
-    )
+    name: str | None = None
+    locks: list[LockImplementationInput] | None = None
+    states: list[StateImplementationInput] | None = None
+    bloks: list[BlokImplementationInput] | None = None
+    implementations: list[ImplementationInput] | None = None
+    hash: str | None = None
 
 
 def implement_agent(info: Info, input: ImplementAgentInput) -> types.Agent:

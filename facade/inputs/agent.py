@@ -1,7 +1,7 @@
 """Inputs for agent lifecycle controls (pin, bounce, kick, block, update)."""
 
 import strawberry
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from strawberry.experimental import pydantic
 
 
@@ -13,8 +13,8 @@ class PinInputModel(BaseModel):
         pin: Boolean flag indicating whether to pin or unpin
     """
 
-    id: str
-    pin: bool
+    id: str = Field(description="The unique identifier of the item to pin.")
+    pin: bool = Field(description="Boolean flag indicating whether to pin or unpin.")
 
 
 @pydantic.input(PinInputModel, description="The input for pinning an model.")
@@ -30,12 +30,12 @@ class BounceInputModel(BaseModel):
         agent: ID of the agent to bounce
     """
 
-    agent: str
+    agent: str = Field(description="The agent ID to bounce.")
 
 
 @pydantic.input(BounceInputModel, description="The input for bouncing an agent.")
 class BounceInput:
-    agent: strawberry.ID = strawberry.field(description="The agent ID to bounce.")
+    agent: strawberry.ID
 
 
 class KickInputModel(BaseModel):
@@ -45,14 +45,14 @@ class KickInputModel(BaseModel):
         agent: ID of the agent to bounce
     """
 
-    agent: str
-    reason: str | None = None
+    agent: str = Field(description="The agent ID to bounce.")
+    reason: str | None = Field(default=None, description="The reason for kicking the agent.")
 
 
 @pydantic.input(KickInputModel, description="The input for bouncing an agent.")
 class KickInput:
-    agent: strawberry.ID = strawberry.field(description="The agent ID to bounce.")
-    reason: str | None = strawberry.field(default=None, description="The reason for kicking the agent.")
+    agent: strawberry.ID
+    reason: str | None = None
 
 
 class BlockInputModel(BaseModel):
@@ -62,14 +62,14 @@ class BlockInputModel(BaseModel):
         agent: ID of the agent to bounce
     """
 
-    agent: str
-    reason: str | None = None
+    agent: str = Field(description="The agent ID to bounce.")
+    reason: str | None = Field(default=None, description="The reason for kicking the agent.")
 
 
 @pydantic.input(BlockInputModel, description="The input for bouncing an agent.")
 class BlockInput:
-    agent: strawberry.ID = strawberry.field(description="The agent ID to bounce.")
-    reason: str | None = strawberry.field(default=None, description="The reason for kicking the agent.")
+    agent: strawberry.ID
+    reason: str | None = None
 
 
 class UnblockInputModel(BaseModel):
@@ -79,12 +79,12 @@ class UnblockInputModel(BaseModel):
         agent: ID of the agent to bounce
     """
 
-    agent: str
+    agent: str = Field(description="The agent ID to unblock.")
 
 
 @pydantic.input(UnblockInputModel, description="The input for bouncing an agent.")
 class UnblockInput:
-    agent: strawberry.ID = strawberry.field(description="The agent ID to unblock.")
+    agent: strawberry.ID
 
 
 class UpdateAgentInputModel(BaseModel):
@@ -95,11 +95,11 @@ class UpdateAgentInputModel(BaseModel):
         name: The new name for the agent
     """
 
-    id: str
-    name: str | None = None
+    id: str = Field(description="The ID of the agent to update.")
+    name: str | None = Field(default=None, description="The new name for the agent.")
 
 
 @pydantic.input(UpdateAgentInputModel, description="The input for updating an agent.")
 class UpdateAgentInput:
-    id: strawberry.ID = strawberry.field(description="The ID of the agent to update.")
-    name: str | None = strawberry.field(default=None, description="The new name for the agent.")
+    id: strawberry.ID
+    name: str | None = None

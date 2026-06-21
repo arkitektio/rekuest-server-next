@@ -5,6 +5,14 @@ from rekuest_core.inputs import models
 import strawberry
 from rekuest_core import enums, scalars
 
+# NOTE: For ``@strawberry.experimental.pydantic`` types, GraphQL field descriptions are
+# sourced from the *pydantic* model (``Field(description=...)`` in ``models.py``), not from
+# ``strawberry.field(description=...)``. The pydantic models are therefore the single source
+# of truth for field documentation. Type-level descriptions (passed to the decorator or via a
+# class docstring) still work here and are kept. Pure ``@strawberry.input`` types that are not
+# backed by a pydantic model (``PortGroupInput``, ``DefinitionInput``) keep their field-level
+# descriptions because those are read directly by strawberry.
+
 
 @pydantic.input(
     models.EffectInputModel,
@@ -19,28 +27,13 @@ from rekuest_core import enums, scalars
     """,
 )
 class EffectInput:
-    kind: enums.EffectKind = strawberry.field(description="The kind of the effect. Can be either message, hide or custom")
-    dependencies: list[str] | None = strawberry.field(
-        default_factory=list,
-        description="The dependencies of the effect. Use the .. syntax to traverse the tree of ports. For example, if you have a port with the key 'foo' and you want to reference a port with the key 'bar' that is a child of 'foo', you would use 'foo..bar'",
-    )
-    function: scalars.ValidatorFunction = strawberry.field(description="The function to run to determine if the effect should be applied")
-    message: str | None = strawberry.field(
-        default=None,
-        description="The message to display when the effect is applied (if it is a message effect)",
-    )
-    hook: str | None = strawberry.field(
-        default=None,
-        description="The hook to run when the effect is applied (if it is a custom effect)",
-    )
-    ward: str | None = strawberry.field(
-        default=None,
-        description="The ward to run when the effect is applied (if it is a custom effect)",
-    )
-    fade: bool | None = strawberry.field(
-        default=True,
-        description="Whether to fade out the port when the effect is applied (if it is a hide effect)",
-    )
+    kind: enums.EffectKind
+    dependencies: list[str] | None = strawberry.field(default_factory=list)
+    function: scalars.ValidatorFunction
+    message: str | None = None
+    hook: str | None = None
+    ward: str | None = None
+    fade: bool | None = True
 
 
 @pydantic.input(
@@ -56,25 +49,16 @@ that is displayed when the user hovers over the choice.
     """,
 )
 class ChoiceInput:
-    value: scalars.AnyDefault = strawberry.field(description="The value of the choice. This is the value that is returned when the choice is selected")
-    label: str = strawberry.field(description="The label of the choice. This is the text that is displayed in the UI")
-    image: str | None = strawberry.field(
-        default=None,
-        description="The image of the choice. This is the image that is displayed in the UI (must be a URL)",
-    )
-    description: str | None = strawberry.field(
-        default=None,
-        description="The description of the choice. This is the text that is displayed in the UI when the user hovers over the choice",
-    )
+    value: scalars.AnyDefault
+    label: str
+    image: str | None = None
+    description: str | None = None
 
 
 @pydantic.input(models.StateAccessorInputModel)
 class StateAccessorInput:
-    option_key: enums.OptionKey = strawberry.field(description="The part of the state accessor to use as the value for the assign widget (e.g. the key, the description, the logo, etc.)")
-    sub_path: str | None = strawberry.field(
-        default=None,
-        description="The sub path to access a specific part of the state value. Always traverse from top to bottom level. i.e state.x for state.x and state.x.y for state.x.y. You can also use an arrow function to specify a dynamic path based on the other arguments, e.g. (args) => state[args.foo]",
-    )
+    option_key: enums.OptionKey
+    sub_path: str | None = None
 
 
 @pydantic.input(models.AssignWidgetInputModel)
@@ -92,68 +76,27 @@ class AssignWidgetInput:
 
     """
 
-    kind: enums.AssignWidgetKind = strawberry.field(description="The kind of the assign widget. Can be either dropdown, text, slider, checkbox, radio or custom")
-    query: scalars.SearchQuery | None = strawberry.field(
-        default=None,
-        description="The query to run when searching for choices. This is used for dropdowns and text inputs",
-    )
-    choices: list[ChoiceInput] | None = strawberry.field(
-        default=None,
-        description="The choices to display in the dropdown. This is used for dropdowns and text inputs",
-    )
-    min: float | None = strawberry.field(
-        default=None,
-        description="The minimum value of the slider (if a slider). . This is used for sliders and text inputs",
-    )
-    max: float | None = strawberry.field(
-        default=None,
-        description="The maximum value of the slider (if a slider). This is used for sliders and text inputs",
-    )
-    step: float | None = strawberry.field(
-        default=None,
-        description="The step value of the slider (if a slider). This is used for sliders and text inputs",
-    )
-    placeholder: str | None = strawberry.field(
-        default=None,
-        description="The placeholder of the input if . This is used for text inputs and dropdowns",
-    )
-    as_paragraph: bool | None = strawberry.field(
-        default=None,
-        description="Whether to display the input as a paragraph or not. This is used for text inputs and dropdowns",
-    )
-    hook: str | None = strawberry.field(
-        default=None,
-        description="The hook to run when the input is changed. This is used for custom assign widgets",
-    )
-    ward: str | None = strawberry.field(
-        default=None,
-        description="The ward that is respoinsbiel for handling queriny the choices",
-    )
-    fallback: Optional[Annotated["AssignWidgetInput", strawberry.lazy(__name__)]] = strawberry.field(
-        default=None,
-        description="The fallback assign widget to use if the current one fails. This is used for custom assign widgets",
-    )
-    filters: Optional[List[Annotated["ArgPortInput", strawberry.lazy(__name__)]]] = strawberry.field(
-        default_factory=list,
-        description="The filters to apply to a search widget. This is used for custom assign widgets",
-    )
-    dependencies: list[str] | None = strawberry.field(
-        default_factory=list,
-        description="The dependencies of the assign widget, which will be pased to the search or the hook widget. Use the .. syntax to traverse the tree of ports. For example, if you have a port with the key 'foo' and you want to reference a port with the key 'bar' that is a child of 'foo', you would use 'foo..bar'",
-    )
-    dependency: str | None = strawberry.field(default=None, description="The dependency that we are going to use to fullfill the state choices. If none is provided its the own state that will be queried")
-    state_path: str | None = strawberry.field(
-        default=None,
-        description="The path to the state value that we are going to use to fullfill the state choices. Always traverse from top to bottom level. i.e state.x for state.x and state.x.y for state.x.y. You can also use an arrow function to specify a dynamic path based on the other arguments, e.g. (args) => state[args.foo]",
-    )
-    target_dependency: str | None = strawberry.field(default=None, description="The dependency that we are going to target with a proxy widget. This is used for proxy widgets")
-    target_action: str | None = strawberry.field(default=None, description="The action that we are going to target with a proxy widget. This is used for proxy widgets")
-    target_port: str | None = strawberry.field(default=None, description="The port that we are going to target with a proxy widget. This is used for proxy widgets")
-
-    state_accessors: Optional[List[Annotated["StateAccessorInput", strawberry.lazy(__name__)]]] = strawberry.field(
-        default=None,
-        description="State accessors are used to specify how to access the state values that we are going to use to fullfill the state choices. This is used when the state value that we want to use is not the same as the one of the port, e.g. when we want to use a specific key of a state object, or when we want to use a dynamic key based on the other arguments. The option_key field is used to specify which part of the state accessor we want to use as the value for the assign widget (e.g. the key, the description, the logo, etc.)",
-    )
+    kind: enums.AssignWidgetKind
+    query: scalars.SearchQuery | None = None
+    choices: list[ChoiceInput] | None = None
+    state_choices: str | None = None
+    follow_value: str | None = None
+    min: float | None = None
+    max: float | None = None
+    step: float | None = None
+    placeholder: str | None = None
+    as_paragraph: bool | None = None
+    hook: str | None = None
+    ward: str | None = None
+    fallback: Optional[Annotated["AssignWidgetInput", strawberry.lazy(__name__)]] = None
+    filters: Optional[List[Annotated["ArgPortInput", strawberry.lazy(__name__)]]] = strawberry.field(default_factory=list)
+    dependencies: list[str] | None = strawberry.field(default_factory=list)
+    dependency: str | None = None
+    state_path: str | None = None
+    target_dependency: str | None = None
+    target_action: str | None = None
+    target_port: str | None = None
+    state_accessors: Optional[List[Annotated["StateAccessorInput", strawberry.lazy(__name__)]]] = None
 
 
 @pydantic.input(
@@ -173,15 +116,9 @@ class AssignWidgetInput:
     """,
 )
 class ReturnWidgetInput:
-    kind: enums.ReturnWidgetKind = strawberry.field(description="The kind of the return widget. Can be either dropdown, text, slider, checkbox, radio or custom")
-    query: scalars.SearchQuery | None = strawberry.field(
-        default=None,
-        description="The query to run when searching for choices. This is used for dropdowns and text inputs",
-    )
-    choices: list[ChoiceInput] | None = strawberry.field(
-        default=None,
-        description="The choices to display in the dropdown. This is used for dropdowns and text inputs",
-    )
+    kind: enums.ReturnWidgetKind
+    query: scalars.SearchQuery | None = None
+    choices: list[ChoiceInput] | None = None
     min: int | None = None
     max: int | None = None
     step: int | None = None
@@ -192,21 +129,18 @@ class ReturnWidgetInput:
 
 @pydantic.input(
     models.ValidatorInputModel,
-    description=""" 
+    description="""
 A validating function for a port. Can specify a function that will run when validating values of the port.
 If outside dependencies are needed they need to be specified in the dependencies field. With the .. syntax
-when transversing the tree of ports. 
+when transversing the tree of ports.
 
 """,
 )
 class ValidatorInput:
-    function: scalars.ValidatorFunction = strawberry.field(description="The function to run when validating the port")
-    dependencies: list[str] | None = strawberry.field(
-        default_factory=list,
-        description="The dependencies of the function. Use the .. syntax to traverse the tree of ports. For example, if you have a port with the key 'foo' and you want to reference a port with the key 'bar' that is a child of 'foo', you would use 'foo..bar'",
-    )
+    function: scalars.ValidatorFunction
+    dependencies: list[str] | None = strawberry.field(default_factory=list)
     label: str | None = None
-    error_message: str | None = strawberry.field(description="The error message to display when the validation fails")
+    error_message: str | None = None
 
 
 @pydantic.input(
@@ -216,25 +150,23 @@ class ValidatorInput:
 """,
 )
 class OptimisticInput:
-    state: str = strawberry.field(description="The state to optimistically set when the action is is assigned")
-    path: str = strawberry.field(
-        description="The path to the state.value to optimistically set the value, always traverse from top to bottom level. i.e state.x for state.x and state.x.y for state.x.y. YOu can also use an arrow function to specify a dynamic path based on the other arguments, e.g. (args) => state[args.foo]",
-    )
-    accessor: str | None = strawberry.field(default=None, description="The accessor to get the value to optimistically set. This is used when the value to optimistically set is not the same as the value of the port")
+    state: str
+    path: str
+    accessor: str | None = None
 
 
 @pydantic.input(models.RequiresInputModel)
 class RequiresInput:
-    key: str = strawberry.field(description="The key of the requirement. This is used to uniquely identify the requirement")
-    operator: enums.RequiresOperator = strawberry.field(description="The operator for the requirement")
-    value: scalars.Arg = strawberry.field(description="The value of the requirement. This can be any JSON serializable value")
+    key: str
+    operator: enums.RequiresOperator
+    value: scalars.Arg
 
 
 @pydantic.input(models.ProvidesInputModel)
 class ProvidesInput:
-    key: str = strawberry.field(description="The key of the provision. This is used to uniquely identify the provision")
-    operator: enums.ProvidesOperator = strawberry.field(description="The operator for the provision")
-    value: scalars.Arg = strawberry.field(description="The value of the provision. This can be any JSON serializable value")
+    key: str
+    operator: enums.ProvidesOperator
+    value: scalars.Arg
 
 
 @pydantic.input(
@@ -259,36 +191,19 @@ class ProvidesInput:
     """,
 )
 class ArgPortInput:
-    validators: list[ValidatorInput] | None = strawberry.field(default_factory=list, description="The validators for the port")
-    key: str = strawberry.field(description="The key of the port")
-    label: str | None = strawberry.field(
-        default=None,
-        description="The label of the port. This is the text that is displayed in the UI",
-    )
-    kind: enums.PortKind = strawberry.field(description="The kind of the port. This is the type of the port. Can be either int, string, structure, list, bool, dict, float, date, union or model")
-    description: str | None = strawberry.field(
-        default=None,
-        description="The description of the port. This is the text that is displayed in the UI when the user hovers over the port",
-    )
-    identifier: str | None = strawberry.field(
-        default=None,
-        description="The identifier of a structure port. This is used to uniquely identify a specific type of structure.",
-    )
-    nullable: bool = strawberry.field(
-        default=False,
-        description="Whether the port is nullable or not. If the port is nullable, it can be set to null. If the port is not nullable, it cannot be set to null",
-    )
-    effects: list[EffectInput] | None = strawberry.field(default_factory=list, description="The effects of the port")
-    choices: list[ChoiceInput] | None = strawberry.field(
-        default_factory=list,
-        description="The options for the port. This is used for dropdowns and text inputs",
-    )
+    validators: list[ValidatorInput] | None = strawberry.field(default_factory=list)
+    key: str
+    label: str | None = None
+    kind: enums.PortKind
+    description: str | None = None
+    identifier: str | None = None
+    nullable: bool = False
+    effects: list[EffectInput] | None = strawberry.field(default_factory=list)
+    choices: list[ChoiceInput] | None = strawberry.field(default_factory=list)
     default: scalars.AnyDefault | None = None
     children: list[Annotated["ArgPortInput", strawberry.lazy(__name__)]] | None = strawberry.field(default_factory=list)
     widget: Optional["AssignWidgetInput"] = None
-    requires: list[RequiresInput] | None = strawberry.field(
-        default_factory=list, description="The descriptors for the port. Descriptors are key-value pairs that can be used to add additional metadata to a port. When using rekuest's action search, you can filter actions based on their port descriptors"
-    )
+    requires: list[RequiresInput] | None = strawberry.field(default_factory=list)
 
 
 @pydantic.input(
@@ -313,36 +228,19 @@ class ArgPortInput:
     """,
 )
 class ReturnPortInput:
-    validators: list[ValidatorInput] | None = strawberry.field(default_factory=list, description="The validators for the port")
-    key: str = strawberry.field(description="The key of the port")
-    label: str | None = strawberry.field(
-        default=None,
-        description="The label of the port. This is the text that is displayed in the UI",
-    )
-    kind: enums.PortKind = strawberry.field(description="The kind of the port. This is the type of the port. Can be either int, string, structure, list, bool, dict, float, date, union or model")
-    description: str | None = strawberry.field(
-        default=None,
-        description="The description of the port. This is the text that is displayed in the UI when the user hovers over the port",
-    )
-    identifier: str | None = strawberry.field(
-        default=None,
-        description="The identifier of a structure port. This is used to uniquely identify a specific type of structure.",
-    )
-    nullable: bool = strawberry.field(
-        default=False,
-        description="Whether the port is nullable or not. If the port is nullable, it can return null",
-    )
-    effects: list[EffectInput] | None = strawberry.field(default_factory=list, description="The effects of the port")
-    choices: list[ChoiceInput] | None = strawberry.field(
-        default_factory=list,
-        description="The options for the port. This is used for dropdowns and text inputs",
-    )
+    validators: list[ValidatorInput] | None = strawberry.field(default_factory=list)
+    key: str
+    label: str | None = None
+    kind: enums.PortKind
+    description: str | None = None
+    identifier: str | None = None
+    nullable: bool = False
+    effects: list[EffectInput] | None = strawberry.field(default_factory=list)
+    choices: list[ChoiceInput] | None = strawberry.field(default_factory=list)
     default: scalars.AnyDefault | None = None
     children: list[Annotated["ReturnPortInput", strawberry.lazy(__name__)]] | None = strawberry.field(default_factory=list)
     widget: Optional["ReturnWidgetInput"] = None
-    provides: list[ProvidesInput] | None = strawberry.field(
-        default_factory=list, description="The provisions for the port. Provisions are key-value pairs that can be used to add additional metadata to a port. When using rekuest's action search, you can filter actions based on their port provisions"
-    )
+    provides: list[ProvidesInput] | None = strawberry.field(default_factory=list)
 
 
 @strawberry.input(
@@ -362,30 +260,12 @@ class PortGroupInput:
     create a dependency graph for your implementations and actions""",
 )
 class PortMatchInput:
-    at: int | None = strawberry.field(
-        default=None,
-        description="The index of the port to match. ",
-    )
-    key: str | None = strawberry.field(
-        default=None,
-        description="The key of the port to match.",
-    )
-    kind: enums.PortKind | None = strawberry.field(
-        default=None,
-        description="The kind of the port to match. ",
-    )
-    identifier: str | None = strawberry.field(
-        default=None,
-        description="The identifier of the port to match. ",
-    )
-    nullable: bool | None = strawberry.field(
-        default=None,
-        description="Whether the port is nullable. ",
-    )
-    children: Optional[list[Annotated["PortMatchInput", strawberry.lazy(__name__)]]] = strawberry.field(
-        default=None,
-        description="The matches for the children of the port to match. ",
-    )
+    at: int | None = None
+    key: str | None = None
+    kind: enums.PortKind | None = None
+    identifier: str | None = None
+    nullable: bool | None = None
+    children: Optional[list[Annotated["PortMatchInput", strawberry.lazy(__name__)]]] = None
 
 
 @pydantic.input(
@@ -394,47 +274,19 @@ class PortMatchInput:
     create a dependency graph for your implementations and actions""",
 )
 class ActionDependencyInput:
-    key: str = strawberry.field(
-        description="The key of the action. This is used to identify the dependency in the system.",
-    )
-    app: str | None = strawberry.field(
-        default=None,
-        description="Which app this dependency corresponds to (i.e. do you want to use a stardist agent for that or imagej agents needs to be a world unique classsifier (reverse domain notation) that identifies the type of agent you want to use, and then we can have multiple agents of the same type running in the system, e.g. startdist could be the app for all agents that correpsond to a startdist instance)",
-    )
-    allow_inactive: bool | None = strawberry.field(default=None, description="Allow inactive nodes, defaults to true")
-    name: str | None = strawberry.field(
-        default=None,
-        description="The name of the action. This is used to identify the action in the system.",
-    )
-    action_key: str | None = strawberry.field(
-        default=None,
-        description="The key of the state this dependency corresponds to. (i.e frame:acquireimage)",
-    )
-    description: str | None = strawberry.field(
-        default=None,
-        description="The description of the action. This can described the action and its purpose.",
-    )
-    arg_matches: list[PortMatchInput] | None = strawberry.field(
-        default=None,
-        description="The demands for the action args, this can be additionaly specified so that when we loosen the matching criteria for an action in a resolver, we can still make sure to match the right action based on the demands for the args. This is used to identify the demand in the system.",
-    )
-    return_matches: list[PortMatchInput] | None = strawberry.field(
-        default=None,
-        description="The demands for the action args, this can be additionaly specified so that when we loosen the matching criteria for an action in a resolver, we can still make sure to match the right action based on the demands for the args. This is used to identify the demand in the system.",
-    )
-    protocols: list[strawberry.ID] | None = strawberry.field(
-        default=None,
-        description="The protocols that the action is implementing or relying on. This is used to identify the demand in the system, and can be used to match actions that are implementing the same protocol together.",
-    )
-    force_arg_length: int | None = strawberry.field(
-        default=None,
-        description="Require that the action has a specific number of args. When loosing the matching criteria for an action in a resolver, we can still make sure to match the right action based on the demands for the args. This is used to identify the demand in the system.",
-    )
-    force_return_length: int | None = strawberry.field(
-        default=None,
-        description="Require that the action has a specific number of returns. This is used to identify the demand in the system.",
-    )
-    optional: bool = strawberry.field(default=False, description="Whether the dependency is optional or not. If the dependency is optional, the agent doesn't have to provide it to be potentially callable")
+    key: str
+    version: str | None = None
+    app: str | None = None
+    allow_inactive: bool | None = None
+    name: str | None = None
+    action_key: str | None = None
+    description: str | None = None
+    arg_matches: list[PortMatchInput] | None = None
+    return_matches: list[PortMatchInput] | None = None
+    protocols: list[strawberry.ID] | None = None
+    force_arg_length: int | None = None
+    force_return_length: int | None = None
+    optional: bool = False
 
 
 @pydantic.input(
@@ -443,35 +295,16 @@ class ActionDependencyInput:
     create a dependency graph for your implementations and actions""",
 )
 class StateDependencyInput:
-    key: str = strawberry.field(
-        description="The key of the state. This is used to identify the dependency in the system.",
-    )
-    app: str | None = strawberry.field(
-        default=None,
-        description="Which app this dependency corresponds to (i.e. do you want to use a stardist agent for that or imagej agents needs to be a world unique classsifier (reverse domain notation) that identifies the type of agent you want to use, and then we can have multiple agents of the same type running in the system, e.g. startdist could be the app for all agents that correpsond to a startdist instance)",
-    )
-    state_key: str | None = strawberry.field(
-        default=None,
-        description="The key of the state this dependency corresponds to. (i.e frame:count)",
-    )
-    allow_inactive: bool | None = strawberry.field(default=None, description="Allow inactive nodes, defaults to true")
-    name: str | None = strawberry.field(
-        default=None,
-        description="The name of the state. This is used to identify the action in the system.",
-    )
-    description: str | None = strawberry.field(
-        default=None,
-        description="The description of the action. This can described the action and its purpose.",
-    )
-    port_matches: list[PortMatchInput] | None = strawberry.field(
-        default=None,
-        description="The demands for the action args, this can be additionaly specified so that when we loosen the matching criteria for an action in a resolver, we can still make sure to match the right action based on the demands for the args. This is used to identify the demand in the system.",
-    )
-    protocols: list[strawberry.ID] | None = strawberry.field(
-        default=None,
-        description="The protocols that the action is implementing or relying on. This is used to identify the demand in the system, and can be used to match actions that are implementing the same protocol together.",
-    )
-    optional: bool = strawberry.field(default=False, description="Whether the dependency is optional or not. If the dependency is optional, the agent doesn't have to provide it to be potentially callable")
+    key: str
+    version: str | None = None
+    app: str | None = None
+    state_key: str | None = None
+    allow_inactive: bool | None = None
+    name: str | None = None
+    description: str | None = None
+    port_matches: list[PortMatchInput] | None = None
+    protocols: list[strawberry.ID] | None = None
+    optional: bool = False
 
 
 @pydantic.input(
@@ -480,54 +313,20 @@ class StateDependencyInput:
     create a dependency graph for your implementations and actions""",
 )
 class AgentDependencyInput:
-    key: str = strawberry.field(
-        description="The key of this dependency, when assigning you can reference this key to specify which agent_dependency you are assigning to. ",
-    )
-    app: str | None = strawberry.field(
-        default=None,
-        description="Which app this dependency corresponds to (i.e. do you want to use a stardist agent for that or imagej agents needs to be a world unique classsifier (reverse domain notation) that identifies the type of agent you want to use, and then we can have multiple agents of the same type running in the system, e.g. startdist could be the app for all agents that correpsond to a startdist instance)",
-    )
-    version: str | None = strawberry.field(
-        default=None,
-        description="The version of the app this dependency corresponds to.",
-    )
-    auto_resolvable: bool = strawberry.field(
-        default=False,
-        description="Whether this dependency is auto resolvable or not. If so we will try to automatically resolve it based on the demands specified in the dependency and the capabilities of the available agents in the system. This is used to identify the demand in the system. Attention if any of the dependencies of this agent dependency is not auto resolvable, this dependency will also not be auto resolvable",
-    )
-    name: str | None = strawberry.field(
-        default=None,
-        description="The name of the agent. This is used to identify the agent in the system.",
-    )
-    description: str | None = strawberry.field(
-        default=None,
-        description="A description of the dependency, why it is needed and what it is used for. This can be used to provide more context to users when assigning dependencies.",
-    )
-    optional: bool = strawberry.field(default=False, description="Whether the dependency is optional or not. If the dependency is optional, users can choose to not provide it")
-    action_demands: list[ActionDependencyInput] | None = strawberry.field(
-        default=None,
-        description="The action demands of the agent. This is used to identify the demand in the system.",
-    )
-    state_demands: list[StateDependencyInput] | None = strawberry.field(
-        default=None,
-        description="The state demands of the agent. This is used to identify the demand in the system.",
-    )
-    min_viable_instances: int | None = strawberry.field(
-        default=None,
-        description="The minimum amount of viable instances for the agent. This is used to identify the demand in the system.",
-    )
-    max_viable_instances: int | None = strawberry.field(
-        default=None,
-        description="The maximum amount of viable instances for the agent. This is used to identify the demand in the system.",
-    )
-    mutually_exclusive_keys: list[str] | None = strawberry.field(
-        default=None,
-        description="A list of keys of other agent dependencies that are mutually exclusive with this one. This means two agent dependencies with mutually exclusive keys cannot be assigned to the same implementing agent. This is used to identify the demand in the system.",
-    )
-    prefered_instances: int | None = strawberry.field(
-        default=None,
-        description="The prefered amount of instances for the agent. This is used to identify the demand in the system.",
-    )
+    key: str
+    app: str | None = None
+    version: str | None = None
+    auto_resolvable: bool = False
+    name: str | None = None
+    description: str | None = None
+    optional: bool = False
+    action_demands: list[ActionDependencyInput] | None = None
+    state_demands: list[StateDependencyInput] | None = None
+    min_viable_instances: int | None = None
+    max_viable_instances: int | None = None
+    mutually_exclusive_keys: list[str] | None = None
+    prefered_instances: int | None = None
+    assign_policy: enums.AssignPolicy = enums.AssignPolicy.BALANCED
 
 
 @strawberry.input(
@@ -617,49 +416,18 @@ class TrackInput:
     description="""A implementation is a blueprint for a action. It is composed of a definition, a list of dependencies, and a list of params.""",
 )
 class ImplementationInput:
-    definition: DefinitionInput = strawberry.field(
-        description="The definition of the implementation. This is used to uniquely identify the implementation",
-    )
-    interface: str | None = strawberry.field(
-        default=None,
-        description="The interface of the implementation. This is used to group implementations together in the UI",
-    )
-    params: scalars.AnyDefault | None = strawberry.field(
-        default=None,
-        description="The params of the implementation. This is used to pass parameters to the implementation",
-    )
-    dynamic: bool = strawberry.field(
-        default=False,
-        description="Whether the implementation is dynamic or not. If the implementation is dynamic, it can be used to create a dynamic action. If the implementation is not dynamic, it cannot be used to create a dynamic action",
-    )
-    logo: str | None = strawberry.field(
-        default=None,
-        description="The logo of the implementation. This is used to display the logo in the UI either it should be 'custom:svg-paths' or a lucide icon name like 'lucide:activity' urls are not supported at the moment",
-    )
-    locks: list[str] | None = strawberry.field(
-        default=None,
-        description="The locks of the implementation. This is used to specify which resources the implementation needs to run",
-    )
-    optimistics: list[OptimisticInput] | None = strawberry.field(
-        default=None,
-        description="The optimistics of the definition. This is used to optimistically set state values when the action is assigned. This is used to provide a better user experience by optimistically setting state",
-    )
-    tracks: list[TrackInput] | None = strawberry.field(
-        default=None,
-        description="The tracks of the definition. This is used to track values over time during the runtime of an action. This is the state of a dependency",
-    )
-    manipulates: list[str] | None = strawberry.field(
-        default=None,
-        description="The states that the implementation manipulates. This is used to identify which states are manipulated by the implementation, and can be use to enhance state safety in the system",
-    )
-    needs_token: bool = strawberry.field(
-        default=True,
-        description="Whether Rekuest should mint a signed provenance token when this implementation is assigned. Default true (provenance-by-default); set false for trivial/internal tasks that never produce external provenance.",
-    )
-    provenance_audience: list[str] | None = strawberry.field(
-        default=None,
-        description="The downstream service(s) the provenance token should be scoped to (the token's `aud`). If omitted, Rekuest derives the audience from the structures the assignment acts on.",
-    )
+    definition: DefinitionInput
+    interface: str | None = None
+    instance_id: str | None = None
+    params: scalars.AnyDefault | None = None
+    dynamic: bool = False
+    logo: str | None = None
+    locks: list[str] | None = None
+    optimistics: list[OptimisticInput] | None = None
+    tracks: list[TrackInput] | None = None
+    manipulates: list[str] | None = None
+    needs_token: bool = True
+    provenance_audience: list[str] | None = None
     dependencies: list[AgentDependencyInput] = strawberry.field(default_factory=list)
 
 
@@ -668,8 +436,8 @@ class ImplementationInput:
     description="""A state schema is a blueprint for a state. It is composed of a definition, a list of dependencies, and a list of params.""",
 )
 class StateDefinitionInput:
-    name: str = strawberry.field(description="The name of the state schema. This is used to uniquely identify the state schema")
-    ports: list[ReturnPortInput] = strawberry.field(default_factory=list, description="The ports of the state schema. This is used to define the structure of the state")
+    name: str
+    ports: list[ReturnPortInput] = strawberry.field(default_factory=list)
 
 
 @pydantic.input(
@@ -677,8 +445,8 @@ class StateDefinitionInput:
     description="""A state implementation is a blueprint for a state. It is composed of a definition, a list of dependencies, and a list of params.""",
 )
 class StateImplementationInput:
-    interface: str = strawberry.field(description="The key of the state implementation. This is used to uniquely identify the state implementation")
-    definition: StateDefinitionInput = strawberry.field(description="The schema of the state implementation. This is used to define the structure of the state")
+    interface: str
+    definition: StateDefinitionInput
 
 
 @pydantic.input(
@@ -687,7 +455,7 @@ class StateImplementationInput:
 )
 class LockDefinitionInput:
     key: str
-    description: str | None = strawberry.field(default=None, description="Describe the structure a bit")
+    description: str | None = None
 
 
 @pydantic.input(
@@ -705,9 +473,13 @@ class LockImplementationInput:
 )
 class StructureInput:
     key: str
-    description: str | None = strawberry.field(default=None, description="Describe the structure a bit")
-    default_assign_widget: Optional["AssignWidgetInput"] = strawberry.field(default=None, description="Describe the structure a bit")
-    default_return_widget: Optional["ReturnWidgetInput"] = strawberry.field(default=None, description="Describe the structure a bit")
+    description: str | None = None
+    implements: list[str] | None = None
+    descriptors: list[str] | None = None
+    default_widget: Optional["AssignWidgetInput"] = None
+    default_return_widget: Optional["ReturnWidgetInput"] = None
+    qet_query: str | None = None
+    describe_query: str | None = None
 
 
 @pydantic.input(
@@ -716,15 +488,15 @@ class StructureInput:
 )
 class InterfaceInput:
     key: str
-    description: str | None = strawberry.field(default=None, description="Describe the structure a bit")
-    default_assign_widget: Optional["AssignWidgetInput"] = strawberry.field(default=None, description="Describe the structure a bit")
-    default_return_widget: Optional["ReturnWidgetInput"] = strawberry.field(default=None, description="Describe the structure a bit")
+    description: str | None = None
+    default_widget: Optional["AssignWidgetInput"] = None
+    default_return_widget: Optional["ReturnWidgetInput"] = None
 
 
 @pydantic.input(models.DescriptorSchemaInputModel, description="A descriptor model")
 class DescriptorSchemaInput:
-    key: str = strawberry.field(description="The key of the descriptor. This is used to uniquely identify the descriptor")
-    description: str | None = strawberry.field(default=None, description="Describe the descriptor a bit")
+    key: str
+    description: str | None = None
 
 
 @pydantic.input(
@@ -733,60 +505,61 @@ class DescriptorSchemaInput:
 )
 class StructurePackageInput:
     key: str
-    description: str | None = strawberry.field(default=None, description="Describe the schema")
-    descriptors: list[DescriptorSchemaInput] | None = strawberry.field(default=None, description="The listed descriptors")
-    interfaces: list[InterfaceInput] | None = strawberry.field(default=None, description="The listed interfaces")
-    structures: list[StructureInput] | None = strawberry.field(default=None, description="The listed structures")
+    version: str = "0.1.0"
+    description: str | None = None
+    descriptors: list[DescriptorSchemaInput] | None = None
+    interfaces: list[InterfaceInput] | None = None
+    structures: list[StructureInput] | None = None
 
 
 @pydantic.input(models.DynamicValueInputModel, description="A bound state pointer referencing a variable inside a Blok state instance.")
 class DynamicValueInput:
-    path: Optional[str] = strawberry.field(default=None, description="JSON Pointer to a variable inside the Blok's isolated data model (e.g., '/microscope/exposure').")
+    path: Optional[str] = None
 
 
 @pydantic.input(models.AgentCallInputModel, description="Defines a callback that routes user interactions directly to an Arkitekt Agent via Rekuest.")
 class AgentCallInput:
-    dependency: str = strawberry.field(description="The abstract agent dependency key declared in the Blok manifest (e.g., 'stage_dep').")
-    operation: str = strawberry.field(description="The target function name registered on that specific agent's worker thread loop.")
-    arguments: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = strawberry.field(default=None, description="Key-value arguments map compiled for the target agent call.")
+    dependency: str
+    operation: str
+    arguments: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = None
 
 
 @pydantic.input(models.UtilCallInputModel, description="Defines a utility call that can be invoked within the system.")
 class UtilCallInput:
-    operation: str = strawberry.field(description="The utility function name to invoke.")
-    arguments: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = strawberry.field(default=None, description="Key-value arguments map compiled for the target utility call.")
+    operation: str
+    arguments: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = None
 
 
 @pydantic.input(models.ActionArgumentInputModel, description="A JSON-serializable argument entry for a multi-agent action trigger.")
 class ActionArgumentInput:
-    key: str | None = strawberry.field(default=None, description="The argument property name.")
-    value_literal: Optional[scalars.JSONSerializable] = strawberry.field(default=None, description="Static literal string value if not dynamically bound.")
-    value_path: Optional[str] = strawberry.field(default=None, description="JSON Pointer referencing the shared Blok state to inject into this argument slot dynamically.")
+    key: str | None = None
+    value_literal: Optional[scalars.JSONSerializable] = None
+    value_path: Optional[str] = None
 
-    agent_call: Optional[AgentCallInput] = strawberry.field(default=None, description="Defines a nested agent call if this argument should trigger an agent interaction.")
-    util_call: Optional[UtilCallInput] = strawberry.field(default=None, description="Defines a nested utility call if this argument should trigger a system utility interaction.")
-    value_list: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = strawberry.field(default=None, description="Defines a list of values if this argument should be an array.")
-    value_dict: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = strawberry.field(default=None, description="Defines a list of key-value pairs if this argument should be a dictionary.")
+    agent_call: Optional[AgentCallInput] = None
+    util_call: Optional[UtilCallInput] = None
+    value_list: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = None
+    value_dict: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = None
 
 
 @pydantic.input(models.ComponentPropInputModel, description="A single key-value prop configuration for a component layout node.")
 class ComponentPropInput:
-    key: str = strawberry.field(description="The prop key name matching the target UI catalog constraint.")
+    key: str
 
     # Primitives mapping to standard properties, state paths, or actions
-    static_value: Optional[scalars.JSONSerializable] = strawberry.field(default=None, description="A raw scalar or JSON-stringified literal configuration parameter (e.g. '40x' or True).")
-    dynamic_value: Optional[DynamicValueInput] = strawberry.field(default=None, description="A reactive state data-binding rule.")
-    agent_call: Optional[AgentCallInput] = strawberry.field(default=None, description="Defines an imperative interactive network action callback loop if this prop should trigger an agent interaction.")
-    util_call: Optional[UtilCallInput] = strawberry.field(default=None, description="Defines an imperative interactive network action callback loop if this prop should trigger a system utility interaction.")
-    declares_value: Optional[str] = strawberry.field(default=None, description="If true, this prop declares a new 'value' in that can be referenced by other props or actions in the same Blok. The value of this field should be the name of the declared value (e.g., 'selected_user').")
+    static_value: Optional[scalars.JSONSerializable] = None
+    dynamic_value: Optional[DynamicValueInput] = None
+    agent_call: Optional[AgentCallInput] = None
+    util_call: Optional[UtilCallInput] = None
+    declares_value: Optional[str] = None
 
 
 @pydantic.input(models.ComponentNodeInputModel, description="An abstract structural visual element inside a Blok blueprint manifest.")
 class ComponentNodeInput:
-    id: str = strawberry.field(description="Unique structural string identifying this node instance inside the flat workspace layout tree.")
-    component: str = strawberry.field(description="The type indicator token matching your Electron app's registered catalog specs (e.g. 'Slider').")
-    props: Optional[List[ComponentPropInput]] = strawberry.field(default_factory=list, description="The collection of static values, state pointers, or action endpoints assigned to this component.")
-    children: Optional[List[Annotated["ComponentNodeInput", strawberry.lazy(__name__)]]] = strawberry.field(default=None, description="Flat adjacency pointer list mapping out IDs nested inside this specific component layer.")
+    id: str
+    component: str
+    props: Optional[List[ComponentPropInput]] = strawberry.field(default_factory=list)
+    children: Optional[List[Annotated["ComponentNodeInput", strawberry.lazy(__name__)]]] = None
 
 
 @pydantic.input(
@@ -795,8 +568,8 @@ class ComponentNodeInput:
 )
 class BlokImplementationInput:
     key: str
-    dependencies: list[AgentDependencyInput] = strawberry.field(default_factory=list, description="The dependencies required by this Blok.")
-    components: list[ComponentNodeInput] = strawberry.field(default_factory=list, description="The UI component tree blueprint for this Blok.")
-    catalog: Optional[str] = strawberry.field(default=None, description="The optional catalog name if this Blok should be registered inside a specific namespace in your Electron app's UI component registry.")
-    demo_state: Optional[scalars.JSONSerializable] = strawberry.field(default=None, description="An optional JSON-serializable object providing demo state values for this Blok's internal reactive data model, useful for testing and development purposes.")
-    description: Optional[str] = strawberry.field(default=None, description="A human-readable description about this Blok's purpose and functionality.")
+    dependencies: list[AgentDependencyInput] = strawberry.field(default_factory=list)
+    components: list[ComponentNodeInput] = strawberry.field(default_factory=list)
+    catalog: Optional[str] = None
+    demo_state: Optional[scalars.JSONSerializable] = None
+    description: Optional[str] = None

@@ -3,7 +3,7 @@
 from typing import Any
 
 import strawberry
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from rekuest_core import scalars as rscalars
 from strawberry.experimental import pydantic
 
@@ -19,8 +19,8 @@ class HookInputModel(BaseModel):
         hash: Hash identifier for the hook action
     """
 
-    kind: enums.HookKind
-    hash: str
+    kind: enums.HookKind = Field(description="The kind of the hook. This is used to identify the hook in the system.")
+    hash: str = Field(description="The hash of the hook. This is used to identify the hook in the system.")
 
 
 @pydantic.input(
@@ -28,8 +28,8 @@ class HookInputModel(BaseModel):
     description="A hook is a function that is called when a action has reached a specific lifecycle point. Hooks are jsut actions that take an assignation as input and return a value.",
 )
 class HookInput:
-    kind: enums.HookKind = strawberry.field(description="The kind of the hook. This is used to identify the hook in the system.")
-    hash: rscalars.ActionHash = strawberry.field(description="The hash of the hook. This is used to identify the hook in the system.")
+    kind: enums.HookKind
+    hash: rscalars.ActionHash
 
 
 class AssignInputModel(BaseModel):
@@ -52,87 +52,77 @@ class AssignInputModel(BaseModel):
         step: Whether the assignation should step to breakpoints
     """
 
-    action: str | None = None
-    dependency: str | None = None
-    resolution: str | None = None  # if assining to a implementation with dependencies
-    implementation: str | None = None
-    agent: str | None = None
-    action_hash: str | None = None
-    method: str | None = None
-    interface: str | None = None
-    hooks: list[HookInputModel] | None = None
-    args: dict[str, Any]
-    reference: str | None = None
-    parent: str | None = None
-    cached: bool | None = None
-    log: bool | None = None
-    capture: bool | None = None
-    ephemeral: bool | None = None
-    dependencies: list[ResolvedDependencyInputModel] | None = None
-    is_hook: bool | None = None
-    step: bool | None = None
+    action: str | None = Field(default=None, description="The action ID to assign to")
+    dependency: str | None = Field(default=None, description="The dependency key.method to assign when running inside a resolved assignation")
+    resolution: str | None = Field(
+        default=None,
+        description="The resolution ID to assign to when assining to a implementation with dependencies",
+    )  # if assining to a implementation with dependencies
+    implementation: str | None = Field(
+        default=None,
+        description="The implementation ID to assign to when directly assingint to a implementation",
+    )
+    agent: str | None = Field(
+        default=None,
+        description="The agent ID to assign to when directly assingint to a implementation",
+    )
+    action_hash: str | None = Field(
+        default=None,
+        description="The hash of the action. This is used to identify the action in the system.",
+    )
+    method: str | None = Field(default=None, description="The method key to assign when running inside a resolved assignation")
+    interface: str | None = Field(
+        default=None,
+        description="The interface of the implementation. Only ussable if you also set agent",
+    )
+    hooks: list[HookInputModel] | None = Field(
+        default=None,
+        description="The hooks of the assignation. This is used to identify the assignation in the system.",
+    )
+    args: dict[str, Any] = Field(description="The args of the assignation. Its a dictionary of ports and values")
+    reference: str | None = Field(
+        default=None,
+        description="The reference of the assignation. This is used to identify the assignation in the system.",
+    )
+    parent: str | None = Field(
+        default=None,
+        description="The parent ID of the assignation. This is used to identify the assignation in the system.",
+    )
+    cached: bool | None = Field(default=None, description="Whether the assignation should be cached")
+    log: bool | None = Field(default=None, description="Whether the assignation should be logged")
+    capture: bool | None = Field(default=None, description="Whether to capture the assignation.")
+    ephemeral: bool | None = Field(default=None, description="Whether the assignation is ephemeral")
+    dependencies: list[ResolvedDependencyInputModel] | None = Field(
+        default=None,
+        description="The dependencies of the assignation. This maps dependency keys to implementation IDs.",
+    )
+    is_hook: bool | None = Field(default=None, description="Whether the assignation is a hook")
+    step: bool | None = Field(default=None, description="Whether the assignation should step. Ie. go to the next breakpoint")
+    policy: enums.AssignPolicy | None = Field(default=None, description="The policy for the assignation. This defines how the assignation should be handled.")
 
 
 @pydantic.input(AssignInputModel, description="The input for assigning args to a action.")
 class AssignInput:
-    action: strawberry.ID | None = strawberry.field(default=None, description="The action ID to assign to")
-    implementation: strawberry.ID | None = strawberry.field(
-        default=None,
-        description="The implementation ID to assign to when directly assingint to a implementation",
-    )
-    agent: strawberry.ID | None = strawberry.field(
-        default=None,
-        description="The agent ID to assign to when directly assingint to a implementation",
-    )
-    action_hash: rscalars.ActionHash | None = strawberry.field(
-        default=None,
-        description="The hash of the action. This is used to identify the action in the system.",
-    )
-    dependency: str | None = strawberry.field(default=None, description="The dependency key.method to assign when running inside a resolved assignation")
-    method: str | None = strawberry.field(default=None, description="The method key to assign when running inside a resolved assignation")
-    interface: str | None = strawberry.field(
-        default=None,
-        description="The interface of the implementation. Only ussable if you also set agent",
-    )
-    resolution: strawberry.ID | None = strawberry.field(
-        default=None,
-        description="The resolution ID to assign to when assining to a implementation with dependencies",
-    )
-    hooks: list[HookInput] | None = strawberry.field(
-        default_factory=list,
-        description="The hooks of the assignation. This is used to identify the assignation in the system.",
-    )
-    capture: bool = strawberry.field(
-        default=False,
-        description="Whether to capture the assignation.",
-    )
-    args: scalars.Args = strawberry.field(
-        description="The args of the assignation. Its a dictionary of ports and values",
-    )
-    reference: str | None = strawberry.field(
-        default=None,
-        description="The reference of the assignation. This is used to identify the assignation in the system.",
-    )
-    parent: strawberry.ID | None = strawberry.field(
-        default=None,
-        description="The parent ID of the assignation. This is used to identify the assignation in the system.",
-    )
-    step: bool | None = strawberry.field(
-        default=False,
-        description="Whether the assignation should step. Ie. go to the next breakpoint",
-    )
-    dependencies: list[ResolvedDependencyInput] | None = strawberry.field(
-        default=None,
-        description="The dependencies of the assignation. This maps dependency keys to implementation IDs.",
-    )
-    policy: enums.AssignPolicy | None = strawberry.field(
-        default=None,
-        description="The policy for the assignation. This defines how the assignation should be handled.",
-    )
+    action: strawberry.ID | None = None
+    implementation: strawberry.ID | None = None
+    agent: strawberry.ID | None = None
+    action_hash: rscalars.ActionHash | None = None
+    dependency: str | None = None
+    method: str | None = None
+    interface: str | None = None
+    resolution: strawberry.ID | None = None
+    hooks: list[HookInput] | None = strawberry.field(default_factory=list)
+    capture: bool = False
+    args: scalars.Args
+    reference: str | None = None
+    parent: strawberry.ID | None = None
+    step: bool | None = False
+    dependencies: list[ResolvedDependencyInput] | None = None
+    policy: enums.AssignPolicy | None = None
     cached: bool = False
     ephemeral: bool = False
     log: bool = False
-    is_hook: bool | None = strawberry.field(default=False, description="Whether the assignation is a hook")
+    is_hook: bool | None = False
 
 
 class CancelInputModel(BaseModel):
@@ -142,12 +132,12 @@ class CancelInputModel(BaseModel):
         assignation: ID of the assignation to cancel
     """
 
-    assignation: str
+    assignation: str = Field(description="The assignation ID to cancel")
 
 
 @pydantic.input(CancelInputModel, description="The input for canceling an assignation.")
 class CancelInput:
-    assignation: strawberry.ID = strawberry.field(description="The assignation ID to cancel")
+    assignation: strawberry.ID
 
 
 class PauseInputModel(BaseModel):
@@ -157,12 +147,12 @@ class PauseInputModel(BaseModel):
         assignation: ID of the assignation to pause
     """
 
-    assignation: str
+    assignation: str = Field(description="The assignation ID to pause")
 
 
 @pydantic.input(PauseInputModel, description="The input for pausing an assignation.")
 class PauseInput:
-    assignation: strawberry.ID = strawberry.field(description="The assignation ID to pause")
+    assignation: strawberry.ID
 
 
 class CollectInputModel(BaseModel):
@@ -172,7 +162,7 @@ class CollectInputModel(BaseModel):
         drawers: List of drawer IDs to collect from
     """
 
-    drawers: list[str]
+    drawers: list[str] = Field(description="The drawer ID to collect")
 
 
 @pydantic.input(
@@ -180,7 +170,7 @@ class CollectInputModel(BaseModel):
     description="The input for collecting a shelved item in a drawer.",
 )
 class CollectInput:
-    drawers: list[strawberry.ID] = strawberry.field(description="The drawer ID to collect")
+    drawers: list[strawberry.ID]
 
 
 class ResumeInputModel(BaseModel):
@@ -190,12 +180,12 @@ class ResumeInputModel(BaseModel):
         assignation: ID of the assignation to resume
     """
 
-    assignation: str
+    assignation: str = Field(description="The assignation ID to resume")
 
 
 @pydantic.input(ResumeInputModel, description="The input for resuming an assignation.")
 class ResumeInput:
-    assignation: strawberry.ID = strawberry.field(description="The assignation ID to resume")
+    assignation: strawberry.ID
 
 
 class StepInputModel(BaseModel):
@@ -205,7 +195,7 @@ class StepInputModel(BaseModel):
         assignation: ID of the assignation to step
     """
 
-    assignation: str
+    assignation: str = Field(description="The assignation ID to step")
 
 
 @pydantic.input(
@@ -213,7 +203,7 @@ class StepInputModel(BaseModel):
     description="The input for stepping an assignation. Stepping is used to go from one breakpoint to another.",
 )
 class StepInput:
-    assignation: strawberry.ID = strawberry.field(description="The assignation ID to step")
+    assignation: strawberry.ID
 
 
 class InterruptInputModel(BaseModel):
@@ -223,9 +213,9 @@ class InterruptInputModel(BaseModel):
         assignation: ID of the assignation to interrupt
     """
 
-    assignation: str
+    assignation: str = Field(description="The assignation ID to interrupt")
 
 
 @pydantic.input(InterruptInputModel, description="The input for interrupting an assignation.")
 class InterruptInput:
-    assignation: strawberry.ID = strawberry.field(description="The assignation ID to interrupt")
+    assignation: strawberry.ID

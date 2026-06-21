@@ -13,6 +13,7 @@ from .agent import (
     AgentStatusChoices,
     WaiterStatusChoices,
 )
+from rekuest_core.enums import AssignPolicy
 from .assignation import (
     AssignationEventChoices,
     AssignationEventKind,
@@ -20,7 +21,6 @@ from .assignation import (
     AssignationInstructKind,
     AssignationStatus,
     AssignationStatusChoices,
-    AssignPolicy,
 )
 from .dashboard import PanelKind, PanelKindChoices
 from .log import LogLevel, LogLevelChoices
