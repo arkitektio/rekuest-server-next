@@ -428,6 +428,7 @@ class ImplementationInput:
     manipulates: list[str] | None = None
     needs_token: bool = True
     provenance_audience: list[str] | None = None
+    effect: enums.EffectClass = enums.EffectClass.NONE
     dependencies: list[AgentDependencyInput] = strawberry.field(default_factory=list)
 
 

@@ -41,6 +41,30 @@ AGENT_REDIS_PORT = conf.redis.port
 
 AGENT_HEARTBEAT_NOT_RESPONDED_CODE = 3001
 
+# Per-mode reclaim grace window (seconds). On a disconnect the failure/cascade is delayed
+# this long so a brief blip can reclaim same-session in-flight work before it fires. 0 means
+# no grace (strict). ``PHYSICAL`` overrides the window for effect:physical work, which may
+# warrant a shorter (or zero) window than freely-retryable effect:none work. Consumed by the
+# reclaim/grace backend via ``facade.grace.grace_seconds``.
+_rekuest_conf = conf.get("rekuest", {}) or {}
+REKUEST_GRACE = {
+    "DEFAULT": _rekuest_conf.get("grace_default", 30),
+    "PER_MODE": _rekuest_conf.get("grace_per_mode", {}) or {},
+    "PHYSICAL": _rekuest_conf.get("grace_physical", 5),
+    # Progress lease (seconds): a physical assignation that has reported progress but then
+    # goes silent this long — while its agent is still connected (wedged-but-alive) — is
+    # failed as terminal. 0 disables the lease (default).
+    "PROGRESS_LEASE": _rekuest_conf.get("progress_lease", 0),
+}
+
+# Capability scopes that gate ``AgentMode`` (see ``facade.capabilities``). Enforcement is
+# opt-in so agents whose tokens predate these scopes keep working until ENFORCE is enabled.
+REKUEST_CAPABILITIES = {
+    "ENFORCE": _rekuest_conf.get("enforce_capabilities", False),
+    "EXECUTES_WORK_SCOPE": _rekuest_conf.get("executes_work_scope", "rekuest:execute"),
+    "CAN_ASSIGN_ROOT_SCOPE": _rekuest_conf.get("can_assign_root_scope", "rekuest:assign_root"),
+}
+
 # Application definition
 USE_X_FORWARDED_HOST = conf.django.get("use_x_forwarded_host", True)
 

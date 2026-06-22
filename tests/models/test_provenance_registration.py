@@ -8,8 +8,10 @@ dispatch never recomputes them.
 
 import pytest
 
+from rekuest_core.enums import EffectClass
 from rekuest_core.inputs.models import DefinitionInputModel, ImplementationInputModel
 
+from facade import enums
 from facade.mutations.implementation import _create_implementation
 
 from tests.factories import create_agent_for_registry, create_registry_bundle
@@ -56,3 +58,26 @@ def test_declared_audience_is_persisted_verbatim():
         agent,
     )
     assert impl.provenance_audience == ["explicit-service"]
+
+
+@pytest.mark.django_db
+def test_effect_defaults_to_none():
+    agent = _agent("effect-default")
+    impl = _create_implementation(
+        ImplementationInputModel(definition=_definition(), interface="thresholder"),
+        agent,
+    )
+    assert impl.effect == enums.EffectClassChoices.NONE
+
+
+@pytest.mark.django_db
+def test_physical_effect_is_persisted():
+    agent = _agent("effect-physical")
+    impl = _create_implementation(
+        ImplementationInputModel(definition=_definition(), interface="thresholder", effect=EffectClass.PHYSICAL),
+        agent,
+    )
+    assert impl.effect == enums.EffectClassChoices.PHYSICAL
+    # Re-read from the DB to confirm it actually persisted, not just set in memory.
+    impl.refresh_from_db()
+    assert impl.effect == "PHYSICAL"

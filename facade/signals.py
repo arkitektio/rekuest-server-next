@@ -1,6 +1,6 @@
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
-from facade import models, channels, channel_events
+from facade import models, channels, channel_events, transport
 from authentikate.models import Organization
 
 import logging
@@ -72,11 +72,9 @@ def ass_post_save(sender, instance: models.Assignation = None, created=None, **k
 @receiver(post_save, sender=models.AssignationEvent)
 def ass_event_post_save(sender, instance: models.AssignationEvent = None, created=None, **kwargs):
     logger.info("Assignation Event received")
-    if instance.assignation.caller_id:
-        channels.assignation_event_channel.broadcast(
-            channel_events.AssignationEventCreatedEvent(event=instance.id),
-            [f"ass_caller_{instance.assignation.caller_id}"],
-        )
+    # One typed publisher fans the persisted event out to its caller (channel layer for the
+    # GraphQL subscription + live WS forward, and a webhook POST for a HookAgent caller).
+    transport.publish_assignation_event(instance)
 
 
 @receiver(post_save, sender=models.Implementation)

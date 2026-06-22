@@ -116,11 +116,13 @@ async def seed_agent(instance_id, token=TEST_TOKEN, blocked=False):
 # --------------------------------------------------------------------------- #
 # Object-graph builders (run synchronously, wrapped via sync_to_async)
 # --------------------------------------------------------------------------- #
-def _build_assignation(prefix):
+def _build_assignation(prefix, *, effect="NONE", originating_connection_id=None, originating_session_id=None, parent=None):
     """Create a standalone Action -> Implementation -> Assignation graph.
 
     The persist backend looks assignations up by id (not by the registered agent),
-    so this graph is independent of the agent that streams the events.
+    so this graph is independent of the agent that streams the events. ``effect`` sets the
+    implementation's effect class; ``originating_*``/``parent`` wire the caller-death/grace
+    tests' origination + tree shape.
     """
     user = User.objects.create(username=f"{prefix}-user", password="x", sub=f"{prefix}-sub")
     device = Device.objects.create(device_id=f"{prefix}-device")
@@ -140,7 +142,7 @@ def _build_assignation(prefix):
         description=f"{prefix} description", hash=f"{prefix}-action-hash", organization=org,
     )
     implementation = Implementation.objects.create(
-        release=release, interface=f"{prefix}-iface", action=action, agent=agent, dynamic=False,
+        release=release, interface=f"{prefix}-iface", action=action, agent=agent, dynamic=False, effect=effect,
     )
 
     return Assignation.objects.create(
@@ -148,6 +150,9 @@ def _build_assignation(prefix):
         action=action,
         agent=agent,
         implementation=implementation,
+        parent=parent,
+        originating_connection_id=originating_connection_id,
+        originating_session_id=originating_session_id,
         latest_event_kind=enums.AssignationEventKind.ASSIGN,
         latest_instruct_kind=enums.AssignationInstructChoices.ASSIGN,
     )
@@ -176,6 +181,48 @@ def _build_unimplemented_assignation_for_agent(agent_pk, prefix):
     )
 
 
+def _build_assignation_for_agent_caller(agent_pk, prefix):
+    """An assignation whose ``caller`` is the agent's own identity.
+
+    Used by the caller-event return tests: because the assignation's caller matches the
+    registered agent's caller (group ``ass_caller_{caller_id}``), events on it are streamed
+    back to that agent's socket as ``Caller*`` messages.
+    """
+    agent = Agent.objects.select_related("user", "client", "organization").get(pk=agent_pk)
+    caller, _ = Caller.objects.get_or_create(client=agent.client, user=agent.user, organization=agent.organization)
+
+    app = App.objects.create(identifier=f"{prefix}-app")
+    release = Release.objects.create(app=app, version="1.0.0")
+    action = Action.objects.create(
+        app=app, key=f"{prefix}-key", version="1.0.0", name=f"{prefix} action",
+        description=f"{prefix} description", hash=f"{prefix}-action-hash", organization=agent.organization,
+    )
+    implementation = Implementation.objects.create(
+        release=release, interface=f"{prefix}-iface", action=action, agent=agent, dynamic=False,
+    )
+    return Assignation.objects.create(
+        caller=caller,
+        action=action,
+        agent=agent,
+        implementation=implementation,
+        latest_event_kind=enums.AssignationEventKind.ASSIGN,
+        latest_instruct_kind=enums.AssignationInstructChoices.ASSIGN,
+    )
+
+
+def _build_implementation_for_agent(agent_pk, prefix, needs_token=False):
+    """An Action + Implementation owned by ``agent`` (connectable assign target)."""
+    agent = Agent.objects.select_related("app", "release", "organization").get(pk=agent_pk)
+    action = Action.objects.create(
+        app=agent.app, key=f"{prefix}-key", version="1.0.0", name=f"{prefix} action",
+        description=f"{prefix} description", hash=f"{prefix}-action-hash", organization=agent.organization,
+    )
+    return Implementation.objects.create(
+        release=agent.release, interface=f"{prefix}-iface", action=action, agent=agent,
+        dynamic=False, needs_token=needs_token,
+    )
+
+
 def _build_state_for_agent(agent_pk, interface, prefix):
     """Create a State (and its definition) attached to an existing agent."""
     definition = StateDefinition.objects.create(
@@ -184,6 +231,23 @@ def _build_state_for_agent(agent_pk, interface, prefix):
     return State.objects.create(definition=definition, interface=interface, agent_id=agent_pk, value={})
 
 
+def _build_webhook_agent(prefix, secret="s3cr3t", hook_url="https://hook.example/in"):
+    """A HookAgent (kind=WEBHOOK) with a hook_url + shared secret, plus its identity graph."""
+    user = User.objects.create(username=f"{prefix}-user", password="x", sub=f"{prefix}-sub")
+    device = Device.objects.create(device_id=f"{prefix}-device")
+    client = Client.objects.create(client_id=f"{prefix}-client", device=device)
+    org = Organization.objects.create(slug=f"{prefix}-org")
+    app = App.objects.create(identifier=f"{prefix}-app")
+    release = Release.objects.create(app=app, version="1.0.0")
+    return Agent.objects.create(
+        app=app, hash=f"{prefix}-hash", release=release, user=user, client=client, organization=org,
+        kind=enums.AgentKind.WEBHOOK.value, hook_url=hook_url, hook_url_secret=secret,
+    )
+
+
 build_assignation = sync_to_async(_build_assignation)
+build_assignation_for_agent_caller = sync_to_async(_build_assignation_for_agent_caller)
+build_implementation_for_agent = sync_to_async(_build_implementation_for_agent)
+build_webhook_agent = sync_to_async(_build_webhook_agent)
 build_unimplemented_assignation_for_agent = sync_to_async(_build_unimplemented_assignation_for_agent)
 build_state_for_agent = sync_to_async(_build_state_for_agent)

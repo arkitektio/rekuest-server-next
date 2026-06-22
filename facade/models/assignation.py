@@ -84,6 +84,18 @@ class Assignation(models.Model):
         blank=True,
         related_name="assignations",
     )
+    originating_connection_id = models.CharField(
+        max_length=1000,
+        null=True,
+        blank=True,
+        help_text="The websocket connection id that originated this (root) assignation over the agent socket. Identifies which live connection's death should cascade-cancel it. Null for GraphQL-originated or non-root assignations.",
+    )
+    originating_session_id = models.CharField(
+        max_length=1000,
+        null=True,
+        blank=True,
+        help_text="The caller's process session id (volatile, in-memory) at origination. Lets a reconnect with the same session reclaim instead of cascade-cancelling. Null for GraphQL-originated or non-root assignations.",
+    )
     agent = models.ForeignKey(
         "Agent",
         on_delete=models.CASCADE,

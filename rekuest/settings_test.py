@@ -18,6 +18,10 @@ DATABASE_ROUTERS = []
 # Use in-memory channel layer for tests instead of Redis
 CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
 
+# Default tests to grace=0 → disconnects cascade inline/immediately (the legacy,
+# deterministic behavior). The reclaim/grace tests opt into a window with override_settings.
+REKUEST_GRACE = {"DEFAULT": 0, "PER_MODE": {}, "PHYSICAL": 0}
+
 # Point the agent queue at the published dokker redis port (see
 # tests/integration/docker-compose.yaml). Replaces the old redis-factory monkeypatch.
 AGENT_REDIS_HOST = "localhost"

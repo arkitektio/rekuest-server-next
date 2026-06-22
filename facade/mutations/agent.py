@@ -3,7 +3,7 @@ import uuid
 from kante.types import Info
 from facade.mutations.implementation import _create_implementation
 import strawberry
-from facade import types, models, inputs, scalars
+from facade import types, models, inputs, scalars, enums
 from rekuest_core.inputs.types import BlokImplementationInput, StructureInput, InterfaceInput, ImplementationInput, LockImplementationInput, StateImplementationInput
 from rekuest_core.inputs.models import BlokImplementationInputModel, ImplementationInputModel, StateImplementationInputModel, LockImplementationInputModel
 import logging
@@ -19,6 +19,18 @@ class AgentInput:
     name: str | None = strawberry.field(
         default=None,
         description="The name of the agent. This is used to identify the agent in the system.",
+    )
+    kind: enums.AgentKind | None = strawberry.field(
+        default=None,
+        description="The transport kind of the agent: WEBSOCKET (default) or WEBHOOK (a HookAgent the backend POSTs to).",
+    )
+    hook_url: str | None = strawberry.field(
+        default=None,
+        description="For a WEBHOOK agent: the URL the backend POSTs messages (Assign, Cancel, Caller* events) to.",
+    )
+    hook_url_secret: str | None = strawberry.field(
+        default=None,
+        description="For a WEBHOOK agent: the shared secret used to HMAC-sign messages in both directions (outbound delivery and POST intake).",
     )
 
 
@@ -53,6 +65,20 @@ def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
         shelve=memory_shelve,
     ):
         drawer.delete()
+
+    # Configure the transport (idempotent): a HookAgent declares its kind + endpoint here.
+    updated_fields = []
+    if input.kind is not None:
+        agent.kind = getattr(input.kind, "value", input.kind)
+        updated_fields.append("kind")
+    if input.hook_url is not None:
+        agent.hook_url = input.hook_url
+        updated_fields.append("hook_url")
+    if input.hook_url_secret is not None:
+        agent.hook_url_secret = input.hook_url_secret
+        updated_fields.append("hook_url_secret")
+    if updated_fields:
+        agent.save(update_fields=updated_fields)
 
     return agent
 

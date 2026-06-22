@@ -16,7 +16,7 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from kante.path import dynamicpath
+from kante.path import dynamicpath, re_dynamicpath
 from django.http import HttpRequest, JsonResponse
 from django.urls import include, path
 from health_check.views import HealthCheckView
@@ -38,9 +38,12 @@ def jwks_view(request: HttpRequest) -> JsonResponse:
     return response
 
 
+from facade.http_intake import hook_intake  # noqa: E402  (apps are ready when the URLconf loads)
+
 urlpatterns = [
     dynamicpath("admin/", admin.site.urls),
     dynamicpath(".well-known/jwks.json", csrf_exempt(jwks_view), name="provenance_jwks"),
+    re_dynamicpath(r"agi/http/(?P<agent_id>[^/]+)$", csrf_exempt(hook_intake), name="hook_intake"),
     dynamicpath(
         "ht",
         csrf_exempt(

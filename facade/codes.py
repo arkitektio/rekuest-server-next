@@ -5,3 +5,4 @@ FROM_AGENT_MESSAGE_RECEIVED_BEFORE_REGISTRATION_CODE = 3004
 AGENT_IS_BLOCKED_CODE = 4003
 AGENT_ALREADY_CONNECTED_CODE = 4004  # reject: another connection is already live and force was not set
 AGENT_REPLACED_CODE = 4005  # incumbent connection kicked because a newer connection registered with force
+MODE_NOT_AUTHORIZED_CODE = 4006  # requested AgentMode exceeds the capabilities granted by the token's scopes

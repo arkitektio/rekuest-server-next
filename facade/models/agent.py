@@ -58,6 +58,12 @@ class Agent(models.Model):
         blank=True,
         help_text="Identifies the websocket connection currently owning this Agent. Used to reject/displace duplicate connections and to guard disconnect handling against a displaced connection.",
     )
+    active_session_id = models.CharField(
+        max_length=1000,
+        null=True,
+        blank=True,
+        help_text="The executor process's volatile session id from the last connect. On reconnect, a matching session means the same process survived (reclaim in-flight work); a different session means a fresh process (fail-and-cascade the orphaned work).",
+    )
     on_instance = models.CharField(
         max_length=1000,
         help_text="The Instance this Agent is running on",

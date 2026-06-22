@@ -54,10 +54,10 @@ def _resolve_audience(implementation: Any) -> List[str]:
     return list(implementation.provenance_audience or [])
 
 
-def _current_roles(info: Any) -> List[str]:
-    """Roles of the principal making the current request (best effort)."""
+def _current_roles(ctx: Any) -> List[str]:
+    """Roles of the principal originating the current request (best effort)."""
     try:
-        return list(info.context.request.membership.roles or [])
+        return list(ctx.roles or [])
     except Exception:
         return []
 
@@ -67,28 +67,32 @@ def _sign(claims: Dict[str, Any]) -> str:
     return jwt.encode(header, claims, keys.get_signing_key(), algorithms=keys.ALGORITHMS)
 
 
-def mint_token_for_assignation(assignation: Any, info: Any) -> Optional[str]:
+def mint_token_for_assignation(assignation: Any, ctx: Any) -> Optional[str]:
     """Mint the provenance token for ``assignation``, or return None to skip.
 
-    Returns None when the implementation opts out (``needs_token=False``) or when
-    the root principal cannot be confirmed human under a lenient policy. Raises
-    ``ValueError`` for a non-human root under a strict policy.
+    ``ctx`` is a :class:`facade.caller_context.CallerContext` (a legacy ``Info`` is also
+    accepted and coerced). Returns None when the implementation opts out
+    (``needs_token=False``) or when the root principal cannot be confirmed human under a
+    lenient policy. Raises ``ValueError`` for a non-human root under a strict policy.
     """
+    from facade.caller_context import CallerContext
+
+    ctx = CallerContext.coerce(ctx)
+
     implementation = assignation.implementation
     if implementation is None or not implementation.needs_token:
         return None
 
     agent = assignation.agent
-    request = info.context.request
 
     is_top = assignation.parent_id is None
     root = assignation if is_top else _resolve_root(assignation)
 
     # Immediate causer of this hop, and the human at the root of the tree.
-    sub = str(request.user.sub)
+    sub = str(ctx.user.sub)
     if is_top:
         root_caused_by = sub
-        root_human = principal.is_human_by_roles(_current_roles(info))
+        root_human = principal.is_human_by_roles(_current_roles(ctx))
     else:
         root_caller = root.caller
         if root_caller is None or root_caller.user_id is None:

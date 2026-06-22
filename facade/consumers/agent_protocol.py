@@ -25,19 +25,28 @@ from django.conf import settings
 from django.utils import timezone
 from pydantic import BaseModel, Field
 
-from facade import codes, messages, models
+from facade import capabilities, codes, messages, models
+from facade.capabilities import Capabilities
 from facade.consumers.agent_queue import AgentQueue
+from facade.message_router import UnknownAgentMessage, route_from_agent_message
 from facade.persist_backend import persist_backend
+from facade.ports import PersistBackend
 
 logger = logging.getLogger(__name__)
 
 SendCallable = Callable[[str], Awaitable[None]]
 CloseCallable = Callable[[int], Awaitable[None]]
-Authenticator = Callable[[messages.Register], Awaitable["models.Agent"]]
+# The authenticator resolves a Register to the durable agent identity AND the
+# capabilities granted by its token scopes (the two are decided together, from the
+# same token, so the protocol never has to re-authenticate to learn capabilities).
+Authenticator = Callable[[messages.Register], Awaitable[tuple["models.Agent", Capabilities]]]
 # Wired by the adapter so the protocol can join the agent's connection group and
 # displace other live connections — both are no-ops by default (unit tests).
 RegisterConnectionCallable = Callable[[str], Awaitable[None]]
 KickOthersCallable = Callable[[], Awaitable[None]]
+# Wired by the adapter so the protocol can join the caller event group
+# (``ass_caller_{caller_id}``) and receive the events of work it originated.
+RegisterCallerCallable = Callable[[str], Awaitable[None]]
 
 
 async def _noop_register_connection(agent_id: str) -> None:
@@ -48,14 +57,18 @@ async def _noop_kick_others() -> None:
     return None
 
 
+async def _noop_register_caller(caller_id: str) -> None:
+    return None
+
+
 class FromAgentPayload(BaseModel):
     """Pydantic model representing the payload sent by the agent."""
 
     message: messages.FromAgentMessage = Field(discriminator="type")
 
 
-async def default_authenticator(register: messages.Register) -> "models.Agent":
-    """Resolve a ``Register`` to its ``Agent`` via the token identity.
+async def default_authenticator(register: messages.Register) -> tuple["models.Agent", Capabilities]:
+    """Resolve a ``Register`` to its ``Agent`` + granted ``Capabilities`` via the token.
 
     NOTE: the ``aget_or_create`` create-branch omits the required
     ``app``/``release`` columns, so this can only *find* an
@@ -79,7 +92,8 @@ async def default_authenticator(register: messages.Register) -> "models.Agent":
             name=f"{client.client_id}",
         ),
     )
-    return agent
+    caps = capabilities.capabilities_from_scopes(getattr(token, "scopes", []))
+    return agent, caps
 
 
 class AgentProtocol:
@@ -91,10 +105,11 @@ class AgentProtocol:
         send: SendCallable,
         close: CloseCallable,
         queue: AgentQueue,
-        backend=persist_backend,
+        backend: PersistBackend = persist_backend,
         authenticator: Authenticator = default_authenticator,
         register_connection: RegisterConnectionCallable = _noop_register_connection,
         kick_others: KickOthersCallable = _noop_kick_others,
+        register_caller: RegisterCallerCallable = _noop_register_caller,
         connection_id: Optional[str] = None,
         heartbeat_interval: Optional[float] = None,
         heartbeat_timeout: Optional[float] = None,
@@ -106,6 +121,7 @@ class AgentProtocol:
         self.authenticator = authenticator
         self.register_connection = register_connection
         self.kick_others = kick_others
+        self.register_caller = register_caller
         # Identifies this connection so the backend can tell, on disconnect,
         # whether we are still the agent's active connection or were displaced.
         self.connection_id = connection_id or str(uuid.uuid4())
@@ -117,6 +133,15 @@ class AgentProtocol:
         )
 
         self.agent: Optional["models.Agent"] = None
+        # Resolved at register: the granted capabilities, the requested mode, whether this
+        # connection is the executor singleton, and the executor's volatile process id.
+        self.capabilities: Optional[Capabilities] = None
+        self.mode: messages.AgentMode = messages.AgentMode.EXECUTOR
+        self.executes_work: bool = False
+        self.session_id: Optional[str] = None
+        # The durable caller id whose event group this connection joined (any mode may
+        # originate work and must receive its results back over this socket).
+        self.caller_id: Optional[str] = None
         self.received_initial_payload = False
         self.heartbeat_future: Optional[asyncio.Future] = None
         self.listen_task: Optional[asyncio.Task] = None
@@ -167,69 +192,96 @@ class AgentProtocol:
             await self.close(codes.FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE)
 
     async def dispatch(self, message: messages.FromAgentMessage) -> None:
-        """Route a validated, post-registration message to its handler."""
-        agent_id = self.agent.pk
-        match message:
-            # A second Register after registration is a protocol violation: it must
-            # NOT re-run on_register (that would orphan the first listen/heartbeat
-            # task pair). Fall through to ``case _`` below and close.
-            case messages.HeartbeatEvent():
-                await self.on_agent_heartbeat()
-            case messages.CancelledEvent():
-                await self.backend.on_agent_cancelled(agent_id, message)
-            case messages.YieldEvent():
-                await self.backend.on_agent_yield(agent_id, message)
-            case messages.LogEvent():
-                await self.backend.on_agent_log(agent_id, message)
-            case messages.ProgressEvent():
-                await self.backend.on_agent_progress(agent_id, message)
-            case messages.DoneEvent():
-                await self.backend.on_agent_done(agent_id, message)
-            case messages.ErrorEvent():
-                await self.backend.on_agent_error(agent_id, message)
-            case messages.CriticalEvent():
-                await self.backend.on_agent_critical(agent_id, message)
-            case messages.StatePatchEvent():
-                await self.backend.on_agent_state_patch(agent_id, message)
-            case messages.StateSnapshotEvent():
-                await self.backend.on_agent_state_snapshot(agent_id, message)
-            case messages.SessionInitMessage():
-                await self.backend.on_agent_session_init(agent_id, message)
-            case _:
-                logger.error("Unknown message in agent")
-                await self.close(codes.FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE)
+        """Route a validated, post-registration message to its handler.
+
+        ``HeartbeatEvent`` is WS-only liveness and handled here; everything else goes through
+        the shared :func:`route_from_agent_message` (the same router the HTTP HookAgent intake
+        uses) and its returned reply is sent over the socket. A second Register / Lock / etc.
+        raises ``UnknownAgentMessage`` and closes the connection.
+        """
+        if isinstance(message, messages.HeartbeatEvent):
+            await self.on_agent_heartbeat()
+            return
+
+        try:
+            reply = await route_from_agent_message(
+                self.backend,
+                self.agent.pk,
+                self.capabilities,
+                message,
+                connection_id=self.connection_id,
+                session_id=self.session_id,
+            )
+        except UnknownAgentMessage:
+            logger.error("Unknown message in agent")
+            await self.close(codes.FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE)
+            return
+
+        if reply is not None:
+            await self.send_to_agent_message(reply)
 
     async def on_register(self, register: messages.Register) -> None:
-        """Authenticate, send ``Init`` and spawn the background loops."""
-        self.agent = await self.authenticator(register)
+        """Authenticate, authorize the requested mode, send ``Init`` and spawn loops.
+
+        Gate order (each gate may close and return): authenticate → blocked → mode
+        authorization → conflict/displacement (executors only) → connect + Init + loops.
+        """
+        self.agent, self.capabilities = await self.authenticator(register)
+        self.mode = messages.AgentMode(register.mode)
+        self.session_id = register.session_id
+        self.executes_work = capabilities.mode_executes_work(self.mode)
 
         if self.agent.blocked:
             await self.close(codes.AGENT_IS_BLOCKED_CODE)
             return
 
-        # Conflict handling: only one live connection per agent. If the agent is
-        # already connected, reject this connection unless ``force`` is set — in
-        # which case displace the incumbent and take over.
-        was_connected = self.agent.connected
-        if was_connected and not register.force:
+        # Capabilities come from the token, never self-declaration: a participant may
+        # only operate in a mode its scopes cover.
+        if not capabilities.authorize_mode(self.capabilities, self.mode):
             await self.send_to_agent_message(
-                messages.ProtocolError(error="Another connection is already registered for this agent. Reconnect with force to take over.")
+                messages.ProtocolError(error=f"Token is not authorized for mode {self.mode.value}.")
             )
-            await self.close(codes.AGENT_ALREADY_CONNECTED_CODE)
+            await self.close(codes.MODE_NOT_AUTHORIZED_CODE)
             return
 
-        # Join the agent's connection group first (so we can later be kicked).
-        await self.register_connection(self.agent.pk)
+        # Join the caller event group for EVERY mode: even a pure executor assigns
+        # *dependent* work and must receive its results back over this socket. Done
+        # before Init so no originated-work event is missed.
+        self.caller_id = await self.backend.get_or_create_caller_id(self.agent.pk)
+        await self.register_caller(self.caller_id)
 
-        # Claim ownership (sets ``active_connection_id`` to us) BEFORE displacing the
-        # incumbent. Order matters: the displaced connection's disconnect handler is
-        # guarded on ``active_connection_id`` — if we kicked before claiming, it could
-        # still see itself as active and wrongly mark the agent disconnected.
-        assignations = await self.backend.on_agent_connected(self.agent.pk, self.connection_id)
-        if was_connected and register.force:
-            await self.kick_others()
+        # Caller reclaim: cancel any pending caller-death cascade for this session and adopt
+        # the roots it originated (runs for every mode — any participant may originate work).
+        await self.backend.on_caller_connected(self.agent.pk, self.connection_id, self.session_id)
 
         self.heartbeat_future = None
+
+        if self.executes_work:
+            # The executor is a singleton: only one live connection per agent. Reject a
+            # second unless ``force`` is set, in which case displace the incumbent.
+            was_connected = self.agent.connected
+            if was_connected and not register.force:
+                await self.send_to_agent_message(
+                    messages.ProtocolError(error="Another connection is already registered for this agent. Reconnect with force to take over.")
+                )
+                await self.close(codes.AGENT_ALREADY_CONNECTED_CODE)
+                return
+
+            # Join the agent's connection group first (so we can later be kicked).
+            await self.register_connection(self.agent.pk)
+
+            # Claim ownership (sets ``active_connection_id`` to us) BEFORE displacing the
+            # incumbent. Order matters: the displaced connection's disconnect handler is
+            # guarded on ``active_connection_id`` — if we kicked before claiming, it could
+            # still see itself as active and wrongly mark the agent disconnected.
+            assignations = await self.backend.on_agent_connected(self.agent.pk, self.connection_id, session_id=self.session_id)
+            if was_connected and register.force:
+                await self.kick_others()
+        else:
+            # Non-executors (frontend/observer/caller) are NOT the singleton: no
+            # displacement, no ``active_connection_id`` claim (that would corrupt the
+            # executor's liveness on a shared Agent row), and no in-flight inquiries.
+            assignations = await self.backend.on_observer_connected(self.agent.pk, self.connection_id, mode=self.mode.value)
 
         await self.send_to_agent_message(
             messages.Init(
@@ -238,7 +290,11 @@ class AgentProtocol:
             )
         )
 
-        self.listen_task = asyncio.create_task(self.listen_for_tasks(self.agent.pk))
+        # The redis per-agent task queue carries ToAgent executor commands (Assign,
+        # Cancel, …) — only an executor should drain it. Heartbeat liveness runs for
+        # every mode (a caller's death must be detectable to cascade-cancel its work).
+        if self.executes_work:
+            self.listen_task = asyncio.create_task(self.listen_for_tasks(self.agent.pk))
         self.heartbeat_task = asyncio.create_task(self.heartbeat(self.agent.pk))
 
     async def on_agent_heartbeat(self) -> None:
@@ -303,6 +359,13 @@ class AgentProtocol:
                 logger.error("Error cancelling agent task", exc_info=True)
 
         if self.agent is not None:
-            await self.backend.on_agent_disconnected(self.agent.pk, self.connection_id)
+            # Executor teardown drives the in-flight failure/grace cascade over EXECUTED work.
+            if self.executes_work:
+                await self.backend.on_agent_disconnected(self.agent.pk, self.connection_id)
+            # Caller-death drives the cascade over ORIGINATED roots — independent of execution,
+            # so it runs for every mode (the backend no-ops it for observers).
+            await self.backend.on_caller_disconnected(
+                self.agent.pk, self.connection_id, session_id=self.session_id, mode=self.mode.value
+            )
 
         await self.queue.close()
