@@ -23,6 +23,7 @@ dependencies = [
     "django-polymorphic>=4.11.2",
     "boto3>=1.42.73",
     "jsonschema>=4.26.0",
+    "dokker>=2.5",
 ]
 
 [dependency-groups]
@@ -73,6 +74,7 @@ include = [
     "facade/caller_context.py",
     "facade/caller_events.py",
     "facade/hooks.py",
+    "facade/consumers/agent_protocol.py",
 ]
 exclude = ["**/migrations", "**/__pycache__", ".venv", "tests"]
 # Django models / pydantic models defeat structural inference without a plugin.

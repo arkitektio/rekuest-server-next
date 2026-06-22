@@ -106,8 +106,10 @@ async def seed_agent(instance_id, token=TEST_TOKEN, blocked=False):
         user=user,
         organization=organization,
         defaults=dict(
-            app=app, release=release,
-            hash=f"{instance_id}-hash", blocked=blocked,
+            app=app,
+            release=release,
+            hash=f"{instance_id}-hash",
+            blocked=blocked,
         ),
     )
     return agent
@@ -133,16 +135,30 @@ def _build_assignation(prefix, *, effect="NONE", originating_connection_id=None,
     app = App.objects.create(identifier=f"{prefix}-app")
     release = Release.objects.create(app=app, version="1.0.0")
     agent = Agent.objects.create(
-        app=app, hash=f"{prefix}-hash", release=release,
-        user=user, client=client, organization=org,
+        app=app,
+        hash=f"{prefix}-hash",
+        release=release,
+        user=user,
+        client=client,
+        organization=org,
     )
 
     action = Action.objects.create(
-        app=app, key=f"{prefix}-key", version="1.0.0", name=f"{prefix} action",
-        description=f"{prefix} description", hash=f"{prefix}-action-hash", organization=org,
+        app=app,
+        key=f"{prefix}-key",
+        version="1.0.0",
+        name=f"{prefix} action",
+        description=f"{prefix} description",
+        hash=f"{prefix}-action-hash",
+        organization=org,
     )
     implementation = Implementation.objects.create(
-        release=release, interface=f"{prefix}-iface", action=action, agent=agent, dynamic=False, effect=effect,
+        release=release,
+        interface=f"{prefix}-iface",
+        action=action,
+        agent=agent,
+        dynamic=False,
+        effect=effect,
     )
 
     return Assignation.objects.create(
@@ -168,8 +184,13 @@ def _build_unimplemented_assignation_for_agent(agent_pk, prefix):
     agent = Agent.objects.get(pk=agent_pk)
     app = App.objects.create(identifier=f"{prefix}-app")
     action = Action.objects.create(
-        app=app, key=f"{prefix}-key", version="1.0.0", name=f"{prefix} action",
-        description=f"{prefix} description", hash=f"{prefix}-action-hash", organization=agent.organization,
+        app=app,
+        key=f"{prefix}-key",
+        version="1.0.0",
+        name=f"{prefix} action",
+        description=f"{prefix} description",
+        hash=f"{prefix}-action-hash",
+        organization=agent.organization,
     )
     return Assignation.objects.create(
         caller=None,
@@ -194,11 +215,20 @@ def _build_assignation_for_agent_caller(agent_pk, prefix):
     app = App.objects.create(identifier=f"{prefix}-app")
     release = Release.objects.create(app=app, version="1.0.0")
     action = Action.objects.create(
-        app=app, key=f"{prefix}-key", version="1.0.0", name=f"{prefix} action",
-        description=f"{prefix} description", hash=f"{prefix}-action-hash", organization=agent.organization,
+        app=app,
+        key=f"{prefix}-key",
+        version="1.0.0",
+        name=f"{prefix} action",
+        description=f"{prefix} description",
+        hash=f"{prefix}-action-hash",
+        organization=agent.organization,
     )
     implementation = Implementation.objects.create(
-        release=release, interface=f"{prefix}-iface", action=action, agent=agent, dynamic=False,
+        release=release,
+        interface=f"{prefix}-iface",
+        action=action,
+        agent=agent,
+        dynamic=False,
     )
     return Assignation.objects.create(
         caller=caller,
@@ -210,23 +240,35 @@ def _build_assignation_for_agent_caller(agent_pk, prefix):
     )
 
 
-def _build_implementation_for_agent(agent_pk, prefix, needs_token=False):
+def _build_implementation_for_agent(agent_pk, prefix, needs_token=True):
     """An Action + Implementation owned by ``agent`` (connectable assign target)."""
     agent = Agent.objects.select_related("app", "release", "organization").get(pk=agent_pk)
     action = Action.objects.create(
-        app=agent.app, key=f"{prefix}-key", version="1.0.0", name=f"{prefix} action",
-        description=f"{prefix} description", hash=f"{prefix}-action-hash", organization=agent.organization,
+        app=agent.app,
+        key=f"{prefix}-key",
+        version="1.0.0",
+        name=f"{prefix} action",
+        description=f"{prefix} description",
+        hash=f"{prefix}-action-hash",
+        organization=agent.organization,
     )
     return Implementation.objects.create(
-        release=agent.release, interface=f"{prefix}-iface", action=action, agent=agent,
-        dynamic=False, needs_token=needs_token,
+        release=agent.release,
+        interface=f"{prefix}-iface",
+        action=action,
+        agent=agent,
+        dynamic=False,
+        needs_token=needs_token,
     )
 
 
 def _build_state_for_agent(agent_pk, interface, prefix):
     """Create a State (and its definition) attached to an existing agent."""
     definition = StateDefinition.objects.create(
-        name=f"{prefix} state", hash=f"{prefix}-state-hash", ports=[], description=f"{prefix} state def",
+        name=f"{prefix} state",
+        hash=f"{prefix}-state-hash",
+        ports=[],
+        description=f"{prefix} state def",
     )
     return State.objects.create(definition=definition, interface=interface, agent_id=agent_pk, value={})
 
@@ -240,8 +282,15 @@ def _build_webhook_agent(prefix, secret="s3cr3t", hook_url="https://hook.example
     app = App.objects.create(identifier=f"{prefix}-app")
     release = Release.objects.create(app=app, version="1.0.0")
     return Agent.objects.create(
-        app=app, hash=f"{prefix}-hash", release=release, user=user, client=client, organization=org,
-        kind=enums.AgentKind.WEBHOOK.value, hook_url=hook_url, hook_url_secret=secret,
+        app=app,
+        hash=f"{prefix}-hash",
+        release=release,
+        user=user,
+        client=client,
+        organization=org,
+        kind=enums.AgentKind.WEBHOOK.value,
+        hook_url=hook_url,
+        hook_url_secret=secret,
     )
 
 

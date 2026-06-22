@@ -27,7 +27,7 @@ from facade.codes import (
     HEARTBEAT_NOT_RESPONDED_CODE,
 )
 from facade.capabilities import Capabilities
-from facade.consumers.agent_protocol import AgentProtocol
+from facade.consumers.agent_protocol import AgentProtocol, RegisteredSession
 from facade.consumers.agent_queue import InMemoryAgentQueue
 
 # Full executor-and-caller; mirrors the rollout default (enforcement off).
@@ -69,6 +69,12 @@ class FakeBackend:
         if self.caller_assign_error is not None:
             raise self.caller_assign_error
         return SimpleNamespace(pk="new-ass-1"), True  # stands in for the created Assignation
+
+    async def on_caller_cancel(self, agent_id, message, *, connection_id=None, session_id=None):
+        self.calls.append(("caller_cancel", agent_id, message))
+        if self.caller_assign_error is not None:
+            raise self.caller_assign_error
+        return SimpleNamespace(pk="ctrl-ass-1")
 
     async def on_agent_connected(self, agent_id, connection_id=None, session_id=None):
         self.calls.append(("connected", agent_id))
@@ -195,9 +201,8 @@ class TestAgentProtocolUnit:
         assert json.loads(sent[0])["type"] == messages.ToAgentMessageType.PROTOCOL_ERROR.value
         assert closed == [AGENT_ALREADY_CONNECTED_CODE]
         assert kicked == []  # nobody is displaced on a plain rejection
-        # No background loops were spawned for a rejected registration.
-        assert protocol.listen_task is None
-        assert protocol.heartbeat_task is None
+        # No session (and thus no background loops) for a rejected registration.
+        assert protocol.session is None
 
     async def test_force_register_kicks_incumbent_when_connected(self):
         # An already-connected agent + force -> displace the incumbent and proceed
@@ -243,7 +248,7 @@ class TestAgentProtocolUnit:
 
         assert json.loads(sent[0])["type"] == messages.ToAgentMessageType.PROTOCOL_ERROR.value
         assert closed == [MODE_NOT_AUTHORIZED_CODE]
-        assert protocol.listen_task is None and protocol.heartbeat_task is None
+        assert protocol.session is None
 
     async def test_caller_mode_does_not_displace_and_skips_executor_queue(self):
         # A non-executor (CALLER) is NOT the singleton: even with an already-connected
@@ -262,8 +267,8 @@ class TestAgentProtocolUnit:
         assert closed == []
         assert kicked == []
         assert ("observer_connected", agent.pk, messages.AgentMode.CALLER.value) in backend.calls
-        assert protocol.listen_task is None  # never drains executor commands
-        assert protocol.heartbeat_task is not None  # liveness still tracked
+        assert protocol.session.listen_task is None  # never drains executor commands
+        assert protocol.session.heartbeat_task is not None  # liveness still tracked
         await protocol.shutdown()
         assert ("caller_disconnected", agent.pk, messages.AgentMode.CALLER.value) in backend.calls
 
@@ -331,6 +336,36 @@ class TestAgentProtocolUnit:
         assert ack["event"] == done.id and ack["assignation"] == "ass-9" and ack["seq"] == 7
         await protocol.shutdown()
 
+    async def test_caller_control_routes_and_acks(self):
+        backend = FakeBackend()
+        protocol, sent, closed, _ = make_protocol(backend=backend)
+        await protocol.receive(_register_frame())
+        sent.clear()
+
+        req = messages.CallerCancel(assignation="ass-7", auto_interrupt=5)
+        await protocol.receive(req.model_dump_json())
+
+        assert any(c[0] == "caller_cancel" for c in backend.calls)
+        result = json.loads(sent[-1])
+        assert result["type"] == messages.ToAgentMessageType.CALLER_CONTROL_RESULT.value
+        assert result["request"] == req.id and result["accepted"] is True
+        assert closed == []
+        await protocol.shutdown()
+
+    async def test_caller_control_failure_nacks_without_closing(self):
+        backend = FakeBackend(caller_assign_error=PermissionError("not the caller"))
+        protocol, sent, closed, _ = make_protocol(backend=backend)
+        await protocol.receive(_register_frame())
+        sent.clear()
+
+        await protocol.receive(messages.CallerCancel(assignation="ass-x").model_dump_json())
+
+        result = json.loads(sent[-1])
+        assert result["type"] == messages.ToAgentMessageType.CALLER_CONTROL_RESULT.value
+        assert result["accepted"] is False and "not the caller" in result["error"]
+        assert closed == []  # a bad control request never tears down the socket
+        await protocol.shutdown()
+
     async def test_unhandled_message_closes(self):
         protocol, sent, closed, _ = make_protocol()
         await protocol.receive(_register_frame())
@@ -373,7 +408,7 @@ class TestAgentProtocolUnit:
             return [s for s in sent if json.loads(s)["type"] == messages.ToAgentMessageType.HEARTBEAT.value]
 
         assert await _wait_for(lambda: len(_heartbeats()) >= 1)
-        await protocol.on_agent_heartbeat()
+        await protocol.session.on_agent_heartbeat()
 
         # Give the loop time to time out if the answer had not been accepted.
         await asyncio.sleep(0.2)
@@ -434,11 +469,28 @@ class TestAgentProtocolUnit:
         agent.asave = blocking_asave
 
         protocol, sent, closed, _ = make_protocol(agent=agent)
-        protocol.agent = agent  # simulate post-registration state
+        # Build the post-registration session directly to exercise its heartbeat handling.
+        session = RegisteredSession(
+            agent=agent,
+            capabilities=FULL_CAPABILITIES,
+            mode=messages.AgentMode.EXECUTOR,
+            executes_work=True,
+            session_id=None,
+            caller_id="caller",
+            connection_id=protocol.connection_id,
+            backend=protocol.backend,
+            queue=protocol.queue,
+            send_to_agent_message=protocol.send_to_agent_message,
+            send=protocol._send,
+            close=protocol.close,
+            heartbeat_interval=protocol.heartbeat_interval,
+            heartbeat_timeout=protocol.heartbeat_timeout,
+        )
+        protocol.session = session
         future = asyncio.get_event_loop().create_future()
-        protocol.heartbeat_future = future
+        session.heartbeat_future = future
 
-        task = asyncio.create_task(protocol.on_agent_heartbeat())
+        task = asyncio.create_task(session.on_agent_heartbeat())
         try:
             # The future is resolved even though asave is still blocked.
             assert await _wait_for(lambda: future.done())
@@ -470,15 +522,17 @@ class TestAgentProtocolUnit:
         # the first listen/heartbeat task pair). It closes instead.
         protocol, sent, closed, _ = make_protocol()
         await protocol.receive(_register_frame())
-        first_listen = protocol.listen_task
-        first_heartbeat = protocol.heartbeat_task
+        session = protocol.session
+        first_listen = session.listen_task
+        first_heartbeat = session.heartbeat_task
 
         await protocol.receive(_register_frame())
 
         assert FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE in closed
-        # The task handles are untouched — no new pair was spawned.
-        assert protocol.listen_task is first_listen
-        assert protocol.heartbeat_task is first_heartbeat
+        # The session and its task handles are untouched — no new pair was spawned.
+        assert protocol.session is session
+        assert session.listen_task is first_listen
+        assert session.heartbeat_task is first_heartbeat
 
         await protocol.shutdown()
         # The original pair is the one shutdown cancels — nothing left orphaned.

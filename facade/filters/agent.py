@@ -14,19 +14,6 @@ from facade import inputs, managers, models
 
 @strawberry_django.filter_type(models.Agent, description="A way to filter agents")
 class AgentFilter:
-    @filter_field(description="Filter by scope")
-    def scope(self, info: Info, queryset, value: ScopeFilter, prefix: str):
-        q = Q()
-        if value.public is not None:
-            q &= Q(**{f"{prefix}is_public": value.public})
-        if value.org is not None:
-            q &= Q(**{f"{prefix}organization": info.context.request.organization})
-        if value.shared is not None:
-            raise NotImplementedError("Shared scope filtering not implemented")
-        if value.me is not None:
-            q &= Q(**{f"{prefix}creator": info.context.request.user})
-        return queryset, q
-
     @filter_field(description="Filter by client ID of the app the agent is registered to")
     def client_id(self, info: Info, queryset, value: str, prefix: str):
         return queryset.filter(**{f"{prefix}client__client_id": value}), Q()

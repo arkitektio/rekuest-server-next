@@ -13,6 +13,7 @@ from facade.messages import AgentMode
 _TERMINAL_KINDS = (
     enums.AssignationEventKind.DONE,
     enums.AssignationEventKind.CANCELLED,
+    enums.AssignationEventKind.INTERUPTED,
     enums.AssignationEventKind.ERROR,
     enums.AssignationEventKind.CRITICAL,
 )
@@ -34,6 +35,9 @@ class ModelPersistBackend:
         self._executor_grace = GraceScheduler()
         self._caller_grace = GraceScheduler()
         self._progress_leases = GraceScheduler()
+        # auto_interrupt escalation timers (keyed by assignation id): a cancel with an
+        # auto_interrupt window escalates to an interrupt if not confirmed in time.
+        self._auto_interrupt = GraceScheduler()
 
     async def _unfold_to_higher_order(self, child_assignation_id: str, kind, returns: Optional[dict] = None, message: Optional[str] = None) -> None:
         """If this assignation is the child of a higher-order wrapper, re-emit a mapped event on it.
@@ -116,6 +120,7 @@ class ModelPersistBackend:
         never retried). ``effect:none`` → DISCONNECTED (fate unknown, recoverable/retryable).
         """
         for ass in assignations:
+            self._auto_interrupt.cancel(ass.pk)
             implementation = ass.implementation
             effect = implementation.effect if implementation is not None else enums.EffectClassChoices.NONE.value
             if effect == enums.EffectClassChoices.PHYSICAL.value:
@@ -262,6 +267,112 @@ class ModelPersistBackend:
         """
         return []
 
+    # ----------------------------------------------------------------------- #
+    # Caller lifecycle controls (two-phase; the request phase wraps the sync postman backend)
+    # ----------------------------------------------------------------------- #
+    def _caller_control_sync(self, agent_id: int, assignation_id: str, op: str) -> models.Assignation:
+        """Ownership-check then dispatch a control op on the sync postman backend.
+
+        A caller may only control assignations whose ``caller`` is its own identity. Raises
+        ``Assignation.DoesNotExist`` (unknown), ``PermissionError`` (not the caller), or
+        ``ValueError`` (already terminal — from the postman backend).
+        """
+        from facade import inputs
+        from facade.backend import controll_backend
+
+        agent = models.Agent.objects.select_related("user", "client", "organization").get(id=agent_id)
+        caller, _ = models.Caller.objects.get_or_create(client=agent.client, user=agent.user, organization=agent.organization)
+        ass = models.Assignation.objects.get(id=assignation_id)
+        if ass.caller_id != caller.pk:
+            raise PermissionError("Not authorized to control this assignation (not its caller).")
+
+        ref = str(assignation_id)
+        ops = {
+            "cancel": lambda: controll_backend.cancel(inputs.CancelInputModel(assignation=ref)),
+            "interrupt": lambda: controll_backend.interrupt(inputs.InterruptInputModel(assignation=ref)),
+            "pause": lambda: controll_backend.pause(inputs.PauseInputModel(assignation=ref)),
+            "resume": lambda: controll_backend.resume(inputs.ResumeInputModel(assignation=ref)),
+            "step": lambda: controll_backend.step(inputs.StepInputModel(assignation=ref)),
+        }
+        return ops[op]()
+
+    async def on_caller_cancel(self, agent_id: int, message: messages.CallerCancel, *, connection_id: str | None = None, session_id: str | None = None) -> models.Assignation:
+        ass = await database_sync_to_async(self._caller_control_sync)(agent_id, message.assignation, "cancel")
+        if message.auto_interrupt is not None:
+            self._auto_interrupt.schedule(message.assignation, float(message.auto_interrupt), lambda: self._escalate_to_interrupt(message.assignation))
+        return ass
+
+    async def on_caller_interrupt(self, agent_id: int, message: messages.CallerInterrupt, *, connection_id: str | None = None, session_id: str | None = None) -> models.Assignation:
+        return await database_sync_to_async(self._caller_control_sync)(agent_id, message.assignation, "interrupt")
+
+    async def on_caller_pause(self, agent_id: int, message: messages.CallerPause, *, connection_id: str | None = None, session_id: str | None = None) -> models.Assignation:
+        return await database_sync_to_async(self._caller_control_sync)(agent_id, message.assignation, "pause")
+
+    async def on_caller_resume(self, agent_id: int, message: messages.CallerResume, *, connection_id: str | None = None, session_id: str | None = None) -> models.Assignation:
+        return await database_sync_to_async(self._caller_control_sync)(agent_id, message.assignation, "resume")
+
+    async def on_caller_step(self, agent_id: int, message: messages.CallerStep, *, connection_id: str | None = None, session_id: str | None = None) -> models.Assignation:
+        return await database_sync_to_async(self._caller_control_sync)(agent_id, message.assignation, "step")
+
+    async def _escalate_to_interrupt(self, assignation_id: str) -> None:
+        """auto_interrupt fired: escalate an unconfirmed cancel to an interrupt. Idempotent."""
+        from facade import inputs
+        from facade.backend import controll_backend
+
+        def _do() -> None:
+            ass = models.Assignation.objects.get(id=assignation_id)
+            if ass.is_done:
+                return  # the cancel confirmed (or otherwise terminal) before the window — no-op
+            controll_backend.interrupt(inputs.InterruptInputModel(assignation=str(assignation_id)))
+
+        try:
+            await database_sync_to_async(_do)()
+        except models.Assignation.DoesNotExist:
+            return
+
+    # ----------------------------------------------------------------------- #
+    # Lifecycle confirmation handlers (the second phase)
+    # ----------------------------------------------------------------------- #
+    async def on_agent_interrupted(self, agent_id: int, message: messages.InterruptedEvent) -> None:
+        self._progress_leases.cancel(message.assignation)
+        self._auto_interrupt.cancel(message.assignation)
+        try:
+            x = await models.Assignation.objects.aget(id=message.assignation)
+        except models.Assignation.DoesNotExist:
+            return
+        if x.is_done:
+            return
+        await models.AssignationEvent.objects.acreate(assignation_id=message.assignation, kind=enums.AssignationEventKind.INTERUPTED)
+        x.is_done = True
+        x.finished_at = timezone.now()
+        x.latest_event_kind = enums.AssignationEventKind.INTERUPTED
+        await x.asave(update_fields=["is_done", "finished_at", "latest_event_kind"])
+        await self._unfold_to_higher_order(message.assignation, enums.AssignationEventKind.INTERUPTED)
+
+    async def _on_nonterminal_confirm(self, assignation_id: str, kind, *, cancel_lease: bool = False) -> None:
+        """Persist a non-terminal lifecycle confirmation (paused/resumed/stepped)."""
+        if cancel_lease:
+            self._progress_leases.cancel(assignation_id)
+        try:
+            x = await models.Assignation.objects.aget(id=assignation_id)
+        except models.Assignation.DoesNotExist:
+            return  # a confirmation for an unknown assignation must not tear down the transport
+        if x.is_done:
+            return
+        await models.AssignationEvent.objects.acreate(assignation_id=assignation_id, kind=kind)
+        x.latest_event_kind = kind
+        await x.asave(update_fields=["latest_event_kind"])
+
+    async def on_agent_paused(self, agent_id: int, message: messages.PausedEvent) -> None:
+        # A suspended op stops reporting progress — don't let the silent-physical-op lease reap it.
+        await self._on_nonterminal_confirm(message.assignation, enums.AssignationEventKind.PAUSED, cancel_lease=True)
+
+    async def on_agent_resumed(self, agent_id: int, message: messages.ResumedEvent) -> None:
+        await self._on_nonterminal_confirm(message.assignation, enums.AssignationEventKind.RESUMED)
+
+    async def on_agent_stepped(self, agent_id: int, message: messages.SteppedEvent) -> None:
+        await self._on_nonterminal_confirm(message.assignation, enums.AssignationEventKind.STEPPED)
+
     async def on_caller_connected(self, agent_id: int, connection_id: str | None = None, session_id: str | None = None) -> None:
         """A participant that may originate work connected — reclaim its orphaned roots.
 
@@ -319,6 +430,7 @@ class ModelPersistBackend:
             ass = stack.pop()
             if ass.is_done:
                 continue
+            self._auto_interrupt.cancel(ass.pk)
             # Tell the executing agent to stop (best-effort, off the event loop).
             await sync_to_async(AgentConsumer.broadcast)(ass.agent_id, messages.Cancel(assignation=str(ass.pk)))
             await models.AssignationEvent.objects.acreate(
@@ -356,6 +468,7 @@ class ModelPersistBackend:
         logging.info(f"Critical Assignation {message}")
 
         self._progress_leases.cancel(message.assignation)
+        self._auto_interrupt.cancel(message.assignation)
         x = await models.Assignation.objects.aget(id=message.assignation)
         if x.is_done:
             return  # dedup: a resent terminal report (the agent retries until EventAck)
@@ -375,6 +488,7 @@ class ModelPersistBackend:
         logging.info(f"Critical Assignation {message}")
 
         self._progress_leases.cancel(message.assignation)
+        self._auto_interrupt.cancel(message.assignation)
         x = await models.Assignation.objects.aget(id=message.assignation)
         if x.is_done:
             return  # dedup: a resent terminal report (the agent retries until EventAck)
@@ -394,6 +508,7 @@ class ModelPersistBackend:
         logging.info(f"Critical Assignation {message}")
 
         self._progress_leases.cancel(message.assignation)
+        self._auto_interrupt.cancel(message.assignation)
         x = await models.Assignation.objects.aget(id=message.assignation)
         if x.is_done:
             return  # dedup: a resent terminal report (the agent retries until EventAck)
@@ -414,6 +529,7 @@ class ModelPersistBackend:
         logging.info(f"Criticial Assignation {message}")
 
         self._progress_leases.cancel(message.assignation)
+        self._auto_interrupt.cancel(message.assignation)
         x = await models.Assignation.objects.aget(id=message.assignation)
         if x.is_done:
             return  # dedup: a resent terminal report (the agent retries until EventAck)

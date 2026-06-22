@@ -45,7 +45,7 @@ from .auth import (
     UserOrder,
 )
 from .blok import MaterializedBlokFilter, MaterializedBlokOrder
-from .common import ParamPair, ScopeFilter
+from .common import ParamPair
 from .dashboard import DashboardPlacementFilter, DashboardPlacementOrder
 from .dependency import (
     BlokDependencyFilter,
@@ -95,7 +95,6 @@ from .toolbox import (
 )
 
 __all__ = [
-    "ScopeFilter",
     "ParamPair",
     "UserFilter",
     "UserOrder",

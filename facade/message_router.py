@@ -35,6 +35,16 @@ def _ack(message: messages.FromAgentEvent) -> messages.EventAck:
     )
 
 
+async def _control(op, agent_id, message, connection_id, session_id) -> messages.CallerControlResult:
+    """Run a caller lifecycle-control request and return its ack (NACK on error, never raise)."""
+    try:
+        assignation = await op(agent_id, message, connection_id=connection_id, session_id=session_id)
+    except Exception as e:
+        logger.error("Caller control request failed", exc_info=True)
+        return messages.CallerControlResult(request=message.id, assignation=message.assignation, accepted=False, error=str(e))
+    return messages.CallerControlResult(request=message.id, assignation=str(assignation.pk), accepted=True)
+
+
 async def route_from_agent_message(
     backend: PersistBackend,
     agent_id: int,
@@ -66,8 +76,33 @@ async def route_from_agent_message(
                 return messages.CallerAssignResult(request=message.id, reference=message.reference, assignation=None, created=False, error=str(e))
             return messages.CallerAssignResult(request=message.id, reference=message.reference, assignation=str(assignation.pk), created=created)
 
+        # Caller lifecycle-control requests (two-phase; the outcome streams back as Caller* mirrors).
+        case messages.CallerCancel():
+            return await _control(backend.on_caller_cancel, agent_id, message, connection_id, session_id)
+        case messages.CallerInterrupt():
+            return await _control(backend.on_caller_interrupt, agent_id, message, connection_id, session_id)
+        case messages.CallerPause():
+            return await _control(backend.on_caller_pause, agent_id, message, connection_id, session_id)
+        case messages.CallerResume():
+            return await _control(backend.on_caller_resume, agent_id, message, connection_id, session_id)
+        case messages.CallerStep():
+            return await _control(backend.on_caller_step, agent_id, message, connection_id, session_id)
+
+        # Lifecycle confirmation events from the executing agent.
         case messages.CancelledEvent():
             await backend.on_agent_cancelled(agent_id, message)
+            return _ack(message)
+        case messages.InterruptedEvent():
+            await backend.on_agent_interrupted(agent_id, message)
+            return _ack(message)
+        case messages.PausedEvent():
+            await backend.on_agent_paused(agent_id, message)
+            return _ack(message)
+        case messages.ResumedEvent():
+            await backend.on_agent_resumed(agent_id, message)
+            return _ack(message)
+        case messages.SteppedEvent():
+            await backend.on_agent_stepped(agent_id, message)
             return _ack(message)
         case messages.YieldEvent():
             await backend.on_agent_yield(agent_id, message)

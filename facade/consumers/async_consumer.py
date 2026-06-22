@@ -84,7 +84,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
         it too would race the ack. Best-effort: a brief disconnect simply misses events.
         """
         protocol = getattr(self, "protocol", None)
-        if protocol is None or protocol.agent is None:
+        if protocol is None or protocol.session is None:
             return  # not registered yet — nothing to correlate against
 
         event_id = (event.get("message") or {}).get("event")

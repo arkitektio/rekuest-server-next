@@ -82,4 +82,16 @@ def build_caller_message(event: EventLike) -> Optional[messages.CallerEventMessa
         return messages.CallerInterrupting(**base)
     if kind == Kind.INTERUPTED.value:
         return messages.CallerInterrupted(**base)
+    if kind == Kind.PAUSING.value:
+        return messages.CallerPausing(**base)
+    if kind == Kind.PAUSED.value:
+        return messages.CallerPaused(**base)
+    if kind == Kind.RESUMING.value:
+        return messages.CallerResuming(**base)
+    if kind == Kind.RESUMED.value:
+        return messages.CallerResumed(**base)
+    if kind == Kind.STEPPING.value:
+        return messages.CallerStepping(**base)
+    if kind == Kind.STEPPED.value:
+        return messages.CallerStepped(**base)
     return None

@@ -84,8 +84,16 @@ class ToAgentMessageType(str, Enum):
     CALLER_CANCELLED = "CALLER_CANCELLED"
     CALLER_INTERRUPTING = "CALLER_INTERRUPTING"
     CALLER_INTERRUPTED = "CALLER_INTERRUPTED"
+    CALLER_PAUSING = "CALLER_PAUSING"
+    CALLER_PAUSED = "CALLER_PAUSED"
+    CALLER_RESUMING = "CALLER_RESUMING"
+    CALLER_RESUMED = "CALLER_RESUMED"
+    CALLER_STEPPING = "CALLER_STEPPING"
+    CALLER_STEPPED = "CALLER_STEPPED"
     CALLER_ERROR = "CALLER_ERROR"
     CALLER_CRITICAL = "CALLER_CRITICAL"
+    # Ack for a caller's lifecycle-control request (cancel/interrupt/pause/resume/step).
+    CALLER_CONTROL_RESULT = "CALLER_CONTROL_RESULT"
 
 
 class FromAgentMessageType(str, Enum):
@@ -112,6 +120,12 @@ class FromAgentMessageType(str, Enum):
     STATE_SNAPSHOT = "STATE_SNAPSHOT"
     SESSION_INIT = "SESSION_INIT"
     CALLER_ASSIGN = "CALLER_ASSIGN"
+    # Caller-issued lifecycle control requests over the socket (mirroring CALLER_ASSIGN).
+    CALLER_CANCEL = "CALLER_CANCEL"
+    CALLER_INTERRUPT = "CALLER_INTERRUPT"
+    CALLER_PAUSE = "CALLER_PAUSE"
+    CALLER_RESUME = "CALLER_RESUME"
+    CALLER_STEP = "CALLER_STEP"
 
 
 class Message(BaseModel):
@@ -350,6 +364,7 @@ class SteppedEvent(FromAgentEvent):
     """
 
     type: Literal[FromAgentMessageType.STEPPED] = FromAgentMessageType.STEPPED
+    assignation: str
 
 
 class LogEvent(FromAgentEvent):
@@ -625,6 +640,68 @@ class CallerAssignResult(Message):
     error: Optional[str] = Field(default=None, description="A human-readable error if the assign was rejected (e.g. missing can_assign_root).")
 
 
+class CallerControl(Message):
+    """Base for a caller's lifecycle-control request over the socket (cancel/interrupt/…).
+
+    The WebSocket equivalent of the GraphQL postman lifecycle mutations: the caller that
+    originated an assignation drives its lifecycle. The request is two-phase — it broadcasts a
+    ToAgent control message and is acked with a ``CallerControlResult``; the *outcome*
+    (CANCELLED/PAUSED/…) is observed via the ``Caller*`` mirror stream, not this ack.
+    """
+
+    assignation: str = Field(description="The assignation to control (must be owned by this caller).")
+
+
+class CallerCancel(CallerControl):
+    """Request a graceful cancel of an assignation."""
+
+    type: Literal[FromAgentMessageType.CALLER_CANCEL] = FromAgentMessageType.CALLER_CANCEL
+    auto_interrupt: Optional[float] = Field(
+        default=None,
+        description="Seconds. If the cancel is not confirmed within this window, auto-escalate to an interrupt. None disables escalation (the cancel stays pending until the agent confirms or the caller escalates manually).",
+    )
+
+
+class CallerInterrupt(CallerControl):
+    """Request a forceful interrupt (propagates to all children)."""
+
+    type: Literal[FromAgentMessageType.CALLER_INTERRUPT] = FromAgentMessageType.CALLER_INTERRUPT
+
+
+class CallerPause(CallerControl):
+    """Request the agent to suspend the assignation."""
+
+    type: Literal[FromAgentMessageType.CALLER_PAUSE] = FromAgentMessageType.CALLER_PAUSE
+
+
+class CallerResume(CallerControl):
+    """Request the agent to resume a suspended assignation."""
+
+    type: Literal[FromAgentMessageType.CALLER_RESUME] = FromAgentMessageType.CALLER_RESUME
+
+
+class CallerStep(CallerControl):
+    """Request the agent to step to its next breakpoint."""
+
+    type: Literal[FromAgentMessageType.CALLER_STEP] = FromAgentMessageType.CALLER_STEP
+
+
+class CallerControlResult(Message):
+    """The backend's ack that a caller lifecycle-control *request* was accepted (or rejected).
+
+    ``accepted`` is True once the request was persisted (an ``-ING`` event) and broadcast to the
+    executing agent; False (with ``error``) when rejected — e.g. the assignation is not owned by
+    this caller, is unknown, or is already terminal. The resolved outcome arrives later as a
+    ``Caller*`` mirror.
+    """
+
+    type: Literal[ToAgentMessageType.CALLER_CONTROL_RESULT] = ToAgentMessageType.CALLER_CONTROL_RESULT
+    request: str = Field(description="The id of the CallerCancel/Interrupt/Pause/Resume/Step this answers.")
+    assignation: Optional[str] = Field(default=None, description="The controlled assignation id.")
+    accepted: bool = Field(description="True when the request was accepted (broadcast + -ING persisted); False when rejected.")
+    error: Optional[str] = Field(default=None, description="A human-readable reason when the request was rejected.")
+
+
 class EventAck(Message):
     """Backend → agent acknowledgement that a reported event was made durable.
 
@@ -743,6 +820,42 @@ class CallerInterrupted(CallerEvent):
     type: Literal[ToAgentMessageType.CALLER_INTERRUPTED] = ToAgentMessageType.CALLER_INTERRUPTED
 
 
+class CallerPausing(CallerEvent):
+    """The assignation is being paused."""
+
+    type: Literal[ToAgentMessageType.CALLER_PAUSING] = ToAgentMessageType.CALLER_PAUSING
+
+
+class CallerPaused(CallerEvent):
+    """The assignation was paused (suspended)."""
+
+    type: Literal[ToAgentMessageType.CALLER_PAUSED] = ToAgentMessageType.CALLER_PAUSED
+
+
+class CallerResuming(CallerEvent):
+    """The assignation is being resumed."""
+
+    type: Literal[ToAgentMessageType.CALLER_RESUMING] = ToAgentMessageType.CALLER_RESUMING
+
+
+class CallerResumed(CallerEvent):
+    """The assignation was resumed (running again)."""
+
+    type: Literal[ToAgentMessageType.CALLER_RESUMED] = ToAgentMessageType.CALLER_RESUMED
+
+
+class CallerStepping(CallerEvent):
+    """The assignation is being stepped."""
+
+    type: Literal[ToAgentMessageType.CALLER_STEPPING] = ToAgentMessageType.CALLER_STEPPING
+
+
+class CallerStepped(CallerEvent):
+    """The assignation stepped to its next breakpoint."""
+
+    type: Literal[ToAgentMessageType.CALLER_STEPPED] = ToAgentMessageType.CALLER_STEPPED
+
+
 class CallerError(CallerEvent):
     """The assignation errored (potentially recoverable)."""
 
@@ -772,6 +885,12 @@ CallerEventMessage = Union[
     CallerCancelled,
     CallerInterrupting,
     CallerInterrupted,
+    CallerPausing,
+    CallerPaused,
+    CallerResuming,
+    CallerResumed,
+    CallerStepping,
+    CallerStepped,
     CallerError,
     CallerCritical,
 ]
@@ -792,6 +911,7 @@ ToAgentMessage = Union[
     Kick,
     EventAck,
     CallerAssignResult,
+    CallerControlResult,
     CallerBound,
     CallerQueued,
     CallerAssigned,
@@ -805,7 +925,13 @@ ToAgentMessage = Union[
     CallerCancelled,
     CallerInterrupting,
     CallerInterrupted,
+    CallerPausing,
+    CallerPaused,
+    CallerResuming,
+    CallerResumed,
+    CallerStepping,
+    CallerStepped,
     CallerError,
     CallerCritical,
 ]
-FromAgentMessage = Union[CriticalEvent, LogEvent, ProgressEvent, DoneEvent, ErrorEvent, YieldEvent, Register, HeartbeatEvent, SteppedEvent, ResumedEvent, PausedEvent, CancelledEvent, InterruptedEvent, StatePatchEvent, StateSnapshotEvent, LockEvent, UnlockEvent, SessionInitMessage, CallerAssign]
+FromAgentMessage = Union[CriticalEvent, LogEvent, ProgressEvent, DoneEvent, ErrorEvent, YieldEvent, Register, HeartbeatEvent, SteppedEvent, ResumedEvent, PausedEvent, CancelledEvent, InterruptedEvent, StatePatchEvent, StateSnapshotEvent, LockEvent, UnlockEvent, SessionInitMessage, CallerAssign, CallerCancel, CallerInterrupt, CallerPause, CallerResume, CallerStep]

@@ -123,56 +123,67 @@ class RedisControllBackend:
     def create_message_id(self) -> str:
         return str(uuid.uuid4())
 
-    def interrupt(self, input: inputs.InterruptInputModel) -> models.Assignation:
-        parent = models.Assignation.objects.get(id=input.assignation)
-        parent.latest_instruct_kind = enums.AssignationInstructKind.INTERRUPT
-        parent.save()
+    def _request_control(
+        self,
+        assignation_id,
+        *,
+        instruct_kind,
+        inging_kind,
+        to_agent_factory,
+        propagate_children: bool = False,
+    ) -> models.Assignation:
+        """The shared request phase of a two-phase lifecycle op.
 
-        AgentConsumer.broadcast(
-            parent.implementation.agent.id,
-            messages.Interrupt(
-                assignation=parent.id,
-            ),
-        )
+        Sets ``latest_instruct_kind``, persists the ``-ING`` event (which fans out the matching
+        ``Caller*ing`` mirror to the caller), and broadcasts the ToAgent control message — for
+        the target, and (when ``propagate_children``) for every still-running descendant. The
+        op resolves only when the executing agent sends the matching confirmation event. Raises
+        if the assignation is already terminal.
+        """
+        ass = models.Assignation.objects.select_related("agent").get(id=assignation_id)
+        if ass.is_done:
+            raise ValueError("Assignation is already terminal")
 
-        children = models.Assignation.objects.filter(parent_id=input.assignation).all()
+        targets = [ass]
+        if propagate_children:
+            targets += list(models.Assignation.objects.filter(root_id=ass.id, is_done=False))
 
-        for child in children:
-            child.latest_instruct_kind = enums.AssignationInstructKind.INTERRUPT
-            child.save()
+        for target in targets:
+            target.latest_instruct_kind = instruct_kind
+            target.save(update_fields=["latest_instruct_kind"])
+            models.AssignationEvent.objects.create(assignation=target, kind=inging_kind)
+            AgentConsumer.broadcast(target.agent_id, to_agent_factory(str(target.pk)))
 
-            AgentConsumer.broadcast(
-                child.implementation.agent.id,
-                messages.Interrupt(
-                    assignation=child.id,
-                ),
-            )
-
-        return parent
+        return ass
 
     def cancel(self, input: inputs.CancelInputModel) -> models.Assignation:
-        assignation = models.Assignation.objects.get(id=input.assignation)
-        assignation.latest_event_kind = enums.AssignationStatus.CANCELLED
-        assignation.save()
-
-        AgentConsumer.broadcast(
-            assignation.agent.id,
-            message=messages.Cancel(
-                assignation=str(assignation.id),
-            ),
+        # Two-phase: CANCELING now; CANCELLED + is_done only when the agent confirms with
+        # CancelledEvent. Sent to the mother only (the actor winds down its own children).
+        return self._request_control(
+            input.assignation,
+            instruct_kind=enums.AssignationInstructKind.CANCEL,
+            inging_kind=enums.AssignationEventKind.CANCELING,
+            to_agent_factory=lambda a: messages.Cancel(assignation=a),
         )
 
-        # Forward cancellation to child assignations — e.g. the lower assignation a
-        # higher-order wrapper delegated to, which runs the real work on another agent.
-        for child in models.Assignation.objects.filter(parent_id=assignation.id, is_done=False):
-            AgentConsumer.broadcast(
-                child.agent.id,
-                message=messages.Cancel(
-                    assignation=str(child.id),
-                ),
-            )
+    def interrupt(self, input: inputs.InterruptInputModel) -> models.Assignation:
+        # Forceful: propagates Interrupt to all still-running descendants. Still two-phase —
+        # each reaches INTERUPTED only on its agent's InterruptedEvent.
+        return self._request_control(
+            input.assignation,
+            instruct_kind=enums.AssignationInstructKind.INTERRUPT,
+            inging_kind=enums.AssignationEventKind.INTERUPTING,
+            to_agent_factory=lambda a: messages.Interrupt(assignation=a),
+            propagate_children=True,
+        )
 
-        return assignation
+    def pause(self, input: inputs.PauseInputModel) -> models.Assignation:
+        return self._request_control(
+            input.assignation,
+            instruct_kind=enums.AssignationInstructKind.PAUSE,
+            inging_kind=enums.AssignationEventKind.PAUSING,
+            to_agent_factory=lambda a: messages.Pause(assignation=a),
+        )
 
     def assign(self, principal: "CallerContext | Any", input: inputs.AssignInputModel) -> models.Assignation:
         ctx = CallerContext.coerce(principal)
@@ -408,18 +419,13 @@ class RedisControllBackend:
 
         return higher_assignation
 
-    def resume(self, info: Info, input: inputs.ResumeInputModel) -> models.Assignation:
-        assignation = models.Assignation.objects.get(id=input.assignation)
-        assignation.latest_instruct_kind = enums.AssignationInstructKind.RESUME
-        assignation.save()
-
-        AgentConsumer.broadcast(
-            assignation.agent.id,
-            message=messages.Cancel(
-                assignation=assignation.id,
-            ),
+    def resume(self, input: inputs.ResumeInputModel) -> models.Assignation:
+        return self._request_control(
+            input.assignation,
+            instruct_kind=enums.AssignationInstructKind.RESUME,
+            inging_kind=enums.AssignationEventKind.RESUMING,
+            to_agent_factory=lambda a: messages.Resume(assignation=a),
         )
-        return assignation
 
     def bounce(self, info: Info, input: inputs.BounceInputModel) -> models.Agent:
         agent = models.Agent.objects.get(id=input.agent)
@@ -486,18 +492,13 @@ class RedisControllBackend:
 
         return input.drawers
 
-    def step(self, info: Info, input: inputs.StepInputModel) -> models.Assignation:
-        assignation = models.Assignation.objects.get(id=input.assignation)
-        assignation.latest_instruct_kind = enums.AssignationInstructKind.STEP
-        assignation.save()
-
-        AgentConsumer.broadcast(
-            assignation.agent.pk,
-            message=messages.Cancel(
-                assignation=assignation.pk,
-            ),
+    def step(self, input: inputs.StepInputModel) -> models.Assignation:
+        return self._request_control(
+            input.assignation,
+            instruct_kind=enums.AssignationInstructKind.STEP,
+            inging_kind=enums.AssignationEventKind.STEPPING,
+            to_agent_factory=lambda a: messages.Step(assignation=a),
         )
-        return assignation
 
 
 controll_backend = RedisControllBackend()
