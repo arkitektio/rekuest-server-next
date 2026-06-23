@@ -18,7 +18,7 @@ from .agent import (
     UpdateAgentInput,
     UpdateAgentInputModel,
 )
-from .assignation import (
+from .task import (
     AssignInput,
     AssignInputModel,
     CancelInput,
@@ -129,7 +129,7 @@ __all__ = [
     "UnblockInputModel",
     "UpdateAgentInput",
     "UpdateAgentInputModel",
-    # assignation
+    # task
     "AssignInput",
     "AssignInputModel",
     "CancelInput",

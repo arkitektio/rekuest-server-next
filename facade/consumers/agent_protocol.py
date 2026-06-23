@@ -57,7 +57,7 @@ Authenticator = Callable[[messages.Register], Awaitable[tuple["models.Agent", Ca
 RegisterConnectionCallable = Callable[[str], Awaitable[None]]
 KickOthersCallable = Callable[[], Awaitable[None]]
 # Wired by the adapter so the protocol can join the caller event group
-# (``ass_caller_{caller_id}``) and receive the events of work it originated.
+# (``task_caller_{caller_id}``) and receive the events of work it originated.
 RegisterCallerCallable = Callable[[str], Awaitable[None]]
 
 
@@ -406,14 +406,14 @@ class AgentProtocol:
             # incumbent. Order matters: the displaced connection's disconnect handler is
             # guarded on ``active_connection_id`` — if we kicked before claiming, it could
             # still see itself as active and wrongly mark the agent disconnected.
-            assignations = await self.backend.on_agent_connected(agent.pk, self.connection_id, session_id=session_id)
+            tasks = await self.backend.on_agent_connected(agent.pk, self.connection_id, session_id=session_id)
             if was_connected and register.force:
                 await self.kick_others()
         else:
             # Non-executors (frontend/observer/caller) are NOT the singleton: no
             # displacement, no ``active_connection_id`` claim (that would corrupt the
             # executor's liveness on a shared Agent row), and no in-flight inquiries.
-            assignations = await self.backend.on_observer_connected(agent.pk, self.connection_id, mode=mode.value)
+            tasks = await self.backend.on_observer_connected(agent.pk, self.connection_id, mode=mode.value)
 
         # Registration succeeded: everything from here is the post-register half.
         self.session = RegisteredSession(
@@ -436,7 +436,7 @@ class AgentProtocol:
         await self.send_to_agent_message(
             messages.Init(
                 agent=str(agent.pk),
-                inquiries=[messages.AssignInquiry(assignation=str(a.pk)) for a in assignations],
+                inquiries=[messages.AssignInquiry(task=str(a.pk)) for a in tasks],
             )
         )
 

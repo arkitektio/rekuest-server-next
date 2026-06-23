@@ -1,6 +1,6 @@
 """Unit tests for the pure caller-event mapper (no DB, no channels).
 
-``build_caller_message`` is the single place that turns a persisted ``AssignationEvent``
+``build_execution_event`` is the single place that turns a persisted ``TaskEvent``
 into its minimal caller-bound socket message, so it is exercised here with a light stub.
 """
 
@@ -10,16 +10,16 @@ from typing import Optional
 import pytest
 
 from facade import messages
-from facade.caller_events import build_caller_message
-from facade.enums import AssignationEventChoices as Kind
+from facade.caller_events import build_execution_event
+from facade.enums import TaskEventChoices as Kind
 
 
 @dataclass
 class StubEvent:
-    """The minimal surface ``build_caller_message`` reads — stands in for the ORM model."""
+    """The minimal surface ``build_execution_event`` reads — stands in for the ORM model."""
 
     id: int = 42
-    assignation_id: str = "ass-1"
+    task_id: str = "ass-1"
     kind: str = Kind.PROGRESS.value
     message: Optional[str] = None
     progress: Optional[int] = None
@@ -28,70 +28,70 @@ class StubEvent:
 
 
 def test_progress_maps_with_progress_and_message():
-    msg = build_caller_message(StubEvent(kind=Kind.PROGRESS.value, progress=50, message="half"))
-    assert isinstance(msg, messages.CallerProgress)
-    assert msg.assignation == "ass-1" and msg.event == "42" and msg.seq == 42
+    msg = build_execution_event(StubEvent(kind=Kind.PROGRESS.value, progress=50, message="half"))
+    assert isinstance(msg, messages.ProgressEvent)
+    assert msg.task == "ass-1" and msg.event == "42" and msg.seq == 42
     assert msg.progress == 50 and msg.message == "half"
 
 
 def test_yield_carries_returns():
-    msg = build_caller_message(StubEvent(kind=Kind.YIELD.value, returns={"x": 1}))
-    assert isinstance(msg, messages.CallerYield) and msg.returns == {"x": 1}
+    msg = build_execution_event(StubEvent(kind=Kind.YIELD.value, returns={"x": 1}))
+    assert isinstance(msg, messages.YieldEvent) and msg.returns == {"x": 1}
 
 
 def test_error_and_critical_take_message_as_error():
-    err = build_caller_message(StubEvent(kind=Kind.ERROR.value, message="boom"))
-    crit = build_caller_message(StubEvent(kind=Kind.CRITICAL.value, message="fatal"))
-    assert isinstance(err, messages.CallerError) and err.error == "boom"
-    assert isinstance(crit, messages.CallerCritical) and crit.error == "fatal"
+    err = build_execution_event(StubEvent(kind=Kind.FAILED.value, message="boom"))
+    crit = build_execution_event(StubEvent(kind=Kind.CRITICAL.value, message="fatal"))
+    assert isinstance(err, messages.FailedEvent) and err.error == "boom"
+    assert isinstance(crit, messages.CriticalEvent) and crit.error == "fatal"
 
 
 def test_log_defaults_invalid_level_to_info():
-    # AssignationEvent.level is an AssignationEventChoices string (or None) — not a log
+    # TaskEvent.level is an TaskEventChoices string (or None) — not a log
     # level — so a non-log-level value must degrade to INFO rather than fail validation.
-    info = build_caller_message(StubEvent(kind=Kind.LOG.value, message="hi", level=None))
-    assert isinstance(info, messages.CallerLog) and info.level == "INFO" and info.message == "hi"
-    warn = build_caller_message(StubEvent(kind=Kind.LOG.value, message="hi", level="WARN"))
-    assert isinstance(warn, messages.CallerLog) and warn.level == "WARN"
-    coerced = build_caller_message(StubEvent(kind=Kind.LOG.value, level="PROGRESS"))
-    assert isinstance(coerced, messages.CallerLog) and coerced.level == "INFO"
+    info = build_execution_event(StubEvent(kind=Kind.LOG.value, message="hi", level=None))
+    assert isinstance(info, messages.LogEvent) and info.level == "INFO" and info.message == "hi"
+    warn = build_execution_event(StubEvent(kind=Kind.LOG.value, message="hi", level="WARN"))
+    assert isinstance(warn, messages.LogEvent) and warn.level == "WARN"
+    coerced = build_execution_event(StubEvent(kind=Kind.LOG.value, level="PROGRESS"))
+    assert isinstance(coerced, messages.LogEvent) and coerced.level == "INFO"
 
 
 def test_disconnected_carries_message():
-    msg = build_caller_message(StubEvent(kind=Kind.DISCONNECTED.value, message="fate unknown"))
-    assert isinstance(msg, messages.CallerDisconnected) and msg.message == "fate unknown"
+    msg = build_execution_event(StubEvent(kind=Kind.DISCONNECTED.value, message="fate unknown"))
+    assert isinstance(msg, messages.DisconnectedEvent) and msg.message == "fate unknown"
 
 
 @pytest.mark.parametrize(
     "kind,cls",
     [
-        (Kind.BOUND.value, messages.CallerBound),
-        (Kind.QUEUED.value, messages.CallerQueued),
-        (Kind.ASSIGN.value, messages.CallerAssigned),
-        (Kind.DELEGATE.value, messages.CallerDelegate),
-        (Kind.DONE.value, messages.CallerDone),
-        (Kind.CANCELING.value, messages.CallerCanceling),
-        (Kind.CANCELLED.value, messages.CallerCancelled),
-        (Kind.INTERUPTING.value, messages.CallerInterrupting),
-        (Kind.INTERUPTED.value, messages.CallerInterrupted),
-        (Kind.PAUSING.value, messages.CallerPausing),
-        (Kind.PAUSED.value, messages.CallerPaused),
-        (Kind.RESUMING.value, messages.CallerResuming),
-        (Kind.RESUMED.value, messages.CallerResumed),
+        (Kind.BOUND.value, messages.BoundEvent),
+        (Kind.QUEUED.value, messages.QueuedEvent),
+        (Kind.STARTED.value, messages.StartedEvent),
+        (Kind.DELEGATE.value, messages.DelegateEvent),
+        (Kind.COMPLETED.value, messages.CompletedEvent),
+        (Kind.CANCELLING.value, messages.CancellingEvent),
+        (Kind.CANCELLED.value, messages.CancelledEvent),
+        (Kind.INTERRUPTING.value, messages.InterruptingEvent),
+        (Kind.INTERRUPTED.value, messages.InterruptedEvent),
+        (Kind.PAUSING.value, messages.PausingEvent),
+        (Kind.PAUSED.value, messages.PausedEvent),
+        (Kind.RESUMING.value, messages.ResumingEvent),
+        (Kind.RESUMED.value, messages.ResumedEvent),
     ],
 )
 def test_bare_kinds_map_to_their_class(kind, cls):
-    msg = build_caller_message(StubEvent(kind=kind))
+    msg = build_execution_event(StubEvent(kind=kind))
     assert isinstance(msg, cls)
-    assert msg.assignation == "ass-1" and msg.event == "42" and msg.seq == 42
+    assert msg.task == "ass-1" and msg.event == "42" and msg.seq == 42
 
 
-def test_interupted_is_a_plain_string_value_not_a_tuple():
-    # Guards the confusing `INTERUPTED = ("INTERUPTED",)` literal in AssignationEventKind:
+def test_interrupted_is_a_plain_string_value_not_a_tuple():
+    # Guards against a `INTERRUPTED = ("INTERRUPTED",)` tuple literal in TaskEventKind:
     # the persisted choices value must be a plain string so the mapping matches.
-    assert Kind.INTERUPTED.value == "INTERUPTED"
-    assert isinstance(build_caller_message(StubEvent(kind="INTERUPTED")), messages.CallerInterrupted)
+    assert Kind.INTERRUPTED.value == "INTERRUPTED"
+    assert isinstance(build_execution_event(StubEvent(kind="INTERRUPTED")), messages.InterruptedEvent)
 
 
 def test_unforwarded_kind_returns_none():
-    assert build_caller_message(StubEvent(kind="UNASSIGN")) is None
+    assert build_execution_event(StubEvent(kind="UNASSIGN")) is None

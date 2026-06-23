@@ -25,16 +25,16 @@ def state_post_save(sender, instance: models.State = None, created=None, **kwarg
 def action_singal(sender, instance=None, created=None, **kwargs):
     if instance:
         if created:
-            channels.action_channel.broadcast(channel_events.ActionSignal(create=instance.id), [f"actions_{instance.organization.id}"])
+            channels.action_channel.broadcast(channel_events.ActionEvent(create=instance.id), [f"actions_{instance.organization.id}"])
         else:
-            channels.action_channel.broadcast(channel_events.ActionSignal(update=instance.id), [f"actions_{instance.organization.id}"])
+            channels.action_channel.broadcast(channel_events.ActionEvent(update=instance.id), [f"actions_{instance.organization.id}"])
 
 
 @receiver(post_save, sender=models.Agent)
 def agent_post_save(sender, instance: models.Agent = None, created=None, **kwargs):
     if instance:
         channels.agent_updated_channel.broadcast(
-            channel_events.AgentSignal(create=instance.id) if created else channel_events.AgentSignal(update=instance.id),
+            channel_events.AgentEvent(create=instance.id) if created else channel_events.AgentEvent(update=instance.id),
             [f"agents_for_{instance.organization.id}"],
         )
 
@@ -43,52 +43,52 @@ def agent_post_save(sender, instance: models.Agent = None, created=None, **kwarg
 def agent_post_delete(sender, instance: models.Agent = None, **kwargs):
     if instance:
         channels.agent_updated_channel.broadcast(
-            channel_events.AgentSignal(delete=instance.id),
+            channel_events.AgentEvent(delete=instance.id),
             [f"agents_for_{instance.organization.id}"],
         )
 
 
-@receiver(post_save, sender=models.Assignation)
-def ass_post_save(sender, instance: models.Assignation = None, created=None, **kwargs):
+@receiver(post_save, sender=models.Task)
+def task_post_save(sender, instance: models.Task = None, created=None, **kwargs):
     if created and instance.caller_id:
-        channels.assignation_event_channel.broadcast(
-            channel_events.AssignationEventCreatedEvent(create=str(instance.id)),
-            [f"ass_caller_{instance.caller_id}"],
+        channels.task_event_channel.broadcast(
+            channel_events.TaskEventCreatedEvent(create=str(instance.id)),
+            [f"task_caller_{instance.caller_id}"],
         )
 
     if instance.parent:
         if created:
-            channels.child_assignation_channel.broadcast(
-                channel_events.ChildAssignationEvent(create=str(instance.id)),
-                [f"child_assignations_{instance.parent.id}"],
+            channels.child_task_channel.broadcast(
+                channel_events.ChildTaskEvent(create=str(instance.id)),
+                [f"child_tasks_{instance.parent.id}"],
             )
         else:
-            channels.child_assignation_channel.broadcast(
-                channel_events.ChildAssignationEvent(update=str(instance.id)),
-                [f"child_assignations_{instance.parent.id}"],
+            channels.child_task_channel.broadcast(
+                channel_events.ChildTaskEvent(update=str(instance.id)),
+                [f"child_tasks_{instance.parent.id}"],
             )
 
 
-@receiver(post_save, sender=models.AssignationEvent)
-def ass_event_post_save(sender, instance: models.AssignationEvent = None, created=None, **kwargs):
-    logger.info("Assignation Event received")
+@receiver(post_save, sender=models.TaskEvent)
+def task_event_post_save(sender, instance: models.TaskEvent = None, created=None, **kwargs):
+    logger.info("Task Event received")
     # One typed publisher fans the persisted event out to its caller (channel layer for the
     # GraphQL subscription + live WS forward, and a webhook POST for a HookAgent caller).
-    transport.publish_assignation_event(instance)
+    transport.publish_task_event(instance)
 
 
 @receiver(post_save, sender=models.Implementation)
 def implementation_post_save(sender, instance: models.Implementation = None, created=None, **kwargs):
     if created:
-        channels.new_implementation_channel.broadcast(channel_events.ImplementationSignal(create=instance.id))
+        channels.new_implementation_channel.broadcast(channel_events.ImplementationEvent(create=instance.id))
     else:
-        channels.new_implementation_channel.broadcast(channel_events.ImplementationSignal(update=instance.id), [f"implementation_{instance.id}"])
+        channels.new_implementation_channel.broadcast(channel_events.ImplementationEvent(update=instance.id), [f"implementation_{instance.id}"])
 
 
 @receiver(post_delete, sender=models.Implementation)
 def implementation_post_del(sender, instance: models.Implementation = None, **kwargs):
     if instance:
-        channels.new_implementation_channel.broadcast(channel_events.ImplementationSignal(delete=instance.id), [f"implementation_{instance.id}"])
+        channels.new_implementation_channel.broadcast(channel_events.ImplementationEvent(delete=instance.id), [f"implementation_{instance.id}"])
 
 
 @receiver(post_save, sender=models.Patch)

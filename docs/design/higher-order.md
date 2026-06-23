@@ -27,12 +27,12 @@ the remap/unfold contract is unit-testable without a database or the websocket s
 ## Two-tier execution: wrapper (virtual) + child (real)
 
 When `assign` resolves a higher-order implementation it calls `_assign_higher_order` instead of the
-normal path. Two assignations are created:
+normal path. Two tasks are created:
 
-- **Wrapper assignation** (`H`) — the user-facing one. It is created with the original caller args
+- **Wrapper task** (`H`) — the user-facing one. It is created with the original caller args
   but is **never broadcast to an agent**; its own agent need not even be connected. This is what the
   caller subscribes to and sees events on.
-- **Child assignation** (`L`) — the real work. Its args/dependencies are projected from the wrapper,
+- **Child task** (`L`) — the real work. Its args/dependencies are projected from the wrapper,
   it is parented to the wrapper (`parent = H`, `root = H.root or H`), and it **is** broadcast to a
   freshly-resolved connected agent that implements the lower action.
 
@@ -48,12 +48,12 @@ sequenceDiagram
     C->>BE: assign(higher implementation)
     BE->>BE: resolve connected lower implementation/agent
     BE->>BE: build_lower_args / build_lower_dependencies
-    BE->>DB: create wrapper assignation H (NOT broadcast)
-    BE->>DB: create child assignation L (parent = H)
+    BE->>DB: create wrapper task H (NOT broadcast)
+    BE->>DB: create child task L (parent = H)
     BE->>AG: broadcast Assign(L)
     AG-->>PB: YieldEvent / DoneEvent / ErrorEvent (on L)
     PB->>PB: project_returns(config, L.returns)
-    PB->>DB: AssignationEvent on H (delegated_to = L)
+    PB->>DB: TaskEvent on H (delegated_to = L)
     DB-->>C: subscription on H sees the (mapped) event
 ```
 
@@ -80,7 +80,7 @@ clash):
 ## Projecting dependencies inward — `build_lower_dependencies`
 
 `build_lower_dependencies(config, resolved_h_dependencies)` takes the wrapper's *resolved* dependency
-dict (an explicit, stored contract — see [assignation-lifecycle.md](assignation-lifecycle.md)) and
+dict (an explicit, stored contract — see [task-lifecycle.md](task-lifecycle.md)) and
 projects it onto `L`'s dependency slots:
 
 - **Empty `dependency_map`** → pass-through by matching key.
@@ -109,7 +109,7 @@ child's terminal/yield events onto the wrapper. `_unfold_to_higher_order` (calle
 1. Loads the child, finds its `parent`, and checks the parent's implementation is a wrapper
    (`higher_order_for_id is not None`). Non-higher-order children (hooks, dependency sub-assignments)
    are ignored.
-2. Creates an `AssignationEvent` on the **wrapper** with the same `kind`, linked via `delegated_to =
+2. Creates an `TaskEvent` on the **wrapper** with the same `kind`, linked via `delegated_to =
    child`. For `YIELD`, the returns are run through `project_returns` first.
 3. On a terminal kind, marks the wrapper `is_done` and stamps `finished_at`.
 

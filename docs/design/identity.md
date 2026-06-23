@@ -64,9 +64,9 @@ def get_caller_for_context(info: Info) -> models.Caller:
 
 The Caller's roles:
 
-- **Owns requests.** It is stamped on `Assignation.caller` and `Reservation.caller` — the record of
+- **Owns requests.** It is stamped on `Task.caller` and `Reservation.caller` — the record of
   *who requested* the work, stored separately from *who executes* it.
-- **Keys the realtime channel.** Assignation events are broadcast to `ass_caller_{caller_id}`
+- **Keys the realtime channel.** Task events are broadcast to `ass_caller_{caller_id}`
   (`facade/signals.py`); the caller subscribes there to watch its own work. See
   [realtime.md](realtime.md).
 - **Exists without an Agent.** A pure frontend that only assigns and watches has a `Caller` and no
@@ -108,7 +108,7 @@ class Agent(models.Model):
 
 There is exactly **one Agent per `(client, user, organization)`** — the provider complement of the
 Caller constraint. An Agent owns `Implementation`s (the actions it can run), `State`s, `Lock`s and
-the `Assignation`s routed to it.
+the `Task`s routed to it.
 
 > **Note on creation:** the WebSocket `default_authenticator` can only *find* an existing Agent —
 > its `aget_or_create` create-branch omits the required `app`/`release`/`device` columns. Agents are
@@ -123,9 +123,9 @@ tempting. It is wrong, for concrete reasons:
 - **Caller-without-agent is normal.** Frontends assign, query and subscribe with a Caller and no
   Agent. Merging would force every requestor to own an Agent row — which means `app`/`release`/
   `device` and "I am a provider" — conflating *requestor* with *executor*.
-- **Requestor ≠ executor on a single record.** `Assignation.caller` (who asked) and
-  `Assignation.agent` (who runs) are deliberately different FKs. User A can assign to user B's
-  agent. A merged model would have to denormalize the triple onto every assignation/reservation and
+- **Requestor ≠ executor on a single record.** `Task.caller` (who asked) and
+  `Task.agent` (who runs) are deliberately different FKs. User A can assign to user B's
+  agent. A merged model would have to denormalize the triple onto every task/reservation and
   lose the single, deduplicated identity object.
 - **They evolve independently.** Provider cardinality might later become 1-per-device (same user,
   two machines); requestor identity stays 1-per-triple. Two models keep that future open.
@@ -142,7 +142,7 @@ and agent-owner, via a 1:1 `Agent.registry` FK). It was split:
 
 - `Registry` was renamed to **`Caller`** to name its real role (the requestor).
 - `Agent` gained its **own** `client` FK and **dropped** `registry`, so it stands alone.
-- The requestor FK on `Assignation` / `Reservation` / `AssignationInstruct` was renamed
+- The requestor FK on `Task` / `Reservation` / `TaskInstruct` was renamed
   `registry` → **`caller`**, and the realtime channel `ass_registry_{id}` → **`ass_caller_{id}`**.
 
 If you encounter `registry` in old branches, migrations, or external schema snapshots, read it as
@@ -151,5 +151,5 @@ If you encounter `registry` in old branches, migrations, or external schema snap
 ## Where this shows up next
 
 - The full model graph and constraints: [domain-model.md](domain-model.md).
-- How a Caller's `assign` becomes routed work: [assignation-lifecycle.md](assignation-lifecycle.md).
+- How a Caller's `assign` becomes routed work: [task-lifecycle.md](task-lifecycle.md).
 - How an Agent authenticates and connects: [agent-protocol.md](agent-protocol.md).

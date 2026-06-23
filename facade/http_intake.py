@@ -1,10 +1,10 @@
 """HTTP POST intake — the upstream transport for HookAgents.
 
 A HookAgent POSTs the same FromAgent messages a websocket agent would send (reporting events
-like Done/Yield/Progress, and ``CallerAssign`` for server-to-server origination) to
+like Done/Yield/Progress, and ``AssignRequest`` for server-to-server origination) to
 ``POST /agi/http/<agent_id>``, HMAC-signed with the agent's ``hook_url_secret``. The request
 is verified, parsed, and routed through the SAME :func:`route_from_agent_message` the socket
-uses; the reply (``EventAck`` / ``CallerAssignResult``) is returned in the HTTP response.
+uses; the reply (``EventAck`` / ``AssignResponse``) is returned in the HTTP response.
 """
 
 from __future__ import annotations

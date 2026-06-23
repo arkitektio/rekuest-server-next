@@ -56,7 +56,7 @@ class TestProvenanceDispatch:
         await register(communicator, instance_id="prov-agent")
 
         info = _Info(authenticated_context)
-        assignation = await sync_to_async(controll_backend.assign)(
+        task = await sync_to_async(controll_backend.assign)(
             info, inputs.AssignInputModel(implementation=str(impl.pk), args={"x": 1})
         )
 
@@ -69,8 +69,8 @@ class TestProvenanceDispatch:
         decoded = _decode(received["token"])
         assert decoded.header["alg"] == "EdDSA"
         claims = decoded.claims
-        assert claims["tsk"] == str(assignation.pk)
-        assert claims["rtk"] == str(assignation.pk)
+        assert claims["tsk"] == str(task.pk)
+        assert claims["rtk"] == str(task.pk)
         assert claims["ptk"] is None
         # The seeded caller's sub (static test token) is the human root.
         assert claims["sub"] == "1"

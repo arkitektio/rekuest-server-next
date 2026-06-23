@@ -4,7 +4,7 @@ This ``__init__`` re-exports every public type so the established
 ``from facade import types`` / ``types.X`` access keeps working.
 
 Because the types densely cross-reference each other (e.g. ``Agent`` references
-``Assignation``), the submodules use
+``Task``), the submodules use
 ``from __future__ import annotations`` so no annotation is evaluated at import
 time (avoiding import cycles). At the bottom of this module every public type is
 injected into each submodule's globals, so that the string forward references
@@ -14,7 +14,7 @@ resolve against the defining module's namespace when Strawberry builds the schem
 from . import (
     action,
     agent,
-    assignation,
+    task,
     auth,
     base,
     blok,
@@ -32,12 +32,12 @@ from . import (
 )
 from .action import Action, ActionStats, ActionStatsResolver
 from .agent import Agent, AgentEvent, HardwareRecord
-from .assignation import (
-    Assignation,
-    AssignationEvent,
-    AssignationInstruct,
-    AssignationStats,
-    AssignationStatsResolver,
+from .task import (
+    Task,
+    TaskEvent,
+    TaskInstruct,
+    TaskStats,
+    TaskStatsResolver,
 )
 from .auth import App, Caller, Client, Device, Organization, Release, User
 from .base import build_prescoped_queryset, build_prescoper
@@ -123,11 +123,11 @@ __all__ = [
     "FilesystemShelve",
     "FileDrawer",
     "MemoryDrawer",
-    "Assignation",
-    "AssignationStats",
-    "AssignationStatsResolver",
-    "AssignationEvent",
-    "AssignationInstruct",
+    "Task",
+    "TaskStats",
+    "TaskStatsResolver",
+    "TaskEvent",
+    "TaskInstruct",
     "TestCase",
     "TestResult",
     "Dashboard",
@@ -165,7 +165,7 @@ __all__ = [
 _SUBMODULES = (
     action,
     agent,
-    assignation,
+    task,
     auth,
     blok,
     dashboard,

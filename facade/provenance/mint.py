@@ -12,9 +12,9 @@ the full vocabulary):
     act.cid      the executing agent's OAuth client_id
     iat / exp    issued-at / expiry                                        (RFC 7519)
     jti          unique per token (verifier enforces single-use)           (RFC 7519)
-    tsk          this assignation id (task)
-    ptk          parent assignation id (null if this is the root)
-    rtk          root assignation id (== tsk when this is the root)
+    tsk          this task id (task)
+    ptk          parent task id (null if this is the root)
+    rtk          root task id (== tsk when this is the root)
     rcb          root caused by — the human principal at the root (invariant: always human)
     ahs          args hash: sha256 of the canonicalized args (see canonical.py)
     aha          args hash algorithm/version, so verifiers know how to recompute
@@ -38,9 +38,9 @@ logger = logging.getLogger(__name__)
 _MAX_LINEAGE_DEPTH = 256
 
 
-def _resolve_root(assignation: Any) -> Any:
-    """Walk the ``parent`` chain to the originating (root) assignation."""
-    current = assignation
+def _resolve_root(task: Any) -> Any:
+    """Walk the ``parent`` chain to the originating (root) task."""
+    current = task
     seen = 0
     while current.parent_id is not None and seen < _MAX_LINEAGE_DEPTH:
         current = current.parent
@@ -67,8 +67,8 @@ def _sign(claims: Dict[str, Any]) -> str:
     return jwt.encode(header, claims, keys.get_signing_key(), algorithms=keys.ALGORITHMS)
 
 
-def mint_token_for_assignation(assignation: Any, ctx: Any) -> Optional[str]:
-    """Mint the provenance token for ``assignation``, or return None to skip.
+def mint_token_for_task(task: Any, ctx: Any) -> Optional[str]:
+    """Mint the provenance token for ``task``, or return None to skip.
 
     ``ctx`` is a :class:`facade.caller_context.CallerContext` (a legacy ``Info`` is also
     accepted and coerced). Returns None when the implementation opts out
@@ -79,14 +79,14 @@ def mint_token_for_assignation(assignation: Any, ctx: Any) -> Optional[str]:
 
     ctx = CallerContext.coerce(ctx)
 
-    implementation = assignation.implementation
+    implementation = task.implementation
     if implementation is None or not implementation.needs_token:
         return None
 
-    agent = assignation.agent
+    agent = task.agent
 
-    is_top = assignation.parent_id is None
-    root = assignation if is_top else _resolve_root(assignation)
+    is_top = task.parent_id is None
+    root = task if is_top else _resolve_root(task)
 
     # Immediate causer of this hop, and the human at the root of the tree.
     sub = str(ctx.user.sub)
@@ -104,7 +104,7 @@ def mint_token_for_assignation(assignation: Any, ctx: Any) -> Optional[str]:
 
     if not root_human:
         message = (
-            f"Refusing to mint provenance token for assignation {assignation.pk}: "
+            f"Refusing to mint provenance token for task {task.pk}: "
             f"root principal (root_caused_by={root_caused_by}) is not an accountable human."
         )
         if settings.PROVENANCE["STRICT"]:
@@ -125,11 +125,11 @@ def mint_token_for_assignation(assignation: Any, ctx: Any) -> Optional[str]:
         "exp": int(exp.timestamp()),
         "jti": str(uuid.uuid4()),
         # Rekuest provenance claims (compact symbols; see docs/design/provenance.md).
-        "tsk": str(assignation.pk),
-        "ptk": str(assignation.parent_id) if assignation.parent_id else None,
+        "tsk": str(task.pk),
+        "ptk": str(task.parent_id) if task.parent_id else None,
         "rtk": str(root.pk),
         "rcb": root_caused_by,
-        "ahs": canonical.args_hash(assignation.args or {}),
+        "ahs": canonical.args_hash(task.args or {}),
         "aha": f"sha256-canonical-v{canonical.CANONICALIZATION_VERSION}",
     }
 

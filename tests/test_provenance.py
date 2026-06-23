@@ -6,7 +6,7 @@ shape + signature of the minted claim set. Verification semantics that belong
 downstream (single-use jti, actor binding, args_hash recomputation) are out of
 scope here.
 
-The mint tests use lightweight fakes for the assignation/request graph so the
+The mint tests use lightweight fakes for the task/request graph so the
 issuing logic can be verified without standing up the database — the claim
 contract depends only on attributes Rekuest reads off those objects.
 """
@@ -39,7 +39,7 @@ def _implementation(needs_token: bool = True, provenance_audience: Optional[list
     return SimpleNamespace(needs_token=needs_token, provenance_audience=provenance_audience)
 
 
-def _assignation(
+def _task(
     pk: str,
     *,
     implementation: Any = None,
@@ -152,14 +152,14 @@ def test_derive_from_action_uses_args_and_returns() -> None:
 
 def test_audience_taken_from_implementation(lenient: None) -> None:
     impl = _implementation(provenance_audience=["mikro", "fluss"])
-    assignation = _assignation("1", implementation=impl)
-    token = mint.mint_token_for_assignation(assignation, _info())
+    task = _task("1", implementation=impl)
+    token = mint.mint_token_for_task(task, _info())
     assert _decode(token).claims["aud"] == ["mikro", "fluss"]
 
 
 def test_audience_empty_when_implementation_has_none(lenient: None) -> None:
-    assignation = _assignation("1", implementation=_implementation(provenance_audience=None))
-    token = mint.mint_token_for_assignation(assignation, _info())
+    task = _task("1", implementation=_implementation(provenance_audience=None))
+    token = mint.mint_token_for_task(task, _info())
     assert _decode(token).claims["aud"] == []
 
 
@@ -168,8 +168,8 @@ def test_audience_empty_when_implementation_has_none(lenient: None) -> None:
 
 def test_needs_token_false_skips_minting(lenient: None) -> None:
     impl = _implementation(needs_token=False)
-    assignation = _assignation("1", implementation=impl)
-    assert mint.mint_token_for_assignation(assignation, _info()) is None
+    task = _task("1", implementation=impl)
+    assert mint.mint_token_for_task(task, _info()) is None
 
 
 # --- top-level claim correctness -----------------------------------------
@@ -178,10 +178,10 @@ def test_needs_token_false_skips_minting(lenient: None) -> None:
 def test_top_level_claims(lenient: None) -> None:
     agent = _agent(user_sub="agent-9", client_id="client-9")
     impl = _implementation(provenance_audience=["mikro"])
-    assignation = _assignation("assign-1", implementation=impl, agent=agent, args={"x": 1})
+    task = _task("assign-1", implementation=impl, agent=agent, args={"x": 1})
     info = _info(user_sub="human-7")
 
-    token = mint.mint_token_for_assignation(assignation, info)
+    token = mint.mint_token_for_task(task, info)
     decoded = _decode(token)
 
     # Header: pinned EdDSA, kid present.
@@ -207,9 +207,9 @@ def test_top_level_claims(lenient: None) -> None:
 
 
 def test_jti_is_unique_per_mint(lenient: None) -> None:
-    assignation = _assignation("1")
+    task = _task("1")
     info = _info()
-    jtis = {_decode(mint.mint_token_for_assignation(assignation, info)).claims["jti"] for _ in range(5)}
+    jtis = {_decode(mint.mint_token_for_task(task, info)).claims["jti"] for _ in range(5)}
     assert len(jtis) == 5
 
 
@@ -218,18 +218,18 @@ def test_jti_is_unique_per_mint(lenient: None) -> None:
 
 def test_sub_assignment_inherits_root(lenient: None) -> None:
     root_caller = SimpleNamespace(user=SimpleNamespace(sub="root-human"), user_id=1, organization_id=1)
-    root = _assignation("root-1", caller=root_caller)
-    child = _assignation("child-1", parent=root)
+    root = _task("root-1", caller=root_caller)
+    child = _task("child-1", parent=root)
     # The hop is caused by some service principal, not the root human.
     info = _info(user_sub="service-principal")
 
-    token = mint.mint_token_for_assignation(child, info)
+    token = mint.mint_token_for_task(child, info)
     claims = _decode(token).claims
 
     assert claims["tsk"] == "child-1"
     assert claims["ptk"] == "root-1"
     assert claims["rtk"] == "root-1"
-    # Root human inherited from the root assignation's caller, not the hop principal.
+    # Root human inherited from the root task's caller, not the hop principal.
     assert claims["rcb"] == "root-human"
     assert claims["sub"] == "service-principal"
 
@@ -240,27 +240,27 @@ def test_sub_assignment_inherits_root(lenient: None) -> None:
 def test_strict_refuses_non_human_root(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(settings.PROVENANCE, "HUMAN_ROLES", ["user"])
     monkeypatch.setitem(settings.PROVENANCE, "STRICT", True)
-    assignation = _assignation("1")
+    task = _task("1")
     info = _info(roles=["service"])  # no "user" role
     with pytest.raises(ValueError):
-        mint.mint_token_for_assignation(assignation, info)
+        mint.mint_token_for_task(task, info)
 
 
 def test_lenient_skips_non_human_root(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(settings.PROVENANCE, "HUMAN_ROLES", ["user"])
     monkeypatch.setitem(settings.PROVENANCE, "STRICT", False)
-    assignation = _assignation("1")
+    task = _task("1")
     info = _info(roles=["service"])
-    assert mint.mint_token_for_assignation(assignation, info) is None
+    assert mint.mint_token_for_task(task, info) is None
 
 
 def test_human_role_allows_mint(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(settings.PROVENANCE, "HUMAN_ROLES", ["user"])
     monkeypatch.setitem(settings.PROVENANCE, "STRICT", True)
     monkeypatch.setitem(settings.PROVENANCE, "DEFAULT_AUDIENCE", [])
-    assignation = _assignation("1")
+    task = _task("1")
     info = _info(user_sub="real-human", roles=["user", "viewer"])
-    token = mint.mint_token_for_assignation(assignation, info)
+    token = mint.mint_token_for_task(task, info)
     assert _decode(token).claims["rcb"] == "real-human"
 
 

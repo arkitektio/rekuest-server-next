@@ -18,12 +18,12 @@ class TestAgentDelivery:
         session = await open_agent(agent_ws, "delivery-agent")
 
         assign = messages.Assign(
-            interface="iface", assignation=str(uuid.uuid4()),
+            interface="iface", task=str(uuid.uuid4()),
             args={"a": 1}, user="1", app="test-app", action="some-action",
         )
         # broadcast() lpushes to the agent's redis queue; listen_for_tasks relays it.
         await sync_to_async(AgentConsumer.broadcast)(session.agent_pk, assign)
 
         received = await session.receive(messages.Assign)
-        assert received.assignation == assign.assignation
+        assert received.task == assign.task
         assert received.args == {"a": 1}

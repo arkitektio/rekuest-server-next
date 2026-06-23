@@ -9,7 +9,7 @@ from facade import enums, inputs, models, types, messages
 from facade.caller_context import CallerContext
 from facade.consumers.async_consumer import AgentConsumer
 from facade.higher_order import build_lower_args, build_lower_dependencies
-from facade.provenance import mint_token_for_assignation
+from facade.provenance import mint_token_for_task
 from kante.types import Info
 import logging
 
@@ -118,74 +118,74 @@ def acted_on_from_args(args: dict, action: models.Action) -> list[str]:
 
 
 class RedisControllBackend:
-    """The postman backend: resolves + persists assignations, then notifies via transport."""
+    """The postman backend: resolves + persists tasks, then notifies via transport."""
 
     def create_message_id(self) -> str:
         return str(uuid.uuid4())
 
     def _request_control(
         self,
-        assignation_id,
+        task_id,
         *,
         instruct_kind,
         inging_kind,
         to_agent_factory,
         propagate_children: bool = False,
-    ) -> models.Assignation:
+    ) -> models.Task:
         """The shared request phase of a two-phase lifecycle op.
 
         Sets ``latest_instruct_kind``, persists the ``-ING`` event (which fans out the matching
         ``Caller*ing`` mirror to the caller), and broadcasts the ToAgent control message — for
         the target, and (when ``propagate_children``) for every still-running descendant. The
         op resolves only when the executing agent sends the matching confirmation event. Raises
-        if the assignation is already terminal.
+        if the task is already terminal.
         """
-        ass = models.Assignation.objects.select_related("agent").get(id=assignation_id)
-        if ass.is_done:
-            raise ValueError("Assignation is already terminal")
+        task = models.Task.objects.select_related("agent").get(id=task_id)
+        if task.is_done:
+            raise ValueError("Task is already terminal")
 
-        targets = [ass]
+        targets = [task]
         if propagate_children:
-            targets += list(models.Assignation.objects.filter(root_id=ass.id, is_done=False))
+            targets += list(models.Task.objects.filter(root_id=task.id, is_done=False))
 
         for target in targets:
             target.latest_instruct_kind = instruct_kind
             target.save(update_fields=["latest_instruct_kind"])
-            models.AssignationEvent.objects.create(assignation=target, kind=inging_kind)
+            models.TaskEvent.objects.create(task=target, kind=inging_kind)
             AgentConsumer.broadcast(target.agent_id, to_agent_factory(str(target.pk)))
 
-        return ass
+        return task
 
-    def cancel(self, input: inputs.CancelInputModel) -> models.Assignation:
+    def cancel(self, input: inputs.CancelInputModel) -> models.Task:
         # Two-phase: CANCELING now; CANCELLED + is_done only when the agent confirms with
         # CancelledEvent. Sent to the mother only (the actor winds down its own children).
         return self._request_control(
-            input.assignation,
-            instruct_kind=enums.AssignationInstructKind.CANCEL,
-            inging_kind=enums.AssignationEventKind.CANCELING,
-            to_agent_factory=lambda a: messages.Cancel(assignation=a),
+            input.task,
+            instruct_kind=enums.TaskInstructKind.CANCEL,
+            inging_kind=enums.TaskEventKind.CANCELLING,
+            to_agent_factory=lambda a: messages.Cancel(task=a),
         )
 
-    def interrupt(self, input: inputs.InterruptInputModel) -> models.Assignation:
+    def interrupt(self, input: inputs.InterruptInputModel) -> models.Task:
         # Forceful: propagates Interrupt to all still-running descendants. Still two-phase —
-        # each reaches INTERUPTED only on its agent's InterruptedEvent.
+        # each reaches INTERRUPTED only on its agent's Interrupted report.
         return self._request_control(
-            input.assignation,
-            instruct_kind=enums.AssignationInstructKind.INTERRUPT,
-            inging_kind=enums.AssignationEventKind.INTERUPTING,
-            to_agent_factory=lambda a: messages.Interrupt(assignation=a),
+            input.task,
+            instruct_kind=enums.TaskInstructKind.INTERRUPT,
+            inging_kind=enums.TaskEventKind.INTERRUPTING,
+            to_agent_factory=lambda a: messages.Interrupt(task=a),
             propagate_children=True,
         )
 
-    def pause(self, input: inputs.PauseInputModel) -> models.Assignation:
+    def pause(self, input: inputs.PauseInputModel) -> models.Task:
         return self._request_control(
-            input.assignation,
-            instruct_kind=enums.AssignationInstructKind.PAUSE,
-            inging_kind=enums.AssignationEventKind.PAUSING,
-            to_agent_factory=lambda a: messages.Pause(assignation=a),
+            input.task,
+            instruct_kind=enums.TaskInstructKind.PAUSE,
+            inging_kind=enums.TaskEventKind.PAUSING,
+            to_agent_factory=lambda a: messages.Pause(task=a),
         )
 
-    def assign(self, principal: "CallerContext | Any", input: inputs.AssignInputModel) -> models.Assignation:
+    def assign(self, principal: "CallerContext | Any", input: inputs.AssignInputModel) -> models.Task:
         ctx = CallerContext.coerce(principal)
         # TODO: Check if function is cached and was
 
@@ -199,13 +199,13 @@ class RedisControllBackend:
 
         if input.dependency:
             assert input.method, "Method key must be provided when assigning to a dependency"
-            assert input.parent, "Dependency assignments must have a parent assignation"
+            assert input.parent, "Dependency assignments must have a parent task"
 
-            parent = models.Assignation.objects.get(id=input.parent)
+            parent = models.Task.objects.get(id=input.parent)
             dependencies = parent.dependencies
 
             if input.dependency not in dependencies:
-                raise ValueError(f"Dependency {input.dependency} not found in parent assignation dependencies. {parent.dependencies}")
+                raise ValueError(f"Dependency {input.dependency} not found in parent task dependencies. {parent.dependencies}")
 
             agent_dependency = dependencies[input.dependency]
 
@@ -262,10 +262,10 @@ class RedisControllBackend:
             raise ValueError("You need to provide either, action_hash or action_id, to create an assignment for an agent")
 
         if not action:
-            raise ValueError("Could not determine action for this assignation")
+            raise ValueError("Could not determine action for this task")
 
-        # Higher-order implementations are orchestrated server-side: the wrapper assignation
-        # is virtual and a child assignation runs the resolved lower implementation.
+        # Higher-order implementations are orchestrated server-side: the wrapper task
+        # is virtual and a child task runs the resolved lower implementation.
         if implementation is not None and implementation.higher_order_for_id is not None:
             return self._assign_higher_order(ctx, input, implementation, caller)
 
@@ -275,8 +275,8 @@ class RedisControllBackend:
         if dependency_dict is None:
             dependency_dict = build_dependency_dict(implementation, ctx, input.dependencies or [])
 
-        # TODO: if ephemeral is set, we should not store the assignation in the database
-        assignation = models.Assignation.objects.create(
+        # TODO: if ephemeral is set, we should not store the task in the database
+        task = models.Task.objects.create(
             action=action,
             args=input.args,
             reference=reference,
@@ -289,8 +289,8 @@ class RedisControllBackend:
             dependency_method=input.method,
             resolution=resolution,
             is_done=False,
-            latest_event_kind=enums.AssignationEventKind.ASSIGN,
-            latest_instruct_kind=enums.AssignationInstructKind.ASSIGN,
+            latest_event_kind=enums.TaskEventKind.STARTED,
+            latest_instruct_kind=enums.TaskInstructKind.ASSIGN,
             hooks=input.hooks or [],
             dependencies=dependency_dict,
             caller=caller,
@@ -299,12 +299,12 @@ class RedisControllBackend:
 
         action = implementation.action
 
-        token = mint_token_for_assignation(assignation, ctx)
+        token = mint_token_for_task(task, ctx)
 
         AgentConsumer.broadcast(
-            assignation.agent.pk,
+            task.agent.pk,
             message=messages.Assign(
-                assignation=str(assignation.pk),
+                task=str(task.pk),
                 args=input.args,
                 user=str(ctx.user.sub),
                 app=str(ctx.client.client_id),
@@ -325,19 +325,19 @@ class RedisControllBackend:
                         ctx,
                         inputs.AssignInputModel(
                             action_hash=hook.hash,
-                            parent=assignation.pk,
-                            args={"assignation": assignation.pk},
+                            parent=task.pk,
+                            args={"task": task.pk},
                             reference="init_hook_0",
                         ),
                     )
 
-        return assignation
+        return task
 
-    def _assign_higher_order(self, ctx: CallerContext, input: inputs.AssignInputModel, higher: models.Implementation, caller: models.Caller) -> models.Assignation:
-        """Orchestrate a higher-order assignation: remap args/deps, run a child on the lower agent.
+    def _assign_higher_order(self, ctx: CallerContext, input: inputs.AssignInputModel, higher: models.Implementation, caller: models.Caller) -> models.Task:
+        """Orchestrate a higher-order task: remap args/deps, run a child on the lower agent.
 
-        The wrapper (``higher``) assignation is virtual — it is never broadcast to an agent.
-        A child assignation runs the resolved lower implementation; its yields/done are unfolded
+        The wrapper (``higher``) task is virtual — it is never broadcast to an agent.
+        A child task runs the resolved lower implementation; its yields/done are unfolded
         back onto the wrapper in ``persist_backend`` (see the higher-order return path).
         """
         config = higher.higher_order_config or {}
@@ -361,8 +361,8 @@ class RedisControllBackend:
 
         reference = input.reference or self.create_message_id()
 
-        # The user-facing wrapper assignation — created but NOT broadcast.
-        higher_assignation = models.Assignation.objects.create(
+        # The user-facing wrapper task — created but NOT broadcast.
+        higher_task = models.Task.objects.create(
             action=higher.action,
             args=input.args,
             reference=reference,
@@ -372,43 +372,43 @@ class RedisControllBackend:
             capture=input.capture if input.capture is not None else False,
             implementation=higher,
             is_done=False,
-            latest_event_kind=enums.AssignationEventKind.ASSIGN,
-            latest_instruct_kind=enums.AssignationInstructKind.ASSIGN,
+            latest_event_kind=enums.TaskEventKind.STARTED,
+            latest_instruct_kind=enums.TaskInstructKind.ASSIGN,
             hooks=input.hooks or [],
             dependencies=higher_dependencies,
             caller=caller,
             ephemeral=input.ephemeral if input.ephemeral is not None else False,
         )
 
-        # The child assignation that actually runs on the resolved lower agent.
-        lower_assignation = models.Assignation.objects.create(
+        # The child task that actually runs on the resolved lower agent.
+        lower_task = models.Task.objects.create(
             action=lower_action,
             args=lower_args,
             reference=self.create_message_id(),
-            parent=higher_assignation,
-            root=higher_assignation.root or higher_assignation,
+            parent=higher_task,
+            root=higher_task.root or higher_task,
             agent=lower_agent,
             acted_on=acted_on_from_args(lower_args, lower_action),
             capture=False,
             implementation=lower_impl,
             is_done=False,
-            latest_event_kind=enums.AssignationEventKind.ASSIGN,
-            latest_instruct_kind=enums.AssignationInstructKind.ASSIGN,
+            latest_event_kind=enums.TaskEventKind.STARTED,
+            latest_instruct_kind=enums.TaskInstructKind.ASSIGN,
             dependencies=lower_dependencies,
             caller=caller,
         )
 
-        token = mint_token_for_assignation(lower_assignation, ctx)
+        token = mint_token_for_task(lower_task, ctx)
 
         AgentConsumer.broadcast(
             lower_agent.pk,
             message=messages.Assign(
-                assignation=str(lower_assignation.pk),
+                task=str(lower_task.pk),
                 args=lower_args,
                 user=str(ctx.user.sub),
                 app=str(ctx.client.client_id),
                 org=str(ctx.organization.slug) if ctx.organization else None,
-                reference=lower_assignation.reference,
+                reference=lower_task.reference,
                 capture=False,
                 resolution=None,
                 interface=lower_impl.interface,
@@ -417,14 +417,14 @@ class RedisControllBackend:
             ),
         )
 
-        return higher_assignation
+        return higher_task
 
-    def resume(self, input: inputs.ResumeInputModel) -> models.Assignation:
+    def resume(self, input: inputs.ResumeInputModel) -> models.Task:
         return self._request_control(
-            input.assignation,
-            instruct_kind=enums.AssignationInstructKind.RESUME,
-            inging_kind=enums.AssignationEventKind.RESUMING,
-            to_agent_factory=lambda a: messages.Resume(assignation=a, step=input.step),
+            input.task,
+            instruct_kind=enums.TaskInstructKind.RESUME,
+            inging_kind=enums.TaskEventKind.RESUMING,
+            to_agent_factory=lambda a: messages.Resume(task=a, step=input.step),
         )
 
     def bounce(self, info: Info, input: inputs.BounceInputModel) -> models.Agent:

@@ -6,7 +6,7 @@ Two groups live here:
   ``create_action_for_organization``) used by the model tests.
 * **Agent object-graph builders** used by the websocket tests — the async
   ``seed_agent`` (pre-creates the agent the consumer looks up for a token) plus the
-  ``build_*`` helpers that assemble Action -> Implementation -> Assignation / State
+  ``build_*`` helpers that assemble Action -> Implementation -> Task / State
   graphs. The ``build_*`` names are ``sync_to_async``-wrapped for use from async tests.
 """
 
@@ -24,7 +24,7 @@ from facade import enums
 from facade.models import (
     Action,
     Agent,
-    Assignation,
+    Task,
     Caller,
     Implementation,
     State,
@@ -118,10 +118,10 @@ async def seed_agent(instance_id, token=TEST_TOKEN, blocked=False):
 # --------------------------------------------------------------------------- #
 # Object-graph builders (run synchronously, wrapped via sync_to_async)
 # --------------------------------------------------------------------------- #
-def _build_assignation(prefix, *, effect="NONE", originating_connection_id=None, originating_session_id=None, parent=None):
-    """Create a standalone Action -> Implementation -> Assignation graph.
+def _build_task(prefix, *, effect="NONE", originating_connection_id=None, originating_session_id=None, parent=None):
+    """Create a standalone Action -> Implementation -> Task graph.
 
-    The persist backend looks assignations up by id (not by the registered agent),
+    The persist backend looks tasks up by id (not by the registered agent),
     so this graph is independent of the agent that streams the events. ``effect`` sets the
     implementation's effect class; ``originating_*``/``parent`` wire the caller-death/grace
     tests' origination + tree shape.
@@ -161,7 +161,7 @@ def _build_assignation(prefix, *, effect="NONE", originating_connection_id=None,
         effect=effect,
     )
 
-    return Assignation.objects.create(
+    return Task.objects.create(
         caller=caller,
         action=action,
         agent=agent,
@@ -169,13 +169,13 @@ def _build_assignation(prefix, *, effect="NONE", originating_connection_id=None,
         parent=parent,
         originating_connection_id=originating_connection_id,
         originating_session_id=originating_session_id,
-        latest_event_kind=enums.AssignationEventKind.ASSIGN,
-        latest_instruct_kind=enums.AssignationInstructChoices.ASSIGN,
+        latest_event_kind=enums.TaskEventKind.STARTED,
+        latest_instruct_kind=enums.TaskInstructChoices.ASSIGN,
     )
 
 
-def _build_unimplemented_assignation_for_agent(agent_pk, prefix):
-    """An unfinished assignation owned directly by ``agent`` with NO implementation.
+def _build_unimplemented_task_for_agent(agent_pk, prefix):
+    """An unfinished task owned directly by ``agent`` with NO implementation.
 
     Exercises the disconnect path: such rows are found by the direct ``agent`` FK
     but would be missed by an ``implementation__agent`` filter (implementation is
@@ -192,21 +192,21 @@ def _build_unimplemented_assignation_for_agent(agent_pk, prefix):
         hash=f"{prefix}-action-hash",
         organization=agent.organization,
     )
-    return Assignation.objects.create(
+    return Task.objects.create(
         caller=None,
         action=action,
         agent=agent,
         implementation=None,
-        latest_event_kind=enums.AssignationEventKind.ASSIGN,
-        latest_instruct_kind=enums.AssignationInstructChoices.ASSIGN,
+        latest_event_kind=enums.TaskEventKind.STARTED,
+        latest_instruct_kind=enums.TaskInstructChoices.ASSIGN,
     )
 
 
-def _build_assignation_for_agent_caller(agent_pk, prefix):
-    """An assignation whose ``caller`` is the agent's own identity.
+def _build_task_for_agent_caller(agent_pk, prefix):
+    """A task whose ``caller`` is the agent's own identity.
 
-    Used by the caller-event return tests: because the assignation's caller matches the
-    registered agent's caller (group ``ass_caller_{caller_id}``), events on it are streamed
+    Used by the caller-event return tests: because the task's caller matches the
+    registered agent's caller (group ``task_caller_{caller_id}``), events on it are streamed
     back to that agent's socket as ``Caller*`` messages.
     """
     agent = Agent.objects.select_related("user", "client", "organization").get(pk=agent_pk)
@@ -230,13 +230,13 @@ def _build_assignation_for_agent_caller(agent_pk, prefix):
         agent=agent,
         dynamic=False,
     )
-    return Assignation.objects.create(
+    return Task.objects.create(
         caller=caller,
         action=action,
         agent=agent,
         implementation=implementation,
-        latest_event_kind=enums.AssignationEventKind.ASSIGN,
-        latest_instruct_kind=enums.AssignationInstructChoices.ASSIGN,
+        latest_event_kind=enums.TaskEventKind.STARTED,
+        latest_instruct_kind=enums.TaskInstructChoices.ASSIGN,
     )
 
 
@@ -294,9 +294,9 @@ def _build_webhook_agent(prefix, secret="s3cr3t", hook_url="https://hook.example
     )
 
 
-build_assignation = sync_to_async(_build_assignation)
-build_assignation_for_agent_caller = sync_to_async(_build_assignation_for_agent_caller)
+build_task = sync_to_async(_build_task)
+build_task_for_agent_caller = sync_to_async(_build_task_for_agent_caller)
 build_implementation_for_agent = sync_to_async(_build_implementation_for_agent)
 build_webhook_agent = sync_to_async(_build_webhook_agent)
-build_unimplemented_assignation_for_agent = sync_to_async(_build_unimplemented_assignation_for_agent)
+build_unimplemented_task_for_agent = sync_to_async(_build_unimplemented_task_for_agent)
 build_state_for_agent = sync_to_async(_build_state_for_agent)

@@ -14,13 +14,13 @@ from .agent import (
     WaiterStatusChoices,
 )
 from rekuest_core.enums import AssignPolicy
-from .assignation import (
-    AssignationEventChoices,
-    AssignationEventKind,
-    AssignationInstructChoices,
-    AssignationInstructKind,
-    AssignationStatus,
-    AssignationStatusChoices,
+from .task import (
+    TaskEventChoices,
+    TaskEventKind,
+    TaskInstructChoices,
+    TaskInstructKind,
+    TaskStatus,
+    TaskStatusChoices,
 )
 from .dashboard import PanelKind, PanelKindChoices
 from .log import LogLevel, LogLevelChoices
@@ -40,13 +40,13 @@ __all__ = [
     "AgentStatus",
     "AgentStatusChoices",
     "WaiterStatusChoices",
-    # assignation
-    "AssignationEventChoices",
-    "AssignationEventKind",
-    "AssignationInstructChoices",
-    "AssignationInstructKind",
-    "AssignationStatus",
-    "AssignationStatusChoices",
+    # task
+    "TaskEventChoices",
+    "TaskEventKind",
+    "TaskInstructChoices",
+    "TaskInstructKind",
+    "TaskStatus",
+    "TaskStatusChoices",
     "AssignPolicy",
     # dashboard
     "PanelKind",

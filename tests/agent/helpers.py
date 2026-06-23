@@ -24,7 +24,7 @@ M = TypeVar("M", bound=messages.Message)
 
 
 def _type_value(message_cls: Type[messages.Message]) -> str:
-    """The wire ``type`` string a message class serializes to (e.g. ``"CALLER_PROGRESS"``)."""
+    """The wire ``type`` string a message class serializes to (e.g. ``"PROGRESS_EVENT"``)."""
     default = message_cls.model_fields["type"].default
     return getattr(default, "value", default)
 

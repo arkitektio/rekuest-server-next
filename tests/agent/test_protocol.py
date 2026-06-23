@@ -21,10 +21,10 @@ from facade.codes import (
     FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE,
     FROM_AGENT_MESSAGE_IS_NOT_VALID_JSON_CODE,
 )
-from facade.models import Agent, AssignationEvent
+from facade.models import Agent, TaskEvent
 
 from tests.agent.helpers import connect_agent, open_agent
-from tests.factories import TEST_TOKEN, build_unimplemented_assignation_for_agent
+from tests.factories import TEST_TOKEN, build_unimplemented_task_for_agent
 
 
 @pytest.mark.django_db(transaction=True)
@@ -78,19 +78,19 @@ class TestAgentProtocol:
         agent = await Agent.objects.aget(pk=session.agent_pk)
         assert agent.connected is False
 
-    async def test_disconnect_marks_unimplemented_assignation(self, agent_ws):
-        # Regression (B1): an unfinished assignation owned directly by the agent but with a
+    async def test_disconnect_marks_unimplemented_task(self, agent_ws):
+        # Regression (B1): an unfinished task owned directly by the agent but with a
         # null implementation must still get a DISCONNECTED event on disconnect. The handler
         # previously filtered by ``implementation__agent`` and silently skipped these rows.
         session = await open_agent(agent_ws, "disconnect-unimpl-agent")
-        assignation = await build_unimplemented_assignation_for_agent(session.agent_pk, "disc-unimpl")
+        task = await build_unimplemented_task_for_agent(session.agent_pk, "disc-unimpl")
 
         await session.disconnect()
 
         events = [
             e
-            async for e in AssignationEvent.objects.filter(
-                assignation_id=assignation.pk, kind=enums.AssignationEventKind.DISCONNECTED
+            async for e in TaskEvent.objects.filter(
+                task_id=task.pk, kind=enums.TaskEventKind.DISCONNECTED
             )
         ]
         assert len(events) == 1
@@ -108,5 +108,5 @@ class TestAgentProtocol:
         # router and closes 3003. (Lock/Unlock/Paused/Resumed/Stepped/Interrupted events are
         # currently unhandled by the consumer.)
         session = await open_agent(agent_ws, "unhandled-agent")
-        await session.send(messages.LockEvent(key="lock-1", assignation=str(uuid.uuid4())))
+        await session.send(messages.Lock(key="lock-1", task=str(uuid.uuid4())))
         await session.expect_close(FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE)

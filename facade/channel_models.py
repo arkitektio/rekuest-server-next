@@ -14,6 +14,6 @@ class StateUpdateEvent(BaseModel):
     state: str = Field(..., description="The state that was updated.")
     
     
-class AssignationEventCreatedEvent(BaseModel):
+class TaskEventCreatedEvent(BaseModel):
     """A model representing an event update."""
     event: str = Field(..., description="The event that was created.")

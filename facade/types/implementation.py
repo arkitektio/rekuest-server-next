@@ -48,11 +48,11 @@ class Implementation:
     def tracks(self) -> list[rtypes.Track]:
         return [rmodels.TrackModel(**i) for i in self.tracks]
 
-    @strawberry_django.field(description="Get the latest completed assignation created by the current user.")
-    def my_latest_assignation(self, info: Info) -> Optional["Assignation"]:
+    @strawberry_django.field(description="Get the latest completed task created by the current user.")
+    def my_latest_task(self, info: Info) -> Optional["Task"]:
         user = info.context.request.user
         return (
-            self.assignations.filter(
+            self.tasks.filter(
                 implementation=self.id,
                 is_done=True,
                 caller__user=user,

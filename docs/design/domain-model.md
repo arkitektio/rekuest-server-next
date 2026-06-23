@@ -11,10 +11,10 @@ rules that encode most of the business logic.
 
 ```mermaid
 erDiagram
-    Caller ||--o{ Assignation : "requests"
+    Caller ||--o{ Task : "requests"
     Caller ||--o{ Reservation : "owns"
     Agent ||--o{ Implementation : "provides"
-    Agent ||--o{ Assignation : "executes"
+    Agent ||--o{ Task : "executes"
     Agent ||--o{ State : "reports"
     Agent ||--o{ Lock : "holds"
 
@@ -28,12 +28,12 @@ erDiagram
     Implementation }o--|| Implementation : "higher_order_for"
 
     Reservation }o--o{ Implementation : "pools"
-    Reservation ||--o{ Assignation : "routes"
+    Reservation ||--o{ Task : "routes"
 
-    Assignation ||--o{ AssignationEvent : "logs"
-    Assignation ||--o{ AssignationInstruct : "instructed by"
-    Assignation }o--|| Assignation : "parent / root"
-    Assignation }o--o| Resolution : "resolved with"
+    Task ||--o{ TaskEvent : "logs"
+    Task ||--o{ TaskInstruct : "instructed by"
+    Task }o--|| Task : "parent / root"
+    Task }o--o| Resolution : "resolved with"
 
     Resolution ||--o{ ResolvedDependency : "binds"
     ResolvedDependency }o--|| Implementation : "chosen tool"
@@ -47,7 +47,7 @@ erDiagram
 
 | Model | Purpose |
 | --- | --- |
-| `Caller` | The `(client, user, organization)` requestor identity. Owns `Assignation`/`Reservation`. |
+| `Caller` | The `(client, user, organization)` requestor identity. Owns `Task`/`Reservation`. |
 | `Agent` | The provider runtime: same triple + `app`/`release`/`device` + connection state. |
 
 See [identity.md](identity.md). The rest of the graph attaches to one of these two.
@@ -106,13 +106,13 @@ dependencies. Resolutions can be named templates (`is_template`) for reuse.
 pre-binds a set of `implementations` for an `action`, owned by a `caller`. Assignments submitted to
 a reservation are routed to one of its implementations by a `strategy`
 (`RANDOM`, `ROUND_ROBIN`, `LEAST_BUSY`, `LEAST_TIME`, `LEAST_LOAD`, `DIRECT`). It records
-`saved_args` (defaults), `binds` (routing config) and provenance (`causing_assignation`,
+`saved_args` (defaults), `binds` (routing config) and provenance (`causing_task`,
 `causing_dependency`). Reservations are optional — a caller can also assign directly to an action
 or implementation without one.
 
-## 5. Execution layer — Assignation and its events
+## 5. Execution layer — Task and its events
 
-**`Assignation`** (`facade/models/assignation.py`) is the **central execution log** — one row per
+**`Task`** (`facade/models/task.py`) is the **central execution log** — one row per
 task run, tracking it from assignment to completion. The fields that matter most:
 
 | Field | Role |
@@ -130,19 +130,19 @@ task run, tracking it from assignment to completion. The fields that matter most
 | `is_done`, `finished_at` | Terminal markers. |
 | `ephemeral` | Delete after completion vs. keep for audit. |
 
-**`AssignationEvent`** is the immutable per-transition log entry the agent (or server) appends:
-`kind` (see the lifecycle in [assignation-lifecycle.md](assignation-lifecycle.md)), optional
+**`TaskEvent`** is the immutable per-transition log entry the agent (or server) appends:
+`kind` (see the lifecycle in [task-lifecycle.md](task-lifecycle.md)), optional
 `returns` (for `YIELD`), `progress`, `message`, `level`, and `delegated_to` (used by higher-order
 unfolding).
 
-**`AssignationInstruct`** is a command directed *at* a running assignation by a `caller`
+**`TaskInstruct`** is a command directed *at* a running task by a `caller`
 (`ASSIGN`, `CANCEL`, `STEP`, `RESUME`, `PAUSE`, `INTERRUPT`, `COLLECT`).
 
-**`AgentEvent`** is the agent-lifecycle analogue (`CONNECT`/`DISCONNECT`), separate from assignation
+**`AgentEvent`** is the agent-lifecycle analogue (`CONNECT`/`DISCONNECT`), separate from task
 events.
 
 **`Lock`** (in `agent.py`) is a per-agent mutual-exclusion key, optionally `hold_by` an
-`Assignation`.
+`Task`.
 
 ## 6. State layer
 
@@ -152,7 +152,7 @@ Agents can expose structured, evolving state:
 - **`State`** — the current value for one `(interface, agent)` against a `definition`, with a
   `retention_policy` controlling how much history is kept.
 - **`Patch`** — an incremental JSON-Patch change (`op`/`path`/`value`) with a `global_rev` revision
-  counter and the `assignation` that caused it (causality).
+  counter and the `task` that caused it (causality).
 - **`Snapshot`** — a full-value checkpoint at a `global_rev`.
 - **`Session`** — a session boundary within an agent's state lifecycle.
 
@@ -164,7 +164,7 @@ Supporting models round out the catalogue: `Collection` / `Protocol` (groupings 
 contracts on Actions), `Structure` / `Interface` / `Descriptor` / `StructurePackage` (the type
 system ports reference), `Toolbox` / `Shortcut` (saved task configs), `TestCase` / `TestResult`,
 the `Blok` / `Dashboard` UI models, and the agent `Shelve`/`Drawer` storage (`FilesystemShelve`,
-`MemoryShelve`, and their drawers) for inter-assignation data.
+`MemoryShelve`, and their drawers) for inter-task data.
 
 ## Uniqueness & cardinality (the encoded business rules)
 

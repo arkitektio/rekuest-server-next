@@ -1,8 +1,8 @@
-"""Map a persisted ``AssignationEvent`` to its caller-bound socket message.
+"""Map a persisted ``TaskEvent`` to its caller-bound socket message.
 
-The calling participant (the one that originated work via ``CallerAssign``) receives a
-minimal per-kind ``Caller*`` mirror of each assignation event over its own socket — no
-GraphQL. This module is the single, pure, DB-free place that decides which ``Caller*``
+The calling participant (the one that originated work via ``AssignRequest``) receives a
+minimal per-kind ``…Event`` mirror of each task event over its own socket — no
+GraphQL. This module is the single, pure, DB-free place that decides which ``…Event``
 class an event kind maps to and how its fields are populated, so it is trivially
 unit-testable with a light event-like stub.
 
@@ -15,17 +15,17 @@ from __future__ import annotations
 from typing import Optional, Protocol, cast
 
 from facade import messages
-from facade.enums import AssignationEventChoices as Kind
+from facade.enums import TaskEventChoices as Kind
 
 _LOG_LEVELS = {"DEBUG", "INFO", "ERROR", "WARN", "CRITICAL"}
 
 
 class EventLike(Protocol):
-    """The minimal surface ``build_caller_message`` reads — satisfied by the ORM model and test stubs."""
+    """The minimal surface ``build_execution_event`` reads — satisfied by the ORM model and test stubs."""
 
     id: int
-    assignation_id: int
-    kind: object  # a TextChoices/str-enum member or a plain string; normalized in build_caller_message
+    task_id: int
+    kind: object  # a TextChoices/str-enum member or a plain string; normalized in build_execution_event
     message: Optional[str]
     progress: Optional[int]
     returns: Optional[dict]
@@ -34,16 +34,16 @@ class EventLike(Protocol):
 
 def _base_kwargs(event: EventLike) -> dict:
     return {
-        "assignation": str(event.assignation_id),
+        "task": str(event.task_id),
         "event": str(event.id),
         "seq": int(event.id),
     }
 
 
-def build_caller_message(event: EventLike) -> Optional[messages.CallerEventMessage]:
-    """Build the ``Caller*`` message mirroring ``event``, or ``None`` if its kind is not forwarded.
+def build_execution_event(event: EventLike) -> Optional[messages.ExecutionEventMessage]:
+    """Build the ``…Event`` message mirroring ``event``, or ``None`` if its kind is not forwarded.
 
-    Keys off the persisted ``kind`` string (``AssignationEventChoices`` values). Unknown /
+    Keys off the persisted ``kind`` string (``TaskEventChoices`` values). Unknown /
     not-forwarded kinds (e.g. ``UNASSIGN``) return ``None`` so the caller stream stays minimal.
     """
     base = _base_kwargs(event)
@@ -52,42 +52,42 @@ def build_caller_message(event: EventLike) -> Optional[messages.CallerEventMessa
     kind = event.kind.value if hasattr(event.kind, "value") else str(event.kind)
 
     if kind == Kind.PROGRESS.value:
-        return messages.CallerProgress(**base, progress=event.progress, message=event.message)
+        return messages.ProgressEvent(**base, progress=event.progress, message=event.message)
     if kind == Kind.YIELD.value:
-        return messages.CallerYield(**base, returns=event.returns)
+        return messages.YieldEvent(**base, returns=event.returns)
     if kind == Kind.LOG.value:
         level = event.level if event.level in _LOG_LEVELS else "INFO"
-        return messages.CallerLog(**base, message=event.message, level=cast(messages.LogLevelLiteral, level))
-    if kind == Kind.ERROR.value:
-        return messages.CallerError(**base, error=event.message)
+        return messages.LogEvent(**base, message=event.message, level=cast(messages.LogLevelLiteral, level))
+    if kind == Kind.FAILED.value:
+        return messages.FailedEvent(**base, error=event.message)
     if kind == Kind.CRITICAL.value:
-        return messages.CallerCritical(**base, error=event.message)
+        return messages.CriticalEvent(**base, error=event.message)
     if kind == Kind.DISCONNECTED.value:
-        return messages.CallerDisconnected(**base, message=event.message)
-    if kind == Kind.DONE.value:
-        return messages.CallerDone(**base)
+        return messages.DisconnectedEvent(**base, message=event.message)
+    if kind == Kind.COMPLETED.value:
+        return messages.CompletedEvent(**base)
     if kind == Kind.BOUND.value:
-        return messages.CallerBound(**base)
+        return messages.BoundEvent(**base)
     if kind == Kind.QUEUED.value:
-        return messages.CallerQueued(**base)
-    if kind == Kind.ASSIGN.value:
-        return messages.CallerAssigned(**base)
+        return messages.QueuedEvent(**base)
+    if kind == Kind.STARTED.value:
+        return messages.StartedEvent(**base)
     if kind == Kind.DELEGATE.value:
-        return messages.CallerDelegate(**base)
-    if kind == Kind.CANCELING.value:
-        return messages.CallerCanceling(**base)
+        return messages.DelegateEvent(**base)
+    if kind == Kind.CANCELLING.value:
+        return messages.CancellingEvent(**base)
     if kind == Kind.CANCELLED.value:
-        return messages.CallerCancelled(**base)
-    if kind == Kind.INTERUPTING.value:
-        return messages.CallerInterrupting(**base)
-    if kind == Kind.INTERUPTED.value:
-        return messages.CallerInterrupted(**base)
+        return messages.CancelledEvent(**base)
+    if kind == Kind.INTERRUPTING.value:
+        return messages.InterruptingEvent(**base)
+    if kind == Kind.INTERRUPTED.value:
+        return messages.InterruptedEvent(**base)
     if kind == Kind.PAUSING.value:
-        return messages.CallerPausing(**base)
+        return messages.PausingEvent(**base)
     if kind == Kind.PAUSED.value:
-        return messages.CallerPaused(**base)
+        return messages.PausedEvent(**base)
     if kind == Kind.RESUMING.value:
-        return messages.CallerResuming(**base)
+        return messages.ResumingEvent(**base)
     if kind == Kind.RESUMED.value:
-        return messages.CallerResumed(**base)
+        return messages.ResumedEvent(**base)
     return None

@@ -22,7 +22,7 @@ class Lock(models.Model):
     created_at = models.DateTimeField(auto_created=True, auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     hold_by = models.ForeignKey(
-        "Assignation",
+        "Task",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

@@ -5,7 +5,7 @@ backend POSTs downstream messages to ``agent.hook_url`` and the agent POSTs upst
 messages to the intake endpoint. Both directions are authenticated by an HMAC over the
 shared ``agent.hook_url_secret`` — there is no JWT on the HTTP path.
 
-Delivery is persist-then-POST: callers persist the Assignation/event row *before* calling
+Delivery is persist-then-POST: callers persist the Task/event row *before* calling
 out here, so a failed POST is logged (not raised) and the persisted row remains the durable
 record from which a later redelivery sweep can re-POST.
 """
@@ -46,7 +46,7 @@ def verify(secret: str | None, body: bytes, signature: str | None) -> bool:
 def deliver_to_hook(agent: "models.Agent", body: str) -> bool:
     """POST ``body`` (a JSON message) to ``agent.hook_url``, HMAC-signed. Never raises.
 
-    Returns True on a 2xx response. Failures are logged — the persisted Assignation/event
+    Returns True on a 2xx response. Failures are logged — the persisted Task/event
     row is the durable record, so a failed delivery is recoverable, not lost.
     """
     url = getattr(agent, "hook_url", None)

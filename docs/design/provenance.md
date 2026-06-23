@@ -12,7 +12,7 @@ the **issuing** side only (what Rekuest emits). Verification, single-use enforce
 and the provenance store live downstream (in Mikro / koherent) and are deliberately out of scope.
 
 > Read [identity.md](identity.md) first — the token is built almost entirely from the
-> `(client, user, organization)` triple and the `Assignation` lineage described there.
+> `(client, user, organization)` triple and the `Task` lineage described there.
 
 ## Why a separate token
 
@@ -59,15 +59,15 @@ different issuers, verified against different keys.
 This is the guarantee the whole scheme leans on: **every artifact, however deep in a causal tree,
 traces back to an accountable human at the root.**
 
-Rekuest enforces it at mint time, using its broker position and the existing `Assignation.parent`
-lineage (the regular `assign` path does not populate `Assignation.root`, so the root is found by
-**walking the `parent` chain** to the assignation that has no parent):
+Rekuest enforces it at mint time, using its broker position and the existing `Task.parent`
+lineage (the regular `assign` path does not populate `Task.root`, so the root is found by
+**walking the `parent` chain** to the task that has no parent):
 
 - **Top-level assignment** (no parent): the initiator must be a human. Rekuest classifies the
   current request principal from its roles (see *Human classification* below). The token sets
   `rcb = sub = <the initiating human>`, and `rtk = tsk` (the root is itself).
 - **Sub-assignment** (has a parent): Rekuest walks to the root and **inherits** the root human and
-  root id from it — `rcb` and `rtk` are copied from the root assignation's caller, never recomputed.
+  root id from it — `rcb` and `rtk` are copied from the root task's caller, never recomputed.
   `sub` is whatever caused *this* hop (which may be an agent or service); `ptk` is the immediate
   parent.
 - **Refusal.** If the root principal cannot be confirmed human, a tree with a non-human root is a
@@ -119,9 +119,9 @@ is the verifier's job, not Rekuest's.
 
 | Symbol | Expands to | Meaning |
 | --- | --- | --- |
-| `tsk` | task | this assignation id |
-| `ptk` | parent task | immediate parent assignation id (`null` if this is the root) |
-| `rtk` | root task | root assignation id of the whole tree (`== tsk` when this is the root) |
+| `tsk` | task | this task id |
+| `ptk` | parent task | immediate parent task id (`null` if this is the root) |
+| `rtk` | root task | root task id of the whole tree (`== tsk` when this is the root) |
 | `rcb` | root caused by | the **human** principal at the root of the tree (invariant: always human) |
 | `ahs` | args hash | SHA-256 of the canonicalized args |
 | `aha` | args hash alg | the canonicalization algorithm/version, so a verifier can recompute `ahs` |
@@ -152,7 +152,7 @@ the canonical form so any verifier reproduces the exact bytes before hashing —
   "exp": 1750003600,
   "jti": "f1c2…",
   // rekuest provenance
-  "tsk": "9b1a…",                   // this assignation
+  "tsk": "9b1a…",                   // this task
   "ptk": null,                      // no parent → this is the root
   "rtk": "9b1a…",                   // root == self
   "rcb": "user-42",                 // accountable human at the root

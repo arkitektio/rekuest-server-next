@@ -1,5 +1,5 @@
 from .action import new_actions
-from .assignation import assignation_events, assignations, child_assignations
+from .task import task_events, tasks, child_tasks
 from .implementation import implementation_change, implementations
 from .state import state_update_events, latest_patches, watch_state, watch_agent
 from .agent import agents
@@ -7,14 +7,14 @@ from .agent import agents
 
 __all__ = [
     "new_actions",
-    "assignation_events",
-    "assignations",
+    "task_events",
+    "tasks",
     "implementation_change",
     "implementations",
     "state_update_events",
     "latest_patches",
     "watch_state",
     "watch_agent",
-    "child_assignations",
+    "child_tasks",
     "agents",
 ]

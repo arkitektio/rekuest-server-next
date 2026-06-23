@@ -3,7 +3,7 @@
 Both transports — the WebSocket ``AgentProtocol`` and the HTTP HookAgent intake — feed
 their validated FromAgent messages through :func:`route_from_agent_message`. It performs
 the side effects (persisting events, originating caller work) and **returns** the optional
-reply message (``EventAck`` / ``CallerAssignResult``) rather than sending it, so each
+reply message (``EventAck`` / ``AssignResponse``) rather than sending it, so each
 transport delivers the reply its own way (over the socket, or in the HTTP response).
 
 ``HeartbeatEvent`` is intentionally NOT handled here — it is WebSocket-only liveness and
@@ -30,19 +30,19 @@ def _ack(message: messages.FromAgentEvent) -> messages.EventAck:
     """The durable-report acknowledgement so the agent can stop retaining a terminal report."""
     return messages.EventAck(
         event=message.id,
-        assignation=getattr(message, "assignation", None),
+        task=getattr(message, "task", None),
         seq=getattr(message, "seq", None),
     )
 
 
-async def _control(op, agent_id, message, connection_id, session_id) -> messages.CallerControlResult:
+async def _control(op, agent_id, message, connection_id, session_id) -> messages.ControlResponse:
     """Run a caller lifecycle-control request and return its ack (NACK on error, never raise)."""
     try:
-        assignation = await op(agent_id, message, connection_id=connection_id, session_id=session_id)
+        task = await op(agent_id, message, connection_id=connection_id, session_id=session_id)
     except Exception as e:
         logger.error("Caller control request failed", exc_info=True)
-        return messages.CallerControlResult(request=message.id, assignation=message.assignation, accepted=False, error=str(e))
-    return messages.CallerControlResult(request=message.id, assignation=str(assignation.pk), accepted=True)
+        return messages.ControlResponse(request=message.id, task=message.task, accepted=False, error=str(e))
+    return messages.ControlResponse(request=message.id, task=str(task.pk), accepted=True)
 
 
 async def route_from_agent_message(
@@ -60,11 +60,11 @@ async def route_from_agent_message(
     Register, Lock/Unlock) so the transport can close the socket / return a 4xx.
     """
     match message:
-        case messages.CallerAssign():
+        case messages.AssignRequest():
             # A caller originating work. A bad request NACKs (returns an error result) rather
             # than propagating — it must never tear down the transport.
             try:
-                assignation, created = await backend.on_caller_assign(
+                task, created = await backend.on_caller_assign(
                     agent_id,
                     message,
                     can_assign_root=bool(capabilities and capabilities.can_assign_root),
@@ -72,58 +72,61 @@ async def route_from_agent_message(
                     session_id=session_id,
                 )
             except Exception as e:
-                logger.error("CallerAssign failed", exc_info=True)
-                return messages.CallerAssignResult(request=message.id, reference=message.reference, assignation=None, created=False, error=str(e))
-            return messages.CallerAssignResult(request=message.id, reference=message.reference, assignation=str(assignation.pk), created=created)
+                logger.error("AssignRequest failed", exc_info=True)
+                return messages.AssignResponse(request=message.id, reference=message.reference, task=None, created=False, error=str(e))
+            return messages.AssignResponse(request=message.id, reference=message.reference, task=str(task.pk), created=created)
 
-        # Caller lifecycle-control requests (two-phase; the outcome streams back as Caller* mirrors).
-        case messages.CallerCancel():
+        # Caller lifecycle-control requests (two-phase; the outcome streams back as …Event mirrors).
+        case messages.CancelRequest():
             return await _control(backend.on_caller_cancel, agent_id, message, connection_id, session_id)
-        case messages.CallerInterrupt():
+        case messages.InterruptRequest():
             return await _control(backend.on_caller_interrupt, agent_id, message, connection_id, session_id)
-        case messages.CallerPause():
+        case messages.PauseRequest():
             return await _control(backend.on_caller_pause, agent_id, message, connection_id, session_id)
-        case messages.CallerResume():
+        case messages.ResumeRequest():
             return await _control(backend.on_caller_resume, agent_id, message, connection_id, session_id)
 
         # Lifecycle confirmation events from the executing agent.
-        case messages.CancelledEvent():
+        case messages.Started():
+            await backend.on_agent_started(agent_id, message)
+            return _ack(message)
+        case messages.Cancelled():
             await backend.on_agent_cancelled(agent_id, message)
             return _ack(message)
-        case messages.InterruptedEvent():
+        case messages.Interrupted():
             await backend.on_agent_interrupted(agent_id, message)
             return _ack(message)
-        case messages.PausedEvent():
+        case messages.Paused():
             await backend.on_agent_paused(agent_id, message)
             return _ack(message)
-        case messages.ResumedEvent():
+        case messages.Resumed():
             await backend.on_agent_resumed(agent_id, message)
             return _ack(message)
-        case messages.YieldEvent():
+        case messages.Yield():
             await backend.on_agent_yield(agent_id, message)
             return None
-        case messages.LogEvent():
+        case messages.Log():
             await backend.on_agent_log(agent_id, message)
             return None
-        case messages.ProgressEvent():
+        case messages.Progress():
             await backend.on_agent_progress(agent_id, message)
             return None
-        case messages.DoneEvent():
+        case messages.Completed():
             await backend.on_agent_done(agent_id, message)
             return _ack(message)
-        case messages.ErrorEvent():
+        case messages.Failed():
             await backend.on_agent_error(agent_id, message)
             return _ack(message)
-        case messages.CriticalEvent():
+        case messages.Critical():
             await backend.on_agent_critical(agent_id, message)
             return _ack(message)
-        case messages.StatePatchEvent():
+        case messages.StatePatch():
             await backend.on_agent_state_patch(agent_id, message)
             return None
-        case messages.StateSnapshotEvent():
+        case messages.StateSnapshot():
             await backend.on_agent_state_snapshot(agent_id, message)
             return None
-        case messages.SessionInitMessage():
+        case messages.SessionInit():
             await backend.on_agent_session_init(agent_id, message)
             return None
         case _:

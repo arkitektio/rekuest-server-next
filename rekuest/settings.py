@@ -51,7 +51,7 @@ REKUEST_GRACE = {
     "DEFAULT": _rekuest_conf.get("grace_default", 30),
     "PER_MODE": _rekuest_conf.get("grace_per_mode", {}) or {},
     "PHYSICAL": _rekuest_conf.get("grace_physical", 5),
-    # Progress lease (seconds): a physical assignation that has reported progress but then
+    # Progress lease (seconds): a physical task that has reported progress but then
     # goes silent this long — while its agent is still connected (wedged-but-alive) — is
     # failed as terminal. 0 disables the lease (default).
     "PROGRESS_LEASE": _rekuest_conf.get("progress_lease", 0),

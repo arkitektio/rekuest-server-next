@@ -21,21 +21,21 @@ class PatchEvent(BaseModel):
     agent: int | None = Field(None, description="The agent ID related to the patch.")
 
 
-class AssignationEventCreatedEvent(BaseModel):
-    """A model representing an assignation event created."""
+class TaskEventCreatedEvent(BaseModel):
+    """A model representing a task event created."""
 
     event: int | None = Field(None, description="The event that was created.")
-    create: int | None = Field(None, description="The assignation created.")
+    create: int | None = Field(None, description="The task created.")
 
 
-class ChildAssignationEvent(BaseModel):
-    """A model representing a child assignation event."""
+class ChildTaskEvent(BaseModel):
+    """A model representing a child task event."""
 
-    create: int | None = Field(None, description="The assignation that was created.")
-    update: int | None = Field(None, description="The assignation that was updated.")
+    create: int | None = Field(None, description="The task that was created.")
+    update: int | None = Field(None, description="The task that was updated.")
 
 
-class AgentSignal(BaseModel):
+class AgentEvent(BaseModel):
     """A model representing an agent event."""
 
     create: int | None = Field(None, description="The agent that was created.")
@@ -43,7 +43,7 @@ class AgentSignal(BaseModel):
     delete: int | None = Field(None, description="The agent that was deleted.")
 
 
-class ImplementationSignal(BaseModel):
+class ImplementationEvent(BaseModel):
     """A model representing a template event."""
 
     create: int | None = Field(None, description="The template that was created.")
@@ -51,7 +51,7 @@ class ImplementationSignal(BaseModel):
     delete: int | None = Field(None, description="The template that was deleted.")
 
 
-class ActionSignal(BaseModel):
+class ActionEvent(BaseModel):
     """A model representing an action event."""
 
     create: int | None = Field(None, description="The action that was created.")

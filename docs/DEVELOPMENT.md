@@ -125,7 +125,7 @@ Core models in the `facade/models/` package:
 - **Action**: Abstract, versioned task/function contracts.
 - **Implementation**: Concrete realizations of actions by agents.
 - **State / Patch / Snapshot**: Agent state, its incremental history, and checkpoints.
-- **Reservation / Assignation**: Task routing and the execution log.
+- **Reservation / Task**: Task routing and the execution log.
 
 ### Authentication
 

@@ -17,7 +17,7 @@ class TestAgentStateEvents:
         await build_state_for_agent(session.agent_pk, interface="counter", prefix="patch")
 
         await session.send(
-            messages.StatePatchEvent(
+            messages.StatePatch(
                 session_id="session-1", global_rev=1, state_name="counter", ts=0.0,
                 op="replace", path="/value", value=5, old_value=None, correlation_id=None,
             )
@@ -34,7 +34,7 @@ class TestAgentStateEvents:
         session = await open_agent(agent_ws, "snapshot-agent")
         await build_state_for_agent(session.agent_pk, interface="counter", prefix="snapshot")
 
-        await session.send(messages.StateSnapshotEvent(session_id="session-2", global_rev=3, snapshots={"counter": {"value": 9}}))
+        await session.send(messages.StateSnapshot(session_id="session-2", global_rev=3, snapshots={"counter": {"value": 9}}))
 
         await session.disconnect()
         snapshot = await Snapshot.objects.filter(agent_id=session.agent_pk, global_rev=3).aget()
@@ -44,7 +44,7 @@ class TestAgentStateEvents:
         session = await open_agent(agent_ws, "session-agent")
         await build_state_for_agent(session.agent_pk, interface="counter", prefix="session")
 
-        await session.send(messages.SessionInitMessage(session_id="session-3", states={"counter": {"value": 0}}))
+        await session.send(messages.SessionInit(session_id="session-3", states={"counter": {"value": 0}}))
 
         await session.disconnect()
         snapshot = await Snapshot.objects.filter(agent_id=session.agent_pk).aget()

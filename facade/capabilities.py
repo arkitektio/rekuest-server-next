@@ -4,9 +4,9 @@ Every participant — executor subagent, frontend, dashboard — speaks the *sam
 protocol; what differs is **capability**, resolved from the token's OAuth scopes and
 **never self-declared**. There are two independent axes:
 
-- ``executes_work``   — runs assignations. Its connection is the executor *singleton*
+- ``executes_work``   — runs tasks. Its connection is the executor *singleton*
   (one live, force-displaces) and its disconnect drives the failure cascade.
-- ``can_assign_root`` — may originate *root* (parentless) assignations.
+- ``can_assign_root`` — may originate *root* (parentless) tasks.
 
 The four ``AgentMode`` values are the four combinations (see :class:`messages.AgentMode`).
 A requested mode is only granted if the token carries the capabilities it requires.
@@ -98,5 +98,5 @@ def mode_executes_work(mode: AgentMode) -> bool:
 
 
 def mode_can_assign_root(mode: AgentMode) -> bool:
-    """Whether a connection in this mode may originate root assignations."""
+    """Whether a connection in this mode may originate root tasks."""
     return AgentMode(mode) in (AgentMode.CALLER, AgentMode.ORCHESTRATOR)

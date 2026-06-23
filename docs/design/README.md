@@ -18,7 +18,7 @@ Rekuest is the broker at the centre of the [Arkitekt](https://arkitekt.live) eco
 
 A caller never talks to an agent directly. It issues an `assign` — over GraphQL, or over the same
 `/agi` WebSocket the agents use (`CallerAssign`), or via an HMAC-signed HTTP POST for server-to-server
-callers. Rekuest resolves which implementation/agent should run it, records an `Assignation`, pushes
+callers. Rekuest resolves which implementation/agent should run it, records an `Task`, pushes
 the work to the agent over a WebSocket, persists the events the agent streams back, and re-broadcasts
 them to the caller — over a GraphQL subscription **or** as `Caller*` event mirrors on the same socket.
 Rekuest owns the **catalogue** (which actions exist, who can run them, with what data types) and the
@@ -90,8 +90,8 @@ Start at the top and follow the flow of a request:
    uniqueness/cardinality rules that encode the business logic.
 3. **[action-matching.md](action-matching.md)** — how an Action's `provides`/`requires`
    descriptors compile to JSONPath and how the relational port engine finds matching actions.
-4. **[assignation-lifecycle.md](assignation-lifecycle.md)** — `assign` / `reserve`, the
-   Assignation event state machine, and how results flow back to the caller.
+4. **[task-lifecycle.md](task-lifecycle.md)** — `assign` / `reserve`, the
+   Task event state machine, and how results flow back to the caller.
 5. **[agent-protocol.md](agent-protocol.md)** — the WebSocket wire protocol (executor side):
    register, authenticate, heartbeat, task delivery, connection takeover, capabilities & modes.
 6. **[caller-protocol.md](caller-protocol.md)** — the caller side of the same socket: what a caller
@@ -111,7 +111,7 @@ Everything is anchored on the `(client, user, organization)` identity triple der
 token. A **Caller** is that triple acting as a requestor; an **Agent** is that triple (plus an
 app/release/device) acting as a provider. An **Action** is an abstract, versioned function
 contract; an **Implementation** binds an Action to an Agent. A caller's `assign` creates an
-**Assignation** (the execution log) stamped with the caller, routed to an agent; the agent streams
-**AssignationEvents** back, which are persisted and fanned out to the caller's realtime channel
+**Task** (the execution log) stamped with the caller, routed to an agent; the agent streams
+**TaskEvents** back, which are persisted and fanned out to the caller's realtime channel
 `ass_caller_{id}`. **Reservations** are standing pools that pre-bind a set of implementations for
 repeated assignment. That is the whole system in miniature; the rest is detail.

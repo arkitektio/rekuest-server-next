@@ -11,6 +11,6 @@ store all live downstream and are intentionally *not* implemented here. Rekuest'
 job ends at emitting a correct, signed, conformant claim set.
 """
 
-from facade.provenance.mint import mint_token_for_assignation
+from facade.provenance.mint import mint_token_for_task
 
-__all__ = ["mint_token_for_assignation"]
+__all__ = ["mint_token_for_task"]
