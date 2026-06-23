@@ -4,7 +4,7 @@ Two best-effort notifiers over the authoritative DB rows:
 
 - :func:`deliver_to_agent` — a single ToAgent command to one agent: redis queue for a
   WEBSOCKET agent, HMAC-signed POST for a WEBHOOK HookAgent.
-- :func:`publish_assignation_event` — fan a persisted ``AssignationEvent`` out to its
+- :func:`publish_task_event` — fan a persisted ``TaskEvent`` out to its
   caller: the channel layer (GraphQL subscription + live WS forward) and, if the caller is a
   HookAgent, a webhook POST.
 
@@ -31,23 +31,23 @@ def deliver_to_agent(agent: models.Agent, message: messages.ToAgentMessage) -> N
         RedisAgentQueue.from_settings().push(str(agent.pk), body)
 
 
-def publish_assignation_event(event: models.AssignationEvent) -> None:
-    """Fan a persisted assignation event out to its caller (channel layer + webhook)."""
-    assignation = event.assignation
-    caller_id = assignation.caller_id
+def publish_task_event(event: models.TaskEvent) -> None:
+    """Fan a persisted task event out to its caller (channel layer + webhook)."""
+    task = event.task
+    caller_id = task.caller_id
     if not caller_id:
         return
     # Live WS forward + GraphQL subscription consume this channel-layer broadcast.
-    channels.assignation_event_channel.broadcast(
-        channel_events.AssignationEventCreatedEvent(event=event.id),  # pyright: ignore[reportCallIssue]  # pydantic Field(None) default
-        [f"ass_caller_{caller_id}"],
+    channels.task_event_channel.broadcast(
+        channel_events.TaskEventCreatedEvent(event=event.id),  # pyright: ignore[reportCallIssue]  # pydantic Field(None) default
+        [f"task_caller_{caller_id}"],
     )
-    _deliver_caller_event_to_webhook(event, assignation)
+    _deliver_caller_event_to_webhook(event, task)
 
 
-def _deliver_caller_event_to_webhook(event: models.AssignationEvent, assignation: models.Assignation) -> None:
-    """If the assignation's caller is a HookAgent, POST the …Event mirror to its hook_url."""
-    caller = assignation.caller
+def _deliver_caller_event_to_webhook(event: models.TaskEvent, task: models.Task) -> None:
+    """If the task's caller is a HookAgent, POST the …Event mirror to its hook_url."""
+    caller = task.caller
     if caller is None:
         return
     agent = (

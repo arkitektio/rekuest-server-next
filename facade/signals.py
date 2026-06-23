@@ -48,33 +48,33 @@ def agent_post_delete(sender, instance: models.Agent = None, **kwargs):
         )
 
 
-@receiver(post_save, sender=models.Assignation)
-def ass_post_save(sender, instance: models.Assignation = None, created=None, **kwargs):
+@receiver(post_save, sender=models.Task)
+def task_post_save(sender, instance: models.Task = None, created=None, **kwargs):
     if created and instance.caller_id:
-        channels.assignation_event_channel.broadcast(
-            channel_events.AssignationEventCreatedEvent(create=str(instance.id)),
-            [f"ass_caller_{instance.caller_id}"],
+        channels.task_event_channel.broadcast(
+            channel_events.TaskEventCreatedEvent(create=str(instance.id)),
+            [f"task_caller_{instance.caller_id}"],
         )
 
     if instance.parent:
         if created:
-            channels.child_assignation_channel.broadcast(
-                channel_events.ChildAssignationEvent(create=str(instance.id)),
-                [f"child_assignations_{instance.parent.id}"],
+            channels.child_task_channel.broadcast(
+                channel_events.ChildTaskEvent(create=str(instance.id)),
+                [f"child_tasks_{instance.parent.id}"],
             )
         else:
-            channels.child_assignation_channel.broadcast(
-                channel_events.ChildAssignationEvent(update=str(instance.id)),
-                [f"child_assignations_{instance.parent.id}"],
+            channels.child_task_channel.broadcast(
+                channel_events.ChildTaskEvent(update=str(instance.id)),
+                [f"child_tasks_{instance.parent.id}"],
             )
 
 
-@receiver(post_save, sender=models.AssignationEvent)
-def ass_event_post_save(sender, instance: models.AssignationEvent = None, created=None, **kwargs):
-    logger.info("Assignation Event received")
+@receiver(post_save, sender=models.TaskEvent)
+def task_event_post_save(sender, instance: models.TaskEvent = None, created=None, **kwargs):
+    logger.info("Task Event received")
     # One typed publisher fans the persisted event out to its caller (channel layer for the
     # GraphQL subscription + live WS forward, and a webhook POST for a HookAgent caller).
-    transport.publish_assignation_event(instance)
+    transport.publish_task_event(instance)
 
 
 @receiver(post_save, sender=models.Implementation)

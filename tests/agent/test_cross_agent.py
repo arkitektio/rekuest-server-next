@@ -3,7 +3,7 @@
 Two distinct identities (two static tokens → two Agents in the same org) connect over two
 sockets. The caller originates a ``AssignRequest`` targeting the executor's implementation; the
 backend dispatches the ``Assign`` to the executor, and — because the caller is the
-assignation's caller — the executor's events flow back to the caller as ``Caller*`` mirrors.
+task's caller — the executor's events flow back to the caller as ``Caller*`` mirrors.
 
 The executor connects first so it is available for resolution and receives the broadcast.
 """
@@ -11,7 +11,7 @@ The executor connects first so it is available for resolution and receives the b
 import pytest
 
 from facade import messages
-from facade.models import Assignation
+from facade.models import Task
 
 from tests.agent.helpers import open_agent
 from tests.factories import build_implementation_for_agent
@@ -30,15 +30,15 @@ class TestCrossAgentAssign:
         # The caller originates work targeting the *executor's* implementation.
         await caller.send(messages.AssignRequest(reference="x-1", implementation=str(impl.pk), args={"k": 1}))
         result = await caller.receive(messages.AssignResponse)
-        assert result.created is True and result.assignation
+        assert result.created is True and result.task
 
         # The executor (a DIFFERENT agent) receives the dispatched ASSIGN command.
         assign = await executor.receive(messages.Assign)
-        assert assign.assignation == result.assignation
+        assert assign.task == result.task
         assert assign.interface == impl.interface and assign.args == {"k": 1}
 
-        # The assignation is owned by the executor but called by the caller.
-        ass = await Assignation.objects.select_related("caller").aget(id=result.assignation)
+        # The task is owned by the executor but called by the caller.
+        ass = await Task.objects.select_related("caller").aget(id=result.task)
         assert ass.agent_id == executor.agent_pk
         assert ass.agent_id != caller.agent_pk
         assert ass.caller.client_id == caller.agent.client_id
@@ -56,13 +56,13 @@ class TestCrossAgentAssign:
         assign = await executor.receive(messages.Assign)
 
         # The executor reports progress, then done — over its OWN socket.
-        await executor.send(messages.Progress(assignation=assign.assignation, progress=50, message="half"))
+        await executor.send(messages.Progress(task=assign.task, progress=50, message="half"))
         progress = await caller.receive(messages.ProgressEvent)
-        assert progress.assignation == result.assignation and progress.progress == 50
+        assert progress.task == result.task and progress.progress == 50
 
-        await executor.send(messages.Completed(assignation=assign.assignation))
+        await executor.send(messages.Completed(task=assign.task))
         done = await caller.receive(messages.CompletedEvent)
-        assert done.assignation == result.assignation
+        assert done.task == result.task
 
         await caller.disconnect()
         await executor.disconnect()
@@ -79,7 +79,7 @@ class TestCrossAgentAssign:
         assert result.created is True
 
         assign = await executor.receive(messages.Assign)
-        assert assign.assignation == result.assignation and assign.args == {"v": 7}
+        assert assign.task == result.task and assign.args == {"v": 7}
 
         await caller.disconnect()
         await executor.disconnect()

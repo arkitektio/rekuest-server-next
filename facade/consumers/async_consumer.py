@@ -18,8 +18,8 @@ def _agent_group(agent_id: str) -> str:
 
 
 def _caller_group(caller_id: str) -> str:
-    """Channel-layer group carrying the assignation events a caller originated."""
-    return f"ass_caller_{caller_id}"
+    """Channel-layer group carrying the task events a caller originated."""
+    return f"task_caller_{caller_id}"
 
 
 class AgentConsumer(AsyncWebsocketConsumer):
@@ -74,11 +74,11 @@ class AgentConsumer(AsyncWebsocketConsumer):
         self._caller_group = _caller_group(caller_id)
         await self.channel_layer.group_add(self._caller_group, self.channel_name)
 
-    async def channel_AssignationEventCreatedEvent(self, event: dict) -> None:
-        """Forward a caller-bound assignation event to this socket as a ``…Event`` mirror.
+    async def channel_TaskEventCreatedEvent(self, event: dict) -> None:
+        """Forward a caller-bound task event to this socket as a ``…Event`` mirror.
 
-        Producer side: ``facade/signals.py`` broadcasts ``AssignationEventCreatedEvent`` to
-        ``ass_caller_{caller_id}`` on every Assignation/AssignationEvent save (the same group
+        Producer side: ``facade/signals.py`` broadcasts ``TaskEventCreatedEvent`` to
+        ``task_caller_{caller_id}`` on every Task/TaskEvent save (the same group
         the GraphQL subscription consumes). We only forward the ``event`` branch — the
         ``create`` branch is covered authoritatively by ``AssignResponse``, so forwarding
         it too would race the ack. Best-effort: a brief disconnect simply misses events.
@@ -89,7 +89,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
 
         event_id = (event.get("message") or {}).get("event")
         if event_id is None:
-            return  # a `create` (or malformed) payload — not an assignation event
+            return  # a `create` (or malformed) payload — not an task event
 
         message = await self._build_execution_event(event_id)
         if message is not None:
@@ -97,10 +97,10 @@ class AgentConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def _build_execution_event(self, event_id):
-        """Load the AssignationEvent and map it to its …Event mirror (off the event loop)."""
+        """Load the TaskEvent and map it to its …Event mirror (off the event loop)."""
         try:
-            event = models.AssignationEvent.objects.select_related("assignation").get(id=event_id)
-        except models.AssignationEvent.DoesNotExist:
+            event = models.TaskEvent.objects.select_related("task").get(id=event_id)
+        except models.TaskEvent.DoesNotExist:
             return None
         return caller_events.build_execution_event(event)
 

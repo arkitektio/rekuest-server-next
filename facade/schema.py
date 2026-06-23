@@ -47,7 +47,7 @@ class Query:
     shortcuts: list[types.Shortcut] = field(description="List of shortcuts.")
     toolboxes: list[types.Toolbox] = field(description="List of toolboxes containing shortcuts.")
     action = field(resolver=queries.action, description="Fetch a specific action.")
-    assignations = field(resolver=queries.assignations, description="Fetch assignations.")
+    tasks = field(resolver=queries.tasks, description="Fetch tasks.")
     event = field(resolver=queries.event, description="Fetch a specific event.")
     implementation_at = field(resolver=queries.implementation_at, description="Find implementation at given interface.")
     my_implementation_at = field(resolver=queries.my_implementation_at, description="Find your implementation at a specific interface.")
@@ -64,7 +64,7 @@ class Query:
     structures: list[types.Structure] = field(description="All registered structures.")
     structure_packages: list[types.StructurePackage] = field(description="All registered structure packages.")
     interfaces: list[types.Interface] = field(description="All registered interfaces.")
-    tasks: list[types.Assignation] = field(description="All tasks.")
+    tasks: list[types.Task] = field(description="All tasks.")
     resolved_implementations = field(resolver=queries.resolved_implementations, description="Fetch resolved dependencies for a resolution.")
 
     agent: types.Agent = field(resolver=queries.agent, description="Fetch a specific agent by ID or by app, version and device_id.")
@@ -81,7 +81,7 @@ class Query:
 
     # Stats
     actionStats: types.ActionStats = field(resolver=types.ActionStatsResolver, description="Statistics about actions and their implementations.")
-    assignationStats: types.AssignationStats = field(resolver=types.AssignationStatsResolver, description="Statistics about assignations and their states.")
+    taskStats: types.TaskStats = field(resolver=types.TaskStatsResolver, description="Statistics about tasks and their states.")
 
     state_for = field(resolver=queries.state_for, description="Retrieve state for a specific context.")
 
@@ -165,24 +165,24 @@ class Query:
     def implementation(self, info: Info, id: strawberry.ID) -> types.Implementation:
         return cast(types.Implementation, models.Implementation.objects.get(id=id))
 
-    @field(description="Fetch assignation by ID.")
-    def assignation(self, info: Info, id: strawberry.ID) -> types.Assignation:
-        return cast(types.Assignation, models.Assignation.objects.get(id=id))
+    @field(description="Fetch task by ID.")
+    def task(self, info: Info, id: strawberry.ID) -> types.Task:
+        return cast(types.Task, models.Task.objects.get(id=id))
 
 
 @strawberry.type(description="Root mutation type for executing write operations on the API.")
 class Mutation:
     create_implementation = mutation(resolver=mutations.create_implementation, description="Create a new implementation entry.")
-    ack = mutation(resolver=mutations.ack, description="Acknowledge an assignation.")
+    ack = mutation(resolver=mutations.ack, description="Acknowledge an task.")
     bounce = mutation(resolver=mutations.bounce, description="Bounce an agent so it reconnects.")
     kick = mutation(resolver=mutations.kick, description="Kick an agent to force disconnect. It will fail and not reconnect.")
     assign = mutation(resolver=mutations.assign, description="Assign a task to an agent.")
-    cancel = mutation(resolver=mutations.cancel, description="Cancel an active assignation.")
-    pause = mutation(resolver=mutations.pause, description="Pause an ongoing assignation.")
-    resume = mutation(resolver=mutations.resume, description="Resume a paused assignation.")
-    collect = mutation(resolver=mutations.collect, description="Collect results from an assignation.")
-    interrupt = mutation(resolver=mutations.interrupt, description="Interrupt the execution of an assignation.")
-    reinit = mutation(resolver=mutations.reinit, description="Reinitialize the assignation or agent.")
+    cancel = mutation(resolver=mutations.cancel, description="Cancel an active task.")
+    pause = mutation(resolver=mutations.pause, description="Pause an ongoing task.")
+    resume = mutation(resolver=mutations.resume, description="Resume a paused task.")
+    collect = mutation(resolver=mutations.collect, description="Collect results from an task.")
+    interrupt = mutation(resolver=mutations.interrupt, description="Interrupt the execution of an task.")
+    reinit = mutation(resolver=mutations.reinit, description="Reinitialize the task or agent.")
     block = mutation(resolver=mutations.block, description="Block an agent from connecting.")
     unblock = mutation(resolver=mutations.unblock, description="Unblock a previously blocked agent.")
     delete_implementation = mutation(resolver=mutations.delete_implementation, description="Delete a registered implementation.")
@@ -256,8 +256,8 @@ class Mutation:
 @strawberry.type(description="Root subscription type for real-time event streams from the system.")
 class Subscription:
     new_actions = subscription(resolver=subscriptions.new_actions, description="Subscribe to notifications when new actions are created.")
-    assignations = subscription(resolver=subscriptions.assignations, description="Subscribe to updates on assignations.")
-    assignation_events = subscription(resolver=subscriptions.assignation_events, description="Subscribe to events related to assignations.")
+    tasks = subscription(resolver=subscriptions.tasks, description="Subscribe to updates on tasks.")
+    task_events = subscription(resolver=subscriptions.task_events, description="Subscribe to events related to tasks.")
     agents = subscription(resolver=subscriptions.agents, description="Subscribe to updates on agent connections and statuses.")
     implementation_change = subscription(resolver=subscriptions.implementation_change, description="Subscribe to changes in implementations.")
     implementations = subscription(resolver=subscriptions.implementations, description="Subscribe to creation or updates of implementations.")
@@ -265,7 +265,7 @@ class Subscription:
     latest_patches = subscription(resolver=subscriptions.latest_patches, description="Subscribe to latest patches for specific agents or states.")
     watch_state = subscription(resolver=subscriptions.watch_state, description="Watch a state: yields the current snapshot then streams patches.")
     watch_agent = subscription(resolver=subscriptions.watch_agent, description="Watch an agent: yields snapshots for all states then streams patches.")
-    child_assignations = subscription(resolver=subscriptions.child_assignations, description="Subscribe to child assignation events.")
+    child_tasks = subscription(resolver=subscriptions.child_tasks, description="Subscribe to child task events.")
 
 
 schema = kante.Schema(

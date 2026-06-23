@@ -33,7 +33,7 @@ for detail. In brief:
 ### Identity — Caller and Agent
 Every authenticated request carries a `(client, user, organization)` triple.
 
-- **Caller** — that triple acting as a **requestor** (who asks for work). Owns assignations and
+- **Caller** — that triple acting as a **requestor** (who asks for work). Owns tasks and
   reservations; keys the realtime channel `ass_caller_{id}`. A frontend has a Caller and no Agent.
 - **Agent** — that triple plus an `app`/`release`/`device`, acting as a **provider** (who executes
   work). Connects over the WebSocket and runs implementations.
@@ -44,11 +44,11 @@ Every authenticated request carries a `(client, user, organization)` triple.
 - **Implementation** — binds an Action to an Agent via an `interface`. Carries bound `params`,
   dependencies, and optional higher-order wrapping.
 
-### Reservations and Assignations
+### Reservations and Tasks
 - **Reservation** — a standing pool of implementations for an action, routed by a strategy.
-- **Assignation** — one task execution: the central log, stamped with the caller, routed to an
-  agent, accumulating `AssignationEvent`s. See
-  [`design/assignation-lifecycle.md`](design/assignation-lifecycle.md).
+- **Task** — one task execution: the central log, stamped with the caller, routed to an
+  agent, accumulating `TaskEvent`s. See
+  [`design/task-lifecycle.md`](design/task-lifecycle.md).
 
 ### State management
 - **StateDefinition** — the schema for a kind of agent state.
@@ -95,9 +95,9 @@ query Implementations {
   implementations { id interface agent { id name } action { id name } }
 }
 
-# Assignations (filtered to the calling caller)
-query Assignations {
-  assignations { id reference latestEventKind isDone }
+# Tasks (filtered to the calling caller)
+query Tasks {
+  tasks { id reference latestEventKind isDone }
 }
 
 # State schemas and current state
@@ -129,7 +129,7 @@ mutation Reserve($input: ReserveInput!) {
   reserve(input: $input) { id }
 }
 
-# Steer a running assignation
+# Steer a running task
 mutation Cancel($input: CancelInput!)   { cancel(input: $input)   { id latestInstructKind } }
 mutation Pause($input: PauseInput!)     { pause(input: $input)    { id } }
 mutation Resume($input: ResumeInput!)   { resume(input: $input)   { id } }
@@ -145,9 +145,9 @@ families.
 ### Subscriptions
 
 ```graphql
-# Updates on the caller's own assignations
-subscription Assignations {
-  assignations { create { id latestEventKind } event { id kind progress } }
+# Updates on the caller's own tasks
+subscription Tasks {
+  tasks { create { id latestEventKind } event { id kind progress } }
 }
 
 # Agent connection/status changes within the organization
@@ -161,7 +161,7 @@ subscription WatchState($stateId: ID!) {
 }
 ```
 
-Other streams: `assignation_events`, `child_assignations`, `reservations`, `implementations` /
+Other streams: `task_events`, `child_tasks`, `reservations`, `implementations` /
 `implementation_change`, `state_update_events`, `latest_patches`, `watch_agent`, `new_actions`.
 
 ## Authentication

@@ -1,4 +1,4 @@
-"""Inputs for assignations and the postman lifecycle controls."""
+"""Inputs for tasks and the postman lifecycle controls."""
 
 from typing import Any
 
@@ -25,7 +25,7 @@ class HookInputModel(BaseModel):
 
 @pydantic.input(
     HookInputModel,
-    description="A hook is a function that is called when a action has reached a specific lifecycle point. Hooks are jsut actions that take an assignation as input and return a value.",
+    description="A hook is a function that is called when a action has reached a specific lifecycle point. Hooks are jsut actions that take an task as input and return a value.",
 )
 class HookInput:
     kind: enums.HookKind
@@ -41,19 +41,19 @@ class AssignInputModel(BaseModel):
         agent: Optional agent ID for direct assignment
         action_hash: Optional hash of the action for identification
         interface: Optional interface of the implementation
-        hooks: Optional list of hooks for the assignation
+        hooks: Optional list of hooks for the task
         args: Dictionary of arguments/ports and values
-        reference: Unique reference identifier for the assignation
-        parent: Optional parent ID of the assignation
-        cached: Whether the assignation should be cached
-        log: Whether the assignation should be logged
-        ephemeral: Whether the assignation is ephemeral
-        is_hook: Whether the assignation is a hook
-        step: Whether the assignation should step to breakpoints
+        reference: Unique reference identifier for the task
+        parent: Optional parent ID of the task
+        cached: Whether the task should be cached
+        log: Whether the task should be logged
+        ephemeral: Whether the task is ephemeral
+        is_hook: Whether the task is a hook
+        step: Whether the task should step to breakpoints
     """
 
     action: str | None = Field(default=None, description="The action ID to assign to")
-    dependency: str | None = Field(default=None, description="The dependency key.method to assign when running inside a resolved assignation")
+    dependency: str | None = Field(default=None, description="The dependency key.method to assign when running inside a resolved task")
     resolution: str | None = Field(
         default=None,
         description="The resolution ID to assign to when assining to a implementation with dependencies",
@@ -70,35 +70,35 @@ class AssignInputModel(BaseModel):
         default=None,
         description="The hash of the action. This is used to identify the action in the system.",
     )
-    method: str | None = Field(default=None, description="The method key to assign when running inside a resolved assignation")
+    method: str | None = Field(default=None, description="The method key to assign when running inside a resolved task")
     interface: str | None = Field(
         default=None,
         description="The interface of the implementation. Only ussable if you also set agent",
     )
     hooks: list[HookInputModel] | None = Field(
         default=None,
-        description="The hooks of the assignation. This is used to identify the assignation in the system.",
+        description="The hooks of the task. This is used to identify the task in the system.",
     )
-    args: dict[str, Any] = Field(description="The args of the assignation. Its a dictionary of ports and values")
+    args: dict[str, Any] = Field(description="The args of the task. Its a dictionary of ports and values")
     reference: str | None = Field(
         default=None,
-        description="The reference of the assignation. This is used to identify the assignation in the system.",
+        description="The reference of the task. This is used to identify the task in the system.",
     )
     parent: str | None = Field(
         default=None,
-        description="The parent ID of the assignation. This is used to identify the assignation in the system.",
+        description="The parent ID of the task. This is used to identify the task in the system.",
     )
-    cached: bool | None = Field(default=None, description="Whether the assignation should be cached")
-    log: bool | None = Field(default=None, description="Whether the assignation should be logged")
-    capture: bool | None = Field(default=None, description="Whether to capture the assignation.")
-    ephemeral: bool | None = Field(default=None, description="Whether the assignation is ephemeral")
+    cached: bool | None = Field(default=None, description="Whether the task should be cached")
+    log: bool | None = Field(default=None, description="Whether the task should be logged")
+    capture: bool | None = Field(default=None, description="Whether to capture the task.")
+    ephemeral: bool | None = Field(default=None, description="Whether the task is ephemeral")
     dependencies: list[ResolvedDependencyInputModel] | None = Field(
         default=None,
-        description="The dependencies of the assignation. This maps dependency keys to implementation IDs.",
+        description="The dependencies of the task. This maps dependency keys to implementation IDs.",
     )
-    is_hook: bool | None = Field(default=None, description="Whether the assignation is a hook")
-    step: bool | None = Field(default=None, description="Whether the assignation should step. Ie. go to the next breakpoint")
-    policy: enums.AssignPolicy | None = Field(default=None, description="The policy for the assignation. This defines how the assignation should be handled.")
+    is_hook: bool | None = Field(default=None, description="Whether the task is a hook")
+    step: bool | None = Field(default=None, description="Whether the task should step. Ie. go to the next breakpoint")
+    policy: enums.AssignPolicy | None = Field(default=None, description="The policy for the task. This defines how the task should be handled.")
 
 
 @pydantic.input(AssignInputModel, description="The input for assigning args to a action.")
@@ -126,33 +126,33 @@ class AssignInput:
 
 
 class CancelInputModel(BaseModel):
-    """Base model for canceling an assignation.
+    """Base model for canceling an task.
 
     Attributes:
-        assignation: ID of the assignation to cancel
+        task: ID of the task to cancel
     """
 
-    assignation: str = Field(description="The assignation ID to cancel")
+    task: str = Field(description="The task ID to cancel")
 
 
-@pydantic.input(CancelInputModel, description="The input for canceling an assignation.")
+@pydantic.input(CancelInputModel, description="The input for canceling an task.")
 class CancelInput:
-    assignation: strawberry.ID
+    task: strawberry.ID
 
 
 class PauseInputModel(BaseModel):
-    """Base model for pausing an assignation.
+    """Base model for pausing an task.
 
     Attributes:
-        assignation: ID of the assignation to pause
+        task: ID of the task to pause
     """
 
-    assignation: str = Field(description="The assignation ID to pause")
+    task: str = Field(description="The task ID to pause")
 
 
-@pydantic.input(PauseInputModel, description="The input for pausing an assignation.")
+@pydantic.input(PauseInputModel, description="The input for pausing an task.")
 class PauseInput:
-    assignation: strawberry.ID
+    task: strawberry.ID
 
 
 class CollectInputModel(BaseModel):
@@ -174,33 +174,33 @@ class CollectInput:
 
 
 class ResumeInputModel(BaseModel):
-    """Base model for resuming a paused assignation.
+    """Base model for resuming a paused task.
 
     Attributes:
-        assignation: ID of the assignation to resume
+        task: ID of the task to resume
         step: resume only to the next breakpoint (the equivalent of the old step instruction)
     """
 
-    assignation: str = Field(description="The assignation ID to resume")
+    task: str = Field(description="The task ID to resume")
     step: bool = Field(default=False, description="Resume only until the next breakpoint instead of running on freely.")
 
 
-@pydantic.input(ResumeInputModel, description="The input for resuming an assignation.")
+@pydantic.input(ResumeInputModel, description="The input for resuming an task.")
 class ResumeInput:
-    assignation: strawberry.ID
+    task: strawberry.ID
     step: bool = False
 
 
 class InterruptInputModel(BaseModel):
-    """Base model for interrupting an assignation.
+    """Base model for interrupting an task.
 
     Attributes:
-        assignation: ID of the assignation to interrupt
+        task: ID of the task to interrupt
     """
 
-    assignation: str = Field(description="The assignation ID to interrupt")
+    task: str = Field(description="The task ID to interrupt")
 
 
-@pydantic.input(InterruptInputModel, description="The input for interrupting an assignation.")
+@pydantic.input(InterruptInputModel, description="The input for interrupting an task.")
 class InterruptInput:
-    assignation: strawberry.ID
+    task: strawberry.ID

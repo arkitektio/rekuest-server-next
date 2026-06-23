@@ -26,11 +26,11 @@ from .agent import (
     MemoryDrawer,
     MemoryShelve,
 )
-from .assignation import (
+from .task import (
     AgentEvent,
-    Assignation,
-    AssignationEvent,
-    AssignationInstruct,
+    Task,
+    TaskEvent,
+    TaskInstruct,
 )
 from .blok import (
     Blok,
@@ -107,10 +107,10 @@ __all__ = [
     "Resolution",
     "ResolvedDependency",
     "Implementation",
-    # assignation
-    "Assignation",
-    "AssignationEvent",
-    "AssignationInstruct",
+    # task
+    "Task",
+    "TaskEvent",
+    "TaskInstruct",
     "AgentEvent",
     # testcase
     "TestCase",

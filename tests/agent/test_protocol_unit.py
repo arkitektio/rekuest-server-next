@@ -55,8 +55,8 @@ class FakeAgent:
 class FakeBackend:
     """Records which persist-backend hook the protocol routed each message to."""
 
-    def __init__(self, assignations=None, caller_assign_error=None):
-        self.assignations = assignations or []
+    def __init__(self, tasks=None, caller_assign_error=None):
+        self.tasks = tasks or []
         self.calls = []
         # When set, on_caller_assign raises it (to exercise the nack path).
         self.caller_assign_error = caller_assign_error
@@ -68,7 +68,7 @@ class FakeBackend:
         self.calls.append(("caller_assign", agent_id, message, can_assign_root))
         if self.caller_assign_error is not None:
             raise self.caller_assign_error
-        return SimpleNamespace(pk="new-ass-1"), True  # stands in for the created Assignation
+        return SimpleNamespace(pk="new-ass-1"), True  # stands in for the created Task
 
     async def on_caller_cancel(self, agent_id, message, *, connection_id=None, session_id=None):
         self.calls.append(("caller_cancel", agent_id, message))
@@ -78,7 +78,7 @@ class FakeBackend:
 
     async def on_agent_connected(self, agent_id, connection_id=None, session_id=None):
         self.calls.append(("connected", agent_id))
-        return self.assignations
+        return self.tasks
 
     async def get_or_create_caller_id(self, agent_id):
         self.calls.append(("caller_id", agent_id))
@@ -89,7 +89,7 @@ class FakeBackend:
 
     async def on_observer_connected(self, agent_id, connection_id=None, mode=None):
         self.calls.append(("observer_connected", agent_id, mode))
-        return self.assignations
+        return self.tasks
 
     async def on_caller_connected(self, agent_id, connection_id=None, session_id=None):
         self.calls.append(("caller_connected", agent_id))
@@ -278,7 +278,7 @@ class TestAgentProtocolUnit:
         class RecordingBackend(FakeBackend):
             async def on_agent_connected(self, agent_id, connection_id=None, session_id=None):
                 recorded["session_id"] = session_id
-                return self.assignations
+                return self.tasks
 
         protocol, sent, closed, _ = make_protocol(backend=RecordingBackend())
         await protocol.receive(_register_frame(mode=messages.AgentMode.EXECUTOR, session_id="proc-xyz"))
@@ -301,7 +301,7 @@ class TestAgentProtocolUnit:
         result = json.loads(sent[-1])
         assert result["type"] == messages.ToAgentMessageType.ASSIGN_RESPONSE.value
         assert result["request"] == req.id and result["reference"] == "ref-1"
-        assert result["assignation"] == "new-ass-1" and result["created"] is True
+        assert result["task"] == "new-ass-1" and result["created"] is True
         assert closed == []
         await protocol.shutdown()
 
@@ -317,7 +317,7 @@ class TestAgentProtocolUnit:
 
         result = json.loads(sent[-1])
         assert result["type"] == messages.ToAgentMessageType.ASSIGN_RESPONSE.value
-        assert result["assignation"] is None and result["created"] is False
+        assert result["task"] is None and result["created"] is False
         assert "missing can_assign_root" in result["error"]
         assert closed == []  # crucially, the connection stays open
         await protocol.shutdown()
@@ -328,12 +328,12 @@ class TestAgentProtocolUnit:
         await protocol.receive(_register_frame())
         sent.clear()
 
-        done = messages.Completed(assignation="ass-9", seq=7)
+        done = messages.Completed(task="ass-9", seq=7)
         await protocol.receive(done.model_dump_json())
 
         ack = json.loads(sent[-1])
         assert ack["type"] == messages.ToAgentMessageType.EVENT_ACK.value
-        assert ack["event"] == done.id and ack["assignation"] == "ass-9" and ack["seq"] == 7
+        assert ack["event"] == done.id and ack["task"] == "ass-9" and ack["seq"] == 7
         await protocol.shutdown()
 
     async def test_caller_control_routes_and_acks(self):
@@ -342,7 +342,7 @@ class TestAgentProtocolUnit:
         await protocol.receive(_register_frame())
         sent.clear()
 
-        req = messages.CancelRequest(assignation="ass-7", auto_interrupt=5)
+        req = messages.CancelRequest(task="ass-7", auto_interrupt=5)
         await protocol.receive(req.model_dump_json())
 
         assert any(c[0] == "caller_cancel" for c in backend.calls)
@@ -358,7 +358,7 @@ class TestAgentProtocolUnit:
         await protocol.receive(_register_frame())
         sent.clear()
 
-        await protocol.receive(messages.CancelRequest(assignation="ass-x").model_dump_json())
+        await protocol.receive(messages.CancelRequest(task="ass-x").model_dump_json())
 
         result = json.loads(sent[-1])
         assert result["type"] == messages.ToAgentMessageType.CONTROL_RESPONSE.value
@@ -369,7 +369,7 @@ class TestAgentProtocolUnit:
     async def test_unhandled_message_closes(self):
         protocol, sent, closed, _ = make_protocol()
         await protocol.receive(_register_frame())
-        await protocol.receive(messages.Lock(key="lock-1", assignation=str(uuid.uuid4())).model_dump_json())
+        await protocol.receive(messages.Lock(key="lock-1", task=str(uuid.uuid4())).model_dump_json())
         assert FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE in closed
         await protocol.shutdown()
 
@@ -378,7 +378,7 @@ class TestAgentProtocolUnit:
         protocol, sent, closed, _ = make_protocol(backend=backend)
         await protocol.receive(_register_frame())
         await protocol.receive(
-            messages.Log(assignation=str(uuid.uuid4()), message="hello", level="INFO").model_dump_json()
+            messages.Log(task=str(uuid.uuid4()), message="hello", level="INFO").model_dump_json()
         )
         assert any(call[0] == "log" for call in backend.calls)
         await protocol.shutdown()

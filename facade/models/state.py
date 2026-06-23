@@ -78,7 +78,7 @@ class Patch(models.Model):
     value = models.JSONField(help_text="The value of this patch (e.g. the new value that is being set)")
     timestamp = models.DateTimeField(auto_now_add=True, help_text="The time this patch was created")
     global_rev = models.IntegerField(help_text="The current revision of the state in the global context (e.g. considering all patches that have been applied to this state)")
-    assignation = models.ForeignKey("Assignation", on_delete=models.CASCADE, null=True, blank=True, help_text="The assignation that caused this patch (e.g. to be able to track changes by assignation)", related_name="patches")
+    task = models.ForeignKey("Task", on_delete=models.CASCADE, null=True, blank=True, help_text="The task that caused this patch (e.g. to be able to track changes by task)", related_name="patches")
 
 
 class Snapshot(models.Model):

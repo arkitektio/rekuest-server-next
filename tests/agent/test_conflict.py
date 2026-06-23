@@ -12,10 +12,10 @@ import pytest
 
 from facade import enums, messages
 from facade.codes import AGENT_ALREADY_CONNECTED_CODE, AGENT_REPLACED_CODE
-from facade.models import Agent, AssignationEvent
+from facade.models import Agent, TaskEvent
 
 from tests.agent.helpers import connect_agent, open_agent
-from tests.factories import TEST_TOKEN, build_unimplemented_assignation_for_agent
+from tests.factories import TEST_TOKEN, build_unimplemented_task_for_agent
 
 
 @pytest.mark.django_db(transaction=True)
@@ -48,12 +48,12 @@ class TestAgentConnectionConflict:
         agent = await Agent.objects.aget(pk=incumbent.agent_pk)
         assert agent.connected is True
 
-    async def test_displaced_connection_does_not_mark_assignations_disconnected(self, agent_ws):
-        # Generation guard, end to end: an in-flight assignation owned by the agent must NOT
+    async def test_displaced_connection_does_not_mark_tasks_disconnected(self, agent_ws):
+        # Generation guard, end to end: an in-flight task owned by the agent must NOT
         # receive a DISCONNECTED event when the incumbent is displaced by a force-register —
         # only a genuine disconnect of the active connection should.
         incumbent = await open_agent(agent_ws, "dup-agent")
-        assignation = await build_unimplemented_assignation_for_agent(incumbent.agent_pk, "displace-guard")
+        task = await build_unimplemented_task_for_agent(incumbent.agent_pk, "displace-guard")
 
         taker = await connect_agent(agent_ws)
         await taker.register(force=True)
@@ -63,8 +63,8 @@ class TestAgentConnectionConflict:
 
         disconnected = [
             e
-            async for e in AssignationEvent.objects.filter(
-                assignation_id=assignation.pk, kind=enums.AssignationEventKind.DISCONNECTED
+            async for e in TaskEvent.objects.filter(
+                task_id=task.pk, kind=enums.TaskEventKind.DISCONNECTED
             )
         ]
         assert disconnected == []

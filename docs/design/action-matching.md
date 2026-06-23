@@ -146,6 +146,6 @@ an indexed lookup.
 ## Where this feeds in
 
 Action matching underlies catalogue search, dependency auto-resolution
-([assignation-lifecycle.md](assignation-lifecycle.md)), and higher-order arg/return projection
+([task-lifecycle.md](task-lifecycle.md)), and higher-order arg/return projection
 ([higher-order.md](higher-order.md)) — anywhere the system has to ask "what can satisfy this shape
 of data?".

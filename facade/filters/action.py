@@ -25,8 +25,8 @@ class ActionOrder:
     def used_at(self, info: Info, queryset, value: strawberry_django.Ordering, prefix: str):
         if not value:
             return queryset, []
-        queryset = queryset.annotate(latest_assignation_time=Max(f"{prefix}assignation__created_at"))
-        return queryset, [value.resolve("latest_assignation_time")]
+        queryset = queryset.annotate(latest_task_time=Max(f"{prefix}task__created_at"))
+        return queryset, [value.resolve("latest_task_time")]
 
 
 @strawberry_django.filter_type(models.Action)
@@ -115,11 +115,11 @@ class ActionFilter:
 
     @filter_field
     def used_before(self, info: Info, queryset, value: datetime.datetime, prefix: str):
-        return queryset.filter(**{f"{prefix}assignations__created_at__lt": value}), Q()
+        return queryset.filter(**{f"{prefix}tasks__created_at__lt": value}), Q()
 
     @filter_field
     def used_after(self, info: Info, queryset, value: datetime.datetime, prefix: str):
-        return queryset.filter(**{f"{prefix}assignations__created_at__gt": value}), Q()
+        return queryset.filter(**{f"{prefix}tasks__created_at__gt": value}), Q()
 
     @filter_field
     def stateful(self, info: Info, queryset, value: bool, prefix: str):

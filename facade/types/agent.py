@@ -48,7 +48,7 @@ class Agent:
     kind: enums.AgentKind = strawberry_django.field(description="Kind of the agent.")
     hook_url: str | None = strawberry_django.field(description="Webhook URL for this Agent (only if webhook)", default=None)
     hook_url_secret: str | None = strawberry_django.field(description="Webhook URL secret for this Agent (only if webhook)", default=None)
-    assignations: list["Assignation"] = strawberry_django.field(description="Assignations executed by this agent.")
+    tasks: list["Task"] = strawberry_django.field(description="Tasks executed by this agent.")
     app: App = strawberry_django.field(description="The app this agent belongs to.")
     release: Release = strawberry_django.field(description="The release this agent belongs to.")
     placements: list["Placement"] = strawberry_django.field(description="Placements associated with this agent.")
@@ -81,7 +81,7 @@ class Agent:
         return self.blocked
 
 
-@strawberry_django.type(models.AgentEvent, filters=filters.AssignationEventFilter, pagination=True, description="Event representing agent status or lifecycle change.")
+@strawberry_django.type(models.AgentEvent, filters=filters.TaskEventFilter, pagination=True, description="Event representing agent status or lifecycle change.")
 class AgentEvent:
     id: strawberry.ID = strawberry_django.field(description="ID of the agent event.")
     status: enums.AgentStatus = strawberry_django.field(description="Status of the agent during this event.")
@@ -90,6 +90,6 @@ class AgentEvent:
     def level(self) -> enums.LogLevel:
         return enums.LogLevel.INFO
 
-    @strawberry_django.field(description="Reference back to the assignation.")
+    @strawberry_django.field(description="Reference back to the task.")
     def reference(self) -> str:
-        return self.assignation.reference
+        return self.task.reference

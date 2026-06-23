@@ -1,7 +1,7 @@
-"""Map a persisted ``AssignationEvent`` to its caller-bound socket message.
+"""Map a persisted ``TaskEvent`` to its caller-bound socket message.
 
 The calling participant (the one that originated work via ``AssignRequest``) receives a
-minimal per-kind ``…Event`` mirror of each assignation event over its own socket — no
+minimal per-kind ``…Event`` mirror of each task event over its own socket — no
 GraphQL. This module is the single, pure, DB-free place that decides which ``…Event``
 class an event kind maps to and how its fields are populated, so it is trivially
 unit-testable with a light event-like stub.
@@ -15,7 +15,7 @@ from __future__ import annotations
 from typing import Optional, Protocol, cast
 
 from facade import messages
-from facade.enums import AssignationEventChoices as Kind
+from facade.enums import TaskEventChoices as Kind
 
 _LOG_LEVELS = {"DEBUG", "INFO", "ERROR", "WARN", "CRITICAL"}
 
@@ -24,7 +24,7 @@ class EventLike(Protocol):
     """The minimal surface ``build_execution_event`` reads — satisfied by the ORM model and test stubs."""
 
     id: int
-    assignation_id: int
+    task_id: int
     kind: object  # a TextChoices/str-enum member or a plain string; normalized in build_execution_event
     message: Optional[str]
     progress: Optional[int]
@@ -34,7 +34,7 @@ class EventLike(Protocol):
 
 def _base_kwargs(event: EventLike) -> dict:
     return {
-        "assignation": str(event.assignation_id),
+        "task": str(event.task_id),
         "event": str(event.id),
         "seq": int(event.id),
     }
@@ -43,7 +43,7 @@ def _base_kwargs(event: EventLike) -> dict:
 def build_execution_event(event: EventLike) -> Optional[messages.ExecutionEventMessage]:
     """Build the ``…Event`` message mirroring ``event``, or ``None`` if its kind is not forwarded.
 
-    Keys off the persisted ``kind`` string (``AssignationEventChoices`` values). Unknown /
+    Keys off the persisted ``kind`` string (``TaskEventChoices`` values). Unknown /
     not-forwarded kinds (e.g. ``UNASSIGN``) return ``None`` so the caller stream stays minimal.
     """
     base = _base_kwargs(event)

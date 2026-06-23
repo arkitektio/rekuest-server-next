@@ -55,7 +55,7 @@ sequenceDiagram
     end
     P->>AC: register_connection(agent.pk) (join group)
     P->>PB: on_agent_connected(agent.pk, connection_id)
-    PB-->>P: pending assignations
+    PB-->>P: pending tasks
     opt already connected && force
         P->>AC: kick_others() (displace incumbents)
     end
@@ -101,7 +101,7 @@ A `blocked` agent is closed immediately after authentication.
 ### Init + background loops
 
 On successful register the protocol sends an `Init` carrying the agent id and an `AssignInquiry`
-per pending assignation (work that was queued/unfinished while it was away — returned by
+per pending task (work that was queued/unfinished while it was away — returned by
 `on_agent_connected`). It then spawns two background tasks:
 
 - **`listen_for_tasks`** — relays queued work to the agent (see delivery below).
@@ -126,7 +126,7 @@ Only one connection may own an agent at a time. The mechanism is the agent's
 
 The ordering is the whole point: ownership is claimed **before** displacing the incumbent. The
 displaced connection's `on_agent_disconnected` is guarded — if `active_connection_id` no longer
-points at it, it does **nothing** (does not flip `connected` off, does not mark assignations
+points at it, it does **nothing** (does not flip `connected` off, does not mark tasks
 disconnected), because the new owner is authoritative. This prevents a departing stale connection
 from clobbering the live one's state.
 
@@ -171,9 +171,9 @@ inquiries (`AssignInquiry`). (The caller-bound `Caller*` mirrors and `Caller*Res
 | Message | Handler | Effect |
 | --- | --- | --- |
 | `HeartbeatEvent` | `on_agent_heartbeat` | liveness ack |
-| `ProgressEvent` | `on_agent_progress` | `AssignationEvent(PROGRESS)` |
-| `LogEvent` | `on_agent_log` | `AssignationEvent(LOG)` |
-| `YieldEvent` | `on_agent_yield` | `AssignationEvent(YIELD, returns)` + higher-order unfold |
+| `ProgressEvent` | `on_agent_progress` | `TaskEvent(PROGRESS)` |
+| `LogEvent` | `on_agent_log` | `TaskEvent(LOG)` |
+| `YieldEvent` | `on_agent_yield` | `TaskEvent(YIELD, returns)` + higher-order unfold |
 | `DoneEvent` | `on_agent_done` | terminal: `is_done`, `finished_at` |
 | `CancelledEvent` | `on_agent_cancelled` | terminal — confirms a `Cancel` (→ `CANCELLED`) |
 | `InterruptedEvent` | `on_agent_interrupted` | terminal — confirms an `Interrupt` (→ `INTERUPTED`) |
@@ -199,4 +199,4 @@ A second `Register` after registration is a protocol violation — it must not r
 `AgentProtocol.shutdown` (called from the consumer's `disconnect`) cancels the listen and heartbeat
 tasks, calls `on_agent_disconnected(agent.pk, connection_id)` (which no-ops if displaced), and closes
 the queue connection. The persisted disconnect marks the agent offline and flags its still-running
-assignations `DISCONNECTED` — see [assignation-lifecycle.md](assignation-lifecycle.md).
+tasks `DISCONNECTED` — see [task-lifecycle.md](task-lifecycle.md).

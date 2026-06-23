@@ -30,7 +30,7 @@ def _ack(message: messages.FromAgentEvent) -> messages.EventAck:
     """The durable-report acknowledgement so the agent can stop retaining a terminal report."""
     return messages.EventAck(
         event=message.id,
-        assignation=getattr(message, "assignation", None),
+        task=getattr(message, "task", None),
         seq=getattr(message, "seq", None),
     )
 
@@ -38,11 +38,11 @@ def _ack(message: messages.FromAgentEvent) -> messages.EventAck:
 async def _control(op, agent_id, message, connection_id, session_id) -> messages.ControlResponse:
     """Run a caller lifecycle-control request and return its ack (NACK on error, never raise)."""
     try:
-        assignation = await op(agent_id, message, connection_id=connection_id, session_id=session_id)
+        task = await op(agent_id, message, connection_id=connection_id, session_id=session_id)
     except Exception as e:
         logger.error("Caller control request failed", exc_info=True)
-        return messages.ControlResponse(request=message.id, assignation=message.assignation, accepted=False, error=str(e))
-    return messages.ControlResponse(request=message.id, assignation=str(assignation.pk), accepted=True)
+        return messages.ControlResponse(request=message.id, task=message.task, accepted=False, error=str(e))
+    return messages.ControlResponse(request=message.id, task=str(task.pk), accepted=True)
 
 
 async def route_from_agent_message(
@@ -64,7 +64,7 @@ async def route_from_agent_message(
             # A caller originating work. A bad request NACKs (returns an error result) rather
             # than propagating — it must never tear down the transport.
             try:
-                assignation, created = await backend.on_caller_assign(
+                task, created = await backend.on_caller_assign(
                     agent_id,
                     message,
                     can_assign_root=bool(capabilities and capabilities.can_assign_root),
@@ -73,8 +73,8 @@ async def route_from_agent_message(
                 )
             except Exception as e:
                 logger.error("AssignRequest failed", exc_info=True)
-                return messages.AssignResponse(request=message.id, reference=message.reference, assignation=None, created=False, error=str(e))
-            return messages.AssignResponse(request=message.id, reference=message.reference, assignation=str(assignation.pk), created=created)
+                return messages.AssignResponse(request=message.id, reference=message.reference, task=None, created=False, error=str(e))
+            return messages.AssignResponse(request=message.id, reference=message.reference, task=str(task.pk), created=created)
 
         # Caller lifecycle-control requests (two-phase; the outcome streams back as …Event mirrors).
         case messages.CancelRequest():

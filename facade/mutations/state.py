@@ -21,23 +21,23 @@ def log_patches(info: Info, input: inputs.LogPatchesInput) -> strawberry.ID:
     )
 
     gotten_states = {}
-    gotten_assignations = {}
+    gotten_tasks = {}
 
     for patch in model.patches:
         if patch.state_name not in gotten_states:
             state = models.State.objects.get(interface=patch.state_name, agent=agent, definition__name=patch.state_name)
             gotten_states[patch.state_name] = state
 
-        if patch.correlation_id and patch.correlation_id not in gotten_assignations:
-            assignation = models.Assignation.objects.get(id=patch.correlation_id)
-            gotten_assignations[patch.correlation_id] = assignation
+        if patch.correlation_id and patch.correlation_id not in gotten_tasks:
+            task = models.Task.objects.get(id=patch.correlation_id)
+            gotten_tasks[patch.correlation_id] = task
 
         state = gotten_states[patch.state_name]
 
         if patch.correlation_id:
-            assignation = gotten_assignations[patch.correlation_id]
+            task = gotten_tasks[patch.correlation_id]
         else:
-            assignation = None
+            task = None
 
         models.Patch.objects.create(
             state=state,
@@ -47,7 +47,7 @@ def log_patches(info: Info, input: inputs.LogPatchesInput) -> strawberry.ID:
             current_revision=patch.current_rev,
             future_revision=patch.future_rev,
             session_id=patch.session_id,
-            assignation=assignation,
+            task=task,
         )
 
 
@@ -64,23 +64,23 @@ def log_snapshot(info: Info, input: inputs.LogSnapshotInput) -> strawberry.ID:
     )
 
     gotten_states = {}
-    gotten_assignations = {}
+    gotten_tasks = {}
 
     for patch in model.patches:
         if patch.state_name not in gotten_states:
             state = models.State.objects.get(interface=patch.state_name, agent=agent, definition__name=patch.state_name)
             gotten_states[patch.state_name] = state
 
-        if patch.correlation_id and patch.correlation_id not in gotten_assignations:
-            assignation = models.Assignation.objects.get(id=patch.correlation_id)
-            gotten_assignations[patch.correlation_id] = assignation
+        if patch.correlation_id and patch.correlation_id not in gotten_tasks:
+            task = models.Task.objects.get(id=patch.correlation_id)
+            gotten_tasks[patch.correlation_id] = task
 
         state = gotten_states[patch.state_name]
 
         if patch.correlation_id:
-            assignation = gotten_assignations[patch.correlation_id]
+            task = gotten_tasks[patch.correlation_id]
         else:
-            assignation = None
+            task = None
 
         models.Patch.objects.create(
             state=state,
@@ -90,5 +90,5 @@ def log_snapshot(info: Info, input: inputs.LogSnapshotInput) -> strawberry.ID:
             current_revision=patch.current_rev,
             future_revision=patch.future_rev,
             session_id=patch.session_id,
-            assignation=assignation,
+            task=task,
         )

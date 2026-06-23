@@ -66,7 +66,7 @@ class Patch:
     global_current_revision: int
     global_future_revision: int
     session_id: str
-    assignation: Assignation | None
+    task: Task | None
     state: State
     interface: str
 

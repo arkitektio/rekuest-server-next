@@ -12,15 +12,15 @@ logger = logging.getLogger(__name__)
 def action(
     info: Info,
     id: strawberry.ID | None = None,
-    assignation: strawberry.ID | None = None,
+    task: strawberry.ID | None = None,
     implementation: strawberry.ID | None = None,
     agent: strawberry.ID | None = None,
     interface: str | None = None,
     hash: rscalars.ActionHash | None = None,
     matching: rinputs.ActionDependencyInput | None = None,
 ) -> types.Action:
-    if assignation:
-        return models.Assignation.objects.get(id=assignation).action
+    if task:
+        return models.Task.objects.get(id=task).action
     if implementation:
         return models.Implementation.objects.get(id=implementation).action
 

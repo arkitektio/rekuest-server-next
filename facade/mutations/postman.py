@@ -8,33 +8,33 @@ from kante.types import Info
 logger = logging.getLogger(__name__)
 
 
-def assign(info: Info, input: inputs.AssignInput) -> types.Assignation:
+def assign(info: Info, input: inputs.AssignInput) -> types.Task:
     model = input.to_pydantic()
     return controll_backend.assign(info, model)
 
 
-def pause(info: Info, input: inputs.PauseInput) -> types.Assignation:
+def pause(info: Info, input: inputs.PauseInput) -> types.Task:
     return controll_backend.pause(input)
 
 
-def resume(info: Info, input: inputs.ResumeInput) -> types.Assignation:
+def resume(info: Info, input: inputs.ResumeInput) -> types.Task:
     return controll_backend.resume(input)
 
 
 @strawberry.input
 class AckInput:
-    assignation: strawberry.ID
+    task: strawberry.ID
 
 
-def ack(info: Info, input: AckInput) -> types.Assignation:
-    return models.Assignation.objects.get(id=input.id)
+def ack(info: Info, input: AckInput) -> types.Task:
+    return models.Task.objects.get(id=input.id)
 
 
-def cancel(info: Info, input: inputs.CancelInput) -> types.Assignation:
+def cancel(info: Info, input: inputs.CancelInput) -> types.Task:
     return controll_backend.cancel(input)
 
 
-def interrupt(info: Info, input: inputs.InterruptInput) -> types.Assignation:
+def interrupt(info: Info, input: inputs.InterruptInput) -> types.Task:
     return controll_backend.interrupt(input)
 
 

@@ -179,9 +179,9 @@ class Implementation(models.Model):
     params = models.JSONField(default=dict, help_text="Params for this Implementation")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    tracks = models.JSONField(default=list, help_text="A log of all the assignations that have been provisioned with this implementation, as well as their status and results")
+    tracks = models.JSONField(default=list, help_text="A log of all the tasks that have been provisioned with this implementation, as well as their status and results")
     manipulates = models.ManyToManyField("State", help_text="Which states does this implementation manipulate?", related_name="manipulated_by")
-    dynamic: str = models.BooleanField(help_text="Dynamic Implementations will be able to create new assignations on runtime")
+    dynamic: str = models.BooleanField(help_text="Dynamic Implementations will be able to create new tasks on runtime")
     needs_token = models.BooleanField(
         default=True,
         help_text="Whether Rekuest mints a signed provenance token when this implementation is assigned. Default true (provenance-by-default); false skips minting for trivial/internal tasks.",
@@ -194,7 +194,7 @@ class Implementation(models.Model):
     effect = TextChoicesField(
         choices_enum=enums.EffectClassChoices,
         default=enums.EffectClassChoices.NONE.value,
-        help_text="The effect class of this implementation. NONE work is freely retryable/reclaimable; PHYSICAL work touches the real world and an ambiguous failure is terminal. Declared by the implementation, read at dispatch from assignation.implementation.effect — never caller-supplied.",
+        help_text="The effect class of this implementation. NONE work is freely retryable/reclaimable; PHYSICAL work touches the real world and an ambiguous failure is terminal. Declared by the implementation, read at dispatch from task.implementation.effect — never caller-supplied.",
     )
 
     class Meta:

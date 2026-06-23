@@ -122,7 +122,7 @@ def task_boundaries(
     state_id: strawberry.ID | None = None,
 ) -> Optional[types.TaskBoundary]:
     """Retrieve min/max revisions and times for a task correlation ID."""
-    queryset = models.Patch.objects.filter(assignation__reference=correlation_id)
+    queryset = models.Patch.objects.filter(task__reference=correlation_id)
     if state_id:
         queryset = queryset.filter(state_id=state_id)
 

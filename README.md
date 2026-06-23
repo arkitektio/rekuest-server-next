@@ -29,7 +29,7 @@ diagram shows the high-level design of Rekuest:
 
 > **📐 Architecture documentation.** For a structured, in-depth explanation of the major elements of
 > the service — the Caller/Agent identity model, the relational action-matching engine, the
-> assignation lifecycle, the agent WebSocket protocol, the realtime layer, and higher-order
+> task lifecycle, the agent WebSocket protocol, the realtime layer, and higher-order
 > implementations — see **[`docs/design/`](./docs/design/README.md)**.
 
 ## Developmental Notices

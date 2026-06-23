@@ -9,7 +9,7 @@ from asgiref.sync import sync_to_async
 
 from facade import inputs, messages
 from facade.backend import controll_backend
-from facade.models import Action, Agent, Assignation, AssignationEvent, Implementation
+from facade.models import Action, Agent, Task, TaskEvent, Implementation
 
 from tests.agent.helpers import RECEIVE_TIMEOUT, register, send_message
 from tests.factories import seed_agent
@@ -64,7 +64,7 @@ class TestHigherOrderOrchestration:
         info = _Info(authenticated_context)
 
         # Assign the higher-order implementation with the caller's typed args.
-        higher_assignation = await sync_to_async(controll_backend.assign)(
+        higher_task = await sync_to_async(controll_backend.assign)(
             info, inputs.AssignInputModel(implementation=str(higher_impl.pk), args={"x": 1})
         )
 
@@ -72,28 +72,28 @@ class TestHigherOrderOrchestration:
         received = await communicator.receive_json_from(timeout=RECEIVE_TIMEOUT)
         assert received["type"] == messages.ToAgentMessageType.ASSIGN.value
         assert received["args"] == {"model": "resnet50", "args": {"x": 1}}
-        child_id = received["assignation"]
+        child_id = received["task"]
 
-        # The child is a child of the (virtual) higher assignation and runs on the lower agent.
-        child = await Assignation.objects.aget(pk=child_id)
-        assert str(child.parent_id) == str(higher_assignation.pk)
+        # The child is a child of the (virtual) higher task and runs on the lower agent.
+        child = await Task.objects.aget(pk=child_id)
+        assert str(child.parent_id) == str(higher_task.pk)
         assert str(child.agent_id) == str(agent.pk)
 
         # Drive the lower agent: yield then done.
-        await send_message(communicator, messages.Yield(assignation=child_id, returns={"out": 42}))
-        await send_message(communicator, messages.Completed(assignation=child_id))
+        await send_message(communicator, messages.Yield(task=child_id, returns={"out": 42}))
+        await send_message(communicator, messages.Completed(task=child_id))
         await communicator.disconnect()
 
-        # The wrapper assignation sees the UNFOLDED yield (mapped via return_map) + delegated_to.
-        higher_yield = await AssignationEvent.objects.filter(
-            assignation_id=higher_assignation.pk, kind="YIELD"
+        # The wrapper task sees the UNFOLDED yield (mapped via return_map) + delegated_to.
+        higher_yield = await TaskEvent.objects.filter(
+            task_id=higher_task.pk, kind="YIELD"
         ).aget()
         assert higher_yield.returns == {"result": 42}
         assert str(higher_yield.delegated_to_id) == str(child_id)
 
         # Done propagates to the wrapper.
-        assert await AssignationEvent.objects.filter(assignation_id=higher_assignation.pk, kind="COMPLETED").aexists()
-        refreshed = await Assignation.objects.aget(pk=higher_assignation.pk)
+        assert await TaskEvent.objects.filter(task_id=higher_task.pk, kind="COMPLETED").aexists()
+        refreshed = await Task.objects.aget(pk=higher_task.pk)
         assert refreshed.is_done is True
 
     async def test_assign_fails_when_no_lower_agent_connected(self, agent_ws, authenticated_context):

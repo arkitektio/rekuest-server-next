@@ -41,15 +41,15 @@ class Action:
     defined_at: datetime.datetime = strawberry_django.field(description="Timestamp when the action was defined.")
     test_cases: list["TestCase"] | None = strawberry_django.field(description="Test cases for this action.")
     organization: "Organization" = strawberry_django.field(description="The organization that owns this action.")
-    assignations: list["Assignation"] = strawberry_django.field(description="Assignations created for this action.")
+    tasks: list["Task"] = strawberry_django.field(description="Tasks created for this action.")
 
-    @strawberry_django.field(description="Get the latest completed assignation for this action.")
-    def latest_assignation(self) -> Optional["Assignation"]:
-        return models.Assignation.objects.filter(action=self, is_done=True).order_by("-created_at").first()
+    @strawberry_django.field(description="Get the latest completed task for this action.")
+    def latest_task(self) -> Optional["Task"]:
+        return models.Task.objects.filter(action=self, is_done=True).order_by("-created_at").first()
 
-    @strawberry_django.field(description="Retrieve assignations where this action has run.")
-    def runs(self) -> list["Assignation"] | None:
-        return models.Assignation.objects.filter(action=self).order_by("-created_at")
+    @strawberry_django.field(description="Retrieve tasks where this action has run.")
+    def runs(self) -> list["Task"] | None:
+        return models.Task.objects.filter(action=self).order_by("-created_at")
 
     @strawberry_django.field(description="Input arguments (ports) for the action.")
     def args(self) -> list[rtypes.ArgPort]:

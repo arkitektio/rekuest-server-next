@@ -12,7 +12,7 @@ Key files: `facade/channels.py`, `facade/channel_events.py`, `facade/signals.py`
 
 ```mermaid
 flowchart LR
-    M["Model save/delete<br/>(Assignation, AssignationEvent,<br/>Agent, State, Patch, ...)"] --> S["signals.py<br/>post_save / post_delete"]
+    M["Model save/delete<br/>(Task, TaskEvent,<br/>Agent, State, Patch, ...)"] --> S["signals.py<br/>post_save / post_delete"]
     S --> B["channel.broadcast(event, [topics])"]
     B --> RD[("Redis channel layer")]
     RD --> L["subscription:<br/>channel.listen(context, [topics])"]
@@ -32,8 +32,8 @@ serialized snapshot:
 
 | Channel | Payload | Carries |
 | --- | --- | --- |
-| `assignation_event_channel` | `AssignationEventCreatedEvent` | `create` (assignation id) or `event` (event id) |
-| `child_assignation_channel` | `ChildAssignationEvent` | `create` / `update` (assignation id) |
+| `task_event_channel` | `TaskEventCreatedEvent` | `create` (task id) or `event` (event id) |
+| `child_task_channel` | `ChildTaskEvent` | `create` / `update` (task id) |
 | `agent_updated_channel` | `AgentSignal` | `create` / `update` / `delete` (agent id) |
 | `new_implementation_channel` | `ImplementationSignal` | `create` / `update` / `delete` |
 | `action_channel` | `ActionSignal` / `DBEvent` | action create/update |
@@ -47,8 +47,8 @@ a caller only subscribes to topics keyed by *its own* identity, an org only to i
 
 | Topic key | Audience / meaning |
 | --- | --- |
-| `ass_caller_{caller_id}` | A caller's own assignations + their events. |
-| `child_assignations_{parent_id}` | Children of a specific assignation. |
+| `ass_caller_{caller_id}` | A caller's own tasks + their events. |
+| `child_tasks_{parent_id}` | Children of a specific task. |
 | `agents_for_{org_id}` | Agent create/update/delete within an organization. |
 | `actions_{org_id}` | Action create/update within an organization. |
 | `implementation_{impl_id}` | Updates to one implementation (plus a global create channel). |
@@ -60,11 +60,11 @@ a caller only subscribes to topics keyed by *its own* identity, an org only to i
 
 `facade/signals.py` wires Django `post_save`/`post_delete` to broadcasts. The load-bearing ones:
 
-- **Assignation created** → if it has a `caller_id`, broadcast `AssignationEventCreatedEvent(create)`
-  to `ass_caller_{caller_id}`. If it has a `parent`, also broadcast a `ChildAssignationEvent` to
-  `child_assignations_{parent.id}`.
-- **AssignationEvent created** → if the parent assignation has a `caller_id`, broadcast
-  `AssignationEventCreatedEvent(event)` to `ass_caller_{caller_id}`. This is how a caller sees each
+- **Task created** → if it has a `caller_id`, broadcast `TaskEventCreatedEvent(create)`
+  to `ass_caller_{caller_id}`. If it has a `parent`, also broadcast a `ChildTaskEvent` to
+  `child_tasks_{parent.id}`.
+- **TaskEvent created** → if the parent task has a `caller_id`, broadcast
+  `TaskEventCreatedEvent(event)` to `ass_caller_{caller_id}`. This is how a caller sees each
   `PROGRESS`/`YIELD`/`DONE` as it is persisted.
 - **Agent save/delete** → broadcast `AgentSignal(create|update|delete)` to
   `agents_for_{organization.id}`.
@@ -75,7 +75,7 @@ a caller only subscribes to topics keyed by *its own* identity, an org only to i
 - **Implementation save/delete** → `ImplementationSignal` on the global implementation channel and
   `implementation_{id}`.
 
-Because the caller key (`ass_caller_{id}`) comes straight off `Assignation.caller_id`, the
+Because the caller key (`ass_caller_{id}`) comes straight off `Task.caller_id`, the
 requestor-identity model in [identity.md](identity.md) is exactly what makes "watch my own work"
 work.
 
@@ -83,19 +83,19 @@ work.
 
 A subscription (`facade/subscriptions/*`) is an async generator that resolves the audience key,
 calls `channel.listen(info.context, [topics])`, and for each message loads the referenced row and
-yields the GraphQL type. Sketch of the assignations subscription:
+yields the GraphQL type. Sketch of the tasks subscription:
 
 ```python
-async def assignations(self, info: Info) -> AsyncGenerator[AssignationChangeEvent, None]:
+async def tasks(self, info: Info) -> AsyncGenerator[TaskChangeEvent, None]:
     caller, _ = await models.Caller.objects.aget_or_create(...)   # same identity as backend
-    async for message in assignation_event_channel.listen(info.context, [f"ass_caller_{caller.id}"]):
+    async for message in task_event_channel.listen(info.context, [f"ass_caller_{caller.id}"]):
         if message.create:
-            yield AssignationChangeEvent(create=await models.Assignation.objects.aget(id=message.create))
+            yield TaskChangeEvent(create=await models.Task.objects.aget(id=message.create))
         elif message.event:
-            yield AssignationChangeEvent(event=await models.AssignationEvent.objects.aget(id=message.event))
+            yield TaskChangeEvent(event=await models.TaskEvent.objects.aget(id=message.event))
 ```
 
-The major streams: `assignations` / `assignationEvents` (caller-keyed), `childAssignations`
+The major streams: `tasks` / `taskEvents` (caller-keyed), `childTasks`
 (parent-keyed), `agents` (org-keyed), `implementations`, and the state streams below.
 
 ## The snapshot-then-stream pattern

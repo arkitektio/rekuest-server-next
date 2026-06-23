@@ -1,6 +1,6 @@
 """Unit tests for the pure caller-event mapper (no DB, no channels).
 
-``build_execution_event`` is the single place that turns a persisted ``AssignationEvent``
+``build_execution_event`` is the single place that turns a persisted ``TaskEvent``
 into its minimal caller-bound socket message, so it is exercised here with a light stub.
 """
 
@@ -11,7 +11,7 @@ import pytest
 
 from facade import messages
 from facade.caller_events import build_execution_event
-from facade.enums import AssignationEventChoices as Kind
+from facade.enums import TaskEventChoices as Kind
 
 
 @dataclass
@@ -19,7 +19,7 @@ class StubEvent:
     """The minimal surface ``build_execution_event`` reads — stands in for the ORM model."""
 
     id: int = 42
-    assignation_id: str = "ass-1"
+    task_id: str = "ass-1"
     kind: str = Kind.PROGRESS.value
     message: Optional[str] = None
     progress: Optional[int] = None
@@ -30,7 +30,7 @@ class StubEvent:
 def test_progress_maps_with_progress_and_message():
     msg = build_execution_event(StubEvent(kind=Kind.PROGRESS.value, progress=50, message="half"))
     assert isinstance(msg, messages.ProgressEvent)
-    assert msg.assignation == "ass-1" and msg.event == "42" and msg.seq == 42
+    assert msg.task == "ass-1" and msg.event == "42" and msg.seq == 42
     assert msg.progress == 50 and msg.message == "half"
 
 
@@ -47,7 +47,7 @@ def test_error_and_critical_take_message_as_error():
 
 
 def test_log_defaults_invalid_level_to_info():
-    # AssignationEvent.level is an AssignationEventChoices string (or None) — not a log
+    # TaskEvent.level is an TaskEventChoices string (or None) — not a log
     # level — so a non-log-level value must degrade to INFO rather than fail validation.
     info = build_execution_event(StubEvent(kind=Kind.LOG.value, message="hi", level=None))
     assert isinstance(info, messages.LogEvent) and info.level == "INFO" and info.message == "hi"
@@ -83,11 +83,11 @@ def test_disconnected_carries_message():
 def test_bare_kinds_map_to_their_class(kind, cls):
     msg = build_execution_event(StubEvent(kind=kind))
     assert isinstance(msg, cls)
-    assert msg.assignation == "ass-1" and msg.event == "42" and msg.seq == 42
+    assert msg.task == "ass-1" and msg.event == "42" and msg.seq == 42
 
 
 def test_interrupted_is_a_plain_string_value_not_a_tuple():
-    # Guards against a `INTERRUPTED = ("INTERRUPTED",)` tuple literal in AssignationEventKind:
+    # Guards against a `INTERRUPTED = ("INTERRUPTED",)` tuple literal in TaskEventKind:
     # the persisted choices value must be a plain string so the mapping matches.
     assert Kind.INTERRUPTED.value == "INTERRUPTED"
     assert isinstance(build_execution_event(StubEvent(kind="INTERRUPTED")), messages.InterruptedEvent)

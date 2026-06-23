@@ -4,38 +4,38 @@ import strawberry
 from django.db.models import TextChoices
 
 
-class AssignationStatusChoices(TextChoices):
-    ASSIGNING = "ASSIGNING", "Assigning, (Assignation is being assigned to an Agent)"
-    BOUND = "BOUND", "Bound (Assignation was bound to an Agent)"
-    CANCELING = "CANCELING", "Unassign (Assignation was unassigned from an Agent)"
-    CANCELLED = "CANCELLED", "Unassign (Assignation was unassigned from an Agent)"
-    ONGOING = "ONGOING", "ONGOING (Assignation is currently being performed)"
-    DONE = "DONE", "Done (Assignation finished the Assignation)"
-    ERROR = "ERROR", "Error (Assignation resulted in an error)"
+class TaskStatusChoices(TextChoices):
+    ASSIGNING = "ASSIGNING", "Assigning, (Task is being assigned to an Agent)"
+    BOUND = "BOUND", "Bound (Task was bound to an Agent)"
+    CANCELING = "CANCELING", "Unassign (Task was unassigned from an Agent)"
+    CANCELLED = "CANCELLED", "Unassign (Task was unassigned from an Agent)"
+    ONGOING = "ONGOING", "ONGOING (Task is currently being performed)"
+    DONE = "DONE", "Done (Task finished the Task)"
+    ERROR = "ERROR", "Error (Task resulted in an error)"
 
 
-class AssignationEventChoices(TextChoices):
-    """These are the possible events that can happen to an Assignation.
+class TaskEventChoices(TextChoices):
+    """These are the possible events that can happen to an Task.
 
-    The events are ordered by their appearance in the lifecycle of an Assignation.
+    The events are ordered by their appearance in the lifecycle of an Task.
 
 
     """
 
-    QUEUED = "QUEUED", "Queued (Assignation was queued)"
-    BOUND = "BOUND", "Bound (Assignation was bound to an Agent)"
-    STARTED = "STARTED", "Started (Agent accepted and began the Assignation)"
-    UNASSIGN = "UNASSIGN", "Unassign (Agent received the Assignation)"
-    PROGRESS = "PROGRESS", "Progress (Agent is making progress on the Assignation)"
+    QUEUED = "QUEUED", "Queued (Task was queued)"
+    BOUND = "BOUND", "Bound (Task was bound to an Agent)"
+    STARTED = "STARTED", "Started (Agent accepted and began the Task)"
+    UNASSIGN = "UNASSIGN", "Unassign (Agent received the Task)"
+    PROGRESS = "PROGRESS", "Progress (Agent is making progress on the Task)"
     CANCELLING = "CANCELLING", "Cancelling (a cancel was requested; awaiting the agent's confirmation)"
-    CANCELLED = "CANCELLED", "Cancelled (the agent cancelled the assignation)"
+    CANCELLED = "CANCELLED", "Cancelled (the agent cancelled the task)"
     INTERRUPTING = "INTERRUPTING", "Interrupting (an interrupt was requested; awaiting the agent's confirmation)"
-    INTERRUPTED = "INTERRUPTED", "Interrupted (the agent interrupted the assignation)"
+    INTERRUPTED = "INTERRUPTED", "Interrupted (the agent interrupted the task)"
     PAUSING = "PAUSING", "Pausing (a pause was requested; awaiting the agent's confirmation)"
-    PAUSED = "PAUSED", "Paused (the agent suspended the assignation)"
+    PAUSED = "PAUSED", "Paused (the agent suspended the task)"
     RESUMING = "RESUMING", "Resuming (a resume was requested; awaiting the agent's confirmation)"
-    RESUMED = "RESUMED", "Resumed (the agent resumed the assignation)"
-    DELEGATE = "DELEGATE", "Delegate (Assignation was delegated to another Assignation)"
+    RESUMED = "RESUMED", "Resumed (the agent resumed the task)"
+    DELEGATE = "DELEGATE", "Delegate (Task was delegated to another Task)"
     FAILED = "FAILED"
     CRITICAL = "CRITICAL"
     DISCONNECTED = "DISCONNECTED"
@@ -44,23 +44,23 @@ class AssignationEventChoices(TextChoices):
         "YIELD",
         "Yields (Agent yielded the result)",
     )  # One yield can be interpreted as a return
-    COMPLETED = "COMPLETED", "Completed (Agent finished the Assignation)"
+    COMPLETED = "COMPLETED", "Completed (Agent finished the Task)"
     LOG = "LOG", "Log (Agent logged a message)"
 
 
-class AssignationInstructChoices(TextChoices):
-    """These are the possible events that are instructed to an Assignation."""
+class TaskInstructChoices(TextChoices):
+    """These are the possible events that are instructed to an Task."""
 
-    ASSIGN = "ASSIGN", "Assign (Agent accepted the Assignation)"
-    CANCEL = "CANCEL", "Unassign (Agent received the Assignation)"
-    RESUME = "RESUME", "Resume (Agent resumed the Assignation)"
-    PAUSE = "PAUSE", "Pause (Agent paused the Assignation)"
-    INTERRUPT = "INTERRUPT", "Interrupt (Agent interupted the Assignation)"
+    ASSIGN = "ASSIGN", "Assign (Agent accepted the Task)"
+    CANCEL = "CANCEL", "Unassign (Agent received the Task)"
+    RESUME = "RESUME", "Resume (Agent resumed the Task)"
+    PAUSE = "PAUSE", "Pause (Agent paused the Task)"
+    INTERRUPT = "INTERRUPT", "Interrupt (Agent interupted the Task)"
     COLLECT = "COLLECT", "Collect instruction received"
 
 
-@strawberry.enum(description="The event kind of the assignationevent")
-class AssignationStatus(str, Enum):
+@strawberry.enum(description="The event kind of the taskevent")
+class TaskStatus(str, Enum):
     ASSIGNING = "ASSIGNING"
     ONGOING = "ONGOING"
     CRITICAL = "CRITICAL"
@@ -68,9 +68,9 @@ class AssignationStatus(str, Enum):
     DONE = "DONE"
 
 
-@strawberry.enum(description="The event kind of the assignationevent")
-class AssignationInstructKind(str, Enum):
-    """These are the possible events that are instructed to an Assignation."""
+@strawberry.enum(description="The event kind of the taskevent")
+class TaskInstructKind(str, Enum):
+    """These are the possible events that are instructed to an Task."""
 
     ASSIGN = "ASSIGN"
     CANCEL = "CANCEL"
@@ -80,11 +80,11 @@ class AssignationInstructKind(str, Enum):
     COLLECT = "COLLECT"
 
 
-@strawberry.enum(description="The event kind of the assignationevent")
-class AssignationEventKind(str, Enum):
-    """These are the possible events that can happen to an Assignation.
+@strawberry.enum(description="The event kind of the taskevent")
+class TaskEventKind(str, Enum):
+    """These are the possible events that can happen to an Task.
 
-    The events are ordered by their appearance in the lifecycle of an Assignation.
+    The events are ordered by their appearance in the lifecycle of an Task.
     """
 
     BOUND = "BOUND"

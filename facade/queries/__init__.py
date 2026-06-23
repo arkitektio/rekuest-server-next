@@ -1,4 +1,4 @@
-from .assignation import assignations
+from .task import tasks
 from .event import event
 from .action import action
 from .implementation import implementation_at, my_implementation_at, resolved_implementations
@@ -17,7 +17,7 @@ from .state import (
 from .agent import agent
 
 __all__ = [
-    "assignations",
+    "tasks",
     "action",
     "event",
     "implementation_at",

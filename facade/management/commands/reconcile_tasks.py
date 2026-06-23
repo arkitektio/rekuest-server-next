@@ -6,7 +6,7 @@ reconnects) the timer is gone and the work would stay ``is_done=False`` forever.
 re-runs the same DB-authoritative reconcile op for any websocket executor that is
 disconnected past the grace window — multi-worker-safe, idempotent. Run it on a schedule.
 
-    python manage.py reconcile_assignations
+    python manage.py reconcile_tasks
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ class Command(BaseCommand):
         # Webhook agents never set connected/last_seen (no socket) — only sweep websocket
         # executors that are disconnected and have been gone longer than the grace window.
         agent_ids = list(
-            models.Assignation.objects.filter(
+            models.Task.objects.filter(
                 is_done=False,
                 agent__kind=enums.AgentKind.WEBSOCKET.value,
                 agent__connected=False,
@@ -43,4 +43,4 @@ class Command(BaseCommand):
         for agent_id in agent_ids:
             async_to_sync(persist_backend.reconcile_orphaned_executor_work)(agent_id)
 
-        self.stdout.write(self.style.SUCCESS(f"reconcile_assignations: reconciled {len(agent_ids)} orphaned executor(s)."))
+        self.stdout.write(self.style.SUCCESS(f"reconcile_tasks: reconciled {len(agent_ids)} orphaned executor(s)."))

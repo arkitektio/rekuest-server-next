@@ -3,13 +3,13 @@
 A participant originates work via ``AssignRequest`` and gets a ``AssignResponse`` back.
 Here the registered agent assigns to its own implementation, so it both originates the work
 (caller) and receives the ``ASSIGN`` command (executor). Idempotency: resending the same
-``reference`` returns the same assignation with ``created=False``.
+``reference`` returns the same task with ``created=False``.
 """
 
 import pytest
 
 from facade import messages
-from facade.models import Assignation
+from facade.models import Task
 
 from tests.agent.helpers import open_agent
 from tests.factories import build_implementation_for_agent
@@ -25,19 +25,19 @@ class TestAssignRequest:
         # Originate work referencing our own implementation.
         await session.send(messages.AssignRequest(reference="r-1", implementation=str(impl.pk), args={"x": 1}))
         result = await session.receive(messages.AssignResponse)
-        assert result.reference == "r-1" and result.created is True and result.assignation
+        assert result.reference == "r-1" and result.created is True and result.task
 
-        # Resend the SAME reference → same assignation, created=False, no duplicate row.
+        # Resend the SAME reference → same task, created=False, no duplicate row.
         await session.send(messages.AssignRequest(reference="r-1", implementation=str(impl.pk), args={"x": 1}))
         result2 = await session.receive(messages.AssignResponse)
-        assert result2.assignation == result.assignation and result2.created is False
+        assert result2.task == result.task and result2.created is False
 
-        assert await Assignation.objects.filter(reference="r-1").acount() == 1
+        assert await Task.objects.filter(reference="r-1").acount() == 1
 
-        # Origination is captured on the root assignation for the caller-death cascade:
+        # Origination is captured on the root task for the caller-death cascade:
         # the originating connection id is recorded (session id is None here — the test
         # Register sends no session_id).
-        created = await Assignation.objects.aget(id=result.assignation)
+        created = await Task.objects.aget(id=result.task)
         assert created.originating_connection_id is not None
         await session.disconnect()
 

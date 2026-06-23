@@ -9,7 +9,7 @@ each submodule's namespace below, so nested filter references resolve at schema-
 from . import (
     action,
     agent,
-    assignation,
+    task,
     auth,
     blok,
     common,
@@ -30,11 +30,11 @@ from .agent import (
     HardwareRecordFilter,
     ImplementationAgentFilter,
 )
-from .assignation import (
-    AssignationEventFilter,
-    AssignationEventOrder,
-    AssignationFilter,
-    AssignationOrder,
+from .task import (
+    TaskEventFilter,
+    TaskEventOrder,
+    TaskFilter,
+    TaskOrder,
 )
 from .auth import (
     ClientFilter,
@@ -111,10 +111,10 @@ __all__ = [
     "MemoryShelveOrder",
     "FileDrawerFilter",
     "MemoryDrawerFilter",
-    "AssignationOrder",
-    "AssignationFilter",
-    "AssignationEventOrder",
-    "AssignationEventFilter",
+    "TaskOrder",
+    "TaskFilter",
+    "TaskEventOrder",
+    "TaskEventFilter",
     "TestCaseFilter",
     "TestResultFilter",
     "ResolutionFilter",
@@ -160,7 +160,7 @@ __all__ = [
 _SUBMODULES = (
     action,
     agent,
-    assignation,
+    task,
     auth,
     blok,
     common,

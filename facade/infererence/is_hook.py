@@ -9,6 +9,6 @@ def is_hook(definition: DefinitionInputModel) -> Protocol | None:
     if len(definition.args) != 1:
         return None
 
-    if definition.args[0].identifier == "@rekuest/assignationevent":
+    if definition.args[0].identifier == "@rekuest/taskevent":
         x, _ = Protocol.objects.update_or_create(name="hook", defaults=dict(description="Is this a hook?"))
         return x
