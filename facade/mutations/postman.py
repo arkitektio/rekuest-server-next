@@ -21,10 +21,6 @@ def resume(info: Info, input: inputs.ResumeInput) -> types.Assignation:
     return controll_backend.resume(input)
 
 
-def step(info: Info, input: inputs.StepInput) -> types.Assignation:
-    return controll_backend.step(input)
-
-
 @strawberry.input
 class AckInput:
     assignation: strawberry.ID

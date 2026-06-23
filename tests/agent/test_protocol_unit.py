@@ -14,6 +14,7 @@ to this module.
 import asyncio
 import json
 import uuid
+from types import SimpleNamespace
 
 import pytest
 
@@ -25,8 +26,12 @@ from facade.codes import (
     FROM_AGENT_MESSAGE_IS_NOT_VALID_JSON_CODE,
     HEARTBEAT_NOT_RESPONDED_CODE,
 )
-from facade.consumers.agent_protocol import AgentProtocol
+from facade.capabilities import Capabilities
+from facade.consumers.agent_protocol import AgentProtocol, RegisteredSession
 from facade.consumers.agent_queue import InMemoryAgentQueue
+
+# Full executor-and-caller; mirrors the rollout default (enforcement off).
+FULL_CAPABILITIES = Capabilities(executes_work=True, can_assign_root=True)
 
 from tests.factories import TEST_TOKEN
 
@@ -50,22 +55,53 @@ class FakeAgent:
 class FakeBackend:
     """Records which persist-backend hook the protocol routed each message to."""
 
-    def __init__(self, assignations=None):
+    def __init__(self, assignations=None, caller_assign_error=None):
         self.assignations = assignations or []
         self.calls = []
+        # When set, on_caller_assign raises it (to exercise the nack path).
+        self.caller_assign_error = caller_assign_error
 
-    async def on_agent_connected(self, agent_id, connection_id=None):
+    async def on_agent_done(self, agent_id, message):
+        self.calls.append(("done", agent_id, message))
+
+    async def on_caller_assign(self, agent_id, message, can_assign_root, connection_id=None, session_id=None):
+        self.calls.append(("caller_assign", agent_id, message, can_assign_root))
+        if self.caller_assign_error is not None:
+            raise self.caller_assign_error
+        return SimpleNamespace(pk="new-ass-1"), True  # stands in for the created Assignation
+
+    async def on_caller_cancel(self, agent_id, message, *, connection_id=None, session_id=None):
+        self.calls.append(("caller_cancel", agent_id, message))
+        if self.caller_assign_error is not None:
+            raise self.caller_assign_error
+        return SimpleNamespace(pk="ctrl-ass-1")
+
+    async def on_agent_connected(self, agent_id, connection_id=None, session_id=None):
         self.calls.append(("connected", agent_id))
         return self.assignations
 
+    async def get_or_create_caller_id(self, agent_id):
+        self.calls.append(("caller_id", agent_id))
+        return f"caller-{agent_id}"
+
     async def on_agent_disconnected(self, agent_id, connection_id=None):
         self.calls.append(("disconnected", agent_id))
+
+    async def on_observer_connected(self, agent_id, connection_id=None, mode=None):
+        self.calls.append(("observer_connected", agent_id, mode))
+        return self.assignations
+
+    async def on_caller_connected(self, agent_id, connection_id=None, session_id=None):
+        self.calls.append(("caller_connected", agent_id))
+
+    async def on_caller_disconnected(self, agent_id, connection_id=None, session_id=None, mode=None):
+        self.calls.append(("caller_disconnected", agent_id, mode))
 
     async def on_agent_log(self, agent_id, message):
         self.calls.append(("log", agent_id, message))
 
 
-def make_protocol(agent=None, backend=None, queue=None, heartbeat_interval=10.0, heartbeat_timeout=5.0, kick_others=None, register_connection=None):
+def make_protocol(agent=None, backend=None, queue=None, heartbeat_interval=10.0, heartbeat_timeout=5.0, kick_others=None, register_connection=None, capabilities=FULL_CAPABILITIES):
     """Build an ``AgentProtocol`` wired to list-collecting transport callables."""
     sent = []
     closed = []
@@ -79,7 +115,7 @@ def make_protocol(agent=None, backend=None, queue=None, heartbeat_interval=10.0,
     agent = agent if agent is not None else FakeAgent()
 
     async def authenticator(register):
-        return agent
+        return agent, capabilities
 
     kwargs = {}
     if kick_others is not None:
@@ -111,8 +147,8 @@ async def _wait_for(predicate, timeout=2.0, interval=0.01):
     return predicate()
 
 
-def _register_frame(instance_id="unit-agent", token=TEST_TOKEN, force=False):
-    return messages.Register(token=token, force=force).model_dump_json()
+def _register_frame(instance_id="unit-agent", token=TEST_TOKEN, force=False, mode=messages.AgentMode.EXECUTOR, session_id=None):
+    return messages.Register(token=token, force=force, mode=mode, session_id=session_id).model_dump_json()
 
 
 @pytest.mark.asyncio
@@ -165,9 +201,8 @@ class TestAgentProtocolUnit:
         assert json.loads(sent[0])["type"] == messages.ToAgentMessageType.PROTOCOL_ERROR.value
         assert closed == [AGENT_ALREADY_CONNECTED_CODE]
         assert kicked == []  # nobody is displaced on a plain rejection
-        # No background loops were spawned for a rejected registration.
-        assert protocol.listen_task is None
-        assert protocol.heartbeat_task is None
+        # No session (and thus no background loops) for a rejected registration.
+        assert protocol.session is None
 
     async def test_force_register_kicks_incumbent_when_connected(self):
         # An already-connected agent + force -> displace the incumbent and proceed
@@ -197,6 +232,138 @@ class TestAgentProtocolUnit:
 
         assert kicked == []
         assert json.loads(sent[0])["type"] == messages.ToAgentMessageType.INIT.value
+        await protocol.shutdown()
+
+    # ----------------------------------------------------------------------- #
+    # Capability / mode gating (the single-protocol, capability-bit model).
+    # ----------------------------------------------------------------------- #
+    async def test_mode_exceeding_capabilities_is_rejected(self):
+        # A token that only grants executes_work may not register as CALLER (which
+        # requires can_assign_root). Protocol error + MODE_NOT_AUTHORIZED, no Init.
+        from facade.codes import MODE_NOT_AUTHORIZED_CODE
+
+        exec_only = Capabilities(executes_work=True, can_assign_root=False)
+        protocol, sent, closed, _ = make_protocol(capabilities=exec_only)
+        await protocol.receive(_register_frame(mode=messages.AgentMode.CALLER))
+
+        assert json.loads(sent[0])["type"] == messages.ToAgentMessageType.PROTOCOL_ERROR.value
+        assert closed == [MODE_NOT_AUTHORIZED_CODE]
+        assert protocol.session is None
+
+    async def test_caller_mode_does_not_displace_and_skips_executor_queue(self):
+        # A non-executor (CALLER) is NOT the singleton: even with an already-connected
+        # agent and no force it is admitted (no AGENT_ALREADY_CONNECTED), gets an Init,
+        # does NOT drain the executor task queue, but DOES run a heartbeat loop.
+        backend = FakeBackend()
+        kicked = []
+
+        async def kick_others():
+            kicked.append(True)
+
+        protocol, sent, closed, agent = make_protocol(agent=FakeAgent(connected=True), backend=backend, kick_others=kick_others)
+        await protocol.receive(_register_frame(mode=messages.AgentMode.CALLER, force=False))
+
+        assert json.loads(sent[0])["type"] == messages.ToAgentMessageType.INIT.value
+        assert closed == []
+        assert kicked == []
+        assert ("observer_connected", agent.pk, messages.AgentMode.CALLER.value) in backend.calls
+        assert protocol.session.listen_task is None  # never drains executor commands
+        assert protocol.session.heartbeat_task is not None  # liveness still tracked
+        await protocol.shutdown()
+        assert ("caller_disconnected", agent.pk, messages.AgentMode.CALLER.value) in backend.calls
+
+    async def test_executor_threads_session_id_to_backend_connect(self):
+        recorded = {}
+
+        class RecordingBackend(FakeBackend):
+            async def on_agent_connected(self, agent_id, connection_id=None, session_id=None):
+                recorded["session_id"] = session_id
+                return self.assignations
+
+        protocol, sent, closed, _ = make_protocol(backend=RecordingBackend())
+        await protocol.receive(_register_frame(mode=messages.AgentMode.EXECUTOR, session_id="proc-xyz"))
+        assert recorded["session_id"] == "proc-xyz"
+        await protocol.shutdown()
+
+    async def test_caller_assign_routes_and_acks(self):
+        backend = FakeBackend()
+        protocol, sent, closed, agent = make_protocol(backend=backend)
+        await protocol.receive(_register_frame())
+        sent.clear()
+
+        req = messages.CallerAssign(reference="ref-1", action="act-1", args={"x": 1})
+        await protocol.receive(req.model_dump_json())
+
+        # routed to the backend with the connection's can_assign_root capability
+        ca = next(c for c in backend.calls if c[0] == "caller_assign")
+        assert ca[3] is True  # FULL_CAPABILITIES.can_assign_root
+        # and a CallerAssignResult ack echoing the request id + reference
+        result = json.loads(sent[-1])
+        assert result["type"] == messages.ToAgentMessageType.CALLER_ASSIGN_RESULT.value
+        assert result["request"] == req.id and result["reference"] == "ref-1"
+        assert result["assignation"] == "new-ass-1" and result["created"] is True
+        assert closed == []
+        await protocol.shutdown()
+
+    async def test_caller_assign_failure_nacks_without_closing(self):
+        # A backend error must nack the caller, NOT close the socket (which would kill all
+        # the agent's other work).
+        backend = FakeBackend(caller_assign_error=PermissionError("missing can_assign_root"))
+        protocol, sent, closed, _ = make_protocol(backend=backend)
+        await protocol.receive(_register_frame())
+        sent.clear()
+
+        await protocol.receive(messages.CallerAssign(reference="ref-2", args={}).model_dump_json())
+
+        result = json.loads(sent[-1])
+        assert result["type"] == messages.ToAgentMessageType.CALLER_ASSIGN_RESULT.value
+        assert result["assignation"] is None and result["created"] is False
+        assert "missing can_assign_root" in result["error"]
+        assert closed == []  # crucially, the connection stays open
+        await protocol.shutdown()
+
+    async def test_terminal_event_is_acked(self):
+        backend = FakeBackend()
+        protocol, sent, closed, _ = make_protocol(backend=backend)
+        await protocol.receive(_register_frame())
+        sent.clear()
+
+        done = messages.DoneEvent(assignation="ass-9", seq=7)
+        await protocol.receive(done.model_dump_json())
+
+        ack = json.loads(sent[-1])
+        assert ack["type"] == messages.ToAgentMessageType.EVENT_ACK.value
+        assert ack["event"] == done.id and ack["assignation"] == "ass-9" and ack["seq"] == 7
+        await protocol.shutdown()
+
+    async def test_caller_control_routes_and_acks(self):
+        backend = FakeBackend()
+        protocol, sent, closed, _ = make_protocol(backend=backend)
+        await protocol.receive(_register_frame())
+        sent.clear()
+
+        req = messages.CallerCancel(assignation="ass-7", auto_interrupt=5)
+        await protocol.receive(req.model_dump_json())
+
+        assert any(c[0] == "caller_cancel" for c in backend.calls)
+        result = json.loads(sent[-1])
+        assert result["type"] == messages.ToAgentMessageType.CALLER_CONTROL_RESULT.value
+        assert result["request"] == req.id and result["accepted"] is True
+        assert closed == []
+        await protocol.shutdown()
+
+    async def test_caller_control_failure_nacks_without_closing(self):
+        backend = FakeBackend(caller_assign_error=PermissionError("not the caller"))
+        protocol, sent, closed, _ = make_protocol(backend=backend)
+        await protocol.receive(_register_frame())
+        sent.clear()
+
+        await protocol.receive(messages.CallerCancel(assignation="ass-x").model_dump_json())
+
+        result = json.loads(sent[-1])
+        assert result["type"] == messages.ToAgentMessageType.CALLER_CONTROL_RESULT.value
+        assert result["accepted"] is False and "not the caller" in result["error"]
+        assert closed == []  # a bad control request never tears down the socket
         await protocol.shutdown()
 
     async def test_unhandled_message_closes(self):
@@ -241,7 +408,7 @@ class TestAgentProtocolUnit:
             return [s for s in sent if json.loads(s)["type"] == messages.ToAgentMessageType.HEARTBEAT.value]
 
         assert await _wait_for(lambda: len(_heartbeats()) >= 1)
-        await protocol.on_agent_heartbeat()
+        await protocol.session.on_agent_heartbeat()
 
         # Give the loop time to time out if the answer had not been accepted.
         await asyncio.sleep(0.2)
@@ -274,7 +441,7 @@ class TestAgentProtocolUnit:
             pass
 
         async def authenticator(register):
-            return FakeAgent()
+            return FakeAgent(), FULL_CAPABILITIES
 
         protocol = AgentProtocol(
             send=send,
@@ -302,11 +469,28 @@ class TestAgentProtocolUnit:
         agent.asave = blocking_asave
 
         protocol, sent, closed, _ = make_protocol(agent=agent)
-        protocol.agent = agent  # simulate post-registration state
+        # Build the post-registration session directly to exercise its heartbeat handling.
+        session = RegisteredSession(
+            agent=agent,
+            capabilities=FULL_CAPABILITIES,
+            mode=messages.AgentMode.EXECUTOR,
+            executes_work=True,
+            session_id=None,
+            caller_id="caller",
+            connection_id=protocol.connection_id,
+            backend=protocol.backend,
+            queue=protocol.queue,
+            send_to_agent_message=protocol.send_to_agent_message,
+            send=protocol._send,
+            close=protocol.close,
+            heartbeat_interval=protocol.heartbeat_interval,
+            heartbeat_timeout=protocol.heartbeat_timeout,
+        )
+        protocol.session = session
         future = asyncio.get_event_loop().create_future()
-        protocol.heartbeat_future = future
+        session.heartbeat_future = future
 
-        task = asyncio.create_task(protocol.on_agent_heartbeat())
+        task = asyncio.create_task(session.on_agent_heartbeat())
         try:
             # The future is resolved even though asave is still blocked.
             assert await _wait_for(lambda: future.done())
@@ -338,15 +522,17 @@ class TestAgentProtocolUnit:
         # the first listen/heartbeat task pair). It closes instead.
         protocol, sent, closed, _ = make_protocol()
         await protocol.receive(_register_frame())
-        first_listen = protocol.listen_task
-        first_heartbeat = protocol.heartbeat_task
+        session = protocol.session
+        first_listen = session.listen_task
+        first_heartbeat = session.heartbeat_task
 
         await protocol.receive(_register_frame())
 
         assert FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE in closed
-        # The task handles are untouched — no new pair was spawned.
-        assert protocol.listen_task is first_listen
-        assert protocol.heartbeat_task is first_heartbeat
+        # The session and its task handles are untouched — no new pair was spawned.
+        assert protocol.session is session
+        assert session.listen_task is first_listen
+        assert session.heartbeat_task is first_heartbeat
 
         await protocol.shutdown()
         # The original pair is the one shutdown cancels — nothing left orphaned.

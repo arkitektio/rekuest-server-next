@@ -23,10 +23,12 @@ dependencies = [
     "django-polymorphic>=4.11.2",
     "boto3>=1.42.73",
     "jsonschema>=4.26.0",
+    "dokker>=2.5",
 ]
 
 [dependency-groups]
 dev = [
+    "basedpyright>=1.39.8",
     "django-stubs>=6.0.1",
     "dokker>=2.5",
     "moto>=5.1.22",
@@ -54,6 +56,35 @@ extend-ignore = ["ANN002", "ANN003", "D100", "ANN401"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["rekuest"]
+
+# Type gate for the refactored real-time / protocol plumbing. Run: `basedpyright`.
+# Scoped to the typed plumbing modules; the ORM/pydantic dynamic-inference rules are relaxed
+# (pyright can't see Django's descriptor/manager magic or pydantic defaults without a mypy
+# plugin), so the gate enforces the things that matter here — untyped params, wrong types,
+# bad calls, unreachable code — without drowning in Django false positives.
+[tool.basedpyright]
+typeCheckingMode = "standard"
+pythonVersion = "3.12"
+include = [
+    "facade/ports.py",
+    "facade/transport.py",
+    "facade/message_router.py",
+    "facade/grace.py",
+    "facade/capabilities.py",
+    "facade/caller_context.py",
+    "facade/caller_events.py",
+    "facade/hooks.py",
+    "facade/consumers/agent_protocol.py",
+]
+exclude = ["**/migrations", "**/__pycache__", ".venv", "tests"]
+# Django models / pydantic models defeat structural inference without a plugin.
+reportAttributeAccessIssue = false
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false
+reportAny = false
+reportUnusedCallResult = false
+reportMissingTypeStubs = false
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]

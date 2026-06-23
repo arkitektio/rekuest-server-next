@@ -178,32 +178,17 @@ class ResumeInputModel(BaseModel):
 
     Attributes:
         assignation: ID of the assignation to resume
+        step: resume only to the next breakpoint (the equivalent of the old step instruction)
     """
 
     assignation: str = Field(description="The assignation ID to resume")
+    step: bool = Field(default=False, description="Resume only until the next breakpoint instead of running on freely.")
 
 
 @pydantic.input(ResumeInputModel, description="The input for resuming an assignation.")
 class ResumeInput:
     assignation: strawberry.ID
-
-
-class StepInputModel(BaseModel):
-    """Base model for stepping an assignation through breakpoints.
-
-    Attributes:
-        assignation: ID of the assignation to step
-    """
-
-    assignation: str = Field(description="The assignation ID to step")
-
-
-@pydantic.input(
-    StepInputModel,
-    description="The input for stepping an assignation. Stepping is used to go from one breakpoint to another.",
-)
-class StepInput:
-    assignation: strawberry.ID
+    step: bool = False
 
 
 class InterruptInputModel(BaseModel):

@@ -2,9 +2,10 @@ import logging
 import uuid
 from typing import Optional
 
+from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 
-from facade import codes, messages
+from facade import caller_events, codes, messages, models
 from facade.consumers.agent_protocol import AgentProtocol
 from facade.consumers.agent_queue import RedisAgentQueue
 
@@ -14,6 +15,11 @@ logger = logging.getLogger(__name__)
 def _agent_group(agent_id: str) -> str:
     """Channel-layer group holding every live connection for one agent."""
     return f"agent-{agent_id}"
+
+
+def _caller_group(caller_id: str) -> str:
+    """Channel-layer group carrying the assignation events a caller originated."""
+    return f"ass_caller_{caller_id}"
 
 
 class AgentConsumer(AsyncWebsocketConsumer):
@@ -27,18 +33,18 @@ class AgentConsumer(AsyncWebsocketConsumer):
     groups = ["broadcast"]
 
     @classmethod
-    def broadcast(cls, agent_id: str, message: messages.ToAgentMessage) -> None:
-        """Broadcast a message to a specific agent.
+    def broadcast(cls, agent_id: int, message: messages.ToAgentMessage) -> None:
+        """Send a message to a specific agent over its transport (thin facade).
 
-        Producer side of the agent queue: the agent's ``listen_for_tasks`` loop
-        relays whatever is pushed here. Synchronous because it is called from the
-        backend / signal code.
-
-        Args:
-            agent_id (str): The identifier of the agent.
-            message (messages.ToAgentMessage): The message to send.
+        Kept for the existing backend/signal call sites; delegates to the typed
+        :func:`facade.transport.deliver_to_agent`, which picks redis queue (WEBSOCKET) vs
+        HMAC-signed POST (WEBHOOK). Called only AFTER the row is persisted, so a failed
+        delivery is recoverable from the DB.
         """
-        RedisAgentQueue.from_settings().push(agent_id, message.model_dump_json())
+        from facade import transport  # lazy: transport imports this consumer's queue module
+
+        agent = models.Agent.objects.only("id", "kind", "hook_url", "hook_url_secret").get(id=agent_id)
+        transport.deliver_to_agent(agent, message)
 
     async def connect(self) -> None:
         """Accept the socket and build a protocol bound to this transport."""
@@ -47,12 +53,14 @@ class AgentConsumer(AsyncWebsocketConsumer):
         # can displace the others without closing itself.
         self.connection_id = str(uuid.uuid4())
         self._agent_group: Optional[str] = None
+        self._caller_group: Optional[str] = None
         self.protocol = AgentProtocol(
             send=lambda text: self.send(text_data=text),
             close=lambda code: self.close(code=code),
             queue=RedisAgentQueue.from_settings(),
             register_connection=self.register_connection,
             kick_others=self.kick_others,
+            register_caller=self.register_caller,
             connection_id=self.connection_id,
         )
 
@@ -60,6 +68,41 @@ class AgentConsumer(AsyncWebsocketConsumer):
         """Join the agent's connection group once the agent is known."""
         self._agent_group = _agent_group(agent_id)
         await self.channel_layer.group_add(self._agent_group, self.channel_name)
+
+    async def register_caller(self, caller_id: str) -> None:
+        """Join the caller event group so events of work this identity originated reach us."""
+        self._caller_group = _caller_group(caller_id)
+        await self.channel_layer.group_add(self._caller_group, self.channel_name)
+
+    async def channel_AssignationEventCreatedEvent(self, event: dict) -> None:
+        """Forward a caller-bound assignation event to this socket as a ``Caller*`` message.
+
+        Producer side: ``facade/signals.py`` broadcasts ``AssignationEventCreatedEvent`` to
+        ``ass_caller_{caller_id}`` on every Assignation/AssignationEvent save (the same group
+        the GraphQL subscription consumes). We only forward the ``event`` branch — the
+        ``create`` branch is covered authoritatively by ``CallerAssignResult``, so forwarding
+        it too would race the ack. Best-effort: a brief disconnect simply misses events.
+        """
+        protocol = getattr(self, "protocol", None)
+        if protocol is None or protocol.session is None:
+            return  # not registered yet — nothing to correlate against
+
+        event_id = (event.get("message") or {}).get("event")
+        if event_id is None:
+            return  # a `create` (or malformed) payload — not an assignation event
+
+        message = await self._build_caller_message(event_id)
+        if message is not None:
+            await protocol.send_to_agent_message(message)
+
+    @database_sync_to_async
+    def _build_caller_message(self, event_id):
+        """Load the AssignationEvent and map it to its caller message (off the event loop)."""
+        try:
+            event = models.AssignationEvent.objects.select_related("assignation").get(id=event_id)
+        except models.AssignationEvent.DoesNotExist:
+            return None
+        return caller_events.build_caller_message(event)
 
     async def kick_others(self) -> None:
         """Tell every other connection in this agent's group to close."""
@@ -84,6 +127,9 @@ class AgentConsumer(AsyncWebsocketConsumer):
         group = getattr(self, "_agent_group", None)
         if group is not None:
             await self.channel_layer.group_discard(group, self.channel_name)
+        caller_group = getattr(self, "_caller_group", None)
+        if caller_group is not None:
+            await self.channel_layer.group_discard(caller_group, self.channel_name)
         if hasattr(self, "protocol"):
             await self.protocol.shutdown()
         logger.warning(f"Agent disconnected with code {code}")

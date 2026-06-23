@@ -1,29 +1,35 @@
 from datetime import datetime, timedelta, timezone
 import uuid
 from random import choice
-from typing import Dict, List, Protocol, Any
+from typing import Dict, List, Any
+
+from django.db.models import Q
 
 from facade import enums, inputs, models, types, messages
+from facade.caller_context import CallerContext
 from facade.consumers.async_consumer import AgentConsumer
 from facade.higher_order import build_lower_args, build_lower_dependencies
 from facade.provenance import mint_token_for_assignation
 from kante.types import Info
-from authentikate.vars import get_user, get_client
 import logging
 
 
-class ControllBackend(Protocol):
-    def create_message_id(self) -> str: ...
+def agent_available_q(prefix: str = "agent") -> Q:
+    """Q matching an agent that can receive work: a live WEBSOCKET, OR any WEBHOOK HookAgent.
 
-    def interrupt(self, info: Info, input: inputs.InterruptInputModel) -> types.Assignation: ...
+    HookAgents never set ``connected``/``last_seen`` (no socket), so they would otherwise be
+    invisible to action/dependency resolution — this predicate makes them selectable.
+    """
+    recent = datetime.now(timezone.utc) - timedelta(minutes=1)
+    p = f"{prefix}__" if prefix else ""
+    return Q(**{f"{p}kind": enums.AgentKind.WEBHOOK.value}) | Q(**{f"{p}connected": True, f"{p}last_seen__gt": recent})
 
-    def cancel(self, info: Info, input: inputs.CancelInputModel) -> types.Assignation: ...
 
-    def assign(self, info: Info, input: inputs.AssignInputModel) -> types.Assignation: ...
-
-    def resume(self, info: Info, input: inputs.ResumeInputModel) -> types.Assignation: ...
-
-    def pause(self, info: Info, input: inputs.PauseInputModel) -> types.Assignation: ...
+def agent_is_available(agent: models.Agent) -> bool:
+    """Whether a concrete agent can receive work (a live websocket or a webhook agent)."""
+    if agent.kind == enums.AgentKind.WEBHOOK.value:
+        return True
+    return bool(agent.connected and agent.last_seen and agent.last_seen > datetime.now(timezone.utc) - timedelta(minutes=1))
 
 
 def build_agent_dependency_dict(agent: models.Agent, dep: models.Dependency) -> Dict[str, Any]:
@@ -46,7 +52,7 @@ def build_agent_dependency_dict(agent: models.Agent, dep: models.Dependency) -> 
     }
 
 
-def build_dependency_dict(implementation: models.Implementation, info: Info, dependency_overwrites: List[inputs.ResolvedDependencyInputModel]) -> Dict[str, str]:
+def build_dependency_dict(implementation: models.Implementation, ctx: CallerContext, dependency_overwrites: List[inputs.ResolvedDependencyInputModel]) -> Dict[str, str]:
     dependencies = models.Dependency.objects.filter(implementation=implementation).all()
 
     dep_kwargs = {}
@@ -60,14 +66,14 @@ def build_dependency_dict(implementation: models.Implementation, info: Info, dep
                 if not dep.auto_resolvable:
                     raise ValueError(f"Dependency {dep.key} is not auto resolvable, but was provided with an overwrite that has auto_resolve set to true. Please either set auto_resolve to false for this dependency overwrite, or make the dependency auto resolvable in the system.")
 
-                agents = models.Agent.objects.filter(app__identifier=dep.app_filter, connected=True, last_seen__gt=datetime.now(timezone.utc) - timedelta(minutes=1), organization=info.context.request.organization).all()
+                agents = models.Agent.objects.filter(app__identifier=dep.app_filter, organization=ctx.organization).filter(agent_available_q("")).all()
                 if dep.max_viable_instances is not None:
                     agents = agents[: dep.max_viable_instances]
                 if dep.min_viable_instances is not None and len(agents) < dep.min_viable_instances:
                     raise ValueError(f"Not enough agents found for dependency {dep.key}. Required at least {dep.min_viable_instances} but found only {len(agents)}. Please ensure that there are enough agents available to resolve this dependency.")
 
             else:
-                agents = models.Agent.objects.filter(pk__in=[agent_id.agent for agent_id in overwrite.mapped_agents], connected=True, last_seen__gt=datetime.now(timezone.utc) - timedelta(minutes=1)).all()
+                agents = models.Agent.objects.filter(pk__in=[agent_id.agent for agent_id in overwrite.mapped_agents]).filter(agent_available_q("")).all()
                 if dep.max_viable_instances is not None:
                     agents = agents[: dep.max_viable_instances]
                 if dep.min_viable_instances is not None and len(agents) < dep.min_viable_instances:
@@ -77,7 +83,7 @@ def build_dependency_dict(implementation: models.Implementation, info: Info, dep
             continue
         else:
             if dep.auto_resolvable:
-                agents = models.Agent.objects.filter(app__identifier=dep.app_filter, connected=True, last_seen__gt=datetime.now(timezone.utc) - timedelta(minutes=1), organization=info.context.request.organization).all()
+                agents = models.Agent.objects.filter(app__identifier=dep.app_filter, organization=ctx.organization).filter(agent_available_q("")).all()
                 if dep.max_viable_instances is not None:
                     agents = agents[: dep.max_viable_instances]
                 if dep.min_viable_instances is not None and len(agents) < dep.min_viable_instances:
@@ -89,8 +95,8 @@ def build_dependency_dict(implementation: models.Implementation, info: Info, dep
     return dep_kwargs
 
 
-def get_caller_for_context(info: Info) -> models.Caller:
-    caller, _ = models.Caller.objects.get_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
+def get_caller_for_context(ctx: CallerContext) -> models.Caller:
+    caller, _ = models.Caller.objects.get_or_create(client=ctx.client, user=ctx.user, organization=ctx.organization)
     return caller
 
 
@@ -111,62 +117,76 @@ def acted_on_from_args(args: dict, action: models.Action) -> list[str]:
     return acted_on
 
 
-class RedisControllBackend(ControllBackend):
+class RedisControllBackend:
+    """The postman backend: resolves + persists assignations, then notifies via transport."""
+
     def create_message_id(self) -> str:
         return str(uuid.uuid4())
 
-    def interrupt(self, input: inputs.InterruptInputModel) -> models.Assignation:
-        parent = models.Assignation.objects.get(id=input.assignation)
-        parent.latest_instruct_kind = enums.AssignationInstructKind.INTERRUPT
-        parent.save()
+    def _request_control(
+        self,
+        assignation_id,
+        *,
+        instruct_kind,
+        inging_kind,
+        to_agent_factory,
+        propagate_children: bool = False,
+    ) -> models.Assignation:
+        """The shared request phase of a two-phase lifecycle op.
 
-        AgentConsumer.broadcast(
-            parent.implementation.agent.id,
-            messages.Interrupt(
-                assignation=parent.id,
-            ),
-        )
+        Sets ``latest_instruct_kind``, persists the ``-ING`` event (which fans out the matching
+        ``Caller*ing`` mirror to the caller), and broadcasts the ToAgent control message — for
+        the target, and (when ``propagate_children``) for every still-running descendant. The
+        op resolves only when the executing agent sends the matching confirmation event. Raises
+        if the assignation is already terminal.
+        """
+        ass = models.Assignation.objects.select_related("agent").get(id=assignation_id)
+        if ass.is_done:
+            raise ValueError("Assignation is already terminal")
 
-        children = models.Assignation.objects.filter(parent_id=input.assignation).all()
+        targets = [ass]
+        if propagate_children:
+            targets += list(models.Assignation.objects.filter(root_id=ass.id, is_done=False))
 
-        for child in children:
-            child.latest_instruct_kind = enums.AssignationInstructKind.INTERRUPT
-            child.save()
+        for target in targets:
+            target.latest_instruct_kind = instruct_kind
+            target.save(update_fields=["latest_instruct_kind"])
+            models.AssignationEvent.objects.create(assignation=target, kind=inging_kind)
+            AgentConsumer.broadcast(target.agent_id, to_agent_factory(str(target.pk)))
 
-            AgentConsumer.broadcast(
-                child.implementation.agent.id,
-                messages.Interrupt(
-                    assignation=child.id,
-                ),
-            )
-
-        return parent
+        return ass
 
     def cancel(self, input: inputs.CancelInputModel) -> models.Assignation:
-        assignation = models.Assignation.objects.get(id=input.assignation)
-        assignation.latest_event_kind = enums.AssignationStatus.CANCELLED
-        assignation.save()
-
-        AgentConsumer.broadcast(
-            assignation.agent.id,
-            message=messages.Cancel(
-                assignation=str(assignation.id),
-            ),
+        # Two-phase: CANCELING now; CANCELLED + is_done only when the agent confirms with
+        # CancelledEvent. Sent to the mother only (the actor winds down its own children).
+        return self._request_control(
+            input.assignation,
+            instruct_kind=enums.AssignationInstructKind.CANCEL,
+            inging_kind=enums.AssignationEventKind.CANCELING,
+            to_agent_factory=lambda a: messages.Cancel(assignation=a),
         )
 
-        # Forward cancellation to child assignations — e.g. the lower assignation a
-        # higher-order wrapper delegated to, which runs the real work on another agent.
-        for child in models.Assignation.objects.filter(parent_id=assignation.id, is_done=False):
-            AgentConsumer.broadcast(
-                child.agent.id,
-                message=messages.Cancel(
-                    assignation=str(child.id),
-                ),
-            )
+    def interrupt(self, input: inputs.InterruptInputModel) -> models.Assignation:
+        # Forceful: propagates Interrupt to all still-running descendants. Still two-phase —
+        # each reaches INTERUPTED only on its agent's InterruptedEvent.
+        return self._request_control(
+            input.assignation,
+            instruct_kind=enums.AssignationInstructKind.INTERRUPT,
+            inging_kind=enums.AssignationEventKind.INTERUPTING,
+            to_agent_factory=lambda a: messages.Interrupt(assignation=a),
+            propagate_children=True,
+        )
 
-        return assignation
+    def pause(self, input: inputs.PauseInputModel) -> models.Assignation:
+        return self._request_control(
+            input.assignation,
+            instruct_kind=enums.AssignationInstructKind.PAUSE,
+            inging_kind=enums.AssignationEventKind.PAUSING,
+            to_agent_factory=lambda a: messages.Pause(assignation=a),
+        )
 
-    def assign(self, info: Info, input: inputs.AssignInputModel) -> models.Assignation:
+    def assign(self, principal: "CallerContext | Any", input: inputs.AssignInputModel) -> models.Assignation:
+        ctx = CallerContext.coerce(principal)
         # TODO: Check if function is cached and was
 
         action = None
@@ -175,7 +195,7 @@ class RedisControllBackend(ControllBackend):
         agent = None
         dependency_dict = None
 
-        caller = get_caller_for_context(info)
+        caller = get_caller_for_context(ctx)
 
         if input.dependency:
             assert input.method, "Method key must be provided when assigning to a dependency"
@@ -210,7 +230,7 @@ class RedisControllBackend(ControllBackend):
 
         elif input.action:
             action = models.Action.objects.get(id=input.action)
-            implementation = models.Implementation.objects.filter(action=action, agent__connected=True, agent__last_seen__gt=datetime.now(timezone.utc) - timedelta(minutes=1)).first()
+            implementation = models.Implementation.objects.filter(action=action).filter(agent_available_q("agent")).first()
             if not implementation:
                 raise ValueError(f"No active implementation found for action {action.name}")
 
@@ -224,13 +244,11 @@ class RedisControllBackend(ControllBackend):
             # agent, by the co-location rule) is connectivity-checked in ``_assign_higher_order``,
             # which raises a ValueError. Skip the assert here so that path owns the check.
             if implementation.higher_order_for_id is None:
-                assert agent.connected, "Agent is not connected"
-                assert agent.last_seen, "Agent last seen time is not set"
-                assert agent.last_seen > datetime.now(timezone.utc) - timedelta(minutes=1), "Agent is not connected"
+                assert agent_is_available(agent), "Agent is not available (not connected, and not a webhook agent)"
 
         elif input.action_hash:
-            action = models.Action.objects.get(hash=input.action_hash, organization=info.context.request.organization)
-            implementation = models.Implementation.objects.filter(action=action, agent__connected=True).first()
+            action = models.Action.objects.get(hash=input.action_hash, organization=ctx.organization)
+            implementation = models.Implementation.objects.filter(action=action).filter(agent_available_q("agent")).first()
             if not implementation:
                 raise ValueError(f"No active implementation found for action {action.name}")
             agent = implementation.agent
@@ -249,13 +267,13 @@ class RedisControllBackend(ControllBackend):
         # Higher-order implementations are orchestrated server-side: the wrapper assignation
         # is virtual and a child assignation runs the resolved lower implementation.
         if implementation is not None and implementation.higher_order_for_id is not None:
-            return self._assign_higher_order(info, input, implementation, caller)
+            return self._assign_higher_order(ctx, input, implementation, caller)
 
         acted_on = acted_on_from_args(input.args, action)
 
         reference = input.reference or self.create_message_id()
         if dependency_dict is None:
-            dependency_dict = build_dependency_dict(implementation, info, input.dependencies or [])
+            dependency_dict = build_dependency_dict(implementation, ctx, input.dependencies or [])
 
         # TODO: if ephemeral is set, we should not store the assignation in the database
         assignation = models.Assignation.objects.create(
@@ -281,16 +299,16 @@ class RedisControllBackend(ControllBackend):
 
         action = implementation.action
 
-        token = mint_token_for_assignation(assignation, info)
+        token = mint_token_for_assignation(assignation, ctx)
 
         AgentConsumer.broadcast(
             assignation.agent.pk,
             message=messages.Assign(
                 assignation=str(assignation.pk),
                 args=input.args,
-                user=str(info.context.request.user.sub),
-                app=str(info.context.request.client.client_id),
-                org=str(info.context.request.organization.slug) if info.context.request.organization else None,
+                user=str(ctx.user.sub),
+                app=str(ctx.client.client_id),
+                org=str(ctx.organization.slug) if ctx.organization else None,
                 reference=reference,
                 capture=input.capture if input.capture is not None else False,
                 resolution=str(resolution.pk) if resolution else None,
@@ -304,7 +322,7 @@ class RedisControllBackend(ControllBackend):
                 if hook.kind == enums.HookKind.INIT:
                     # recursive assign
                     self.assign(
-                        info,
+                        ctx,
                         inputs.AssignInputModel(
                             action_hash=hook.hash,
                             parent=assignation.pk,
@@ -315,7 +333,7 @@ class RedisControllBackend(ControllBackend):
 
         return assignation
 
-    def _assign_higher_order(self, info: Info, input: inputs.AssignInputModel, higher: models.Implementation, caller: models.Caller) -> models.Assignation:
+    def _assign_higher_order(self, ctx: CallerContext, input: inputs.AssignInputModel, higher: models.Implementation, caller: models.Caller) -> models.Assignation:
         """Orchestrate a higher-order assignation: remap args/deps, run a child on the lower agent.
 
         The wrapper (``higher``) assignation is virtual — it is never broadcast to an agent.
@@ -331,13 +349,13 @@ class RedisControllBackend(ControllBackend):
         lower_action = lower_impl.action
         lower_agent = lower_impl.agent
 
-        # The wrapper's agent IS the executing agent — it must be connected and live.
-        if not (lower_agent.connected and lower_agent.last_seen and lower_agent.last_seen > datetime.now(timezone.utc) - timedelta(minutes=1)):
-            raise ValueError(f"Agent for lower implementation {lower_impl.interface} is not connected")
+        # The wrapper's agent IS the executing agent — it must be available (live socket or webhook).
+        if not agent_is_available(lower_agent):
+            raise ValueError(f"Agent for lower implementation {lower_impl.interface} is not available")
 
         # Resolve the wrapper's declared dependencies from the caller, then project both the
         # args and the dependencies onto the lower implementation.
-        higher_dependencies = build_dependency_dict(higher, info, input.dependencies or [])
+        higher_dependencies = build_dependency_dict(higher, ctx, input.dependencies or [])
         lower_args = build_lower_args(config, input.args)
         lower_dependencies = build_lower_dependencies(config, higher_dependencies)
 
@@ -380,16 +398,16 @@ class RedisControllBackend(ControllBackend):
             caller=caller,
         )
 
-        token = mint_token_for_assignation(lower_assignation, info)
+        token = mint_token_for_assignation(lower_assignation, ctx)
 
         AgentConsumer.broadcast(
             lower_agent.pk,
             message=messages.Assign(
                 assignation=str(lower_assignation.pk),
                 args=lower_args,
-                user=str(info.context.request.user.sub),
-                app=str(info.context.request.client.client_id),
-                org=str(info.context.request.organization.slug) if info.context.request.organization else None,
+                user=str(ctx.user.sub),
+                app=str(ctx.client.client_id),
+                org=str(ctx.organization.slug) if ctx.organization else None,
                 reference=lower_assignation.reference,
                 capture=False,
                 resolution=None,
@@ -401,18 +419,13 @@ class RedisControllBackend(ControllBackend):
 
         return higher_assignation
 
-    def resume(self, info: Info, input: inputs.ResumeInputModel) -> models.Assignation:
-        assignation = models.Assignation.objects.get(id=input.assignation)
-        assignation.latest_instruct_kind = enums.AssignationInstructKind.RESUME
-        assignation.save()
-
-        AgentConsumer.broadcast(
-            assignation.agent.id,
-            message=messages.Cancel(
-                assignation=assignation.id,
-            ),
+    def resume(self, input: inputs.ResumeInputModel) -> models.Assignation:
+        return self._request_control(
+            input.assignation,
+            instruct_kind=enums.AssignationInstructKind.RESUME,
+            inging_kind=enums.AssignationEventKind.RESUMING,
+            to_agent_factory=lambda a: messages.Resume(assignation=a, step=input.step),
         )
-        return assignation
 
     def bounce(self, info: Info, input: inputs.BounceInputModel) -> models.Agent:
         agent = models.Agent.objects.get(id=input.agent)
@@ -478,19 +491,6 @@ class RedisControllBackend(ControllBackend):
             )
 
         return input.drawers
-
-    def step(self, info: Info, input: inputs.StepInputModel) -> models.Assignation:
-        assignation = models.Assignation.objects.get(id=input.assignation)
-        assignation.latest_instruct_kind = enums.AssignationInstructKind.STEP
-        assignation.save()
-
-        AgentConsumer.broadcast(
-            assignation.agent.pk,
-            message=messages.Cancel(
-                assignation=assignation.pk,
-            ),
-        )
-        return assignation
 
 
 controll_backend = RedisControllBackend()

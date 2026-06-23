@@ -3,7 +3,15 @@ from .settings import DATABASES, AUTHENTIKATE
 import logging
 
 DATABASES["default"] = {**DATABASES["default"], "NAME": "testdb", "PORT": 5555, "HOST": "localhost", "USER": "test", "PASSWORD": "test"}
-AUTHENTIKATE = {**AUTHENTIKATE, "STATIC_TOKENS": {"test": {"sub": "1", "client_id": "oinsoins", "app": "test-app"}}}
+AUTHENTIKATE = {
+    **AUTHENTIKATE,
+    "STATIC_TOKENS": {
+        "test": {"sub": "1", "client_id": "oinsoins", "app": "test-app"},
+        # A second distinct identity (same default ``static_org``) for cross-agent tests —
+        # agent 1 (token "test") assigns to agent 2 (token "test2").
+        "test2": {"sub": "2", "client_id": "oinsoins2", "app": "test-app"},
+    },
+}
 
 
 # For faster test execution, you can uncomment this:
@@ -17,6 +25,10 @@ DATABASE_ROUTERS = []
 
 # Use in-memory channel layer for tests instead of Redis
 CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
+
+# Default tests to grace=0 → disconnects cascade inline/immediately (the legacy,
+# deterministic behavior). The reclaim/grace tests opt into a window with override_settings.
+REKUEST_GRACE = {"DEFAULT": 0, "PER_MODE": {}, "PHYSICAL": 0}
 
 # Point the agent queue at the published dokker redis port (see
 # tests/integration/docker-compose.yaml). Replaces the old redis-factory monkeypatch.

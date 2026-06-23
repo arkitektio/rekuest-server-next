@@ -8,24 +8,22 @@ from asgiref.sync import sync_to_async
 from facade import messages
 from facade.consumers.async_consumer import AgentConsumer
 
-from tests.agent.helpers import RECEIVE_TIMEOUT, connect_and_register
+from tests.agent.helpers import open_agent
 
 
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 class TestAgentDelivery:
     async def test_broadcast_is_delivered_to_agent(self, agent_ws):
-        communicator, init = await connect_and_register(agent_ws, "delivery-agent")
-        agent_pk = init["agent"]
+        session = await open_agent(agent_ws, "delivery-agent")
 
         assign = messages.Assign(
             interface="iface", assignation=str(uuid.uuid4()),
             args={"a": 1}, user="1", app="test-app", action="some-action",
         )
         # broadcast() lpushes to the agent's redis queue; listen_for_tasks relays it.
-        await sync_to_async(AgentConsumer.broadcast)(agent_pk, assign)
+        await sync_to_async(AgentConsumer.broadcast)(session.agent_pk, assign)
 
-        received = await communicator.receive_json_from(timeout=RECEIVE_TIMEOUT)
-        assert received["type"] == messages.ToAgentMessageType.ASSIGN.value
-        assert received["assignation"] == assign.assignation
-        assert received["args"] == {"a": 1}
+        received = await session.receive(messages.Assign)
+        assert received.assignation == assign.assignation
+        assert received.args == {"a": 1}

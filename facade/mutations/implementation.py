@@ -358,6 +358,7 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
         implementation.release = agent.release
         implementation.needs_token = input.needs_token
         implementation.provenance_audience = resolved_audience
+        implementation.effect = getattr(input.effect, "value", input.effect)
         implementation.save()
 
         new_deps = []
@@ -395,6 +396,7 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
             params=input.params or {},
             needs_token=input.needs_token,
             provenance_audience=resolved_audience,
+            effect=getattr(input.effect, "value", input.effect),
         )
 
         new_deps = []

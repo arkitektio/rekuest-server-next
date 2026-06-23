@@ -9,6 +9,18 @@ class ActionKindChoices(TextChoices):
     GENERATOR = "GENERATOR", "Generator"
 
 
+class EffectClassChoices(TextChoices):
+    """The effect class of an implementation (persisted on ``Implementation.effect``).
+
+    NONE work is freely retryable/reclaimable; PHYSICAL work touches the real world, so an
+    ambiguous failure is terminal and must not be retried. Read at runtime from
+    ``assignation.implementation.effect`` — never supplied by the caller.
+    """
+
+    NONE = "NONE", "None (no real-world effect; freely retryable)"
+    PHYSICAL = "PHYSICAL", "Physical (touches the real world; ambiguous failure is terminal)"
+
+
 @strawberry.enum
 class ActionScope(str, Enum):
     GLOBAL = "GLOBAL"

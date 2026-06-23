@@ -1,6 +1,7 @@
 from authentikate.models import Organization, Release
 from django.contrib.auth import get_user_model
 from django.db import models
+from django_choices_field import TextChoicesField
 from rekuest_core.inputs.models import ActionDependencyInputModel
 
 from facade import enums
@@ -189,6 +190,11 @@ class Implementation(models.Model):
         null=True,
         blank=True,
         help_text="Optional declared audience (list of downstream service names) for the provenance token's `aud`. If null, the audience is derived at dispatch from the structures the assignment acts on.",
+    )
+    effect = TextChoicesField(
+        choices_enum=enums.EffectClassChoices,
+        default=enums.EffectClassChoices.NONE.value,
+        help_text="The effect class of this implementation. NONE work is freely retryable/reclaimable; PHYSICAL work touches the real world and an ambiguous failure is terminal. Declared by the implementation, read at dispatch from assignation.implementation.effect — never caller-supplied.",
     )
 
     class Meta:

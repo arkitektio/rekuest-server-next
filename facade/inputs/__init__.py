@@ -33,8 +33,6 @@ from .assignation import (
     PauseInputModel,
     ResumeInput,
     ResumeInputModel,
-    StepInput,
-    StepInputModel,
 )
 from .blok import (
     BlokAgentMappingInput,
@@ -146,8 +144,6 @@ __all__ = [
     "PauseInputModel",
     "ResumeInput",
     "ResumeInputModel",
-    "StepInput",
-    "StepInputModel",
     # blok
     "BlokAgentMappingInput",
     "CreateBlokInput",
