@@ -87,7 +87,7 @@ def test_caller_event_is_posted_to_webhook_caller(post_recorder):
     from facade.models import Caller
 
     agent = _build_webhook_agent("hook-cb")
-    # An task whose caller is this webhook agent's identity.
+    # A task whose caller is this webhook agent's identity.
     caller = Caller.objects.create(client=agent.client, user=agent.user, organization=agent.organization)
     ass = _build_task("hook-cb-ass")
     ass.caller = caller

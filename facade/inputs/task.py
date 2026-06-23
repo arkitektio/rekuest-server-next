@@ -25,7 +25,7 @@ class HookInputModel(BaseModel):
 
 @pydantic.input(
     HookInputModel,
-    description="A hook is a function that is called when a action has reached a specific lifecycle point. Hooks are jsut actions that take an task as input and return a value.",
+    description="A hook is a function that is called when a action has reached a specific lifecycle point. Hooks are jsut actions that take a task as input and return a value.",
 )
 class HookInput:
     kind: enums.HookKind
@@ -126,7 +126,7 @@ class AssignInput:
 
 
 class CancelInputModel(BaseModel):
-    """Base model for canceling an task.
+    """Base model for canceling a task.
 
     Attributes:
         task: ID of the task to cancel
@@ -135,13 +135,13 @@ class CancelInputModel(BaseModel):
     task: str = Field(description="The task ID to cancel")
 
 
-@pydantic.input(CancelInputModel, description="The input for canceling an task.")
+@pydantic.input(CancelInputModel, description="The input for canceling a task.")
 class CancelInput:
     task: strawberry.ID
 
 
 class PauseInputModel(BaseModel):
-    """Base model for pausing an task.
+    """Base model for pausing a task.
 
     Attributes:
         task: ID of the task to pause
@@ -150,7 +150,7 @@ class PauseInputModel(BaseModel):
     task: str = Field(description="The task ID to pause")
 
 
-@pydantic.input(PauseInputModel, description="The input for pausing an task.")
+@pydantic.input(PauseInputModel, description="The input for pausing a task.")
 class PauseInput:
     task: strawberry.ID
 
@@ -185,14 +185,14 @@ class ResumeInputModel(BaseModel):
     step: bool = Field(default=False, description="Resume only until the next breakpoint instead of running on freely.")
 
 
-@pydantic.input(ResumeInputModel, description="The input for resuming an task.")
+@pydantic.input(ResumeInputModel, description="The input for resuming a task.")
 class ResumeInput:
     task: strawberry.ID
     step: bool = False
 
 
 class InterruptInputModel(BaseModel):
-    """Base model for interrupting an task.
+    """Base model for interrupting a task.
 
     Attributes:
         task: ID of the task to interrupt
@@ -201,6 +201,6 @@ class InterruptInputModel(BaseModel):
     task: str = Field(description="The task ID to interrupt")
 
 
-@pydantic.input(InterruptInputModel, description="The input for interrupting an task.")
+@pydantic.input(InterruptInputModel, description="The input for interrupting a task.")
 class InterruptInput:
     task: strawberry.ID

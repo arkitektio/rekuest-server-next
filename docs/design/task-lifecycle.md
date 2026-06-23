@@ -189,7 +189,7 @@ optional — direct `assign` to an action/implementation works without one.
 When an agent drops, `on_agent_disconnected` (guarded by `active_connection_id`, see
 [agent-protocol.md](agent-protocol.md)) marks every still-running task **owned by that agent**
 (`agent_id=…, is_done=False`) with a `DISCONNECTED` event. The filter is on the **direct `agent`
-FK** deliberately — an task may have a null/reassigned `implementation`, so filtering through
+FK** deliberately — a task may have a null/reassigned `implementation`, so filtering through
 `implementation__agent` would silently skip work the agent actually owns.
 
 ## Ephemeral vs persistent

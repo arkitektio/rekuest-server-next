@@ -163,7 +163,7 @@ class Assign(Message):
     """An assign call
 
     And assign call is the initial request to start a specific
-    functionality and will have an task id, that will stand
+    functionality and will have a task id, that will stand
     as a reference for all sub calls (Pause, Interrupt, Reumse, Collect...).
     as well should be passed to all events within the task (
         Progress, Logs, Done, Error, etc)
@@ -269,7 +269,7 @@ class Cancel(Message):
     """A cancel call
 
     A cancellation call is a request from the user to
-    cancel an task nicely (i.e by also nicely
+    cancel a task nicely (i.e by also nicely
     cancelling all the children tasks).
     Cancel represent a "nice alternative" to the interrupt call.
     While a cancellation of a mother task is only send to
@@ -351,7 +351,7 @@ class Resumed(FromAgentEvent):
 class Started(FromAgentEvent):
     """A started report
 
-    Sent when the actor has accepted an task and begun executing it.
+    Sent when the actor has accepted a task and begun executing it.
     Mirrored to the caller as ``StartedEvent``.
     """
 
@@ -375,7 +375,7 @@ class Log(FromAgentEvent):
 class Progress(FromAgentEvent):
     """A progress report
 
-    Sent when the agent wants to report progress on an task.
+    Sent when the agent wants to report progress on a task.
     """
 
     type: Literal[FromAgentMessageType.PROGRESS] = FromAgentMessageType.PROGRESS
@@ -566,7 +566,7 @@ class Init(Message):
 
 
 class AssignRequest(Message):
-    """A caller's request to originate (or resolve) an task over the agent socket.
+    """A caller's request to originate (or resolve) a task over the agent socket.
 
     This is the WebSocket equivalent of the GraphQL ``assign`` mutation: a participant
     holding ``can_assign_root`` (for a parentless root) or running inside a resolved
@@ -617,7 +617,7 @@ class ControlRequest(Message):
     """Base for a caller's lifecycle-control request over the socket (cancel/interrupt/…).
 
     The WebSocket equivalent of the GraphQL postman lifecycle mutations: the caller that
-    originated an task drives its lifecycle. The request is two-phase — it broadcasts a
+    originated a task drives its lifecycle. The request is two-phase — it broadcasts a
     ToAgent control message and is acked with a ``ControlResponse``; the *outcome*
     (CANCELLED/PAUSED/…) is observed via the ``…Event`` mirror stream, not this ack.
     """
@@ -626,7 +626,7 @@ class ControlRequest(Message):
 
 
 class CancelRequest(ControlRequest):
-    """Request a graceful cancel of an task."""
+    """Request a graceful cancel of a task."""
 
     type: Literal[FromAgentMessageType.CANCEL_REQUEST] = FromAgentMessageType.CANCEL_REQUEST
     auto_interrupt: Optional[float] = Field(

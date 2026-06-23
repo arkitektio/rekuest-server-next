@@ -1,6 +1,6 @@
 """Full-stack caller-event return path (item 8).
 
-When an agent is the *caller* of an task, events on that task are streamed
+When an agent is the *caller* of a task, events on that task are streamed
 back to its own socket as ``Caller*`` messages. Here the registered agent is both the
 executor (it reports a ProgressEvent) and the caller (the task's caller is its own
 identity), so the progress it reports comes straight back to it as a ``ProgressEvent``.

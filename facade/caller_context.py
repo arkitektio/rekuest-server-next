@@ -1,4 +1,4 @@
-"""The identity of whoever is originating an task, transport-independent.
+"""The identity of whoever is originating a task, transport-independent.
 
 The postman ``assign`` path historically read identity straight off a Strawberry
 ``Info`` (``info.context.request.{user,client,organization,membership}``). The agent

@@ -146,7 +146,7 @@ the former standalone "step" instruction); `step=false` runs on freely.
 
 ## 4. Observe results — the `Caller*` mirror stream
 
-Every `TaskEvent` for an task you originated is streamed back as a `Caller*` message
+Every `TaskEvent` for a task you originated is streamed back as a `Caller*` message
 (`facade/caller_events.py:build_caller_message` maps each `TaskEventKind` → its mirror class):
 
 | Phase | Mirrors |

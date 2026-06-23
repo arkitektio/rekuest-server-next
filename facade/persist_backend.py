@@ -190,7 +190,7 @@ class ModelPersistBackend:
         connection_id: str | None = None,
         session_id: str | None = None,
     ) -> Tuple[models.Task, bool]:
-        """Originate (or resolve) an task requested by a caller over the socket.
+        """Originate (or resolve) a task requested by a caller over the socket.
 
         Idempotent on ``(caller, reference)`` and durable-before-return: a resend of the same
         ``reference`` returns the existing task with ``created=False`` rather than

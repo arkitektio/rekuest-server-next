@@ -20,7 +20,7 @@ pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.asyncio]
 
 
 async def _owned(prefix):
-    """A seeded agent + an task whose caller is that agent (so it may control it)."""
+    """A seeded agent + a task whose caller is that agent (so it may control it)."""
     agent = await seed_agent(f"{prefix}-agent")
     ass = await build_task_for_agent_caller(agent.pk, prefix)
     return agent, ass

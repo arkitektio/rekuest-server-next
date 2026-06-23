@@ -15,9 +15,9 @@ class TaskStatusChoices(TextChoices):
 
 
 class TaskEventChoices(TextChoices):
-    """These are the possible events that can happen to an Task.
+    """These are the possible events that can happen to a Task.
 
-    The events are ordered by their appearance in the lifecycle of an Task.
+    The events are ordered by their appearance in the lifecycle of a Task.
 
 
     """
@@ -49,7 +49,7 @@ class TaskEventChoices(TextChoices):
 
 
 class TaskInstructChoices(TextChoices):
-    """These are the possible events that are instructed to an Task."""
+    """These are the possible events that are instructed to a Task."""
 
     ASSIGN = "ASSIGN", "Assign (Agent accepted the Task)"
     CANCEL = "CANCEL", "Unassign (Agent received the Task)"
@@ -70,7 +70,7 @@ class TaskStatus(str, Enum):
 
 @strawberry.enum(description="The event kind of the taskevent")
 class TaskInstructKind(str, Enum):
-    """These are the possible events that are instructed to an Task."""
+    """These are the possible events that are instructed to a Task."""
 
     ASSIGN = "ASSIGN"
     CANCEL = "CANCEL"
@@ -82,9 +82,9 @@ class TaskInstructKind(str, Enum):
 
 @strawberry.enum(description="The event kind of the taskevent")
 class TaskEventKind(str, Enum):
-    """These are the possible events that can happen to an Task.
+    """These are the possible events that can happen to a Task.
 
-    The events are ordered by their appearance in the lifecycle of an Task.
+    The events are ordered by their appearance in the lifecycle of a Task.
     """
 
     BOUND = "BOUND"

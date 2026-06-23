@@ -203,7 +203,7 @@ def _build_unimplemented_task_for_agent(agent_pk, prefix):
 
 
 def _build_task_for_agent_caller(agent_pk, prefix):
-    """An task whose ``caller`` is the agent's own identity.
+    """A task whose ``caller`` is the agent's own identity.
 
     Used by the caller-event return tests: because the task's caller matches the
     registered agent's caller (group ``task_caller_{caller_id}``), events on it are streamed

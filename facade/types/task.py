@@ -75,7 +75,7 @@ TaskStats, TaskStatsResolver = create_stats_type(
 )
 
 
-@strawberry_django.type(models.TaskEvent, filters=filters.TaskEventFilter, ordering=filters.TaskEventOrder, pagination=True, description="An event that occurred during an task.")
+@strawberry_django.type(models.TaskEvent, filters=filters.TaskEventFilter, ordering=filters.TaskEventOrder, pagination=True, description="An event that occurred during a task.")
 class TaskEvent:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the event.")
     name: str = strawberry_django.field(description="Name of the event.")

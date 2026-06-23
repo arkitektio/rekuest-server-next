@@ -22,7 +22,7 @@ class PatchEvent(BaseModel):
 
 
 class TaskEventCreatedEvent(BaseModel):
-    """A model representing an task event created."""
+    """A model representing a task event created."""
 
     event: int | None = Field(None, description="The event that was created.")
     create: int | None = Field(None, description="The task created.")

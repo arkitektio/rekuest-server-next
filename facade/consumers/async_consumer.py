@@ -89,7 +89,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
 
         event_id = (event.get("message") or {}).get("event")
         if event_id is None:
-            return  # a `create` (or malformed) payload — not an task event
+            return  # a `create` (or malformed) payload — not a task event
 
         message = await self._build_execution_event(event_id)
         if message is not None:
