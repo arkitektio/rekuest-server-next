@@ -9,6 +9,14 @@ Key files: `facade/consumers/agent_protocol.py` (the protocol), `async_consumer.
 adapter), `agent_queue.py` (the delivery queue), `facade/persist_backend.py` (the backend port),
 `facade/messages.py` (the message catalogue).
 
+> **One protocol, several roles.** `/agi` is unified: the same socket also serves **callers** that
+> originate and control work. What a participant may do is gated by **capabilities** (token scopes)
+> requested via a **mode** on `Register` (`EXECUTOR` / `CALLER` / `ORCHESTRATOR` / `OBSERVER`;
+> `facade/capabilities.py`). This document covers the **executor** role (running work); the caller
+> role — `CallerAssign`, the lifecycle controls, and the `Caller*` event mirrors — is documented in
+> [caller-protocol.md](caller-protocol.md). A requested mode that exceeds the token's capabilities is
+> rejected with `MODE_NOT_AUTHORIZED_CODE` (4006).
+
 ## The humble-object design
 
 The conversation logic lives in `AgentProtocol` — a **plain object with injected dependencies that
@@ -70,6 +78,12 @@ sequenceDiagram
 socket. Frames are parsed and validated through a discriminated-union pydantic model
 (`FromAgentPayload`), so malformed JSON or schema-mismatched frames are rejected with a specific
 close code (`codes.py`).
+
+`Register` carries `token` (identity), `force` (take over an existing connection), `mode` (the role
+requested — default `EXECUTOR`), and `session_id`. The last two are **executor-relevant**: `force`
+and `session_id` are honoured only for participants that `executes_work` (the executor singleton);
+`session_id` is the per-process reclaim signal (same id on reconnect ⇒ the process survived, reclaim
+its in-flight work; a different id ⇒ a fresh process, fail-and-cascade). A pure caller omits both.
 
 ### Authentication
 
@@ -146,10 +160,13 @@ tests.
 
 Messages are split by direction (`facade/messages.py`):
 
-**Server → agent (`ToAgentMessage`)** — `Init`, `Assign`, `Cancel`, `Interrupt`, `Bounce`, `Kick`,
-`Collect`, `Heartbeat`, `ProtocolError`, and inquiries (`AssignInquiry`).
+**Server → agent (`ToAgentMessage`)** — `Init`, `Assign`, the lifecycle control messages `Cancel` /
+`Interrupt` / `Pause` / `Resume`, `Collect`, `Bounce`, `Kick`, `Heartbeat`, `ProtocolError`, and
+inquiries (`AssignInquiry`). (The caller-bound `Caller*` mirrors and `Caller*Result` acks also ride
+`ToAgentMessage` but are addressed to callers — see [caller-protocol.md](caller-protocol.md).)
 
-**Agent → server (`FromAgentMessage`)**, dispatched in `AgentProtocol.dispatch` to the backend:
+**Agent → server (`FromAgentMessage`)**, dispatched (via the shared
+`facade/message_router.py:route_from_agent_message`) to the backend:
 
 | Message | Handler | Effect |
 | --- | --- | --- |
@@ -158,11 +175,21 @@ Messages are split by direction (`facade/messages.py`):
 | `LogEvent` | `on_agent_log` | `AssignationEvent(LOG)` |
 | `YieldEvent` | `on_agent_yield` | `AssignationEvent(YIELD, returns)` + higher-order unfold |
 | `DoneEvent` | `on_agent_done` | terminal: `is_done`, `finished_at` |
-| `CancelledEvent` | `on_agent_cancelled` | terminal |
+| `CancelledEvent` | `on_agent_cancelled` | terminal — confirms a `Cancel` (→ `CANCELLED`) |
+| `InterruptedEvent` | `on_agent_interrupted` | terminal — confirms an `Interrupt` (→ `INTERUPTED`) |
+| `PausedEvent` | `on_agent_paused` | non-terminal — confirms a `Pause` (→ `PAUSED`) |
+| `ResumedEvent` | `on_agent_resumed` | non-terminal — confirms a `Resume` (→ `RESUMED`) |
 | `ErrorEvent` / `CriticalEvent` | `on_agent_error` / `on_agent_critical` | terminal with message |
 | `StatePatchEvent` | `on_agent_state_patch` | append a `Patch` |
 | `StateSnapshotEvent` | `on_agent_state_snapshot` | write `Snapshot`s |
 | `SessionInitMessage` | `on_agent_session_init` | initialize a `Session` |
+
+The four lifecycle **confirmation events** are the executor's half of the two-phase controls: the
+server forwards a `Cancel` / `Interrupt` / `Pause` / `Resume`, and the executing agent reports the
+matching event above when it has acted (terminal for cancel/interrupt, non-terminal for
+pause/resume). Each terminal/confirmation report is acked with an `EventAck` so the agent can stop
+retaining it. The router also handles the caller-originated requests (`CallerAssign`,
+`CallerCancel/Interrupt/Pause/Resume`) — see [caller-protocol.md](caller-protocol.md).
 
 A second `Register` after registration is a protocol violation — it must not re-run `on_register`
 (that would orphan the first listen/heartbeat pair); it falls through to the catch-all and closes.

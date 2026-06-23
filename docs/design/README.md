@@ -16,11 +16,13 @@ Rekuest is the broker at the centre of the [Arkitekt](https://arkitekt.live) eco
 - **Callers** — users and frontend apps that *request* work ("run this action with these args").
 - **Agents** — connected runtimes that *provide* implementations and actually *execute* the work.
 
-A caller never talks to an agent directly. It issues a GraphQL `assign`; Rekuest resolves which
-implementation/agent should run it, records an `Assignation`, pushes the work to the agent over a
-WebSocket, persists the events the agent streams back, and re-broadcasts them to the caller over a
-GraphQL subscription. Rekuest owns the **catalogue** (which actions exist, who can run them, with
-what data types) and the **routing + bookkeeping**; it does not run user code itself.
+A caller never talks to an agent directly. It issues an `assign` — over GraphQL, or over the same
+`/agi` WebSocket the agents use (`CallerAssign`), or via an HMAC-signed HTTP POST for server-to-server
+callers. Rekuest resolves which implementation/agent should run it, records an `Assignation`, pushes
+the work to the agent over a WebSocket, persists the events the agent streams back, and re-broadcasts
+them to the caller — over a GraphQL subscription **or** as `Caller*` event mirrors on the same socket.
+Rekuest owns the **catalogue** (which actions exist, who can run them, with what data types) and the
+**routing + bookkeeping**; it does not run user code itself.
 
 ```mermaid
 flowchart LR
@@ -90,13 +92,16 @@ Start at the top and follow the flow of a request:
    descriptors compile to JSONPath and how the relational port engine finds matching actions.
 4. **[assignation-lifecycle.md](assignation-lifecycle.md)** — `assign` / `reserve`, the
    Assignation event state machine, and how results flow back to the caller.
-5. **[agent-protocol.md](agent-protocol.md)** — the WebSocket wire protocol: register,
-   authenticate, heartbeat, task delivery, connection takeover.
-6. **[realtime.md](realtime.md)** — channels, signals, topic keys, and how subscriptions consume
+5. **[agent-protocol.md](agent-protocol.md)** — the WebSocket wire protocol (executor side):
+   register, authenticate, heartbeat, task delivery, connection takeover, capabilities & modes.
+6. **[caller-protocol.md](caller-protocol.md)** — the caller side of the same socket: what a caller
+   sends to originate work (`CallerAssign`), control its lifecycle (cancel/interrupt/pause/resume),
+   and observe results (`Caller*` mirrors); plus the HTTP intake for server-to-server callers.
+7. **[realtime.md](realtime.md)** — channels, signals, topic keys, and how subscriptions consume
    them.
-7. **[higher-order.md](higher-order.md)** — higher-order implementations (one implementation
+8. **[higher-order.md](higher-order.md)** — higher-order implementations (one implementation
    wrapping another) and server-side event unfolding.
-8. **[provenance.md](provenance.md)** — Rekuest as the provenance authority: the signed
+9. **[provenance.md](provenance.md)** — Rekuest as the provenance authority: the signed
    attestation token minted at dispatch, its claim vocabulary, the human-root invariant, and the
    JWKS endpoint downstream services verify against.
 

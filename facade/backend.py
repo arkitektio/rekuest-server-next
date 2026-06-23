@@ -424,7 +424,7 @@ class RedisControllBackend:
             input.assignation,
             instruct_kind=enums.AssignationInstructKind.RESUME,
             inging_kind=enums.AssignationEventKind.RESUMING,
-            to_agent_factory=lambda a: messages.Resume(assignation=a),
+            to_agent_factory=lambda a: messages.Resume(assignation=a, step=input.step),
         )
 
     def bounce(self, info: Info, input: inputs.BounceInputModel) -> models.Agent:
@@ -491,14 +491,6 @@ class RedisControllBackend:
             )
 
         return input.drawers
-
-    def step(self, input: inputs.StepInputModel) -> models.Assignation:
-        return self._request_control(
-            input.assignation,
-            instruct_kind=enums.AssignationInstructKind.STEP,
-            inging_kind=enums.AssignationEventKind.STEPPING,
-            to_agent_factory=lambda a: messages.Step(assignation=a),
-        )
 
 
 controll_backend = RedisControllBackend()

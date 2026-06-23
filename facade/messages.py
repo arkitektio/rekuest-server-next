@@ -55,7 +55,6 @@ class ToAgentMessageType(str, Enum):
 
     ASSIGN = "ASSIGN"
     CANCEL = "CANCEL"
-    STEP = "STEP"
     COLLECT = "COLLECT"
     RESUME = "RESUME"
     PAUSE = "PAUSE"
@@ -88,11 +87,9 @@ class ToAgentMessageType(str, Enum):
     CALLER_PAUSED = "CALLER_PAUSED"
     CALLER_RESUMING = "CALLER_RESUMING"
     CALLER_RESUMED = "CALLER_RESUMED"
-    CALLER_STEPPING = "CALLER_STEPPING"
-    CALLER_STEPPED = "CALLER_STEPPED"
     CALLER_ERROR = "CALLER_ERROR"
     CALLER_CRITICAL = "CALLER_CRITICAL"
-    # Ack for a caller's lifecycle-control request (cancel/interrupt/pause/resume/step).
+    # Ack for a caller's lifecycle-control request (cancel/interrupt/pause/resume).
     CALLER_CONTROL_RESULT = "CALLER_CONTROL_RESULT"
 
 
@@ -107,7 +104,6 @@ class FromAgentMessageType(str, Enum):
     ERROR = "ERROR"
     PAUSED = "PAUSED"
     CRITICAL = "CRITICAL"
-    STEPPED = "STEPPED"
     RESUMED = "RESUMED"
     CANCELLED = "CANCELLED"
     APP_CANCELLED = "APP_CANCELLED"  # Cancelled by the app not the user how assigned
@@ -125,7 +121,6 @@ class FromAgentMessageType(str, Enum):
     CALLER_INTERRUPT = "CALLER_INTERRUPT"
     CALLER_PAUSE = "CALLER_PAUSE"
     CALLER_RESUME = "CALLER_RESUME"
-    CALLER_STEP = "CALLER_STEP"
 
 
 class Message(BaseModel):
@@ -196,17 +191,6 @@ class Assign(Message):
         return self.interface
 
 
-class Step(Message):
-    """A step call
-    A step call tells the agent to step the assignation
-    and all its children assignation until a resume is received
-    Its on the actor to decide what to do with the children assignations
-    """
-
-    type: Literal[ToAgentMessageType.STEP] = ToAgentMessageType.STEP
-    assignation: str
-
-
 class Bounce(Message):
     """A step call
     A step call tells the agent to step the assignation
@@ -258,10 +242,13 @@ class Pause(Message):
 class Resume(Message):
     """A resume call
 
-    A resume call unpauses the pause"""
+    A resume call unpauses the pause. With ``step=True`` the agent resumes only until the
+    next breakpoint (the equivalent of the old standalone step instruction); with
+    ``step=False`` it runs on freely."""
 
     type: Literal[ToAgentMessageType.RESUME] = ToAgentMessageType.RESUME
     assignation: str
+    step: bool = False
 
 
 class Cancel(Message):
@@ -350,20 +337,6 @@ class ResumedEvent(FromAgentEvent):
     """
 
     type: Literal[FromAgentMessageType.RESUMED] = FromAgentMessageType.RESUMED
-    assignation: str
-
-
-class SteppedEvent(FromAgentEvent):
-    """A stepped event
-
-    A stepped event is sent when the assignation was
-    successfully stepped by the actor and it has now
-    stopped at another breakpoint.
-
-
-    """
-
-    type: Literal[FromAgentMessageType.STEPPED] = FromAgentMessageType.STEPPED
     assignation: str
 
 
@@ -675,15 +648,13 @@ class CallerPause(CallerControl):
 
 
 class CallerResume(CallerControl):
-    """Request the agent to resume a suspended assignation."""
+    """Request the agent to resume a suspended assignation.
+
+    ``step=True`` resumes only to the next breakpoint (the equivalent of the old step
+    instruction); ``step=False`` runs on freely."""
 
     type: Literal[FromAgentMessageType.CALLER_RESUME] = FromAgentMessageType.CALLER_RESUME
-
-
-class CallerStep(CallerControl):
-    """Request the agent to step to its next breakpoint."""
-
-    type: Literal[FromAgentMessageType.CALLER_STEP] = FromAgentMessageType.CALLER_STEP
+    step: bool = False
 
 
 class CallerControlResult(Message):
@@ -696,7 +667,7 @@ class CallerControlResult(Message):
     """
 
     type: Literal[ToAgentMessageType.CALLER_CONTROL_RESULT] = ToAgentMessageType.CALLER_CONTROL_RESULT
-    request: str = Field(description="The id of the CallerCancel/Interrupt/Pause/Resume/Step this answers.")
+    request: str = Field(description="The id of the CallerCancel/Interrupt/Pause/Resume this answers.")
     assignation: Optional[str] = Field(default=None, description="The controlled assignation id.")
     accepted: bool = Field(description="True when the request was accepted (broadcast + -ING persisted); False when rejected.")
     error: Optional[str] = Field(default=None, description="A human-readable reason when the request was rejected.")
@@ -844,18 +815,6 @@ class CallerResumed(CallerEvent):
     type: Literal[ToAgentMessageType.CALLER_RESUMED] = ToAgentMessageType.CALLER_RESUMED
 
 
-class CallerStepping(CallerEvent):
-    """The assignation is being stepped."""
-
-    type: Literal[ToAgentMessageType.CALLER_STEPPING] = ToAgentMessageType.CALLER_STEPPING
-
-
-class CallerStepped(CallerEvent):
-    """The assignation stepped to its next breakpoint."""
-
-    type: Literal[ToAgentMessageType.CALLER_STEPPED] = ToAgentMessageType.CALLER_STEPPED
-
-
 class CallerError(CallerEvent):
     """The assignation errored (potentially recoverable)."""
 
@@ -889,8 +848,6 @@ CallerEventMessage = Union[
     CallerPaused,
     CallerResuming,
     CallerResumed,
-    CallerStepping,
-    CallerStepped,
     CallerError,
     CallerCritical,
 ]
@@ -902,7 +859,6 @@ ToAgentMessage = Union[
     Cancel,
     Interrupt,
     Heartbeat,
-    Step,
     Pause,
     Resume,
     Collect,
@@ -929,9 +885,7 @@ ToAgentMessage = Union[
     CallerPaused,
     CallerResuming,
     CallerResumed,
-    CallerStepping,
-    CallerStepped,
     CallerError,
     CallerCritical,
 ]
-FromAgentMessage = Union[CriticalEvent, LogEvent, ProgressEvent, DoneEvent, ErrorEvent, YieldEvent, Register, HeartbeatEvent, SteppedEvent, ResumedEvent, PausedEvent, CancelledEvent, InterruptedEvent, StatePatchEvent, StateSnapshotEvent, LockEvent, UnlockEvent, SessionInitMessage, CallerAssign, CallerCancel, CallerInterrupt, CallerPause, CallerResume, CallerStep]
+FromAgentMessage = Union[CriticalEvent, LogEvent, ProgressEvent, DoneEvent, ErrorEvent, YieldEvent, Register, HeartbeatEvent, ResumedEvent, PausedEvent, CancelledEvent, InterruptedEvent, StatePatchEvent, StateSnapshotEvent, LockEvent, UnlockEvent, SessionInitMessage, CallerAssign, CallerCancel, CallerInterrupt, CallerPause, CallerResume]

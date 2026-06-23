@@ -85,8 +85,6 @@ async def route_from_agent_message(
             return await _control(backend.on_caller_pause, agent_id, message, connection_id, session_id)
         case messages.CallerResume():
             return await _control(backend.on_caller_resume, agent_id, message, connection_id, session_id)
-        case messages.CallerStep():
-            return await _control(backend.on_caller_step, agent_id, message, connection_id, session_id)
 
         # Lifecycle confirmation events from the executing agent.
         case messages.CancelledEvent():
@@ -100,9 +98,6 @@ async def route_from_agent_message(
             return _ack(message)
         case messages.ResumedEvent():
             await backend.on_agent_resumed(agent_id, message)
-            return _ack(message)
-        case messages.SteppedEvent():
-            await backend.on_agent_stepped(agent_id, message)
             return _ack(message)
         case messages.YieldEvent():
             await backend.on_agent_yield(agent_id, message)

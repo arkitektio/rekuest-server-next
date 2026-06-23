@@ -74,7 +74,6 @@ class AssignationInstructKind(str, Enum):
 
     ASSIGN = "ASSIGN"
     CANCEL = "CANCEL"
-    STEP = "STEP"
     RESUME = "RESUME"
     PAUSE = "PAUSE"
     INTERRUPT = "INTERRUPT"

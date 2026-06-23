@@ -90,8 +90,4 @@ def build_caller_message(event: EventLike) -> Optional[messages.CallerEventMessa
         return messages.CallerResuming(**base)
     if kind == Kind.RESUMED.value:
         return messages.CallerResumed(**base)
-    if kind == Kind.STEPPING.value:
-        return messages.CallerStepping(**base)
-    if kind == Kind.STEPPED.value:
-        return messages.CallerStepped(**base)
     return None

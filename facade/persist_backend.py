@@ -270,7 +270,7 @@ class ModelPersistBackend:
     # ----------------------------------------------------------------------- #
     # Caller lifecycle controls (two-phase; the request phase wraps the sync postman backend)
     # ----------------------------------------------------------------------- #
-    def _caller_control_sync(self, agent_id: int, assignation_id: str, op: str) -> models.Assignation:
+    def _caller_control_sync(self, agent_id: int, assignation_id: str, op: str, *, step: bool = False) -> models.Assignation:
         """Ownership-check then dispatch a control op on the sync postman backend.
 
         A caller may only control assignations whose ``caller`` is its own identity. Raises
@@ -291,8 +291,7 @@ class ModelPersistBackend:
             "cancel": lambda: controll_backend.cancel(inputs.CancelInputModel(assignation=ref)),
             "interrupt": lambda: controll_backend.interrupt(inputs.InterruptInputModel(assignation=ref)),
             "pause": lambda: controll_backend.pause(inputs.PauseInputModel(assignation=ref)),
-            "resume": lambda: controll_backend.resume(inputs.ResumeInputModel(assignation=ref)),
-            "step": lambda: controll_backend.step(inputs.StepInputModel(assignation=ref)),
+            "resume": lambda: controll_backend.resume(inputs.ResumeInputModel(assignation=ref, step=step)),
         }
         return ops[op]()
 
@@ -309,10 +308,7 @@ class ModelPersistBackend:
         return await database_sync_to_async(self._caller_control_sync)(agent_id, message.assignation, "pause")
 
     async def on_caller_resume(self, agent_id: int, message: messages.CallerResume, *, connection_id: str | None = None, session_id: str | None = None) -> models.Assignation:
-        return await database_sync_to_async(self._caller_control_sync)(agent_id, message.assignation, "resume")
-
-    async def on_caller_step(self, agent_id: int, message: messages.CallerStep, *, connection_id: str | None = None, session_id: str | None = None) -> models.Assignation:
-        return await database_sync_to_async(self._caller_control_sync)(agent_id, message.assignation, "step")
+        return await database_sync_to_async(self._caller_control_sync)(agent_id, message.assignation, "resume", step=message.step)
 
     async def _escalate_to_interrupt(self, assignation_id: str) -> None:
         """auto_interrupt fired: escalate an unconfirmed cancel to an interrupt. Idempotent."""
@@ -350,7 +346,7 @@ class ModelPersistBackend:
         await self._unfold_to_higher_order(message.assignation, enums.AssignationEventKind.INTERUPTED)
 
     async def _on_nonterminal_confirm(self, assignation_id: str, kind, *, cancel_lease: bool = False) -> None:
-        """Persist a non-terminal lifecycle confirmation (paused/resumed/stepped)."""
+        """Persist a non-terminal lifecycle confirmation (paused/resumed)."""
         if cancel_lease:
             self._progress_leases.cancel(assignation_id)
         try:
@@ -369,9 +365,6 @@ class ModelPersistBackend:
 
     async def on_agent_resumed(self, agent_id: int, message: messages.ResumedEvent) -> None:
         await self._on_nonterminal_confirm(message.assignation, enums.AssignationEventKind.RESUMED)
-
-    async def on_agent_stepped(self, agent_id: int, message: messages.SteppedEvent) -> None:
-        await self._on_nonterminal_confirm(message.assignation, enums.AssignationEventKind.STEPPED)
 
     async def on_caller_connected(self, agent_id: int, connection_id: str | None = None, session_id: str | None = None) -> None:
         """A participant that may originate work connected — reclaim its orphaned roots.

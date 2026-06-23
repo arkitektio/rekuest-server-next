@@ -1,5 +1,5 @@
 """Two-phase lifecycle controls over the socket: a caller drives cancel/interrupt/pause/
-resume/step on a *different* executor agent, and observes the outcome as Caller* mirrors.
+resume on a *different* executor agent, and observes the outcome as Caller* mirrors.
 
 Each op is two-phase: the caller's request is acked (`CallerControlResult`), the executor
 receives the ToAgent control message and an `-ING` mirror reaches the caller; the resolved
@@ -76,20 +76,19 @@ class TestLifecycleRoundTrips:
         await caller.disconnect()
         await executor.disconnect()
 
-    async def test_step_round_trip_sends_step_not_cancel(self, agent_ws):
-        # Regression: step used to broadcast Cancel. The executor must receive a Step, and the
-        # SteppedEvent (now carrying assignation) flows back as CallerStepped.
+    async def test_resume_with_step_forwards_the_step_flag(self, agent_ws):
+        # Stepping is now resume(step=True) — the executor receives a Resume carrying step=True
+        # (and the old standalone Step message is gone).
         caller, executor, ass_id = await _assigned_pair(agent_ws, "lc-step")
 
-        await caller.send(messages.CallerStep(assignation=ass_id))
+        await caller.send(messages.CallerResume(assignation=ass_id, step=True))
         assert (await caller.receive(messages.CallerControlResult)).accepted is True
-        assert (await executor.receive(messages.Step)).assignation == ass_id
-        assert (await caller.receive(messages.CallerStepping)).assignation == ass_id
+        resume = await executor.receive(messages.Resume)
+        assert resume.assignation == ass_id and resume.step is True
+        assert (await caller.receive(messages.CallerResuming)).assignation == ass_id
 
-        await executor.send(messages.SteppedEvent(assignation=ass_id))
-        assert (await caller.receive(messages.CallerStepped)).assignation == ass_id
-        refreshed = await Assignation.objects.aget(pk=ass_id)
-        assert refreshed.is_done is False and refreshed.latest_event_kind == enums.AssignationEventKind.STEPPED
+        await executor.send(messages.ResumedEvent(assignation=ass_id))
+        assert (await caller.receive(messages.CallerResumed)).assignation == ass_id
         await caller.disconnect()
         await executor.disconnect()
 
@@ -132,8 +131,8 @@ class TestLifecycleFailures:
         await caller.disconnect()
 
     async def test_confirmation_event_no_longer_closes_socket(self, agent_ws):
-        # Regression: Interrupted/Paused/Resumed/Stepped used to hit the router's `case _` and
-        # close the socket. Now they're handled and acked; an unknown assignation is swallowed.
+        # Regression: Interrupted/Paused/Resumed used to hit the router's `case _` and close the
+        # socket. Now they're handled and acked; an unknown assignation is swallowed.
         session = await open_agent(agent_ws, "lc-confirm")
         assignation = await build_assignation("lc-confirm-ass")
 
@@ -142,6 +141,6 @@ class TestLifecycleFailures:
         assert ack.assignation == str(assignation.pk)
 
         # even for an unknown assignation: swallowed, still acked, socket open.
-        await session.send(messages.SteppedEvent(assignation="999999999"))
+        await session.send(messages.ResumedEvent(assignation="999999999"))
         assert await session.receive(messages.EventAck)
         await session.disconnect()

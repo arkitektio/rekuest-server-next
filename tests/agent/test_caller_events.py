@@ -78,8 +78,6 @@ def test_disconnected_carries_message():
         (Kind.PAUSED.value, messages.CallerPaused),
         (Kind.RESUMING.value, messages.CallerResuming),
         (Kind.RESUMED.value, messages.CallerResumed),
-        (Kind.STEPPING.value, messages.CallerStepping),
-        (Kind.STEPPED.value, messages.CallerStepped),
     ],
 )
 def test_bare_kinds_map_to_their_class(kind, cls):

@@ -178,7 +178,6 @@ class Mutation:
     kick = mutation(resolver=mutations.kick, description="Kick an agent to force disconnect. It will fail and not reconnect.")
     assign = mutation(resolver=mutations.assign, description="Assign a task to an agent.")
     cancel = mutation(resolver=mutations.cancel, description="Cancel an active assignation.")
-    step = mutation(resolver=mutations.step, description="Advance an assignation one step.")
     pause = mutation(resolver=mutations.pause, description="Pause an ongoing assignation.")
     resume = mutation(resolver=mutations.resume, description="Resume a paused assignation.")
     collect = mutation(resolver=mutations.collect, description="Collect results from an assignation.")

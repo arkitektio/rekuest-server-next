@@ -1,5 +1,5 @@
 from .implementation import create_implementation, delete_implementation, pin_implementation, set_higher_order
-from .postman import assign, pause, resume, step, ack, cancel, interrupt, collect, bounce, kick, block, unblock
+from .postman import assign, pause, resume, ack, cancel, interrupt, collect, bounce, kick, block, unblock
 from .test import create_test_case, create_test_result
 from .memory_shelve import shelve_in_memory_drawer, unshelve_memory_drawer
 from .agent import ensure_agent, pin_agent, delete_agent
@@ -61,7 +61,6 @@ __all__ = [
     "assign",
     "pause",
     "resume",
-    "step",
     "ack",
     "cancel",
     "interrupt",
