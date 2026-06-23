@@ -80,8 +80,8 @@ class TestHigherOrderOrchestration:
         assert str(child.agent_id) == str(agent.pk)
 
         # Drive the lower agent: yield then done.
-        await send_message(communicator, messages.YieldEvent(assignation=child_id, returns={"out": 42}))
-        await send_message(communicator, messages.DoneEvent(assignation=child_id))
+        await send_message(communicator, messages.Yield(assignation=child_id, returns={"out": 42}))
+        await send_message(communicator, messages.Completed(assignation=child_id))
         await communicator.disconnect()
 
         # The wrapper assignation sees the UNFOLDED yield (mapped via return_map) + delegated_to.
@@ -92,7 +92,7 @@ class TestHigherOrderOrchestration:
         assert str(higher_yield.delegated_to_id) == str(child_id)
 
         # Done propagates to the wrapper.
-        assert await AssignationEvent.objects.filter(assignation_id=higher_assignation.pk, kind="DONE").aexists()
+        assert await AssignationEvent.objects.filter(assignation_id=higher_assignation.pk, kind="COMPLETED").aexists()
         refreshed = await Assignation.objects.aget(pk=higher_assignation.pk)
         assert refreshed.is_done is True
 

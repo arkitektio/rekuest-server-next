@@ -1,7 +1,7 @@
 """Cross-agent dispatch: one agent (the caller) assigns work to a *different* agent (the executor).
 
 Two distinct identities (two static tokens → two Agents in the same org) connect over two
-sockets. The caller originates a ``CallerAssign`` targeting the executor's implementation; the
+sockets. The caller originates a ``AssignRequest`` targeting the executor's implementation; the
 backend dispatches the ``Assign`` to the executor, and — because the caller is the
 assignation's caller — the executor's events flow back to the caller as ``Caller*`` mirrors.
 
@@ -28,8 +28,8 @@ class TestCrossAgentAssign:
         caller = await open_agent(agent_ws, "caller-agent")  # default token → a different identity
 
         # The caller originates work targeting the *executor's* implementation.
-        await caller.send(messages.CallerAssign(reference="x-1", implementation=str(impl.pk), args={"k": 1}))
-        result = await caller.receive(messages.CallerAssignResult)
+        await caller.send(messages.AssignRequest(reference="x-1", implementation=str(impl.pk), args={"k": 1}))
+        result = await caller.receive(messages.AssignResponse)
         assert result.created is True and result.assignation
 
         # The executor (a DIFFERENT agent) receives the dispatched ASSIGN command.
@@ -51,17 +51,17 @@ class TestCrossAgentAssign:
         impl = await build_implementation_for_agent(executor.agent_pk, "xagent2")
         caller = await open_agent(agent_ws, "caller2-agent")
 
-        await caller.send(messages.CallerAssign(reference="x-2", implementation=str(impl.pk), args={}))
-        result = await caller.receive(messages.CallerAssignResult)
+        await caller.send(messages.AssignRequest(reference="x-2", implementation=str(impl.pk), args={}))
+        result = await caller.receive(messages.AssignResponse)
         assign = await executor.receive(messages.Assign)
 
         # The executor reports progress, then done — over its OWN socket.
-        await executor.send(messages.ProgressEvent(assignation=assign.assignation, progress=50, message="half"))
-        progress = await caller.receive(messages.CallerProgress)
+        await executor.send(messages.Progress(assignation=assign.assignation, progress=50, message="half"))
+        progress = await caller.receive(messages.ProgressEvent)
         assert progress.assignation == result.assignation and progress.progress == 50
 
-        await executor.send(messages.DoneEvent(assignation=assign.assignation))
-        done = await caller.receive(messages.CallerDone)
+        await executor.send(messages.Completed(assignation=assign.assignation))
+        done = await caller.receive(messages.CompletedEvent)
         assert done.assignation == result.assignation
 
         await caller.disconnect()
@@ -74,8 +74,8 @@ class TestCrossAgentAssign:
         impl = await build_implementation_for_agent(executor.agent_pk, "xagent3")
         caller = await open_agent(agent_ws, "caller3-agent")
 
-        await caller.send(messages.CallerAssign(reference="x-3", action=str(impl.action_id), args={"v": 7}))
-        result = await caller.receive(messages.CallerAssignResult)
+        await caller.send(messages.AssignRequest(reference="x-3", action=str(impl.action_id), args={"v": 7}))
+        result = await caller.receive(messages.AssignResponse)
         assert result.created is True
 
         assign = await executor.receive(messages.Assign)

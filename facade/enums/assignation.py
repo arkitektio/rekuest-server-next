@@ -24,19 +24,19 @@ class AssignationEventChoices(TextChoices):
 
     QUEUED = "QUEUED", "Queued (Assignation was queued)"
     BOUND = "BOUND", "Bound (Assignation was bound to an Agent)"
-    ASSIGN = "ASSIGN", "Assign (Agent accepted the Assignation)"
+    STARTED = "STARTED", "Started (Agent accepted and began the Assignation)"
     UNASSIGN = "UNASSIGN", "Unassign (Agent received the Assignation)"
     PROGRESS = "PROGRESS", "Progress (Agent is making progress on the Assignation)"
-    CANCELING = "CANCELING", "Unassign (Assignation was unassigned from an Agent)"
-    CANCELLED = "CANCELLED", "Unassign (Assignation was unassigned from an Agent)"
-    INTERUPTING = "INTERUPTING", "Interupting (Assignation was interupted)"
-    INTERUPTED = "INTERUPTED", "Interupted (Assignation was interupted)"
+    CANCELLING = "CANCELLING", "Cancelling (a cancel was requested; awaiting the agent's confirmation)"
+    CANCELLED = "CANCELLED", "Cancelled (the agent cancelled the assignation)"
+    INTERRUPTING = "INTERRUPTING", "Interrupting (an interrupt was requested; awaiting the agent's confirmation)"
+    INTERRUPTED = "INTERRUPTED", "Interrupted (the agent interrupted the assignation)"
     PAUSING = "PAUSING", "Pausing (a pause was requested; awaiting the agent's confirmation)"
     PAUSED = "PAUSED", "Paused (the agent suspended the assignation)"
     RESUMING = "RESUMING", "Resuming (a resume was requested; awaiting the agent's confirmation)"
     RESUMED = "RESUMED", "Resumed (the agent resumed the assignation)"
     DELEGATE = "DELEGATE", "Delegate (Assignation was delegated to another Assignation)"
-    ERROR = "ERROR"
+    FAILED = "FAILED"
     CRITICAL = "CRITICAL"
     DISCONNECTED = "DISCONNECTED"
 
@@ -44,7 +44,7 @@ class AssignationEventChoices(TextChoices):
         "YIELD",
         "Yields (Agent yielded the result)",
     )  # One yield can be interpreted as a return
-    DONE = "DONE", "Done (Agent finished the Assignation)"
+    COMPLETED = "COMPLETED", "Completed (Agent finished the Assignation)"
     LOG = "LOG", "Log (Agent logged a message)"
 
 
@@ -89,24 +89,24 @@ class AssignationEventKind(str, Enum):
 
     BOUND = "BOUND"
     QUEUED = "QUEUED"
-    ASSIGN = "ASSIGN"
+    STARTED = "STARTED"
     PROGRESS = "PROGRESS"
     DELEGATE = "DELEGATE"
 
     DISCONNECTED = "DISCONNECTED"
 
     YIELD = "YIELD"
-    DONE = "DONE"
+    COMPLETED = "COMPLETED"
 
     # Log Events
     LOG = "LOG"
-    CANCELING = "CANCELING"
+    CANCELLING = "CANCELLING"
     CANCELLED = "CANCELLED"
-    INTERUPTING = "INTERUPTING"
-    INTERUPTED = "INTERUPTED"
+    INTERRUPTING = "INTERRUPTING"
+    INTERRUPTED = "INTERRUPTED"
     PAUSING = "PAUSING"
     PAUSED = "PAUSED"
     RESUMING = "RESUMING"
     RESUMED = "RESUMED"
-    ERROR = "ERROR"
+    FAILED = "FAILED"
     CRITICAL = "CRITICAL"

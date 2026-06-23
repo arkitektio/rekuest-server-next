@@ -106,5 +106,5 @@ class TestReconcileSweep:
 
         call_command("reconcile_assignations", stdout=StringIO())
 
-        assert Assignation.objects.get(pk=connected.pk).latest_event_kind == enums.AssignationEventKind.ASSIGN
-        assert Assignation.objects.get(pk=webhook.pk).latest_event_kind == enums.AssignationEventKind.ASSIGN
+        assert Assignation.objects.get(pk=connected.pk).latest_event_kind == enums.AssignationEventKind.STARTED
+        assert Assignation.objects.get(pk=webhook.pk).latest_event_kind == enums.AssignationEventKind.STARTED

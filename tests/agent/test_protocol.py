@@ -108,5 +108,5 @@ class TestAgentProtocol:
         # router and closes 3003. (Lock/Unlock/Paused/Resumed/Stepped/Interrupted events are
         # currently unhandled by the consumer.)
         session = await open_agent(agent_ws, "unhandled-agent")
-        await session.send(messages.LockEvent(key="lock-1", assignation=str(uuid.uuid4())))
+        await session.send(messages.Lock(key="lock-1", assignation=str(uuid.uuid4())))
         await session.expect_close(FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE)

@@ -163,7 +163,7 @@ class TestProgressLease:
         backend = ModelPersistBackend()
         key = str(ass.pk)
 
-        await backend.on_agent_progress("a", messages.ProgressEvent(assignation=key, progress=10))
+        await backend.on_agent_progress("a", messages.Progress(assignation=key, progress=10))
         await asyncio.wait_for(backend._progress_leases[key], timeout=2)
 
         refreshed = await Assignation.objects.aget(pk=ass.pk)
@@ -176,9 +176,9 @@ class TestProgressLease:
         backend = ModelPersistBackend()
         key = str(ass.pk)
 
-        await backend.on_agent_progress("a", messages.ProgressEvent(assignation=key, progress=10))
+        await backend.on_agent_progress("a", messages.Progress(assignation=key, progress=10))
         assert key in backend._progress_leases
-        await backend.on_agent_done("a", messages.DoneEvent(assignation=key))
+        await backend.on_agent_done("a", messages.Completed(assignation=key))
         assert key not in backend._progress_leases  # lease cleared on terminal
 
     async def test_none_effect_has_no_lease(self, settings):
@@ -187,5 +187,5 @@ class TestProgressLease:
         backend = ModelPersistBackend()
         key = str(ass.pk)
 
-        await backend.on_agent_progress("a", messages.ProgressEvent(assignation=key, progress=10))
+        await backend.on_agent_progress("a", messages.Progress(assignation=key, progress=10))
         assert key not in backend._progress_leases  # only physical work gets a lease

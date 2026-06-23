@@ -291,15 +291,15 @@ class TestAgentProtocolUnit:
         await protocol.receive(_register_frame())
         sent.clear()
 
-        req = messages.CallerAssign(reference="ref-1", action="act-1", args={"x": 1})
+        req = messages.AssignRequest(reference="ref-1", action="act-1", args={"x": 1})
         await protocol.receive(req.model_dump_json())
 
         # routed to the backend with the connection's can_assign_root capability
         ca = next(c for c in backend.calls if c[0] == "caller_assign")
         assert ca[3] is True  # FULL_CAPABILITIES.can_assign_root
-        # and a CallerAssignResult ack echoing the request id + reference
+        # and a AssignResponse ack echoing the request id + reference
         result = json.loads(sent[-1])
-        assert result["type"] == messages.ToAgentMessageType.CALLER_ASSIGN_RESULT.value
+        assert result["type"] == messages.ToAgentMessageType.ASSIGN_RESPONSE.value
         assert result["request"] == req.id and result["reference"] == "ref-1"
         assert result["assignation"] == "new-ass-1" and result["created"] is True
         assert closed == []
@@ -313,10 +313,10 @@ class TestAgentProtocolUnit:
         await protocol.receive(_register_frame())
         sent.clear()
 
-        await protocol.receive(messages.CallerAssign(reference="ref-2", args={}).model_dump_json())
+        await protocol.receive(messages.AssignRequest(reference="ref-2", args={}).model_dump_json())
 
         result = json.loads(sent[-1])
-        assert result["type"] == messages.ToAgentMessageType.CALLER_ASSIGN_RESULT.value
+        assert result["type"] == messages.ToAgentMessageType.ASSIGN_RESPONSE.value
         assert result["assignation"] is None and result["created"] is False
         assert "missing can_assign_root" in result["error"]
         assert closed == []  # crucially, the connection stays open
@@ -328,7 +328,7 @@ class TestAgentProtocolUnit:
         await protocol.receive(_register_frame())
         sent.clear()
 
-        done = messages.DoneEvent(assignation="ass-9", seq=7)
+        done = messages.Completed(assignation="ass-9", seq=7)
         await protocol.receive(done.model_dump_json())
 
         ack = json.loads(sent[-1])
@@ -342,12 +342,12 @@ class TestAgentProtocolUnit:
         await protocol.receive(_register_frame())
         sent.clear()
 
-        req = messages.CallerCancel(assignation="ass-7", auto_interrupt=5)
+        req = messages.CancelRequest(assignation="ass-7", auto_interrupt=5)
         await protocol.receive(req.model_dump_json())
 
         assert any(c[0] == "caller_cancel" for c in backend.calls)
         result = json.loads(sent[-1])
-        assert result["type"] == messages.ToAgentMessageType.CALLER_CONTROL_RESULT.value
+        assert result["type"] == messages.ToAgentMessageType.CONTROL_RESPONSE.value
         assert result["request"] == req.id and result["accepted"] is True
         assert closed == []
         await protocol.shutdown()
@@ -358,10 +358,10 @@ class TestAgentProtocolUnit:
         await protocol.receive(_register_frame())
         sent.clear()
 
-        await protocol.receive(messages.CallerCancel(assignation="ass-x").model_dump_json())
+        await protocol.receive(messages.CancelRequest(assignation="ass-x").model_dump_json())
 
         result = json.loads(sent[-1])
-        assert result["type"] == messages.ToAgentMessageType.CALLER_CONTROL_RESULT.value
+        assert result["type"] == messages.ToAgentMessageType.CONTROL_RESPONSE.value
         assert result["accepted"] is False and "not the caller" in result["error"]
         assert closed == []  # a bad control request never tears down the socket
         await protocol.shutdown()
@@ -369,7 +369,7 @@ class TestAgentProtocolUnit:
     async def test_unhandled_message_closes(self):
         protocol, sent, closed, _ = make_protocol()
         await protocol.receive(_register_frame())
-        await protocol.receive(messages.LockEvent(key="lock-1", assignation=str(uuid.uuid4())).model_dump_json())
+        await protocol.receive(messages.Lock(key="lock-1", assignation=str(uuid.uuid4())).model_dump_json())
         assert FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE in closed
         await protocol.shutdown()
 
@@ -378,7 +378,7 @@ class TestAgentProtocolUnit:
         protocol, sent, closed, _ = make_protocol(backend=backend)
         await protocol.receive(_register_frame())
         await protocol.receive(
-            messages.LogEvent(assignation=str(uuid.uuid4()), message="hello", level="INFO").model_dump_json()
+            messages.Log(assignation=str(uuid.uuid4()), message="hello", level="INFO").model_dump_json()
         )
         assert any(call[0] == "log" for call in backend.calls)
         await protocol.shutdown()

@@ -1,6 +1,6 @@
 """Full-stack caller-assign over the agent socket (item 4).
 
-A participant originates work via ``CallerAssign`` and gets a ``CallerAssignResult`` back.
+A participant originates work via ``AssignRequest`` and gets a ``AssignResponse`` back.
 Here the registered agent assigns to its own implementation, so it both originates the work
 (caller) and receives the ``ASSIGN`` command (executor). Idempotency: resending the same
 ``reference`` returns the same assignation with ``created=False``.
@@ -17,19 +17,19 @@ from tests.factories import build_implementation_for_agent
 
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
-class TestCallerAssign:
+class TestAssignRequest:
     async def test_caller_assign_creates_then_is_idempotent(self, agent_ws):
         session = await open_agent(agent_ws, "callerassign-agent")
         impl = await build_implementation_for_agent(session.agent.pk, "callerassign")
 
         # Originate work referencing our own implementation.
-        await session.send(messages.CallerAssign(reference="r-1", implementation=str(impl.pk), args={"x": 1}))
-        result = await session.receive(messages.CallerAssignResult)
+        await session.send(messages.AssignRequest(reference="r-1", implementation=str(impl.pk), args={"x": 1}))
+        result = await session.receive(messages.AssignResponse)
         assert result.reference == "r-1" and result.created is True and result.assignation
 
         # Resend the SAME reference → same assignation, created=False, no duplicate row.
-        await session.send(messages.CallerAssign(reference="r-1", implementation=str(impl.pk), args={"x": 1}))
-        result2 = await session.receive(messages.CallerAssignResult)
+        await session.send(messages.AssignRequest(reference="r-1", implementation=str(impl.pk), args={"x": 1}))
+        result2 = await session.receive(messages.AssignResponse)
         assert result2.assignation == result.assignation and result2.created is False
 
         assert await Assignation.objects.filter(reference="r-1").acount() == 1
@@ -45,7 +45,7 @@ class TestCallerAssign:
         session = await open_agent(agent_ws, "callerassign2-agent")
         impl = await build_implementation_for_agent(session.agent.pk, "callerassign2")
 
-        await session.send(messages.CallerAssign(reference="r-2", implementation=str(impl.pk), args={"y": 2}))
+        await session.send(messages.AssignRequest(reference="r-2", implementation=str(impl.pk), args={"y": 2}))
 
         # The agent is also the executor, so it receives the ASSIGN command for the work.
         assign = await session.receive(messages.Assign)

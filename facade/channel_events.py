@@ -35,7 +35,7 @@ class ChildAssignationEvent(BaseModel):
     update: int | None = Field(None, description="The assignation that was updated.")
 
 
-class AgentSignal(BaseModel):
+class AgentEvent(BaseModel):
     """A model representing an agent event."""
 
     create: int | None = Field(None, description="The agent that was created.")
@@ -43,7 +43,7 @@ class AgentSignal(BaseModel):
     delete: int | None = Field(None, description="The agent that was deleted.")
 
 
-class ImplementationSignal(BaseModel):
+class ImplementationEvent(BaseModel):
     """A model representing a template event."""
 
     create: int | None = Field(None, description="The template that was created.")
@@ -51,7 +51,7 @@ class ImplementationSignal(BaseModel):
     delete: int | None = Field(None, description="The template that was deleted.")
 
 
-class ActionSignal(BaseModel):
+class ActionEvent(BaseModel):
     """A model representing an action event."""
 
     create: int | None = Field(None, description="The action that was created.")

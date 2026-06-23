@@ -169,7 +169,7 @@ def _build_assignation(prefix, *, effect="NONE", originating_connection_id=None,
         parent=parent,
         originating_connection_id=originating_connection_id,
         originating_session_id=originating_session_id,
-        latest_event_kind=enums.AssignationEventKind.ASSIGN,
+        latest_event_kind=enums.AssignationEventKind.STARTED,
         latest_instruct_kind=enums.AssignationInstructChoices.ASSIGN,
     )
 
@@ -197,7 +197,7 @@ def _build_unimplemented_assignation_for_agent(agent_pk, prefix):
         action=action,
         agent=agent,
         implementation=None,
-        latest_event_kind=enums.AssignationEventKind.ASSIGN,
+        latest_event_kind=enums.AssignationEventKind.STARTED,
         latest_instruct_kind=enums.AssignationInstructChoices.ASSIGN,
     )
 
@@ -235,7 +235,7 @@ def _build_assignation_for_agent_caller(agent_pk, prefix):
         action=action,
         agent=agent,
         implementation=implementation,
-        latest_event_kind=enums.AssignationEventKind.ASSIGN,
+        latest_event_kind=enums.AssignationEventKind.STARTED,
         latest_instruct_kind=enums.AssignationInstructChoices.ASSIGN,
     )
 

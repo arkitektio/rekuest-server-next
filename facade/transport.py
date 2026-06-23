@@ -46,7 +46,7 @@ def publish_assignation_event(event: models.AssignationEvent) -> None:
 
 
 def _deliver_caller_event_to_webhook(event: models.AssignationEvent, assignation: models.Assignation) -> None:
-    """If the assignation's caller is a HookAgent, POST the Caller* event to its hook_url."""
+    """If the assignation's caller is a HookAgent, POST the …Event mirror to its hook_url."""
     caller = assignation.caller
     if caller is None:
         return
@@ -65,6 +65,6 @@ def _deliver_caller_event_to_webhook(event: models.AssignationEvent, assignation
         return
     # A Django model satisfies EventLike at runtime, but pyright can't see through the
     # TextChoicesField descriptor to verify it structurally (needs a mypy plugin).
-    message = caller_events.build_caller_message(event)  # pyright: ignore[reportArgumentType]
+    message = caller_events.build_execution_event(event)  # pyright: ignore[reportArgumentType]
     if message is not None:
         hooks.deliver_to_hook(agent, message.model_dump_json())

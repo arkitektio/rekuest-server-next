@@ -1,4 +1,17 @@
-"""Messages that are used to communicate between the rekuest backend and the agent"""
+"""Messages that are used to communicate between the rekuest backend and the agent.
+
+Naming convention — the role lives in the affix and the direction is unambiguous:
+
+- **Backend → Agent commands**: bare imperative (``Assign``, ``Cancel``, ``Pause``).
+- **Agent → Backend reports**: bare past/noun (``Completed``, ``Failed``, ``Progress``).
+- **Caller → Backend requests**: ``…Request`` suffix (``AssignRequest``, ``CancelRequest``).
+- **Backend → Caller acks**: ``…Response`` suffix (``AssignResponse``, ``ControlResponse``).
+- **Backend → Caller event stream**: ``…Event`` suffix (``CompletedEvent``, ``ProgressEvent``).
+
+No names collide because commands are imperative, agent reports are bare past-tense, and
+the caller stream carries the ``…Event`` suffix (``Pause`` cmd vs ``Paused`` report vs
+``PausedEvent`` stream).
+"""
 
 from typing import Any, List, Optional, Literal, Union, Dict
 from pydantic import BaseModel, ConfigDict
@@ -67,30 +80,30 @@ class ToAgentMessageType(str, Enum):
     KICK = "KICK"
     PROTOCOL_ERROR = "PROTOCOL_ERROR"
     EVENT_ACK = "EVENT_ACK"
-    CALLER_ASSIGN_RESULT = "CALLER_ASSIGN_RESULT"
-    # Caller-bound event mirrors — one per AssignationEventKind — streamed back to the
-    # participant that originated the assignation (see ``CallerEvent`` and subclasses).
-    CALLER_BOUND = "CALLER_BOUND"
-    CALLER_QUEUED = "CALLER_QUEUED"
-    CALLER_ASSIGNED = "CALLER_ASSIGNED"
-    CALLER_PROGRESS = "CALLER_PROGRESS"
-    CALLER_DELEGATE = "CALLER_DELEGATE"
-    CALLER_DISCONNECTED = "CALLER_DISCONNECTED"
-    CALLER_YIELD = "CALLER_YIELD"
-    CALLER_DONE = "CALLER_DONE"
-    CALLER_LOG = "CALLER_LOG"
-    CALLER_CANCELING = "CALLER_CANCELING"
-    CALLER_CANCELLED = "CALLER_CANCELLED"
-    CALLER_INTERRUPTING = "CALLER_INTERRUPTING"
-    CALLER_INTERRUPTED = "CALLER_INTERRUPTED"
-    CALLER_PAUSING = "CALLER_PAUSING"
-    CALLER_PAUSED = "CALLER_PAUSED"
-    CALLER_RESUMING = "CALLER_RESUMING"
-    CALLER_RESUMED = "CALLER_RESUMED"
-    CALLER_ERROR = "CALLER_ERROR"
-    CALLER_CRITICAL = "CALLER_CRITICAL"
+    ASSIGN_RESPONSE = "ASSIGN_RESPONSE"
+    # Caller-bound event-stream mirrors — one per AssignationEventKind — streamed back to the
+    # participant that originated the assignation (see ``ExecutionEvent`` and subclasses).
+    BOUND_EVENT = "BOUND_EVENT"
+    QUEUED_EVENT = "QUEUED_EVENT"
+    STARTED_EVENT = "STARTED_EVENT"
+    PROGRESS_EVENT = "PROGRESS_EVENT"
+    DELEGATE_EVENT = "DELEGATE_EVENT"
+    DISCONNECTED_EVENT = "DISCONNECTED_EVENT"
+    YIELD_EVENT = "YIELD_EVENT"
+    COMPLETED_EVENT = "COMPLETED_EVENT"
+    LOG_EVENT = "LOG_EVENT"
+    CANCELLING_EVENT = "CANCELLING_EVENT"
+    CANCELLED_EVENT = "CANCELLED_EVENT"
+    INTERRUPTING_EVENT = "INTERRUPTING_EVENT"
+    INTERRUPTED_EVENT = "INTERRUPTED_EVENT"
+    PAUSING_EVENT = "PAUSING_EVENT"
+    PAUSED_EVENT = "PAUSED_EVENT"
+    RESUMING_EVENT = "RESUMING_EVENT"
+    RESUMED_EVENT = "RESUMED_EVENT"
+    FAILED_EVENT = "FAILED_EVENT"
+    CRITICAL_EVENT = "CRITICAL_EVENT"
     # Ack for a caller's lifecycle-control request (cancel/interrupt/pause/resume).
-    CALLER_CONTROL_RESULT = "CALLER_CONTROL_RESULT"
+    CONTROL_RESPONSE = "CONTROL_RESPONSE"
 
 
 class FromAgentMessageType(str, Enum):
@@ -99,15 +112,15 @@ class FromAgentMessageType(str, Enum):
     REGISTER = "REGISTER"
     LOG = "LOG"
     PROGRESS = "PROGRESS"
-    DONE = "DONE"
+    STARTED = "STARTED"
+    COMPLETED = "COMPLETED"
     YIELD = "YIELD"
-    ERROR = "ERROR"
+    FAILED = "FAILED"
     PAUSED = "PAUSED"
     CRITICAL = "CRITICAL"
     RESUMED = "RESUMED"
     CANCELLED = "CANCELLED"
     APP_CANCELLED = "APP_CANCELLED"  # Cancelled by the app not the user how assigned
-    ASSIGNED = "ASSIGNED"
     INTERRUPTED = "INTERRUPTED"
     HEARTBEAT_ANSWER = "HEARTBEAT_ANSWER"
     STATE_PATCH = "STATE_PATCH"
@@ -115,12 +128,12 @@ class FromAgentMessageType(str, Enum):
     UNLOCK = "UNLOCK"
     STATE_SNAPSHOT = "STATE_SNAPSHOT"
     SESSION_INIT = "SESSION_INIT"
-    CALLER_ASSIGN = "CALLER_ASSIGN"
-    # Caller-issued lifecycle control requests over the socket (mirroring CALLER_ASSIGN).
-    CALLER_CANCEL = "CALLER_CANCEL"
-    CALLER_INTERRUPT = "CALLER_INTERRUPT"
-    CALLER_PAUSE = "CALLER_PAUSE"
-    CALLER_RESUME = "CALLER_RESUME"
+    ASSIGN_REQUEST = "ASSIGN_REQUEST"
+    # Caller-issued lifecycle control requests over the socket (mirroring ASSIGN_REQUEST).
+    CANCEL_REQUEST = "CANCEL_REQUEST"
+    INTERRUPT_REQUEST = "INTERRUPT_REQUEST"
+    PAUSE_REQUEST = "PAUSE_REQUEST"
+    RESUME_REQUEST = "RESUME_REQUEST"
 
 
 class Message(BaseModel):
@@ -192,10 +205,11 @@ class Assign(Message):
 
 
 class Bounce(Message):
-    """A step call
-    A step call tells the agent to step the assignation
-    and all its children assignation until a resume is received
-    Its on the actor to decide what to do with the children assignations
+    """A bounce call
+
+    Tells the agent to disconnect and reconnect (a soft restart of the connection).
+    Exposed as the ``bounce`` GraphQL mutation. ``duration`` optionally hints how long
+    to wait before reconnecting.
     """
 
     type: Literal[ToAgentMessageType.BOUNCE] = ToAgentMessageType.BOUNCE
@@ -203,10 +217,10 @@ class Bounce(Message):
 
 
 class Kick(Message):
-    """A step call
-    A step call tells the agent to step the assignation
-    and all its children assignation until a resume is received
-    Its on the actor to decide what to do with the children assignations
+    """A kick call
+
+    Tells the agent to force-disconnect. Unlike ``Bounce`` it will fail and NOT reconnect.
+    Exposed as the ``kick`` GraphQL mutation. ``reason`` is an optional human-readable cause.
     """
 
     type: Literal[ToAgentMessageType.KICK] = ToAgentMessageType.KICK
@@ -294,58 +308,61 @@ class Interrupt(Message):
     assignation: str
 
 
-class CancelledEvent(FromAgentEvent):
-    """A cancelled event"""
+class Cancelled(FromAgentEvent):
+    """A cancelled report
+
+    Sent when the assignation was successfully cancelled by the actor.
+    """
 
     type: Literal[FromAgentMessageType.CANCELLED] = FromAgentMessageType.CANCELLED
     assignation: str
 
 
-class InterruptedEvent(FromAgentEvent):
-    """An interrupted event
+class Interrupted(FromAgentEvent):
+    """An interrupted report
 
-    A interruppted event is sent when the assignation was
-    successfully interrupted by the actor.
-
-
+    Sent when the assignation was successfully interrupted by the actor.
     """
 
     type: Literal[FromAgentMessageType.INTERRUPTED] = FromAgentMessageType.INTERRUPTED
     assignation: str
 
 
-class PausedEvent(FromAgentEvent):
-    """A paused event
+class Paused(FromAgentEvent):
+    """A paused report
 
-    A paused event is sent when the assignation was
-    successfully paused by the actor.
-
-
+    Sent when the assignation was successfully paused by the actor.
     """
 
     type: Literal[FromAgentMessageType.PAUSED] = FromAgentMessageType.PAUSED
     assignation: str
 
 
-class ResumedEvent(FromAgentEvent):
-    """A resumed event
+class Resumed(FromAgentEvent):
+    """A resumed report
 
-    A resumed event is sent when the assignation was
-    successfully resumed by the actor.
-
-
+    Sent when the assignation was successfully resumed by the actor.
     """
 
     type: Literal[FromAgentMessageType.RESUMED] = FromAgentMessageType.RESUMED
     assignation: str
 
 
-class LogEvent(FromAgentEvent):
-    """A log event
+class Started(FromAgentEvent):
+    """A started report
 
-    A log event is sent when the agent wants to send a log
-    message to the rekuest backend. This is used to
-    send logs from the agent to the rekuest backend
+    Sent when the actor has accepted an assignation and begun executing it.
+    Mirrored to the caller as ``StartedEvent``.
+    """
+
+    type: Literal[FromAgentMessageType.STARTED] = FromAgentMessageType.STARTED
+    assignation: str
+
+
+class Log(FromAgentEvent):
+    """A log report
+
+    Sent when the agent wants to send a log message to the rekuest backend.
     """
 
     type: Literal[FromAgentMessageType.LOG] = FromAgentMessageType.LOG
@@ -355,12 +372,10 @@ class LogEvent(FromAgentEvent):
     """The log level of the message"""
 
 
-class ProgressEvent(FromAgentEvent):
-    """A progress event
+class Progress(FromAgentEvent):
+    """A progress report
 
-    A progress event is sent when the agent wants to send a
-    progress message to the rekuest backend. This is used to
-    send progress from the agent to the rekuest backend
+    Sent when the agent wants to report progress on an assignation.
     """
 
     type: Literal[FromAgentMessageType.PROGRESS] = FromAgentMessageType.PROGRESS
@@ -369,12 +384,10 @@ class ProgressEvent(FromAgentEvent):
     message: Optional[str] = None
 
 
-class YieldEvent(FromAgentEvent):
-    """A yield event
+class Yield(FromAgentEvent):
+    """A yield report
 
-    A yield event is sent when the agent wants to send a
-    yielded assignmented message to the rekuest backend. This is used to
-    send yield from the agent to the rekuest backend
+    Sent when the agent wants to yield an intermediate result to the rekuest backend.
     """
 
     type: Literal[FromAgentMessageType.YIELD] = FromAgentMessageType.YIELD
@@ -382,39 +395,32 @@ class YieldEvent(FromAgentEvent):
     returns: Optional[Dict[str, Any]] = None
 
 
-class DoneEvent(FromAgentEvent):
-    """A done event
+class Completed(FromAgentEvent):
+    """A completed report
 
-    A done event is sent when the actor has finished the assignation
-    and all its children assignation. This is used to
-    send done from the agent to the rekuest backend
+    Sent when the actor has finished the assignation and all its children assignations.
     """
 
-    type: Literal[FromAgentMessageType.DONE] = FromAgentMessageType.DONE
+    type: Literal[FromAgentMessageType.COMPLETED] = FromAgentMessageType.COMPLETED
     assignation: str
 
 
-class ErrorEvent(FromAgentEvent):
-    """An error event
+class Failed(FromAgentEvent):
+    """A failed report
 
-    An error event is sent when the agent wants to send an error
-    message to the rekuest backend. This is used to
-    send errors from the agent to the rekuest backend.
-
-    Errors are potentially recoverable, while critical errors are not.
+    Sent when the agent reports a (potentially recoverable) error from execution.
+    A ``Critical`` report signals an unrecoverable one instead.
     """
 
-    type: Literal[FromAgentMessageType.ERROR] = FromAgentMessageType.ERROR
+    type: Literal[FromAgentMessageType.FAILED] = FromAgentMessageType.FAILED
     assignation: str
     error: str
 
 
-class CriticalEvent(FromAgentEvent):
-    """A critical event
+class Critical(FromAgentEvent):
+    """A critical report
 
-    A critical event is sent when the agent wants to send a critical
-    message to the rekuest backend. This is used to
-    send critical errors from the agent to the rekuest backend
+    Sent when the agent reports an unrecoverable error from execution.
     """
 
     type: Literal[FromAgentMessageType.CRITICAL] = FromAgentMessageType.CRITICAL
@@ -433,7 +439,7 @@ class HeartbeatEvent(Message):
     type: Literal[FromAgentMessageType.HEARTBEAT_ANSWER] = FromAgentMessageType.HEARTBEAT_ANSWER
 
 
-class SessionInitMessage(Message):
+class SessionInit(Message):
     """A session init message
 
     A session init message is sent when the agent starts and wants to
@@ -446,12 +452,11 @@ class SessionInitMessage(Message):
     states: Dict[str, Any] = Field(description="A dictionary containing the initial state snapshots, where the key is the state name and the value is the state snapshot")
 
 
-class StatePatchEvent(Message):
-    """A state patch event
+class StatePatch(Message):
+    """A state patch message
 
-    A state patch event is sent when the agent wants to send a state patch
-    to the rekuest backend. This is used to
-    send state patches from the agent to the rekuest backend
+    A state patch is sent when the agent wants to send a granular state modification
+    to the rekuest backend.
     """
 
     type: Literal[FromAgentMessageType.STATE_PATCH] = FromAgentMessageType.STATE_PATCH
@@ -469,12 +474,11 @@ class StatePatchEvent(Message):
     )
 
 
-class StateSnapshotEvent(Message):
-    """A state snapshot event
+class StateSnapshot(Message):
+    """A state snapshot message
 
-    A state snapshot event is sent when the agent wants to send a state snapshot
-    to the rekuest backend. This is used to
-    send state patches from the agent to the rekuest backend
+    A state snapshot is sent when the agent wants to send a full state snapshot
+    to the rekuest backend.
     """
 
     type: Literal[FromAgentMessageType.STATE_SNAPSHOT] = FromAgentMessageType.STATE_SNAPSHOT
@@ -483,12 +487,10 @@ class StateSnapshotEvent(Message):
     snapshots: Dict[str, Any] = Field(description="A dictionary containing the state snapshots, where the key is the state name and the value is the state snapshot")
 
 
-class LockEvent(Message):
-    """A state patch event
+class Lock(Message):
+    """A lock message
 
-    A state patch event is sent when the agent wants to send a state patch
-    to the rekuest backend. This is used to
-    send state patches from the agent to the rekuest backend
+    Sent when the agent wants to acquire a distributed lock on the rekuest backend.
     """
 
     type: Literal[FromAgentMessageType.LOCK] = FromAgentMessageType.LOCK
@@ -496,12 +498,10 @@ class LockEvent(Message):
     assignation: str
 
 
-class UnlockEvent(Message):
-    """A state patch event
+class Unlock(Message):
+    """An unlock message
 
-    A state patch event is sent when the agent wants to send a state patch
-    to the rekuest backend. This is used to
-    send state patches from the agent to the rekuest backend
+    Sent when the agent wants to release a distributed lock on the rekuest backend.
     """
 
     type: Literal[FromAgentMessageType.UNLOCK] = FromAgentMessageType.UNLOCK
@@ -565,7 +565,7 @@ class Init(Message):
     inquiries: list[AssignInquiry] = []
 
 
-class CallerAssign(Message):
+class AssignRequest(Message):
     """A caller's request to originate (or resolve) an assignation over the agent socket.
 
     This is the WebSocket equivalent of the GraphQL ``assign`` mutation: a participant
@@ -575,10 +575,10 @@ class CallerAssign(Message):
 
     Creation safety is by **idempotency, not transport**: ``reference`` must be stable for
     a logical request, so a resend after reconnect returns the same assignation (see
-    ``CallerAssignResult``) rather than creating a duplicate.
+    ``AssignResponse``) rather than creating a duplicate.
     """
 
-    type: Literal[FromAgentMessageType.CALLER_ASSIGN] = FromAgentMessageType.CALLER_ASSIGN
+    type: Literal[FromAgentMessageType.ASSIGN_REQUEST] = FromAgentMessageType.ASSIGN_REQUEST
     reference: str = Field(description="Caller-supplied idempotency key. Stable across resends of the same logical request.")
     args: Dict[str, ShallowJSONSerializable] = Field(default_factory=dict, description="The args of the assignation (ports → values).")
     action: Optional[str] = Field(default=None, description="The action ID to assign to.")
@@ -596,8 +596,8 @@ class CallerAssign(Message):
     step: Optional[bool] = Field(default=None, description="Whether to step to breakpoints.")
 
 
-class CallerAssignResult(Message):
-    """The backend's authoritative ack that a ``CallerAssign`` was persisted.
+class AssignResponse(Message):
+    """The backend's authoritative ack that an ``AssignRequest`` was persisted.
 
     Echoes the originating request id (``request``) and carries the durable assignation
     id, so the caller can map ``reference``/``request`` → ``assignation`` BEFORE any
@@ -605,69 +605,69 @@ class CallerAssignResult(Message):
     resend of the same ``reference`` yields the same ``assignation`` with ``created=False``.
     """
 
-    type: Literal[ToAgentMessageType.CALLER_ASSIGN_RESULT] = ToAgentMessageType.CALLER_ASSIGN_RESULT
-    request: str = Field(description="The id of the CallerAssign this result answers.")
+    type: Literal[ToAgentMessageType.ASSIGN_RESPONSE] = ToAgentMessageType.ASSIGN_RESPONSE
+    request: str = Field(description="The id of the AssignRequest this result answers.")
     reference: str = Field(description="The idempotency key echoed from the request.")
     assignation: Optional[str] = Field(default=None, description="The durable assignation id, or None when error is set.")
     created: bool = Field(default=True, description="False when an existing assignation was returned for a duplicate reference.")
     error: Optional[str] = Field(default=None, description="A human-readable error if the assign was rejected (e.g. missing can_assign_root).")
 
 
-class CallerControl(Message):
+class ControlRequest(Message):
     """Base for a caller's lifecycle-control request over the socket (cancel/interrupt/…).
 
     The WebSocket equivalent of the GraphQL postman lifecycle mutations: the caller that
     originated an assignation drives its lifecycle. The request is two-phase — it broadcasts a
-    ToAgent control message and is acked with a ``CallerControlResult``; the *outcome*
-    (CANCELLED/PAUSED/…) is observed via the ``Caller*`` mirror stream, not this ack.
+    ToAgent control message and is acked with a ``ControlResponse``; the *outcome*
+    (CANCELLED/PAUSED/…) is observed via the ``…Event`` mirror stream, not this ack.
     """
 
     assignation: str = Field(description="The assignation to control (must be owned by this caller).")
 
 
-class CallerCancel(CallerControl):
+class CancelRequest(ControlRequest):
     """Request a graceful cancel of an assignation."""
 
-    type: Literal[FromAgentMessageType.CALLER_CANCEL] = FromAgentMessageType.CALLER_CANCEL
+    type: Literal[FromAgentMessageType.CANCEL_REQUEST] = FromAgentMessageType.CANCEL_REQUEST
     auto_interrupt: Optional[float] = Field(
         default=None,
         description="Seconds. If the cancel is not confirmed within this window, auto-escalate to an interrupt. None disables escalation (the cancel stays pending until the agent confirms or the caller escalates manually).",
     )
 
 
-class CallerInterrupt(CallerControl):
+class InterruptRequest(ControlRequest):
     """Request a forceful interrupt (propagates to all children)."""
 
-    type: Literal[FromAgentMessageType.CALLER_INTERRUPT] = FromAgentMessageType.CALLER_INTERRUPT
+    type: Literal[FromAgentMessageType.INTERRUPT_REQUEST] = FromAgentMessageType.INTERRUPT_REQUEST
 
 
-class CallerPause(CallerControl):
+class PauseRequest(ControlRequest):
     """Request the agent to suspend the assignation."""
 
-    type: Literal[FromAgentMessageType.CALLER_PAUSE] = FromAgentMessageType.CALLER_PAUSE
+    type: Literal[FromAgentMessageType.PAUSE_REQUEST] = FromAgentMessageType.PAUSE_REQUEST
 
 
-class CallerResume(CallerControl):
+class ResumeRequest(ControlRequest):
     """Request the agent to resume a suspended assignation.
 
     ``step=True`` resumes only to the next breakpoint (the equivalent of the old step
     instruction); ``step=False`` runs on freely."""
 
-    type: Literal[FromAgentMessageType.CALLER_RESUME] = FromAgentMessageType.CALLER_RESUME
+    type: Literal[FromAgentMessageType.RESUME_REQUEST] = FromAgentMessageType.RESUME_REQUEST
     step: bool = False
 
 
-class CallerControlResult(Message):
+class ControlResponse(Message):
     """The backend's ack that a caller lifecycle-control *request* was accepted (or rejected).
 
     ``accepted`` is True once the request was persisted (an ``-ING`` event) and broadcast to the
     executing agent; False (with ``error``) when rejected — e.g. the assignation is not owned by
     this caller, is unknown, or is already terminal. The resolved outcome arrives later as a
-    ``Caller*`` mirror.
+    ``…Event`` mirror.
     """
 
-    type: Literal[ToAgentMessageType.CALLER_CONTROL_RESULT] = ToAgentMessageType.CALLER_CONTROL_RESULT
-    request: str = Field(description="The id of the CallerCancel/Interrupt/Pause/Resume this answers.")
+    type: Literal[ToAgentMessageType.CONTROL_RESPONSE] = ToAgentMessageType.CONTROL_RESPONSE
+    request: str = Field(description="The id of the CancelRequest/InterruptRequest/PauseRequest/ResumeRequest this answers.")
     assignation: Optional[str] = Field(default=None, description="The controlled assignation id.")
     accepted: bool = Field(description="True when the request was accepted (broadcast + -ING persisted); False when rejected.")
     error: Optional[str] = Field(default=None, description="A human-readable reason when the request was rejected.")
@@ -676,7 +676,7 @@ class CallerControlResult(Message):
 class EventAck(Message):
     """Backend → agent acknowledgement that a reported event was made durable.
 
-    The agent retains terminal reports (done/error/critical/cancelled) until it receives
+    The agent retains terminal reports (completed/failed/critical/cancelled) until it receives
     the matching ``EventAck`` and resends them on reconnect; this ack (persist-then-ack)
     is what makes that retain-and-resend safe. Correlates by the acked event's id.
     """
@@ -687,18 +687,18 @@ class EventAck(Message):
     seq: Optional[int] = Field(default=None, description="The stream sequence acknowledged, if the event carried one.")
 
 
-class CallerEvent(Message):
+class ExecutionEvent(Message):
     """Base for backend→caller assignation-event mirrors.
 
-    When a participant originates work (``CallerAssign``), each resulting assignation
-    event is streamed back to it over its own socket as one of the ``Caller*`` subclasses
+    When a participant originates work (``AssignRequest``), each resulting assignation
+    event is streamed back to it over its own socket as one of the ``…Event`` subclasses
     below — a minimal mirror of the persisted ``AssignationEvent``, so the caller never
     needs GraphQL to read results. Delivery is best-effort (the ``ass_caller_{caller_id}``
     channel-layer group); on a brief disconnect events are missed and the caller
     re-inquires on reconnect.
 
     Correlation: ``assignation`` is the key the caller already learned from
-    ``CallerAssignResult``. ``event`` is the originating ``AssignationEvent`` id (a stable
+    ``AssignResponse``. ``event`` is the originating ``AssignationEvent`` id (a stable
     dedup handle) and ``seq`` its monotonic PK (an ordering / gap-detection key).
     """
 
@@ -707,149 +707,149 @@ class CallerEvent(Message):
     seq: int = Field(description="The originating AssignationEvent's monotonic PK — ordering / gap-detection key.")
 
 
-class CallerBound(CallerEvent):
+class BoundEvent(ExecutionEvent):
     """The assignation was bound to an agent."""
 
-    type: Literal[ToAgentMessageType.CALLER_BOUND] = ToAgentMessageType.CALLER_BOUND
+    type: Literal[ToAgentMessageType.BOUND_EVENT] = ToAgentMessageType.BOUND_EVENT
 
 
-class CallerQueued(CallerEvent):
+class QueuedEvent(ExecutionEvent):
     """The assignation was queued."""
 
-    type: Literal[ToAgentMessageType.CALLER_QUEUED] = ToAgentMessageType.CALLER_QUEUED
+    type: Literal[ToAgentMessageType.QUEUED_EVENT] = ToAgentMessageType.QUEUED_EVENT
 
 
-class CallerAssigned(CallerEvent):
-    """The agent accepted the assignation."""
+class StartedEvent(ExecutionEvent):
+    """The agent accepted the assignation and began executing it."""
 
-    type: Literal[ToAgentMessageType.CALLER_ASSIGNED] = ToAgentMessageType.CALLER_ASSIGNED
+    type: Literal[ToAgentMessageType.STARTED_EVENT] = ToAgentMessageType.STARTED_EVENT
 
 
-class CallerProgress(CallerEvent):
+class ProgressEvent(ExecutionEvent):
     """The executing agent reported progress."""
 
-    type: Literal[ToAgentMessageType.CALLER_PROGRESS] = ToAgentMessageType.CALLER_PROGRESS
+    type: Literal[ToAgentMessageType.PROGRESS_EVENT] = ToAgentMessageType.PROGRESS_EVENT
     progress: Optional[int] = None
     message: Optional[str] = None
 
 
-class CallerDelegate(CallerEvent):
+class DelegateEvent(ExecutionEvent):
     """The assignation was delegated to another assignation."""
 
-    type: Literal[ToAgentMessageType.CALLER_DELEGATE] = ToAgentMessageType.CALLER_DELEGATE
+    type: Literal[ToAgentMessageType.DELEGATE_EVENT] = ToAgentMessageType.DELEGATE_EVENT
 
 
-class CallerDisconnected(CallerEvent):
+class DisconnectedEvent(ExecutionEvent):
     """The executing agent disconnected; the assignation's fate is (for now) unknown."""
 
-    type: Literal[ToAgentMessageType.CALLER_DISCONNECTED] = ToAgentMessageType.CALLER_DISCONNECTED
+    type: Literal[ToAgentMessageType.DISCONNECTED_EVENT] = ToAgentMessageType.DISCONNECTED_EVENT
     message: Optional[str] = None
 
 
-class CallerYield(CallerEvent):
+class YieldEvent(ExecutionEvent):
     """The executing agent yielded a result."""
 
-    type: Literal[ToAgentMessageType.CALLER_YIELD] = ToAgentMessageType.CALLER_YIELD
+    type: Literal[ToAgentMessageType.YIELD_EVENT] = ToAgentMessageType.YIELD_EVENT
     returns: Optional[Dict[str, Any]] = None
 
 
-class CallerDone(CallerEvent):
+class CompletedEvent(ExecutionEvent):
     """The assignation finished successfully."""
 
-    type: Literal[ToAgentMessageType.CALLER_DONE] = ToAgentMessageType.CALLER_DONE
+    type: Literal[ToAgentMessageType.COMPLETED_EVENT] = ToAgentMessageType.COMPLETED_EVENT
 
 
-class CallerLog(CallerEvent):
+class LogEvent(ExecutionEvent):
     """A log line from the executing agent."""
 
-    type: Literal[ToAgentMessageType.CALLER_LOG] = ToAgentMessageType.CALLER_LOG
+    type: Literal[ToAgentMessageType.LOG_EVENT] = ToAgentMessageType.LOG_EVENT
     message: Optional[str] = None
     level: LogLevelLiteral = "INFO"
 
 
-class CallerCanceling(CallerEvent):
+class CancellingEvent(ExecutionEvent):
     """The assignation is being cancelled."""
 
-    type: Literal[ToAgentMessageType.CALLER_CANCELING] = ToAgentMessageType.CALLER_CANCELING
+    type: Literal[ToAgentMessageType.CANCELLING_EVENT] = ToAgentMessageType.CANCELLING_EVENT
 
 
-class CallerCancelled(CallerEvent):
+class CancelledEvent(ExecutionEvent):
     """The assignation was cancelled."""
 
-    type: Literal[ToAgentMessageType.CALLER_CANCELLED] = ToAgentMessageType.CALLER_CANCELLED
+    type: Literal[ToAgentMessageType.CANCELLED_EVENT] = ToAgentMessageType.CANCELLED_EVENT
 
 
-class CallerInterrupting(CallerEvent):
+class InterruptingEvent(ExecutionEvent):
     """The assignation is being interrupted."""
 
-    type: Literal[ToAgentMessageType.CALLER_INTERRUPTING] = ToAgentMessageType.CALLER_INTERRUPTING
+    type: Literal[ToAgentMessageType.INTERRUPTING_EVENT] = ToAgentMessageType.INTERRUPTING_EVENT
 
 
-class CallerInterrupted(CallerEvent):
+class InterruptedEvent(ExecutionEvent):
     """The assignation was interrupted."""
 
-    type: Literal[ToAgentMessageType.CALLER_INTERRUPTED] = ToAgentMessageType.CALLER_INTERRUPTED
+    type: Literal[ToAgentMessageType.INTERRUPTED_EVENT] = ToAgentMessageType.INTERRUPTED_EVENT
 
 
-class CallerPausing(CallerEvent):
+class PausingEvent(ExecutionEvent):
     """The assignation is being paused."""
 
-    type: Literal[ToAgentMessageType.CALLER_PAUSING] = ToAgentMessageType.CALLER_PAUSING
+    type: Literal[ToAgentMessageType.PAUSING_EVENT] = ToAgentMessageType.PAUSING_EVENT
 
 
-class CallerPaused(CallerEvent):
+class PausedEvent(ExecutionEvent):
     """The assignation was paused (suspended)."""
 
-    type: Literal[ToAgentMessageType.CALLER_PAUSED] = ToAgentMessageType.CALLER_PAUSED
+    type: Literal[ToAgentMessageType.PAUSED_EVENT] = ToAgentMessageType.PAUSED_EVENT
 
 
-class CallerResuming(CallerEvent):
+class ResumingEvent(ExecutionEvent):
     """The assignation is being resumed."""
 
-    type: Literal[ToAgentMessageType.CALLER_RESUMING] = ToAgentMessageType.CALLER_RESUMING
+    type: Literal[ToAgentMessageType.RESUMING_EVENT] = ToAgentMessageType.RESUMING_EVENT
 
 
-class CallerResumed(CallerEvent):
+class ResumedEvent(ExecutionEvent):
     """The assignation was resumed (running again)."""
 
-    type: Literal[ToAgentMessageType.CALLER_RESUMED] = ToAgentMessageType.CALLER_RESUMED
+    type: Literal[ToAgentMessageType.RESUMED_EVENT] = ToAgentMessageType.RESUMED_EVENT
 
 
-class CallerError(CallerEvent):
+class FailedEvent(ExecutionEvent):
     """The assignation errored (potentially recoverable)."""
 
-    type: Literal[ToAgentMessageType.CALLER_ERROR] = ToAgentMessageType.CALLER_ERROR
+    type: Literal[ToAgentMessageType.FAILED_EVENT] = ToAgentMessageType.FAILED_EVENT
     error: Optional[str] = None
 
 
-class CallerCritical(CallerEvent):
+class CriticalEvent(ExecutionEvent):
     """The assignation hit an unrecoverable error."""
 
-    type: Literal[ToAgentMessageType.CALLER_CRITICAL] = ToAgentMessageType.CALLER_CRITICAL
+    type: Literal[ToAgentMessageType.CRITICAL_EVENT] = ToAgentMessageType.CRITICAL_EVENT
     error: Optional[str] = None
 
 
-# Every Caller* mirror, in AssignationEventKind order. Imported by ``facade.caller_events``.
-CallerEventMessage = Union[
-    CallerBound,
-    CallerQueued,
-    CallerAssigned,
-    CallerProgress,
-    CallerDelegate,
-    CallerDisconnected,
-    CallerYield,
-    CallerDone,
-    CallerLog,
-    CallerCanceling,
-    CallerCancelled,
-    CallerInterrupting,
-    CallerInterrupted,
-    CallerPausing,
-    CallerPaused,
-    CallerResuming,
-    CallerResumed,
-    CallerError,
-    CallerCritical,
+# Every backend→caller mirror, in AssignationEventKind order. Imported by ``facade.caller_events``.
+ExecutionEventMessage = Union[
+    BoundEvent,
+    QueuedEvent,
+    StartedEvent,
+    ProgressEvent,
+    DelegateEvent,
+    DisconnectedEvent,
+    YieldEvent,
+    CompletedEvent,
+    LogEvent,
+    CancellingEvent,
+    CancelledEvent,
+    InterruptingEvent,
+    InterruptedEvent,
+    PausingEvent,
+    PausedEvent,
+    ResumingEvent,
+    ResumedEvent,
+    FailedEvent,
+    CriticalEvent,
 ]
 
 
@@ -866,26 +866,26 @@ ToAgentMessage = Union[
     Bounce,
     Kick,
     EventAck,
-    CallerAssignResult,
-    CallerControlResult,
-    CallerBound,
-    CallerQueued,
-    CallerAssigned,
-    CallerProgress,
-    CallerDelegate,
-    CallerDisconnected,
-    CallerYield,
-    CallerDone,
-    CallerLog,
-    CallerCanceling,
-    CallerCancelled,
-    CallerInterrupting,
-    CallerInterrupted,
-    CallerPausing,
-    CallerPaused,
-    CallerResuming,
-    CallerResumed,
-    CallerError,
-    CallerCritical,
+    AssignResponse,
+    ControlResponse,
+    BoundEvent,
+    QueuedEvent,
+    StartedEvent,
+    ProgressEvent,
+    DelegateEvent,
+    DisconnectedEvent,
+    YieldEvent,
+    CompletedEvent,
+    LogEvent,
+    CancellingEvent,
+    CancelledEvent,
+    InterruptingEvent,
+    InterruptedEvent,
+    PausingEvent,
+    PausedEvent,
+    ResumingEvent,
+    ResumedEvent,
+    FailedEvent,
+    CriticalEvent,
 ]
-FromAgentMessage = Union[CriticalEvent, LogEvent, ProgressEvent, DoneEvent, ErrorEvent, YieldEvent, Register, HeartbeatEvent, ResumedEvent, PausedEvent, CancelledEvent, InterruptedEvent, StatePatchEvent, StateSnapshotEvent, LockEvent, UnlockEvent, SessionInitMessage, CallerAssign, CallerCancel, CallerInterrupt, CallerPause, CallerResume]
+FromAgentMessage = Union[Critical, Log, Progress, Started, Completed, Failed, Yield, Register, HeartbeatEvent, Resumed, Paused, Cancelled, Interrupted, StatePatch, StateSnapshot, Lock, Unlock, SessionInit, AssignRequest, CancelRequest, InterruptRequest, PauseRequest, ResumeRequest]

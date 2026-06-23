@@ -11,10 +11,10 @@ from facade.higher_order import project_returns
 from facade.messages import AgentMode
 
 _TERMINAL_KINDS = (
-    enums.AssignationEventKind.DONE,
+    enums.AssignationEventKind.COMPLETED,
     enums.AssignationEventKind.CANCELLED,
-    enums.AssignationEventKind.INTERUPTED,
-    enums.AssignationEventKind.ERROR,
+    enums.AssignationEventKind.INTERRUPTED,
+    enums.AssignationEventKind.FAILED,
     enums.AssignationEventKind.CRITICAL,
 )
 
@@ -185,7 +185,7 @@ class ModelPersistBackend:
     async def on_caller_assign(
         self,
         agent_id: int,
-        message: messages.CallerAssign,
+        message: messages.AssignRequest,
         can_assign_root: bool,
         connection_id: str | None = None,
         session_id: str | None = None,
@@ -204,7 +204,7 @@ class ModelPersistBackend:
     def _caller_assign_sync(
         self,
         agent_id: int,
-        message: messages.CallerAssign,
+        message: messages.AssignRequest,
         can_assign_root: bool,
         connection_id: str | None = None,
         session_id: str | None = None,
@@ -295,19 +295,19 @@ class ModelPersistBackend:
         }
         return ops[op]()
 
-    async def on_caller_cancel(self, agent_id: int, message: messages.CallerCancel, *, connection_id: str | None = None, session_id: str | None = None) -> models.Assignation:
+    async def on_caller_cancel(self, agent_id: int, message: messages.CancelRequest, *, connection_id: str | None = None, session_id: str | None = None) -> models.Assignation:
         ass = await database_sync_to_async(self._caller_control_sync)(agent_id, message.assignation, "cancel")
         if message.auto_interrupt is not None:
             self._auto_interrupt.schedule(message.assignation, float(message.auto_interrupt), lambda: self._escalate_to_interrupt(message.assignation))
         return ass
 
-    async def on_caller_interrupt(self, agent_id: int, message: messages.CallerInterrupt, *, connection_id: str | None = None, session_id: str | None = None) -> models.Assignation:
+    async def on_caller_interrupt(self, agent_id: int, message: messages.InterruptRequest, *, connection_id: str | None = None, session_id: str | None = None) -> models.Assignation:
         return await database_sync_to_async(self._caller_control_sync)(agent_id, message.assignation, "interrupt")
 
-    async def on_caller_pause(self, agent_id: int, message: messages.CallerPause, *, connection_id: str | None = None, session_id: str | None = None) -> models.Assignation:
+    async def on_caller_pause(self, agent_id: int, message: messages.PauseRequest, *, connection_id: str | None = None, session_id: str | None = None) -> models.Assignation:
         return await database_sync_to_async(self._caller_control_sync)(agent_id, message.assignation, "pause")
 
-    async def on_caller_resume(self, agent_id: int, message: messages.CallerResume, *, connection_id: str | None = None, session_id: str | None = None) -> models.Assignation:
+    async def on_caller_resume(self, agent_id: int, message: messages.ResumeRequest, *, connection_id: str | None = None, session_id: str | None = None) -> models.Assignation:
         return await database_sync_to_async(self._caller_control_sync)(agent_id, message.assignation, "resume", step=message.step)
 
     async def _escalate_to_interrupt(self, assignation_id: str) -> None:
@@ -329,7 +329,7 @@ class ModelPersistBackend:
     # ----------------------------------------------------------------------- #
     # Lifecycle confirmation handlers (the second phase)
     # ----------------------------------------------------------------------- #
-    async def on_agent_interrupted(self, agent_id: int, message: messages.InterruptedEvent) -> None:
+    async def on_agent_interrupted(self, agent_id: int, message: messages.Interrupted) -> None:
         self._progress_leases.cancel(message.assignation)
         self._auto_interrupt.cancel(message.assignation)
         try:
@@ -338,12 +338,12 @@ class ModelPersistBackend:
             return
         if x.is_done:
             return
-        await models.AssignationEvent.objects.acreate(assignation_id=message.assignation, kind=enums.AssignationEventKind.INTERUPTED)
+        await models.AssignationEvent.objects.acreate(assignation_id=message.assignation, kind=enums.AssignationEventKind.INTERRUPTED)
         x.is_done = True
         x.finished_at = timezone.now()
-        x.latest_event_kind = enums.AssignationEventKind.INTERUPTED
+        x.latest_event_kind = enums.AssignationEventKind.INTERRUPTED
         await x.asave(update_fields=["is_done", "finished_at", "latest_event_kind"])
-        await self._unfold_to_higher_order(message.assignation, enums.AssignationEventKind.INTERUPTED)
+        await self._unfold_to_higher_order(message.assignation, enums.AssignationEventKind.INTERRUPTED)
 
     async def _on_nonterminal_confirm(self, assignation_id: str, kind, *, cancel_lease: bool = False) -> None:
         """Persist a non-terminal lifecycle confirmation (paused/resumed)."""
@@ -359,12 +359,16 @@ class ModelPersistBackend:
         x.latest_event_kind = kind
         await x.asave(update_fields=["latest_event_kind"])
 
-    async def on_agent_paused(self, agent_id: int, message: messages.PausedEvent) -> None:
+    async def on_agent_paused(self, agent_id: int, message: messages.Paused) -> None:
         # A suspended op stops reporting progress — don't let the silent-physical-op lease reap it.
         await self._on_nonterminal_confirm(message.assignation, enums.AssignationEventKind.PAUSED, cancel_lease=True)
 
-    async def on_agent_resumed(self, agent_id: int, message: messages.ResumedEvent) -> None:
+    async def on_agent_resumed(self, agent_id: int, message: messages.Resumed) -> None:
         await self._on_nonterminal_confirm(message.assignation, enums.AssignationEventKind.RESUMED)
+
+    async def on_agent_started(self, agent_id: int, message: messages.Started) -> None:
+        # The agent accepted and began executing — record it (mirrored to the caller as StartedEvent).
+        await self._on_nonterminal_confirm(message.assignation, enums.AssignationEventKind.STARTED)
 
     async def on_caller_connected(self, agent_id: int, connection_id: str | None = None, session_id: str | None = None) -> None:
         """A participant that may originate work connected — reclaim its orphaned roots.
@@ -438,7 +442,7 @@ class ModelPersistBackend:
             async for child in models.Assignation.objects.filter(parent_id=ass.pk, is_done=False):
                 stack.append(child)
 
-    async def on_agent_log(self, agent_id: int, message: messages.LogEvent) -> None:
+    async def on_agent_log(self, agent_id: int, message: messages.Log) -> None:
         logging.info(f"Log Assignation {message}")
 
         await models.AssignationEvent.objects.acreate(
@@ -447,7 +451,7 @@ class ModelPersistBackend:
             message=message.message,
         )
 
-    async def on_agent_yield(self, agent_id: int, message: messages.YieldEvent) -> None:
+    async def on_agent_yield(self, agent_id: int, message: messages.Yield) -> None:
         logging.info(f"Yield Assignation {message}")
 
         await models.AssignationEvent.objects.acreate(
@@ -457,7 +461,7 @@ class ModelPersistBackend:
         )
         await self._unfold_to_higher_order(message.assignation, enums.AssignationEventKind.YIELD, returns=message.returns)
 
-    async def on_agent_done(self, agent_id: int, message: messages.DoneEvent) -> None:
+    async def on_agent_done(self, agent_id: int, message: messages.Completed) -> None:
         logging.info(f"Critical Assignation {message}")
 
         self._progress_leases.cancel(message.assignation)
@@ -468,16 +472,16 @@ class ModelPersistBackend:
 
         await models.AssignationEvent.objects.acreate(
             assignation_id=message.assignation,
-            kind=enums.AssignationEventKind.DONE,
+            kind=enums.AssignationEventKind.COMPLETED,
         )
 
         x.is_done = True
         x.finished_at = timezone.now()
-        x.latest_event_kind = enums.AssignationEventKind.DONE
+        x.latest_event_kind = enums.AssignationEventKind.COMPLETED
         await x.asave(update_fields=["is_done", "finished_at", "latest_event_kind"])
-        await self._unfold_to_higher_order(message.assignation, enums.AssignationEventKind.DONE)
+        await self._unfold_to_higher_order(message.assignation, enums.AssignationEventKind.COMPLETED)
 
-    async def on_agent_cancelled(self, agent_id: int, message: messages.CancelledEvent) -> None:
+    async def on_agent_cancelled(self, agent_id: int, message: messages.Cancelled) -> None:
         logging.info(f"Critical Assignation {message}")
 
         self._progress_leases.cancel(message.assignation)
@@ -497,7 +501,7 @@ class ModelPersistBackend:
         await x.asave(update_fields=["is_done", "finished_at", "latest_event_kind"])
         await self._unfold_to_higher_order(message.assignation, enums.AssignationEventKind.CANCELLED)
 
-    async def on_agent_error(self, agent_id: int, message: messages.ErrorEvent) -> None:
+    async def on_agent_error(self, agent_id: int, message: messages.Failed) -> None:
         logging.info(f"Critical Assignation {message}")
 
         self._progress_leases.cancel(message.assignation)
@@ -508,17 +512,17 @@ class ModelPersistBackend:
 
         await models.AssignationEvent.objects.acreate(
             assignation_id=message.assignation,
-            kind=enums.AssignationEventKind.ERROR,
+            kind=enums.AssignationEventKind.FAILED,
             message=message.error,
         )
 
         x.is_done = True
         x.finished_at = timezone.now()
-        x.latest_event_kind = enums.AssignationEventKind.ERROR
+        x.latest_event_kind = enums.AssignationEventKind.FAILED
         await x.asave(update_fields=["is_done", "finished_at", "latest_event_kind"])
-        await self._unfold_to_higher_order(message.assignation, enums.AssignationEventKind.ERROR, message=message.error)
+        await self._unfold_to_higher_order(message.assignation, enums.AssignationEventKind.FAILED, message=message.error)
 
-    async def on_agent_critical(self, agent_id: int, message: messages.CriticalEvent) -> None:
+    async def on_agent_critical(self, agent_id: int, message: messages.Critical) -> None:
         logging.info(f"Criticial Assignation {message}")
 
         self._progress_leases.cancel(message.assignation)
@@ -539,7 +543,7 @@ class ModelPersistBackend:
         await x.asave(update_fields=["is_done", "finished_at", "latest_event_kind"])
         await self._unfold_to_higher_order(message.assignation, enums.AssignationEventKind.CRITICAL, message=message.error)
 
-    async def on_agent_progress(self, agent_id: int, message: messages.ProgressEvent) -> None:
+    async def on_agent_progress(self, agent_id: int, message: messages.Progress) -> None:
         logging.info(f"Progress Assignation {message}")
 
         await models.AssignationEvent.objects.acreate(
@@ -575,7 +579,7 @@ class ModelPersistBackend:
         ass.latest_event_kind = enums.AssignationEventKind.CRITICAL
         await ass.asave(update_fields=["is_done", "finished_at", "latest_event_kind"])
 
-    async def on_agent_state_patch(self, agent_id: int, message: messages.StatePatchEvent) -> None:
+    async def on_agent_state_patch(self, agent_id: int, message: messages.StatePatch) -> None:
         logging.info(f"Log Patch for Assignation {message.state_name}")
 
         state = await models.State.objects.aget(agent_id=agent_id, interface=message.state_name)
@@ -593,7 +597,7 @@ class ModelPersistBackend:
             global_rev=message.global_rev,
         )
 
-    async def on_agent_state_snapshot(self, agent_id: int, message: messages.StateSnapshotEvent) -> None:
+    async def on_agent_state_snapshot(self, agent_id: int, message: messages.StateSnapshot) -> None:
         logging.info(f"Log Snapshot for Assignation {agent_id}")
 
         session, _ = await models.Session.objects.aget_or_create(agent_id=agent_id, session_id=message.session_id)
@@ -610,7 +614,7 @@ class ModelPersistBackend:
                 global_rev=message.global_rev,
             )
 
-    async def on_agent_session_init(self, agent_id: int, message: messages.SessionInitMessage) -> None:
+    async def on_agent_session_init(self, agent_id: int, message: messages.SessionInit) -> None:
         logging.info(f"Session init {message.session_id} with data {message}")
         # For now we don't do anything with this, but it could be used to initialize session-specific data
 

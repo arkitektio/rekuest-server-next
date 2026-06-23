@@ -162,17 +162,17 @@ class RedisControllBackend:
         return self._request_control(
             input.assignation,
             instruct_kind=enums.AssignationInstructKind.CANCEL,
-            inging_kind=enums.AssignationEventKind.CANCELING,
+            inging_kind=enums.AssignationEventKind.CANCELLING,
             to_agent_factory=lambda a: messages.Cancel(assignation=a),
         )
 
     def interrupt(self, input: inputs.InterruptInputModel) -> models.Assignation:
         # Forceful: propagates Interrupt to all still-running descendants. Still two-phase —
-        # each reaches INTERUPTED only on its agent's InterruptedEvent.
+        # each reaches INTERRUPTED only on its agent's Interrupted report.
         return self._request_control(
             input.assignation,
             instruct_kind=enums.AssignationInstructKind.INTERRUPT,
-            inging_kind=enums.AssignationEventKind.INTERUPTING,
+            inging_kind=enums.AssignationEventKind.INTERRUPTING,
             to_agent_factory=lambda a: messages.Interrupt(assignation=a),
             propagate_children=True,
         )
@@ -289,7 +289,7 @@ class RedisControllBackend:
             dependency_method=input.method,
             resolution=resolution,
             is_done=False,
-            latest_event_kind=enums.AssignationEventKind.ASSIGN,
+            latest_event_kind=enums.AssignationEventKind.STARTED,
             latest_instruct_kind=enums.AssignationInstructKind.ASSIGN,
             hooks=input.hooks or [],
             dependencies=dependency_dict,
@@ -372,7 +372,7 @@ class RedisControllBackend:
             capture=input.capture if input.capture is not None else False,
             implementation=higher,
             is_done=False,
-            latest_event_kind=enums.AssignationEventKind.ASSIGN,
+            latest_event_kind=enums.AssignationEventKind.STARTED,
             latest_instruct_kind=enums.AssignationInstructKind.ASSIGN,
             hooks=input.hooks or [],
             dependencies=higher_dependencies,
@@ -392,7 +392,7 @@ class RedisControllBackend:
             capture=False,
             implementation=lower_impl,
             is_done=False,
-            latest_event_kind=enums.AssignationEventKind.ASSIGN,
+            latest_event_kind=enums.AssignationEventKind.STARTED,
             latest_instruct_kind=enums.AssignationInstructKind.ASSIGN,
             dependencies=lower_dependencies,
             caller=caller,

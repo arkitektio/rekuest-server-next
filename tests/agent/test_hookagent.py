@@ -95,7 +95,7 @@ def test_caller_event_is_posted_to_webhook_caller(post_recorder):
 
     AssignationEvent.objects.create(assignation=ass, kind=enums.AssignationEventKind.PROGRESS, progress=42)
 
-    assert any(json.loads(c["content"]).get("type") == messages.ToAgentMessageType.CALLER_PROGRESS.value for c in post_recorder.calls)
+    assert any(json.loads(c["content"]).get("type") == messages.ToAgentMessageType.PROGRESS_EVENT.value for c in post_recorder.calls)
 
 
 # --------------------------------------------------------------------------- #
@@ -117,18 +117,18 @@ class TestHookIntake:
         agent = await build_webhook_agent("hook-in-ca", secret="sek")
         impl = await build_implementation_for_agent(agent.pk, "hook-in-ca")
 
-        msg = messages.CallerAssign(reference="hr-1", implementation=str(impl.pk), args={"x": 1})
+        msg = messages.AssignRequest(reference="hr-1", implementation=str(impl.pk), args={"x": 1})
         response = await hook_intake(_signed_request(agent, msg), str(agent.pk))
 
         assert response.status_code == 200
         data = json.loads(response.content)
-        assert data["type"] == messages.ToAgentMessageType.CALLER_ASSIGN_RESULT.value
+        assert data["type"] == messages.ToAgentMessageType.ASSIGN_RESPONSE.value
         assert data["reference"] == "hr-1" and data["created"] is True and data["assignation"]
         assert await Assignation.objects.filter(reference="hr-1").acount() == 1
 
     async def test_bad_signature_is_rejected(self, post_recorder):
         agent = await build_webhook_agent("hook-in-bad", secret="sek")
-        body = messages.DoneEvent(assignation="x").model_dump_json().encode("utf-8")
+        body = messages.Completed(assignation="x").model_dump_json().encode("utf-8")
         request = RequestFactory().post(
             f"/agi/http/{agent.pk}", data=body, content_type="application/json",
             **{f"HTTP_{hooks.SIGNATURE_HEADER.upper().replace('-', '_')}": "deadbeef"},
@@ -140,7 +140,7 @@ class TestHookIntake:
         agent = await build_webhook_agent("hook-in-done", secret="sek")
         ass = await build_assignation("hook-in-done-ass")
 
-        msg = messages.DoneEvent(assignation=str(ass.pk), seq=3)
+        msg = messages.Completed(assignation=str(ass.pk), seq=3)
         response = await hook_intake(_signed_request(agent, msg), str(agent.pk))
 
         assert response.status_code == 200

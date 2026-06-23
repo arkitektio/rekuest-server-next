@@ -1,7 +1,7 @@
 """Two-phase lifecycle controls over the socket: a caller drives cancel/interrupt/pause/
 resume on a *different* executor agent, and observes the outcome as Caller* mirrors.
 
-Each op is two-phase: the caller's request is acked (`CallerControlResult`), the executor
+Each op is two-phase: the caller's request is acked (`ControlResponse`), the executor
 receives the ToAgent control message and an `-ING` mirror reaches the caller; the resolved
 state arrives only when the executor sends the confirmation event (→ the `-ED` mirror).
 """
@@ -22,8 +22,8 @@ async def _assigned_pair(agent_ws, prefix):
     executor = await open_agent(agent_ws, f"{prefix}-exec", token=EXECUTOR_TOKEN)
     impl = await build_implementation_for_agent(executor.agent_pk, prefix)
     caller = await open_agent(agent_ws, f"{prefix}-caller")
-    await caller.send(messages.CallerAssign(reference=f"{prefix}-r", implementation=str(impl.pk), args={}))
-    await caller.receive(messages.CallerAssignResult)
+    await caller.send(messages.AssignRequest(reference=f"{prefix}-r", implementation=str(impl.pk), args={}))
+    await caller.receive(messages.AssignResponse)
     assign = await executor.receive(messages.Assign)
     return caller, executor, assign.assignation
 
@@ -34,13 +34,13 @@ class TestLifecycleRoundTrips:
     async def test_cancel_round_trip(self, agent_ws):
         caller, executor, ass_id = await _assigned_pair(agent_ws, "lc-cancel")
 
-        await caller.send(messages.CallerCancel(assignation=ass_id))
-        assert (await caller.receive(messages.CallerControlResult)).accepted is True
+        await caller.send(messages.CancelRequest(assignation=ass_id))
+        assert (await caller.receive(messages.ControlResponse)).accepted is True
         assert (await executor.receive(messages.Cancel)).assignation == ass_id  # request, not terminal
-        assert (await caller.receive(messages.CallerCanceling)).assignation == ass_id
+        assert (await caller.receive(messages.CancellingEvent)).assignation == ass_id
 
-        await executor.send(messages.CancelledEvent(assignation=ass_id))  # confirm → terminal
-        assert (await caller.receive(messages.CallerCancelled)).assignation == ass_id
+        await executor.send(messages.Cancelled(assignation=ass_id))  # confirm → terminal
+        assert (await caller.receive(messages.CancelledEvent)).assignation == ass_id
         refreshed = await Assignation.objects.aget(pk=ass_id)
         assert refreshed.is_done is True and refreshed.latest_event_kind == enums.AssignationEventKind.CANCELLED
         await caller.disconnect()
@@ -49,28 +49,28 @@ class TestLifecycleRoundTrips:
     async def test_interrupt_round_trip(self, agent_ws):
         caller, executor, ass_id = await _assigned_pair(agent_ws, "lc-int")
 
-        await caller.send(messages.CallerInterrupt(assignation=ass_id))
-        assert (await caller.receive(messages.CallerControlResult)).accepted is True
+        await caller.send(messages.InterruptRequest(assignation=ass_id))
+        assert (await caller.receive(messages.ControlResponse)).accepted is True
         assert (await executor.receive(messages.Interrupt)).assignation == ass_id
-        assert (await caller.receive(messages.CallerInterrupting)).assignation == ass_id
+        assert (await caller.receive(messages.InterruptingEvent)).assignation == ass_id
 
-        await executor.send(messages.InterruptedEvent(assignation=ass_id))
-        assert (await caller.receive(messages.CallerInterrupted)).assignation == ass_id
+        await executor.send(messages.Interrupted(assignation=ass_id))
+        assert (await caller.receive(messages.InterruptedEvent)).assignation == ass_id
         refreshed = await Assignation.objects.aget(pk=ass_id)
-        assert refreshed.is_done is True and refreshed.latest_event_kind == enums.AssignationEventKind.INTERUPTED
+        assert refreshed.is_done is True and refreshed.latest_event_kind == enums.AssignationEventKind.INTERRUPTED
         await caller.disconnect()
         await executor.disconnect()
 
     async def test_pause_round_trip_is_non_terminal(self, agent_ws):
         caller, executor, ass_id = await _assigned_pair(agent_ws, "lc-pause")
 
-        await caller.send(messages.CallerPause(assignation=ass_id))
-        assert (await caller.receive(messages.CallerControlResult)).accepted is True
+        await caller.send(messages.PauseRequest(assignation=ass_id))
+        assert (await caller.receive(messages.ControlResponse)).accepted is True
         assert (await executor.receive(messages.Pause)).assignation == ass_id
-        assert (await caller.receive(messages.CallerPausing)).assignation == ass_id
+        assert (await caller.receive(messages.PausingEvent)).assignation == ass_id
 
-        await executor.send(messages.PausedEvent(assignation=ass_id))
-        assert (await caller.receive(messages.CallerPaused)).assignation == ass_id
+        await executor.send(messages.Paused(assignation=ass_id))
+        assert (await caller.receive(messages.PausedEvent)).assignation == ass_id
         refreshed = await Assignation.objects.aget(pk=ass_id)
         assert refreshed.is_done is False and refreshed.latest_event_kind == enums.AssignationEventKind.PAUSED
         await caller.disconnect()
@@ -81,36 +81,36 @@ class TestLifecycleRoundTrips:
         # (and the old standalone Step message is gone).
         caller, executor, ass_id = await _assigned_pair(agent_ws, "lc-step")
 
-        await caller.send(messages.CallerResume(assignation=ass_id, step=True))
-        assert (await caller.receive(messages.CallerControlResult)).accepted is True
+        await caller.send(messages.ResumeRequest(assignation=ass_id, step=True))
+        assert (await caller.receive(messages.ControlResponse)).accepted is True
         resume = await executor.receive(messages.Resume)
         assert resume.assignation == ass_id and resume.step is True
-        assert (await caller.receive(messages.CallerResuming)).assignation == ass_id
+        assert (await caller.receive(messages.ResumingEvent)).assignation == ass_id
 
-        await executor.send(messages.ResumedEvent(assignation=ass_id))
-        assert (await caller.receive(messages.CallerResumed)).assignation == ass_id
+        await executor.send(messages.Resumed(assignation=ass_id))
+        assert (await caller.receive(messages.ResumedEvent)).assignation == ass_id
         await caller.disconnect()
         await executor.disconnect()
 
     async def test_pause_resume_done_sequence(self, agent_ws):
         caller, executor, ass_id = await _assigned_pair(agent_ws, "lc-prd")
 
-        await caller.send(messages.CallerPause(assignation=ass_id))
-        await caller.receive(messages.CallerControlResult)
+        await caller.send(messages.PauseRequest(assignation=ass_id))
+        await caller.receive(messages.ControlResponse)
         await executor.receive(messages.Pause)
-        await executor.send(messages.PausedEvent(assignation=ass_id))
-        assert (await caller.receive(messages.CallerPaused)).assignation == ass_id
+        await executor.send(messages.Paused(assignation=ass_id))
+        assert (await caller.receive(messages.PausedEvent)).assignation == ass_id
 
-        await caller.send(messages.CallerResume(assignation=ass_id))
-        await caller.receive(messages.CallerControlResult)
+        await caller.send(messages.ResumeRequest(assignation=ass_id))
+        await caller.receive(messages.ControlResponse)
         await executor.receive(messages.Resume)  # NOT Cancel (regression)
-        await executor.send(messages.ResumedEvent(assignation=ass_id))
-        assert (await caller.receive(messages.CallerResumed)).assignation == ass_id
+        await executor.send(messages.Resumed(assignation=ass_id))
+        assert (await caller.receive(messages.ResumedEvent)).assignation == ass_id
 
-        await executor.send(messages.DoneEvent(assignation=ass_id))
-        assert (await caller.receive(messages.CallerDone)).assignation == ass_id
+        await executor.send(messages.Completed(assignation=ass_id))
+        assert (await caller.receive(messages.CompletedEvent)).assignation == ass_id
         refreshed = await Assignation.objects.aget(pk=ass_id)
-        assert refreshed.is_done is True and refreshed.latest_event_kind == enums.AssignationEventKind.DONE
+        assert refreshed.is_done is True and refreshed.latest_event_kind == enums.AssignationEventKind.COMPLETED
         await caller.disconnect()
         await executor.disconnect()
 
@@ -122,12 +122,12 @@ class TestLifecycleFailures:
         caller = await open_agent(agent_ws, "lc-noown-caller")
         foreign = await build_assignation("lc-noown")  # caller = a different identity
 
-        await caller.send(messages.CallerCancel(assignation=str(foreign.pk)))
-        result = await caller.receive(messages.CallerControlResult)
+        await caller.send(messages.CancelRequest(assignation=str(foreign.pk)))
+        result = await caller.receive(messages.ControlResponse)
         assert result.accepted is False and result.error
         # socket stays open: a second op still gets a (nack) reply.
-        await caller.send(messages.CallerCancel(assignation="999999999"))
-        assert (await caller.receive(messages.CallerControlResult)).accepted is False
+        await caller.send(messages.CancelRequest(assignation="999999999"))
+        assert (await caller.receive(messages.ControlResponse)).accepted is False
         await caller.disconnect()
 
     async def test_confirmation_event_no_longer_closes_socket(self, agent_ws):
@@ -136,11 +136,11 @@ class TestLifecycleFailures:
         session = await open_agent(agent_ws, "lc-confirm")
         assignation = await build_assignation("lc-confirm-ass")
 
-        await session.send(messages.PausedEvent(assignation=str(assignation.pk)))
+        await session.send(messages.Paused(assignation=str(assignation.pk)))
         ack = await session.receive(messages.EventAck)
         assert ack.assignation == str(assignation.pk)
 
         # even for an unknown assignation: swallowed, still acked, socket open.
-        await session.send(messages.ResumedEvent(assignation="999999999"))
+        await session.send(messages.Resumed(assignation="999999999"))
         assert await session.receive(messages.EventAck)
         await session.disconnect()
