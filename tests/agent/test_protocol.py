@@ -11,8 +11,6 @@ be created over the socket. In normal operation the agent is created first via t
 that by pre-creating the agent against the exact identity the consumer derives from the token.
 """
 
-import uuid
-
 import pytest
 
 from facade import enums, messages
@@ -105,8 +103,8 @@ class TestAgentProtocol:
 
     async def test_valid_but_unhandled_message_closes_socket(self, agent_ws):
         # A well-formed FromAgentMessage with no handler hits the ``case _:`` branch in the
-        # router and closes 3003. (Lock/Unlock/Paused/Resumed/Stepped/Interrupted events are
-        # currently unhandled by the consumer.)
+        # router and closes 3003. A second Register (after the handshake) is such a message —
+        # registration only happens on the first frame.
         session = await open_agent(agent_ws, "unhandled-agent")
-        await session.send(messages.Lock(key="lock-1", task=str(uuid.uuid4())))
+        await session.send(messages.Register(token=TEST_TOKEN))
         await session.expect_close(FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE)

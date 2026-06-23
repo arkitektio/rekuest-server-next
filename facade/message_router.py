@@ -57,7 +57,7 @@ async def route_from_agent_message(
     """Dispatch a FromAgent message and return the optional reply.
 
     Raises :class:`UnknownAgentMessage` for messages it does not handle (e.g. a second
-    Register, Lock/Unlock) so the transport can close the socket / return a 4xx.
+    Register) so the transport can close the socket / return a 4xx.
     """
     match message:
         case messages.AssignRequest():
@@ -128,6 +128,15 @@ async def route_from_agent_message(
             return None
         case messages.SessionInit():
             await backend.on_agent_session_init(agent_id, message)
+            return None
+
+        # Distributed locks: acquire records the holding task, unlock clears it (advisory,
+        # fire-and-forget — there is no lock-grant message on the wire).
+        case messages.Lock():
+            await backend.on_agent_lock(agent_id, message)
+            return None
+        case messages.Unlock():
+            await backend.on_agent_unlock(agent_id, message)
             return None
         case _:
             raise UnknownAgentMessage(type(message).__name__)

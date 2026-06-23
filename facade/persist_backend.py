@@ -632,5 +632,23 @@ class ModelPersistBackend:
                 global_rev=0,
             )
 
+    async def on_agent_lock(self, agent_id: int, message: messages.Lock) -> None:
+        # Acquire: record that ``task`` holds lock ``key`` on this agent. Lock rows are
+        # normally pre-created at registration; aupdate_or_create tolerates a missing one.
+        # An unknown task is ignored (a stray lock must not tear down the transport, and
+        # setting a dangling FK would raise IntegrityError → socket close).
+        if not await models.Task.objects.filter(pk=message.task).aexists():
+            logging.warning(f"Lock {message.key} requested by unknown task {message.task} — ignored")
+            return
+        await models.Lock.objects.aupdate_or_create(
+            agent_id=agent_id,
+            key=message.key,
+            defaults={"hold_by_id": message.task},
+        )
+
+    async def on_agent_unlock(self, agent_id: int, message: messages.Unlock) -> None:
+        # Release: clear the holder (no-op if the lock is absent or already free).
+        await models.Lock.objects.filter(agent_id=agent_id, key=message.key).aupdate(hold_by=None)
+
 
 persist_backend = ModelPersistBackend()

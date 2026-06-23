@@ -369,7 +369,8 @@ class TestAgentProtocolUnit:
     async def test_unhandled_message_closes(self):
         protocol, sent, closed, _ = make_protocol()
         await protocol.receive(_register_frame())
-        await protocol.receive(messages.Lock(key="lock-1", task=str(uuid.uuid4())).model_dump_json())
+        # A second Register (after the handshake) has no router case → closes the socket.
+        await protocol.receive(_register_frame())
         assert FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE in closed
         await protocol.shutdown()
 
