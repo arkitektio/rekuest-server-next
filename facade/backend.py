@@ -189,6 +189,11 @@ class RedisControllBackend:
         ctx = CallerContext.coerce(principal)
         # TODO: Check if function is cached and was
 
+        # ``org`` is a required field on the Assign message — fail loudly here rather than
+        # crashing on ``None.slug`` further down (also covers the higher-order path).
+        if ctx.organization is None:
+            raise ValueError("Cannot assign without an organization")
+
         action = None
         implementation = None
         resolution = None
@@ -307,13 +312,13 @@ class RedisControllBackend:
                 task=str(task.pk),
                 args=input.args,
                 user=str(ctx.user.sub),
-                app=str(ctx.client.client_id),
-                org=str(ctx.organization.slug) if ctx.organization else None,
+                org=str(ctx.organization.slug),
                 reference=reference,
                 capture=input.capture if input.capture is not None else False,
                 resolution=str(resolution.pk) if resolution else None,
                 interface=implementation.interface,
                 action=str(implementation.action.hash),
+                implementation=str(implementation.pk),
                 token=token,
             ),
         )
@@ -340,6 +345,9 @@ class RedisControllBackend:
         A child task runs the resolved lower implementation; its yields/done are unfolded
         back onto the wrapper in ``persist_backend`` (see the higher-order return path).
         """
+        # Reached only via ``assign``, which already guarded that an organization exists.
+        assert ctx.organization is not None, "Cannot assign without an organization"
+
         config = higher.higher_order_config or {}
 
         # A higher-order implementation is bound to the agent that owns its lower
@@ -406,13 +414,13 @@ class RedisControllBackend:
                 task=str(lower_task.pk),
                 args=lower_args,
                 user=str(ctx.user.sub),
-                app=str(ctx.client.client_id),
-                org=str(ctx.organization.slug) if ctx.organization else None,
+                org=str(ctx.organization.slug),
                 reference=lower_task.reference,
                 capture=False,
                 resolution=None,
                 interface=lower_impl.interface,
                 action=str(lower_action.hash),
+                implementation=str(lower_impl.pk),
                 token=token,
             ),
         )

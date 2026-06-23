@@ -593,7 +593,7 @@ class ModelPersistBackend:
             op=message.op,
             path=message.path,
             value=message.value,
-            task_id=message.correlation_id,
+            task_id=message.task_id,
             global_rev=message.global_rev,
         )
 

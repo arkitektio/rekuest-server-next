@@ -19,7 +19,8 @@ class TestAgentDelivery:
 
         assign = messages.Assign(
             interface="iface", task=str(uuid.uuid4()),
-            args={"a": 1}, user="1", app="test-app", action="some-action",
+            args={"a": 1}, user="1", org="test-org", action="some-action",
+            implementation="impl-1",
         )
         # broadcast() lpushes to the agent's redis queue; listen_for_tasks relays it.
         await sync_to_async(AgentConsumer.broadcast)(session.agent_pk, assign)

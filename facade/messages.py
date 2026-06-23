@@ -185,23 +185,18 @@ class Assign(Message):
     )
     """ The parent s"""
     resolution: Optional[str] = Field(default=None, description="The resolution id this task has dependencies")
-    capture: bool = Field(default=False, description="Whether to run in debug mode")
+    capture: Optional[bool] = Field(default=None, description="Whether to run in debug mode, false by default")
     reference: Optional[str] = Field(default=None, description="A reference that the assinger provided")
     args: Dict[str, ShallowJSONSerializable] = Field(description="The arguments that was sendend")
     message: Optional[str] = None
     user: str = Field(..., description="The assinging user")
-    org: Optional[str] = Field(default=None, description="The org that the user currently belongs to")
-    app: str = Field(description="The assinging app")
-    action: str = Field(description="The action that triggered this task.")
+    org: str = Field(description="The org that the user currently belongs to")
+    action: str = Field(description="The action of this task")
+    implementation: str = Field(description="The implementation of this task (the id of the implementation)")
     token: Optional[str] = Field(
         default=None,
         description="An opaque, signed provenance token attesting who caused this task and with which inputs. The agent forwards it untouched to downstream services; it does not validate it. None when the implementation opts out of provenance (needs_token=False).",
     )
-
-    @property
-    def actor_id(self) -> str:
-        """The actor id is the id of the actor that will be used to run this task"""
-        return self.interface
 
 
 class Bounce(Message):
@@ -468,9 +463,9 @@ class StatePatch(Message):
     path: str
     value: Any
     old_value: Any | None = Field(description="The old value of the patch, which can be used for debugging and tracing purposes")
-    correlation_id: Optional[str] = Field(
+    task_id: Optional[str] = Field(
         default=None,
-        description="An optional correlation id to correlate this patch with a specific action or event in the agent's execution, which can be used for debugging and tracing purposes",
+        description="The optional task this patch is correlated with (the task being executed when the state changed), used for debugging and tracing. None when the change is not tied to a specific task.",
     )
 
 
