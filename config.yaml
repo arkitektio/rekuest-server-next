@@ -35,13 +35,6 @@ provenance:
 redis:
   host: redis
   port: 6379
-rabbitmq:
-  host: rabbitmq
-  password: guest
-  port: 5672
-  username: guest
-  v_host: ''
-
 authentikate:
   issuers:
   - kind: rsa
