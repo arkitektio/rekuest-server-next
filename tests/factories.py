@@ -25,6 +25,7 @@ from facade.models import (
     Action,
     Agent,
     Task,
+    TaskEvent,
     Caller,
     Implementation,
     State,
@@ -202,12 +203,16 @@ def _build_unimplemented_task_for_agent(agent_pk, prefix):
     )
 
 
-def _build_task_for_agent_caller(agent_pk, prefix):
+def _build_task_for_agent_caller(agent_pk, prefix, parent=None, root=None):
     """A task whose ``caller`` is the agent's own identity.
 
     Used by the caller-event return tests: because the task's caller matches the
     registered agent's caller (group ``task_caller_{caller_id}``), events on it are streamed
     back to that agent's socket as ``Caller*`` messages.
+
+    ``parent``/``root`` wire the task into a tree — pass ``parent=root_task, root=root_task``
+    for a direct child, or ``parent=child, root=root_task`` for a deeper descendant. Leaving
+    both ``None`` builds a root task (``root_id IS NULL``).
     """
     agent = Agent.objects.select_related("user", "client", "organization").get(pk=agent_pk)
     caller, _ = Caller.objects.get_or_create(client=agent.client, user=agent.user, organization=agent.organization)
@@ -235,8 +240,32 @@ def _build_task_for_agent_caller(agent_pk, prefix):
         action=action,
         agent=agent,
         implementation=implementation,
+        parent=parent,
+        root=root,
         latest_event_kind=enums.TaskEventKind.STARTED,
         latest_instruct_kind=enums.TaskInstructChoices.ASSIGN,
+    )
+
+
+def _touch_agent(agent_pk):
+    """Re-save an agent (an ``update`` fan-out on the ``agents`` feed)."""
+    agent = Agent.objects.get(pk=agent_pk)
+    agent.save()
+    return agent
+
+
+def _build_task_event(task_pk, kind=enums.TaskEventChoices.COMPLETED, message=None, progress=None, returns=None):
+    """Persist a ``TaskEvent`` on a task, firing the same ``post_save`` fan-out as real dispatch.
+
+    On a root task this drives a ``mytasks`` / ``tasks`` ``event`` over the change feeds.
+    """
+    task = Task.objects.get(pk=task_pk)
+    return TaskEvent.objects.create(
+        task=task,
+        kind=kind,
+        message=message,
+        progress=progress,
+        returns=returns,
     )
 
 
@@ -296,6 +325,8 @@ def _build_webhook_agent(prefix, secret="s3cr3t", hook_url="https://hook.example
 
 build_task = sync_to_async(_build_task)
 build_task_for_agent_caller = sync_to_async(_build_task_for_agent_caller)
+build_task_event = sync_to_async(_build_task_event)
+touch_agent = sync_to_async(_touch_agent)
 build_implementation_for_agent = sync_to_async(_build_implementation_for_agent)
 build_webhook_agent = sync_to_async(_build_webhook_agent)
 build_unimplemented_task_for_agent = sync_to_async(_build_unimplemented_task_for_agent)
