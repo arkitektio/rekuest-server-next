@@ -5,7 +5,7 @@ import logging
 DATABASES["default"] = {**DATABASES["default"], "NAME": "testdb", "PORT": 5555, "HOST": "localhost", "USER": "test", "PASSWORD": "test"}
 AUTHENTIKATE = {
     **AUTHENTIKATE,
-    "STATIC_TOKENS": {
+    "static_tokens": {
         "test": {"sub": "1", "client_id": "oinsoins", "app": "test-app"},
         # A second distinct identity (same default ``static_org``) for cross-agent tests —
         # agent 1 (token "test") assigns to agent 2 (token "test2").

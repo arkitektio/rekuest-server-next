@@ -1,11 +1,10 @@
 """Ed25519 signing key + JWKS document for the provenance issuer.
 
 The private key is loaded from ``settings.PROVENANCE`` (sourced from the
-``provenance`` block of config.yaml, mirroring how ``lok`` keys are provided).
-If no key is configured an ephemeral keypair is generated once per process and a
-warning is logged — this keeps dispatch and the local test-suite working out of
-the box, but is unsuitable for multi-replica production (replicas would each sign
-under a different key). Configure a static key in production.
+``provenance`` block of config.yaml, mirroring how ``lok`` keys are provided). A
+static key is **required**: if none is configured the facade refuses to start
+(an ephemeral keypair would sign tokens that fail to verify across process
+restarts or replicas, so it is never generated).
 """
 
 from __future__ import annotations
@@ -15,8 +14,8 @@ import threading
 from typing import Any, Dict
 
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ed25519
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from joserfc.jwk import OKPKey
 
 logger = logging.getLogger(__name__)
@@ -41,20 +40,6 @@ def issuer() -> str:
     return settings.PROVENANCE["ISSUER"]
 
 
-def _generate_ephemeral_pems() -> tuple[bytes, bytes]:
-    key = ed25519.Ed25519PrivateKey.generate()
-    private_pem = key.private_bytes(
-        serialization.Encoding.PEM,
-        serialization.PrivateFormat.PKCS8,
-        serialization.NoEncryption(),
-    )
-    public_pem = key.public_key().public_bytes(
-        serialization.Encoding.PEM,
-        serialization.PublicFormat.SubjectPublicKeyInfo,
-    )
-    return private_pem, public_pem
-
-
 def _load() -> None:
     """Populate the module-level signing/public keys (idempotent, thread-safe)."""
     global _signing_key, _public_key
@@ -70,12 +55,12 @@ def _load() -> None:
         public_pem = conf.get("PUBLIC_KEY")
 
         if not private_pem:
-            logger.warning(
-                "No provenance private key configured (settings.PROVENANCE['PRIVATE_KEY']); "
-                "generating an ephemeral Ed25519 keypair. Tokens will not verify across "
-                "process restarts or replicas — configure a static key for production."
+            raise ImproperlyConfigured(
+                "No provenance private key configured (settings.PROVENANCE['PRIVATE_KEY']). "
+                "Set the `provenance.private_key` field in config.yaml (or the "
+                "`PROVENANCE__PRIVATE_KEY` environment variable) — a static Ed25519 key is "
+                "required so tokens verify across process restarts and replicas."
             )
-            private_pem, public_pem = _generate_ephemeral_pems()
 
         kid = _kid()
         signing = OKPKey.import_key(private_pem, {"kid": kid})

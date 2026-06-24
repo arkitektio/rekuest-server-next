@@ -11,8 +11,6 @@ uv run python manage.py ensureadmin
 echo "=> Collecting Static.."
 uv run python manage.py collectstatic --noinput
 
-echo "=> Importing Schemas.."
-uv run python manage.py import_graphql 
 # Start the first process
 echo "=> Starting Server"
 uv run python manage.py runserver 0.0.0.0:80

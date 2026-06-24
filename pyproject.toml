@@ -7,7 +7,7 @@ requires-python = ">=3.12,<4"
 readme = "README.md"
 dependencies = [
     "django>=6.0.3", # Updated to latest stable for performance and security
-    "omegaconf>=2.3.0,<3",
+    "pydantic-settings[yaml]>=2.2",
     "psycopg[binary]>=3.3.3", # Updated to match your lock
     "daphne>=4.2.1,<5", # Better ASGI handling
     "channels-redis>=4.3.0,<5",
