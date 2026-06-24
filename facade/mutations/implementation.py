@@ -1,5 +1,3 @@
-import hashlib
-import json
 import logging
 
 import strawberry
@@ -17,27 +15,6 @@ from facade.provenance import audience as provenance_audience
 import typing as t
 
 logger = logging.getLogger(__name__)
-
-
-def hash_definition(definition: DefinitionInputModel) -> str:
-    hashable_definition = {
-        key: value
-        for key, value in dict(definition.model_dump()).items()
-        if key
-        in [
-            "name",
-            "description",
-            "args",
-            "returns",
-            "stateful",
-            "is_test_for",
-            "collections",
-            "dependencies",
-            "key",
-            "version",
-        ]
-    }
-    return hashlib.sha256(json.dumps(hashable_definition, sort_keys=True).encode()).hexdigest()
 
 
 def extract_structure_recursively(structures: list[str], definition: PortInputModel):
@@ -270,7 +247,7 @@ def rebuild_relational_ports(action: models.Action, definition: DefinitionInputM
 def _create_implementation(input: ImplementationInputModel, agent: models.Agent) -> models.Implementation:
     definition = input.definition
 
-    hash = hash_definition(definition)
+    hash = definition.unique_hash
     key = definition.key
     version = definition.version
     app = agent.app or models.Action.objects.get_or_create(identifier=input.definition.app, organization=agent.organization)[0]

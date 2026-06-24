@@ -1,3 +1,5 @@
+import hashlib
+import json
 from typing import Any, List, Optional
 from rekuest_core import enums
 from pydantic import BaseModel, Field, model_validator
@@ -283,6 +285,28 @@ class DefinitionInputModel(BaseModel):
                             raise ValueError(f"Effect {effect.function} in port {arg.key} has invalid dependency: {dep}")
 
         return self
+
+    @property
+    def unique_hash(self) -> str:
+        """Stable sha256 over the identity-bearing subset of the definition (stored as Action.hash)."""
+        hashable_definition = {
+            key: value
+            for key, value in dict(self.model_dump()).items()
+            if key
+            in [
+                "name",
+                "description",
+                "args",
+                "returns",
+                "stateful",
+                "is_test_for",
+                "collections",
+                "dependencies",
+                "key",
+                "version",
+            ]
+        }
+        return hashlib.sha256(json.dumps(hashable_definition, sort_keys=True).encode()).hexdigest()
 
 
 class DependencyInputModel(BaseModel):
