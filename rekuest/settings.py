@@ -108,7 +108,7 @@ AUTHENTIKATE = {
 
 # Provenance issuer section
 #
-# Rekuest mints a signed (EdDSA / Ed25519) provenance JWT at dispatch and publishes
+# Rekuest mints a signed (Ed25519) provenance JWT at dispatch and publishes
 # the verifying key at the JWKS endpoint (see ``rekuest/urls.py``). Loaded from the
 # ``provenance`` block of config.yaml; sensible defaults keep dispatch working even
 # when the block is absent (an ephemeral keypair is generated, see facade/provenance/keys.py).

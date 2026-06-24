@@ -29,7 +29,7 @@ different issuers, verified against different keys.
 | Question | may this request write? | who caused this, with what inputs? |
 | Role | authorization (a grant) | attestation (a record) |
 | Issuer | the identity provider (`lok`) | Rekuest itself |
-| Signature | RSA | EdDSA / Ed25519 |
+| Signature | RSA | Ed25519 |
 | Lifetime | short (until the request completes) | longer; revoked via `jti`, not tight `exp` |
 | Consumed by | Rekuest (to admit the request) | downstream stores (to record provenance) |
 
@@ -48,7 +48,7 @@ different issuers, verified against different keys.
 
 ## Conformance
 
-- JWS over **EdDSA (Ed25519)** — asymmetric, verifiable offline against the published JWKS.
+- JWS over **Ed25519** (RFC 9864 fully-specified `alg`, replacing the deprecated `EdDSA`) — asymmetric, verifiable offline against the published JWKS.
 - Follows RFC 9700 (OAuth 2.0 Security BCP) and RFC 8725 (JWT BCP): `alg` is pinned (never `none`),
   `exp` is always bound, `aud` is always present and always a **list** (never a wildcard), every JWS
   header carries a `kid`, and every token carries a unique `jti`.
@@ -192,7 +192,7 @@ reference no external structure gets an empty `aud` (present, per RFC 8725, but 
   never leaves Rekuest and is never sent to agents. If no key is configured an ephemeral keypair is
   generated per process (fine for local/dev and the test suite; **unsuitable for multi-replica
   production**, where replicas would each sign under a different key — configure a static key there).
-- Tokens are signed with `alg=EdDSA` and the configured `kid` in the JWS header.
+- Tokens are signed with `alg=Ed25519` and the configured `kid` in the JWS header.
 - The verifying key is published at **`/.well-known/jwks.json`** as a standard JWKS document, served
   with a `Cache-Control: public` header so verifiers fetch-and-cache and verify **offline** — never a
   synchronous per-use callback into Rekuest.

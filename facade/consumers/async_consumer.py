@@ -77,11 +77,12 @@ class AgentConsumer(AsyncWebsocketConsumer):
     async def channel_TaskEventCreatedEvent(self, event: dict) -> None:
         """Forward a caller-bound task event to this socket as a ``…Event`` mirror.
 
-        Producer side: ``facade/signals.py`` broadcasts ``TaskEventCreatedEvent`` to
-        ``task_caller_{caller_id}`` on every Task/TaskEvent save (the same group
-        the GraphQL subscription consumes). We only forward the ``event`` branch — the
-        ``create`` branch is covered authoritatively by ``AssignResponse``, so forwarding
-        it too would race the ack. Best-effort: a brief disconnect simply misses events.
+        Producer side: ``facade/transport.py`` broadcasts ``TaskEventCreatedEvent`` to
+        ``task_caller_{caller_id}`` on every TaskEvent save (this WS forward consumes every
+        caller event, root and child; the slim GraphQL change feeds consume the separate
+        ``root_tasks_*`` topics). We only forward the ``event`` branch — the ``create`` branch
+        is covered authoritatively by ``AssignResponse``, so forwarding it too would race the
+        ack. Best-effort: a brief disconnect simply misses events.
         """
         protocol = getattr(self, "protocol", None)
         if protocol is None or protocol.session is None:

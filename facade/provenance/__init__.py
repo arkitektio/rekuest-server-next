@@ -1,7 +1,7 @@
 """Provenance token issuing.
 
-Rekuest is the *provenance authority*: at dispatch it mints a signed (EdDSA /
-Ed25519) JWT attesting who caused an assignment and with which inputs, and
+Rekuest is the *provenance authority*: at dispatch it mints a signed (Ed25519)
+JWT attesting who caused an assignment and with which inputs, and
 publishes the verifying key at a JWKS endpoint. This is an attestation meant to
 be recorded downstream (e.g. by Mikro/koherent), never an authorization grant —
 it is orthogonal to the auth JWT that gates writes.

@@ -50,23 +50,25 @@ def agent_post_delete(sender, instance: models.Agent = None, **kwargs):
 
 @receiver(post_save, sender=models.Task)
 def task_post_save(sender, instance: models.Task = None, created=None, **kwargs):
-    if created and instance.caller_id:
+    # Root-task change feed: a freshly created root task is fanned out to both the caller's
+    # feed (mytasks) and the org-wide feed (tasks). Child tasks never reach these feeds.
+    if created and instance.root_id is None and instance.caller_id:
         channels.task_event_channel.broadcast(
             channel_events.TaskEventCreatedEvent(create=str(instance.id)),
-            [f"task_caller_{instance.caller_id}"],
+            [
+                f"root_tasks_caller_{instance.caller_id}",
+                f"root_tasks_org_{instance.caller.organization_id}",
+            ],
         )
 
-    if instance.parent:
-        if created:
-            channels.child_task_channel.broadcast(
-                channel_events.ChildTaskEvent(create=str(instance.id)),
-                [f"child_tasks_{instance.parent.id}"],
-            )
-        else:
-            channels.child_task_channel.broadcast(
-                channel_events.ChildTaskEvent(update=str(instance.id)),
-                [f"child_tasks_{instance.parent.id}"],
-            )
+    # Detail feed: notify the direct parent AND the root, so a subscription on the root task
+    # sees the whole subtree while an intermediate task still sees its direct children.
+    if instance.parent_id:
+        topics = {f"child_tasks_{instance.parent_id}"}
+        if instance.root_id:
+            topics.add(f"child_tasks_{instance.root_id}")
+        event = channel_events.ChildTaskEvent(create=str(instance.id)) if created else channel_events.ChildTaskEvent(update=str(instance.id))
+        channels.child_task_channel.broadcast(event, list(topics))
 
 
 @receiver(post_save, sender=models.TaskEvent)

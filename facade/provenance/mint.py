@@ -1,6 +1,6 @@
 """Mint a signed provenance JWT for an assignment at dispatch.
 
-Claim contract (one token per assignment, signed EdDSA / Ed25519). Standard
+Claim contract (one token per assignment, signed Ed25519). Standard
 RFC-registered claims keep their canonical names for interoperability; Rekuest's
 own claims use compact three-letter symbols (see docs/design/provenance.md for
 the full vocabulary):

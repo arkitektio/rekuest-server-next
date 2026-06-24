@@ -37,10 +37,18 @@ def publish_task_event(event: models.TaskEvent) -> None:
     caller_id = task.caller_id
     if not caller_id:
         return
-    # Live WS forward + GraphQL subscription consume this channel-layer broadcast.
+    # The live WS forward (agent socket) consumes every caller event, root and child alike, on
+    # ``task_caller_{caller_id}``. Root-task events additionally feed the slim GraphQL change
+    # feeds (mytasks / tasks), which fan out to both the caller's feed and the org-wide feed.
+    topics = [f"task_caller_{caller_id}"]
+    if task.root_id is None:
+        topics += [
+            f"root_tasks_caller_{caller_id}",
+            f"root_tasks_org_{task.caller.organization_id}",
+        ]
     channels.task_event_channel.broadcast(
         channel_events.TaskEventCreatedEvent(event=event.id),  # pyright: ignore[reportCallIssue]  # pydantic Field(None) default
-        [f"task_caller_{caller_id}"],
+        topics,
     )
     _deliver_caller_event_to_webhook(event, task)
 

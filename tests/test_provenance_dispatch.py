@@ -67,7 +67,7 @@ class TestProvenanceDispatch:
         assert received["token"] is not None
 
         decoded = _decode(received["token"])
-        assert decoded.header["alg"] == "EdDSA"
+        assert decoded.header["alg"] == "Ed25519"
         claims = decoded.claims
         assert claims["tsk"] == str(task.pk)
         assert claims["rtk"] == str(task.pk)

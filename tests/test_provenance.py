@@ -116,7 +116,7 @@ def test_jwks_document_publishes_signing_key() -> None:
     assert jwk["kty"] == "OKP"
     assert jwk["crv"] == "Ed25519"
     assert jwk["kid"] == settings.PROVENANCE["KID"]
-    assert jwk["alg"] == "EdDSA"
+    assert jwk["alg"] == "Ed25519"
     assert jwk["use"] == "sig"
     # The published key is public only — no private component.
     assert "d" not in jwk
@@ -184,8 +184,8 @@ def test_top_level_claims(lenient: None) -> None:
     token = mint.mint_token_for_task(task, info)
     decoded = _decode(token)
 
-    # Header: pinned EdDSA, kid present.
-    assert decoded.header["alg"] == "EdDSA"
+    # Header: pinned Ed25519, kid present.
+    assert decoded.header["alg"] == "Ed25519"
     assert decoded.header["kid"] == settings.PROVENANCE["KID"]
 
     claims = decoded.claims

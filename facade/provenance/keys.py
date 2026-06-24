@@ -21,9 +21,10 @@ from joserfc.jwk import OKPKey
 
 logger = logging.getLogger(__name__)
 
-# RFC 8037 algorithm identifier for Ed25519 JWS. joserfc treats it as
-# non-default, so it must be passed explicitly wherever we sign/verify.
-ALGORITHM = "EdDSA"
+# RFC 9864 fully-specified algorithm identifier for Ed25519 JWS. This replaces
+# the now-deprecated generic "EdDSA" identifier (RFC 8037), which joserfc flags
+# with a SecurityWarning. It must be passed explicitly wherever we sign/verify.
+ALGORITHM = "Ed25519"
 ALGORITHMS = [ALGORITHM]
 
 _lock = threading.Lock()

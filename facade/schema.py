@@ -256,8 +256,8 @@ class Mutation:
 @strawberry.type(description="Root subscription type for real-time event streams from the system.")
 class Subscription:
     new_actions = subscription(resolver=subscriptions.new_actions, description="Subscribe to notifications when new actions are created.")
-    tasks = subscription(resolver=subscriptions.tasks, description="Subscribe to updates on tasks.")
-    task_events = subscription(resolver=subscriptions.task_events, description="Subscribe to events related to tasks.")
+    mytasks = subscription(resolver=subscriptions.mytasks, description="Subscribe to root tasks created by this client (caller-scoped).")
+    tasks = subscription(resolver=subscriptions.tasks, description="Subscribe to root task changes across the whole organization.")
     agents = subscription(resolver=subscriptions.agents, description="Subscribe to updates on agent connections and statuses.")
     implementation_change = subscription(resolver=subscriptions.implementation_change, description="Subscribe to changes in implementations.")
     implementations = subscription(resolver=subscriptions.implementations, description="Subscribe to creation or updates of implementations.")
@@ -265,7 +265,7 @@ class Subscription:
     latest_patches = subscription(resolver=subscriptions.latest_patches, description="Subscribe to latest patches for specific agents or states.")
     watch_state = subscription(resolver=subscriptions.watch_state, description="Watch a state: yields the current snapshot then streams patches.")
     watch_agent = subscription(resolver=subscriptions.watch_agent, description="Watch an agent: yields snapshots for all states then streams patches.")
-    child_tasks = subscription(resolver=subscriptions.child_tasks, description="Subscribe to child task events.")
+    child_tasks = subscription(resolver=subscriptions.child_tasks, description="Subscribe to all descendant task changes of a task.")
 
 
 schema = kante.Schema(
