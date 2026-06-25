@@ -1,173 +1,264 @@
 from datetime import datetime, timedelta, timezone
 import uuid
 from random import choice
-from typing import Protocol
+from typing import Dict, List, Any
+
+from django.db.models import Q
 
 from facade import enums, inputs, models, types, messages
+from facade.caller_context import CallerContext
 from facade.consumers.async_consumer import AgentConsumer
+from facade.higher_order import build_lower_args, build_lower_dependencies
+from facade.provenance import mint_token_for_task
 from kante.types import Info
-from authentikate.vars import get_user, get_client
 import logging
 
 
-class ControllBackend(Protocol):
-    def create_message_id(self) -> str: ...
+def agent_available_q(prefix: str = "agent") -> Q:
+    """Q matching an agent that can receive work: a live WEBSOCKET, OR any WEBHOOK HookAgent.
 
-    def interrupt(self, info: Info, input: inputs.InterruptInputModel) -> types.Assignation: ...
-
-    def reserve(self, info: Info, input: inputs.ReserveInputModel) -> types.Reservation: ...
-
-    def cancel(self, info: Info, input: inputs.CancelInputModel) -> types.Assignation: ...
-
-    def assign(self, info: Info, input: inputs.AssignInputModel) -> types.Assignation: ...
-
-    def resume(self, info: Info, input: inputs.ResumeInputModel) -> types.Assignation: ...
-
-    def pause(self, info: Info, input: inputs.PauseInputModel) -> types.Assignation: ...
+    HookAgents never set ``connected``/``last_seen`` (no socket), so they would otherwise be
+    invisible to action/dependency resolution — this predicate makes them selectable.
+    """
+    recent = datetime.now(timezone.utc) - timedelta(minutes=1)
+    p = f"{prefix}__" if prefix else ""
+    return Q(**{f"{p}kind": enums.AgentKind.WEBHOOK.value}) | Q(**{f"{p}connected": True, f"{p}last_seen__gt": recent})
 
 
-def get_waiter_for_context(info: Info, instance_id: str) -> None:
-    # TODO: HASH THIS FOR EASIER RETRIEVAL
-
-    registry, _ = models.Registry.objects.get_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
-
-    waiter, _ = models.Waiter.objects.get_or_create(registry=registry, instance_id=instance_id, defaults=dict(name="default"))
-    return waiter
+def agent_is_available(agent: models.Agent) -> bool:
+    """Whether a concrete agent can receive work (a live websocket or a webhook agent)."""
+    if agent.kind == enums.AgentKind.WEBHOOK.value:
+        return True
+    return bool(agent.connected and agent.last_seen and agent.last_seen > datetime.now(timezone.utc) - timedelta(minutes=1))
 
 
-class RedisControllBackend(ControllBackend):
+def build_agent_dependency_dict(agent: models.Agent, dep: models.Dependency) -> Dict[str, Any]:
+    implementations: Dict[str, str] = {}
+
+    for action in dep.get_action_demands():
+        try:
+            implementation = models.Implementation.objects.get(action__key=action.key, agent=agent)
+        except models.Implementation.DoesNotExist:
+            raise ValueError(f"No implementation found for dependency demand {action} on agent {agent}")
+
+        if implementation.dependencies.exists():
+            raise NotImplementedError("Nested dependencies are not supported yet, but they are coming soon!")
+
+        implementations[action.key] = {"implementation": str(implementation.pk), "dependencies": {}}
+
+    return {
+        "agent": str(agent.pk),
+        "actions": implementations,
+    }
+
+
+def build_dependency_dict(implementation: models.Implementation, ctx: CallerContext, dependency_overwrites: List[inputs.ResolvedDependencyInputModel]) -> Dict[str, str]:
+    dependencies = models.Dependency.objects.filter(implementation=implementation).all()
+
+    dep_kwargs = {}
+
+    for dep in dependencies:
+        provided = dep.key in [overwrite.key for overwrite in dependency_overwrites]
+        if provided:
+            overwrite = next(overwrite for overwrite in dependency_overwrites if overwrite.key == dep.key)
+
+            if overwrite.auto_resolve:
+                if not dep.auto_resolvable:
+                    raise ValueError(f"Dependency {dep.key} is not auto resolvable, but was provided with an overwrite that has auto_resolve set to true. Please either set auto_resolve to false for this dependency overwrite, or make the dependency auto resolvable in the system.")
+
+                agents = models.Agent.objects.filter(app__identifier=dep.app_filter, organization=ctx.organization).filter(agent_available_q("")).all()
+                if dep.max_viable_instances is not None:
+                    agents = agents[: dep.max_viable_instances]
+                if dep.min_viable_instances is not None and len(agents) < dep.min_viable_instances:
+                    raise ValueError(f"Not enough agents found for dependency {dep.key}. Required at least {dep.min_viable_instances} but found only {len(agents)}. Please ensure that there are enough agents available to resolve this dependency.")
+
+            else:
+                agents = models.Agent.objects.filter(pk__in=[agent_id.agent for agent_id in overwrite.mapped_agents]).filter(agent_available_q("")).all()
+                if dep.max_viable_instances is not None:
+                    agents = agents[: dep.max_viable_instances]
+                if dep.min_viable_instances is not None and len(agents) < dep.min_viable_instances:
+                    raise ValueError(f"Not enough agents found for dependency {dep.key}. Required at least {dep.min_viable_instances} but found only {len(agents)}. Please ensure that there are enough agents available to resolve this dependency.")
+
+            dep_kwargs[dep.key] = [build_agent_dependency_dict(agent, dep) for agent in agents]
+            continue
+        else:
+            if dep.auto_resolvable:
+                agents = models.Agent.objects.filter(app__identifier=dep.app_filter, organization=ctx.organization).filter(agent_available_q("")).all()
+                if dep.max_viable_instances is not None:
+                    agents = agents[: dep.max_viable_instances]
+                if dep.min_viable_instances is not None and len(agents) < dep.min_viable_instances:
+                    raise ValueError(f"Not enough agents found for dependency {dep.key}. Required at least {dep.min_viable_instances} but found only {len(agents)}. Please ensure that there are enough agents available to resolve this dependency.")
+                dep_kwargs[dep.key] = [build_agent_dependency_dict(agent, dep) for agent in agents]
+            else:
+                raise ValueError(f"Dependency {dep.key} was not provided with an overwrite, and is not auto resolvable. Please provide a dependency overwrite for this dependency to ensure it can be resolved properly.")
+
+    return dep_kwargs
+
+
+def get_caller_for_context(ctx: CallerContext) -> models.Caller:
+    caller, _ = models.Caller.objects.get_or_create(client=ctx.client, user=ctx.user, organization=ctx.organization)
+    return caller
+
+
+# TODO: Implement this for nested structures and interfaces as well
+def acted_on_from_args(args: dict, action: models.Action) -> list[str]:
+    acted_on = []
+    for port in action.args:
+        if port["kind"] == "STRUCTURE":
+            identifier = port.get("identifier")
+            key = port.get("key")
+
+            if identifier and key in args:
+                if isinstance(args[key], dict):
+                    acted_on.append(f"{identifier}:{args[key].get('object')}")
+                if isinstance(args[key], str):
+                    acted_on.append(f"{identifier}:{args[key]}")
+
+    return acted_on
+
+
+class RedisControllBackend:
+    """The postman backend: resolves + persists tasks, then notifies via transport."""
+
     def create_message_id(self) -> str:
         return str(uuid.uuid4())
 
-    def interrupt(self, input: inputs.InterruptInputModel) -> models.Assignation:
-        parent = models.Assignation.objects.get(id=input.assignation)
-        parent.status = enums.AssignationEventKind.INTERUPTED
-        parent.save()
+    def _request_control(
+        self,
+        task_id,
+        *,
+        instruct_kind,
+        inging_kind,
+        to_agent_factory,
+        propagate_children: bool = False,
+    ) -> models.Task:
+        """The shared request phase of a two-phase lifecycle op.
 
-        AgentConsumer.broadcast(
-            parent.implementation.agent.id,
-            messages.Interrupt(
-                assignation=parent.id,
-            ),
+        Sets ``latest_instruct_kind``, persists the ``-ING`` event (which fans out the matching
+        ``Caller*ing`` mirror to the caller), and broadcasts the ToAgent control message — for
+        the target, and (when ``propagate_children``) for every still-running descendant. The
+        op resolves only when the executing agent sends the matching confirmation event. Raises
+        if the task is already terminal.
+        """
+        task = models.Task.objects.select_related("agent").get(id=task_id)
+        if task.is_done:
+            raise ValueError("Task is already terminal")
+
+        targets = [task]
+        if propagate_children:
+            targets += list(models.Task.objects.filter(root_id=task.id, is_done=False))
+
+        for target in targets:
+            target.latest_instruct_kind = instruct_kind
+            target.save(update_fields=["latest_instruct_kind"])
+            models.TaskEvent.objects.create(task=target, kind=inging_kind)
+            AgentConsumer.broadcast(target.agent_id, to_agent_factory(str(target.pk)))
+
+        return task
+
+    def cancel(self, input: inputs.CancelInputModel) -> models.Task:
+        # Two-phase: CANCELING now; CANCELLED + is_done only when the agent confirms with
+        # CancelledEvent. Sent to the mother only (the actor winds down its own children).
+        return self._request_control(
+            input.task,
+            instruct_kind=enums.TaskInstructKind.CANCEL,
+            inging_kind=enums.TaskEventKind.CANCELLING,
+            to_agent_factory=lambda a: messages.Cancel(task=a),
         )
 
-        children = models.Assignation.objects.filter(parent_id=input.assignation).all()
-
-        for child in children:
-            child.status = enums.AssignationEventKind.INTERUPTED
-            child.save()
-
-            AgentConsumer.broadcast(
-                child.implementation.agent.id,
-                messages.Interrupt(
-                    assignation=child.id,
-                ),
-            )
-
-        return parent
-
-    def reserve(self, info: Info, input: inputs.ReserveInputModel) -> models.Reservation:
-        if input.action is None and input.implementation is None:
-            raise ValueError("Either action or implementation must be provided")
-
-        if input.implementation:
-            # We provided a implementation and are creating a reservation with just that
-            # implementation
-            implementation = models.Implementation.objects.get(id=input.implementation)
-            action = implementation.action
-            implementations = [implementation]
-        if input.action:
-            # We provided a action and are creating a reservation with all implementations
-            # for that action at this time
-            action = models.Action.objects.get(id=input.action)
-            implementations = models.Implementation.objects.filter(action=action).all()
-            if len(implementations) == 0:
-                raise ValueError("No implementations found for this action. Cannot reserve.")
-
-        waiter = get_waiter_for_context(info, input.instance_id)
-
-        res, created = models.Reservation.objects.update_or_create(
-            reference=input.reference,
-            waiter=waiter,
-            defaults=dict(
-                title=input.title,
-                binds=input.binds.dict() if input.binds else None,
-                causing_assignation_id=input.assignation_id,
-                action=action,
-                strategy=enums.ReservationStrategy.ROUND_ROBIN,
-            ),
+    def interrupt(self, input: inputs.InterruptInputModel) -> models.Task:
+        # Forceful: propagates Interrupt to all still-running descendants. Still two-phase —
+        # each reaches INTERRUPTED only on its agent's Interrupted report.
+        return self._request_control(
+            input.task,
+            instruct_kind=enums.TaskInstructKind.INTERRUPT,
+            inging_kind=enums.TaskEventKind.INTERRUPTING,
+            to_agent_factory=lambda a: messages.Interrupt(task=a),
+            propagate_children=True,
         )
 
-        # TODO: Find really the best fitting provision
-
-        res.implementations.set(implementations)
-
-        # TODO: Cache the reservation in the redis cache and make it available for the assignation
-
-        return res
-
-    def cancel(self, input: inputs.CancelInputModel) -> models.Assignation:
-        assignation = models.Assignation.objects.get(id=input.assignation)
-        assignation.latest_event_kind = enums.AssignationStatus.CANCELLED
-        assignation.save()
-
-        AgentConsumer.broadcast(
-            assignation.agent.id,
-            message=messages.Cancel(
-                assignation=str(assignation.id),
-            ),
+    def pause(self, input: inputs.PauseInputModel) -> models.Task:
+        return self._request_control(
+            input.task,
+            instruct_kind=enums.TaskInstructKind.PAUSE,
+            inging_kind=enums.TaskEventKind.PAUSING,
+            to_agent_factory=lambda a: messages.Pause(task=a),
         )
-        return assignation
 
-    def assign(self, info: Info, input: inputs.AssignInputModel) -> models.Assignation:
+    def assign(self, principal: "CallerContext | Any", input: inputs.AssignInputModel) -> models.Task:
+        ctx = CallerContext.coerce(principal)
         # TODO: Check if function is cached and was
 
-        reservation = None
+        # ``org`` is a required field on the Assign message — fail loudly here rather than
+        # crashing on ``None.slug`` further down (also covers the higher-order path).
+        if ctx.organization is None:
+            raise ValueError("Cannot assign without an organization")
+
         action = None
         implementation = None
+        resolution = None
         agent = None
+        dependency_dict = None
 
-        waiter = get_waiter_for_context(info, input.instance_id)
+        caller = get_caller_for_context(ctx)
 
-        if input.reservation:
-            # TODO: Retrieve the reservation in the redis cache wth the provision keys set
-            # this should be done in the redis cache to allow for super fast retrieval,
-            # especially when using the ephemeral flag
-            reservation = models.Reservation.objects.prefetch_related("provisions").get(id=input.reservation)
-            action = reservation.action
-            implementation = choice(reservation.implementations.all())
-            if not implementation:
-                raise ValueError("No implementation matchable for this reservation")
+        if input.dependency:
+            assert input.method, "Method key must be provided when assigning to a dependency"
+            assert input.parent, "Dependency assignments must have a parent task"
+
+            parent = models.Task.objects.get(id=input.parent)
+            dependencies = parent.dependencies
+
+            if input.dependency not in dependencies:
+                raise ValueError(f"Dependency {input.dependency} not found in parent task dependencies. {parent.dependencies}")
+
+            agent_dependency = dependencies[input.dependency]
+
+            # Choose random agent
+            chosen_agent = choice(agent_dependency)
+
+            if "actions" not in chosen_agent:
+                raise ValueError(f"Dependency {input.dependency} does not contain an action")
+
+            if input.method not in chosen_agent["actions"]:
+                raise ValueError(f"Method {input.method} not found in dependency {input.dependency} actions")
+
+            implementation_dep = chosen_agent["actions"][input.method]
+
+            implementation_id = implementation_dep["implementation"]
+            dependency_dict = implementation_dep["dependencies"]
+
+            implementation = models.Implementation.objects.get(id=implementation_id)
+            action = implementation.action
+            action = implementation.action
             agent = implementation.agent
 
         elif input.action:
-            reservation = None
             action = models.Action.objects.get(id=input.action)
-            implementation = models.Implementation.objects.filter(action=action, agent__connected=True, agent__last_seen__gt=datetime.now() - timedelta(minutes=1)).first()
+            implementation = models.Implementation.objects.filter(action=action).filter(agent_available_q("agent")).first()
             if not implementation:
-                raise ValueError("No active implementation found for this action")
+                raise ValueError(f"No active implementation found for action {action.name}")
 
             agent = implementation.agent
 
         elif input.implementation:
-            reservation = None
             implementation = models.Implementation.objects.get(id=input.implementation)
             action = implementation.action
             agent = implementation.agent
-            assert agent.connected, "Agent is not connected"
-            assert agent.last_seen, "Agent last seen time is not set"
-            assert agent.last_seen > datetime.now(timezone.utc) - timedelta(minutes=1), "Agent is not connected"
+            # A higher-order wrapper is virtual; its agent (== the lower implementation's
+            # agent, by the co-location rule) is connectivity-checked in ``_assign_higher_order``,
+            # which raises a ValueError. Skip the assert here so that path owns the check.
+            if implementation.higher_order_for_id is None:
+                assert agent_is_available(agent), "Agent is not available (not connected, and not a webhook agent)"
 
         elif input.action_hash:
-            reservation = None
-            action = models.Action.objects.filter(hash=input.action_hash).first()
-            implementation = models.Implementation.objects.filter(action=action, agent__connected=True).first()
+            action = models.Action.objects.get(hash=input.action_hash, organization=ctx.organization)
+            implementation = models.Implementation.objects.filter(action=action).filter(agent_available_q("agent")).first()
             if not implementation:
-                raise ValueError("No active implementation found for this action")
+                raise ValueError(f"No active implementation found for action {action.name}")
             agent = implementation.agent
 
-        elif input.interface:
-            reservation = None
+        elif input.implementation:
             implementation = models.Implementation.objects.get(id=input.implementation)
             action = implementation.action
             agent = implementation.agent
@@ -175,39 +266,60 @@ class RedisControllBackend(ControllBackend):
         else:
             raise ValueError("You need to provide either, action_hash or action_id, to create an assignment for an agent")
 
-        reference = input.reference or self.create_message_id()
+        if not action:
+            raise ValueError("Could not determine action for this task")
 
-        # TODO: if ephemeral is set, we should not store the assignation in the database
-        assignation = models.Assignation.objects.create(
-            reservation=reservation,
+        # Higher-order implementations are orchestrated server-side: the wrapper task
+        # is virtual and a child task runs the resolved lower implementation.
+        if implementation is not None and implementation.higher_order_for_id is not None:
+            return self._assign_higher_order(ctx, input, implementation, caller)
+
+        acted_on = acted_on_from_args(input.args, action)
+
+        reference = input.reference or self.create_message_id()
+        if dependency_dict is None:
+            dependency_dict = build_dependency_dict(implementation, ctx, input.dependencies or [])
+
+        # TODO: if ephemeral is set, we should not store the task in the database
+        task = models.Task.objects.create(
             action=action,
             args=input.args,
             reference=reference,
             parent_id=input.parent,
             agent=agent,
+            acted_on=acted_on,
+            capture=input.capture if input.capture is not None else False,
             implementation=implementation,
+            dependency=input.dependency,
+            dependency_method=input.method,
+            resolution=resolution,
             is_done=False,
-            latest_event_kind=enums.AssignationEventKind.ASSIGN,
-            latest_instruct_kind=enums.AssignationInstructKind.ASSIGN,
+            latest_event_kind=enums.TaskEventKind.STARTED,
+            latest_instruct_kind=enums.TaskInstructKind.ASSIGN,
             hooks=input.hooks or [],
-            waiter=waiter,
-            ephemeral=input.ephemeral,
+            dependencies=dependency_dict,
+            caller=caller,
+            ephemeral=input.ephemeral if input.ephemeral is not None else False,
         )
 
         action = implementation.action
 
+        token = mint_token_for_task(task, ctx)
+
         AgentConsumer.broadcast(
-            assignation.agent.pk,
+            task.agent.pk,
             message=messages.Assign(
-                assignation=str(assignation.pk),
+                task=str(task.pk),
                 args=input.args,
-                user=str(info.context.request.user.sub),
-                app=str(info.context.request.client.client_id),
-                org=str(info.context.request.organization.slug) if info.context.request.organization else None,
+                user=str(ctx.user.sub),
+                org=str(ctx.organization.slug),
                 reference=reference,
+                capture=input.capture if input.capture is not None else False,
+                resolution=str(resolution.pk) if resolution else None,
                 interface=implementation.interface,
-                extension=implementation.extension,
                 action=str(implementation.action.hash),
+                implementation=str(implementation.pk),
+                token=token,
             ),
         )
         if input.hooks:
@@ -215,28 +327,156 @@ class RedisControllBackend(ControllBackend):
                 if hook.kind == enums.HookKind.INIT:
                     # recursive assign
                     self.assign(
+                        ctx,
                         inputs.AssignInputModel(
                             action_hash=hook.hash,
-                            parent=assignation.pk,
-                            args={"assignation": assignation.pk},
+                            parent=task.pk,
+                            args={"task": task.pk},
                             reference="init_hook_0",
-                        )
+                        ),
                     )
 
-        return assignation
+        return task
 
-    def resume(self, info: Info, input: inputs.ResumeInputModel) -> models.Assignation:
-        assignation = models.Assignation.objects.get(id=input.assignation)
-        assignation.latest_instruct_kind = enums.AssignationInstructKind.RESUME
-        assignation.save()
+    def _assign_higher_order(self, ctx: CallerContext, input: inputs.AssignInputModel, higher: models.Implementation, caller: models.Caller) -> models.Task:
+        """Orchestrate a higher-order task: remap args/deps, run a child on the lower agent.
+
+        The wrapper (``higher``) task is virtual — it is never broadcast to an agent.
+        A child task runs the resolved lower implementation; its yields/done are unfolded
+        back onto the wrapper in ``persist_backend`` (see the higher-order return path).
+        """
+        # Reached only via ``assign``, which already guarded that an organization exists.
+        assert ctx.organization is not None, "Cannot assign without an organization"
+
+        config = higher.higher_order_config or {}
+
+        # A higher-order implementation is bound to the agent that owns its lower
+        # implementation (enforced at link time in ``set_higher_order``), so the wrapped
+        # impl and its agent are deterministic — no cross-agent resolution needed.
+        lower_impl = higher.higher_order_for
+        lower_action = lower_impl.action
+        lower_agent = lower_impl.agent
+
+        # The wrapper's agent IS the executing agent — it must be available (live socket or webhook).
+        if not agent_is_available(lower_agent):
+            raise ValueError(f"Agent for lower implementation {lower_impl.interface} is not available")
+
+        # Resolve the wrapper's declared dependencies from the caller, then project both the
+        # args and the dependencies onto the lower implementation.
+        higher_dependencies = build_dependency_dict(higher, ctx, input.dependencies or [])
+        lower_args = build_lower_args(config, input.args)
+        lower_dependencies = build_lower_dependencies(config, higher_dependencies)
+
+        reference = input.reference or self.create_message_id()
+
+        # The user-facing wrapper task — created but NOT broadcast.
+        higher_task = models.Task.objects.create(
+            action=higher.action,
+            args=input.args,
+            reference=reference,
+            parent_id=input.parent,
+            agent=higher.agent,
+            acted_on=acted_on_from_args(input.args, higher.action),
+            capture=input.capture if input.capture is not None else False,
+            implementation=higher,
+            is_done=False,
+            latest_event_kind=enums.TaskEventKind.STARTED,
+            latest_instruct_kind=enums.TaskInstructKind.ASSIGN,
+            hooks=input.hooks or [],
+            dependencies=higher_dependencies,
+            caller=caller,
+            ephemeral=input.ephemeral if input.ephemeral is not None else False,
+        )
+
+        # The child task that actually runs on the resolved lower agent.
+        lower_task = models.Task.objects.create(
+            action=lower_action,
+            args=lower_args,
+            reference=self.create_message_id(),
+            parent=higher_task,
+            root=higher_task.root or higher_task,
+            agent=lower_agent,
+            acted_on=acted_on_from_args(lower_args, lower_action),
+            capture=False,
+            implementation=lower_impl,
+            is_done=False,
+            latest_event_kind=enums.TaskEventKind.STARTED,
+            latest_instruct_kind=enums.TaskInstructKind.ASSIGN,
+            dependencies=lower_dependencies,
+            caller=caller,
+        )
+
+        token = mint_token_for_task(lower_task, ctx)
 
         AgentConsumer.broadcast(
-            assignation.agent.id,
-            message=messages.Cancel(
-                assignation=assignation.id,
+            lower_agent.pk,
+            message=messages.Assign(
+                task=str(lower_task.pk),
+                args=lower_args,
+                user=str(ctx.user.sub),
+                org=str(ctx.organization.slug),
+                reference=lower_task.reference,
+                capture=False,
+                resolution=None,
+                interface=lower_impl.interface,
+                action=str(lower_action.hash),
+                implementation=str(lower_impl.pk),
+                token=token,
             ),
         )
-        return assignation
+
+        return higher_task
+
+    def resume(self, input: inputs.ResumeInputModel) -> models.Task:
+        return self._request_control(
+            input.task,
+            instruct_kind=enums.TaskInstructKind.RESUME,
+            inging_kind=enums.TaskEventKind.RESUMING,
+            to_agent_factory=lambda a: messages.Resume(task=a, step=input.step),
+        )
+
+    def bounce(self, info: Info, input: inputs.BounceInputModel) -> models.Agent:
+        agent = models.Agent.objects.get(id=input.agent)
+
+        AgentConsumer.broadcast(
+            agent.id,
+            message=messages.Bounce(
+                agent=agent.id,
+            ),
+        )
+        return agent
+
+    def block(self, info: Info, input: inputs.BlockInputModel) -> models.Agent:
+        agent = models.Agent.objects.get(id=input.agent)
+        agent.blocked = True
+        agent.save()
+
+        AgentConsumer.broadcast(
+            agent.id,
+            message=messages.Kick(
+                agent=agent.id,
+                reason=input.reason,
+            ),
+        )
+        return agent
+
+    def unblock(self, info: Info, input: inputs.UnblockInputModel) -> models.Agent:
+        agent = models.Agent.objects.get(id=input.agent)
+        agent.blocked = False
+        agent.save()
+
+        return agent
+
+    def kick(self, info: Info, input: inputs.KickInputModel) -> models.Agent:
+        agent = models.Agent.objects.get(id=input.agent)
+
+        AgentConsumer.broadcast(
+            agent.id,
+            message=messages.Kick(
+                agent=agent.id,
+            ),
+        )
+        return agent
 
     def collect(self, info: Info, input: inputs.CollectInputModel) -> list[str]:
         agents = {}
@@ -259,19 +499,6 @@ class RedisControllBackend(ControllBackend):
             )
 
         return input.drawers
-
-    def step(self, info: Info, input: inputs.StepInputModel) -> models.Assignation:
-        assignation = models.Assignation.objects.get(id=input.assignation)
-        assignation.latest_instruct_kind = enums.AssignationInstructKind.STEP
-        assignation.save()
-
-        AgentConsumer.broadcast(
-            assignation.agent.pk,
-            message=messages.Cancel(
-                assignation=assignation.pk,
-            ),
-        )
-        return assignation
 
 
 controll_backend = RedisControllBackend()

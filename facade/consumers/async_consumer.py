@@ -1,260 +1,136 @@
-import asyncio
-import datetime
-import json
 import logging
+import uuid
 from typing import Optional
 
-import redis
-import redis.asyncio as aredis
-from authentikate.expand import aexpand_user_from_token, aexpand_client_from_token, aexpand_organization_from_token
-from authentikate.utils import authenticate_token_or_none
+from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
-from django.conf import settings
-from facade import models, messages, codes
-from facade.persist_backend import persist_backend
-from pydantic import BaseModel, Field
+
+from facade import caller_events, codes, messages, models
+from facade.consumers.agent_protocol import AgentProtocol
+from facade.consumers.agent_queue import RedisAgentQueue
 
 logger = logging.getLogger(__name__)
 
-HEARTBEAT_INTERVAL = settings.AGENT_HEARTBEAT_INTERVAL
-HEARTBEAT_RESPONSE_TIMEOUT = settings.AGENT_HEARTBEAT_RESPONSE_TIMEOUT
+
+def _agent_group(agent_id: str) -> str:
+    """Channel-layer group holding every live connection for one agent."""
+    return f"agent-{agent_id}"
 
 
-class FromAgentPayload(BaseModel):
-    """Pydantic model representing the payload sent by the agent."""
-
-    message: messages.FromAgentMessage = Field(discriminator="type")
+def _caller_group(caller_id: str) -> str:
+    """Channel-layer group carrying the task events a caller originated."""
+    return f"task_caller_{caller_id}"
 
 
 class AgentConsumer(AsyncWebsocketConsumer):
-    """WebSocket consumer handling communication with agents."""
+    """Thin Channels adapter around :class:`AgentProtocol`.
+
+    All conversation logic lives in the (transport-agnostic, unit-tested)
+    ``AgentProtocol``; this class only wires the WebSocket transport to it and
+    manages the connection lifecycle.
+    """
 
     groups = ["broadcast"]
 
     @classmethod
-    def broadcast(cls, agent_id: str, message: messages.ToAgentMessage) -> None:
-        """Broadcast a message to a specific agent.
+    def broadcast(cls, agent_id: int, message: messages.ToAgentMessage) -> None:
+        """Send a message to a specific agent over its transport (thin facade).
 
-        Args:
-            agent_id (str): The identifier of the agent.
-            message (messages.ToAgentMessage): The message to send.
+        Kept for the existing backend/signal call sites; delegates to the typed
+        :func:`facade.transport.deliver_to_agent`, which picks redis queue (WEBSOCKET) vs
+        HMAC-signed POST (WEBHOOK). Called only AFTER the row is persisted, so a failed
+        delivery is recoverable from the DB.
         """
-        connection = redis.Redis(host="redis")
-        connection.lpush(f"{agent_id}_my_queue", message.json())
+        from facade import transport  # lazy: transport imports this consumer's queue module
+
+        agent = models.Agent.objects.only("id", "kind", "hook_url", "hook_url_secret").get(id=agent_id)
+        transport.deliver_to_agent(agent, message)
 
     async def connect(self) -> None:
-        """Handles new WebSocket connection."""
-        logger.error("Accepting connection")
+        """Accept the socket and build a protocol bound to this transport."""
         await self.accept()
-        print("Connected to agent")
-        self.client = None
-        self.user = None
-        self.registry = None
-        self.agent = None
-        self.received_initial_payload = False
-
-    async def send_to_agent_message(self, message: messages.ToAgentMessage) -> None:
-        """Send a message to the agent.
-
-        Args:
-            message (messages.ToAgentMessage): The message to send.
-        """
-        await self.send(text_data=message.model_dump_json())
-
-    async def on_register(self, register: messages.Register) -> None:
-        """Handle agent registration.
-
-        Args:
-            register (messages.Register): Registration message from agent.
-
-        Raises:
-            ValueError: If the token is invalid.
-        """
-        logger.error("Registering agent", exc_info=True)
-        token = authenticate_token_or_none(register.token)
-        if not token:
-            raise ValueError("Invalid token")
-
-        self.user = await aexpand_user_from_token(token)
-        self.client = await aexpand_client_from_token(token)
-        self.organization = await aexpand_organization_from_token(token)
-
-        self.registry, _ = await models.Registry.objects.aget_or_create(
-            client=self.client,
-            user=self.user,
-            organization=self.organization,
+        # Identifies this connection within its agent group so a force-register
+        # can displace the others without closing itself.
+        self.connection_id = str(uuid.uuid4())
+        self._agent_group: Optional[str] = None
+        self._caller_group: Optional[str] = None
+        self.protocol = AgentProtocol(
+            send=lambda text: self.send(text_data=text),
+            close=lambda code: self.close(code=code),
+            queue=RedisAgentQueue.from_settings(),
+            register_connection=self.register_connection,
+            kick_others=self.kick_others,
+            register_caller=self.register_caller,
+            connection_id=self.connection_id,
         )
 
-        self.agent, _ = await models.Agent.objects.aget_or_create(
-            registry=self.registry,
-            instance_id=register.instance_id or "default",
-            defaults=dict(
-                name=f"{str(self.registry.pk)} on {register.instance_id}",
-            ),
-        )
+    async def register_connection(self, agent_id: str) -> None:
+        """Join the agent's connection group once the agent is known."""
+        self._agent_group = _agent_group(agent_id)
+        await self.channel_layer.group_add(self._agent_group, self.channel_name)
 
-        self.connection = aredis.Redis(host="redis", auto_close_connection_pool=True)
-        self.assignations = await persist_backend.on_agent_connected(self.agent.pk)
-        self.heartbeat_future: Optional[asyncio.Future] = None
+    async def register_caller(self, caller_id: str) -> None:
+        """Join the caller event group so events of work this identity originated reach us."""
+        self._caller_group = _caller_group(caller_id)
+        await self.channel_layer.group_add(self._caller_group, self.channel_name)
 
-        await self.send_to_agent_message(
-            message=messages.Init(
-                instance_id=self.agent.instance_id,
-                agent=str(self.agent.pk),
-                inquiries=[messages.AssignInquiry(assignation=str(a.pk)) for a in self.assignations],
-            )
-        )
+    async def channel_TaskEventCreatedEvent(self, event: dict) -> None:
+        """Forward a caller-bound task event to this socket as a ``…Event`` mirror.
 
-        self.task = asyncio.create_task(self.listen_for_tasks(self.agent.pk))
-        self.heartbeat_task = asyncio.create_task(self.heartbeat(self.agent.pk))
-        self.heartbeat_task.add_done_callback(lambda x: logging.error(f"Done sending heartbeats {x}"))
-
-    async def on_agent_heartbeat(self) -> None:
-        """Handle heartbeat message from agent."""
-        if not self.agent:
-            raise Exception("Agent not registered")
-        self.agent.connected = True
-        self.agent.last_seen = datetime.datetime.now()
-        await self.agent.asave()
-
-        if self.heartbeat_future and not self.heartbeat_future.done():
-            logging.debug("ANSWERING HEARTBEAT")
-            self.heartbeat_future.set_result(None)
-            self.heartbeat_future = None
-        else:
-            logging.error("Received heartbeat without future, possible race condition.")
-
-    async def heartbeat(self, agent_id: str) -> None:
-        """Send periodic heartbeat messages to the agent.
-
-        Args:
-            agent_id (str): The ID of the agent.
+        Producer side: ``facade/transport.py`` broadcasts ``TaskEventCreatedEvent`` to
+        ``task_caller_{caller_id}`` on every TaskEvent save (this WS forward consumes every
+        caller event, root and child; the slim GraphQL change feeds consume the separate
+        ``root_tasks_*`` topics). We only forward the ``event`` branch — the ``create`` branch
+        is covered authoritatively by ``AssignResponse``, so forwarding it too would race the
+        ack. Best-effort: a brief disconnect simply misses events.
         """
+        protocol = getattr(self, "protocol", None)
+        if protocol is None or protocol.session is None:
+            return  # not registered yet — nothing to correlate against
+
+        event_id = (event.get("message") or {}).get("event")
+        if event_id is None:
+            return  # a `create` (or malformed) payload — not a task event
+
+        message = await self._build_execution_event(event_id)
+        if message is not None:
+            await protocol.send_to_agent_message(message)
+
+    @database_sync_to_async
+    def _build_execution_event(self, event_id):
+        """Load the TaskEvent and map it to its …Event mirror (off the event loop)."""
         try:
-            while True:
-                await asyncio.sleep(HEARTBEAT_INTERVAL)
-                await self.send_to_agent_message(messages.Heartbeat())
-                self.heartbeat_future = asyncio.Future()
+            event = models.TaskEvent.objects.select_related("task").get(id=event_id)
+        except models.TaskEvent.DoesNotExist:
+            return None
+        return caller_events.build_execution_event(event)
 
-                try:
-                    await asyncio.wait_for(self.heartbeat_future, HEARTBEAT_RESPONSE_TIMEOUT)
-                    print("Received heartbeat")
-
-                except asyncio.TimeoutError:
-                    logging.error(f"Timeout on client {self.agent.id} for heartbeat")
-                    await self.close(code=codes.HEARTBEAT_NOT_RESPONDED_CODE)
-
-        except asyncio.CancelledError:
+    async def kick_others(self) -> None:
+        """Tell every other connection in this agent's group to close."""
+        if self._agent_group is None:
             return
+        await self.channel_layer.group_send(
+            self._agent_group,
+            {"type": "agent.displace", "initiator": self.connection_id},
+        )
 
-    async def listen_for_tasks(self, agent_id: str) -> None:
-        """Listen for messages in the agent's Redis queue.
-
-        Args:
-            agent_id (str): The ID of the agent.
-        """
-        try:
-            while True:
-                task = await self.connection.brpoplpush(f"{agent_id}_my_queue", "processing_queue")
-                if task:
-                    await self.send(text_data=task.decode("utf-8"))
-                    await self.connection.lrem("processing_queue", 0, task)
-        except asyncio.CancelledError:
-            self.connection.close()
-            return
+    async def agent_displace(self, event: dict) -> None:
+        """Channel-layer handler: close unless we initiated the displacement."""
+        if event.get("initiator") != self.connection_id:
+            await self.close(code=codes.AGENT_REPLACED_CODE)
 
     async def receive(self, text_data: Optional[str] = None, bytes_data: Optional[bytes] = None) -> None:
-        """Receive and process a message from the WebSocket.
+        """Forward an inbound frame to the protocol."""
+        await self.protocol.receive(text_data)
 
-        Args:
-            text_data (Optional[str]): Text data from the WebSocket.
-            bytes_data (Optional[bytes]): Byte data from the WebSocket.
-        """
-        try:
-            payload = json.loads(text_data)
-        except json.JSONDecodeError:
-            logger.error("Error in agent", exc_info=True)
-            await self.close(code=codes.FROM_AGENT_MESSAGE_IS_NOT_VALID_JSON_CODE)
-            return
-
-        try:
-            payload = FromAgentPayload(message=payload)
-        except Exception as e:
-            logger.error(f"Error in agent {payload}", exc_info=True)
-
-            await self.send_to_agent_message(
-                messages.ProtocolError(
-                    error=str(e),
-                )
-            )
-
-            await self.close(code=codes.FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE)
-            return
-
-        try:
-            if not self.received_initial_payload:
-                if not isinstance(payload.message, messages.Register):
-                    raise ValueError("First message must be a register")
-                self.received_initial_payload = True
-                await self.on_register(payload.message)
-            else:
-                match payload.message:
-                    case messages.Register():
-                        await self.on_register(payload.message)
-                    case messages.HeartbeatEvent():
-                        await self.on_agent_heartbeat()
-                    case messages.CancelledEvent():
-                        await persist_backend.on_agent_cancelled(self.agent.id, payload.message)
-                    case messages.YieldEvent():
-                        await persist_backend.on_agent_yield(self.agent.id, payload.message)
-                    case messages.LogEvent():
-                        await persist_backend.on_agent_log(self.agent.id, payload.message)
-                    case messages.ProgressEvent():
-                        await persist_backend.on_agent_progress(self.agent.id, payload.message)
-                    case messages.DoneEvent():
-                        await persist_backend.on_agent_done(self.agent.id, payload.message)
-                    case messages.ErrorEvent():
-                        await persist_backend.on_agent_error(self.agent.id, payload.message)
-                    case messages.CriticalEvent():
-                        await persist_backend.on_agent_critical(self.agent.id, payload.message)
-                    case _:
-                        logger.error("Unkwonw message in agent", exc_info=True)
-                        await self.close(code=codes.FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE)
-                        return
-        except Exception:
-            logger.error("Unkown in consumer", exc_info=True)
-            await self.close(code=codes.FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE)
-
-    async def disconnect(self, close_code: int) -> None:
-        """Handle socket disconnection.
-
-        Args:
-            close_code (int): The close code for the WebSocket.
-        """
-        if hasattr(self, "task"):
-            self.task.cancel()
-            try:
-                await self.task
-            except asyncio.CancelledError:
-                pass
-            except Exception:
-                logger.error("Error in consumer", exc_info=True)
-                return
-
-        if hasattr(self, "heartbeat_task"):
-            self.heartbeat_task.cancel()
-            try:
-                await self.heartbeat_task
-            except asyncio.CancelledError:
-                pass
-            except Exception:
-                logger.error("Error in consumer", exc_info=True)
-                return
-
-        if hasattr(self, "agent") and self.agent:
-            await persist_backend.on_agent_disconnected(self.agent.id)
-
-        if hasattr(self, "connection"):
-            await self.connection.close()
-
-        logger.warning(f"{self.agent} disconnected with code {close_code}")
+    async def disconnect(self, code: int) -> None:
+        """Tear down the protocol's background work on socket close."""
+        group = getattr(self, "_agent_group", None)
+        if group is not None:
+            await self.channel_layer.group_discard(group, self.channel_name)
+        caller_group = getattr(self, "_caller_group", None)
+        if caller_group is not None:
+            await self.channel_layer.group_discard(caller_group, self.channel_name)
+        if hasattr(self, "protocol"):
+            await self.protocol.shutdown()
+        logger.warning(f"Agent disconnected with code {code}")

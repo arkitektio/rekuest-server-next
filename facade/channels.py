@@ -1,32 +1,20 @@
 from kante.channel import build_channel
-from .channel_events import StateUpdateEvent, DBEvent, AssignationEventCreatedEvent, ImplementationSignal, AgentSignal
+from .channel_events import StateUpdateEvent, DBEvent, TaskEventCreatedEvent, ImplementationEvent, AgentEvent, ChildTaskEvent, PatchEvent
 
 
-action_channel  = build_channel(
-    DBEvent, "action_created_broadcast"
-)
+action_channel = build_channel(DBEvent, "action_created_broadcast")
 
-agent_updated_channel = build_channel(AgentSignal,"agent_updated_broadcast")
+agent_updated_channel = build_channel(AgentEvent, "agent_updated_broadcast")
 
-assignation_updated_channel = build_channel(DBEvent,"assignation_broadcast")
-assignation_event_channel = build_channel(AssignationEventCreatedEvent)
+task_updated_channel = build_channel(DBEvent, "task_broadcast")
+task_event_channel = build_channel(TaskEventCreatedEvent)
 
-
-
-new_implementation_channel  = build_channel(
-    ImplementationSignal
-)
+child_task_channel = build_channel(ChildTaskEvent)
 
 
-state_update_channel = build_channel(
-    DBEvent,"state_update_event_broadcast"
-)
+new_implementation_channel = build_channel(ImplementationEvent)
 
 
-
-reservation_channel = build_channel(
-    DBEvent,"reservation_event_broadcast"
-)
-
+patch_channel = build_channel(PatchEvent)
 
 state_update_channel = build_channel(StateUpdateEvent)

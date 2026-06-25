@@ -11,19 +11,18 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
-from omegaconf import OmegaConf
-import os
+from .configuration import Settings
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-conf = OmegaConf.load(os.path.join(BASE_DIR, "config.yaml"))
+conf = Settings()
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = conf.django.get("secret_key", "changeme")  # TODO: Change this in production
+SECRET_KEY = conf.django.secret_key  # TODO: Change this in production
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -34,10 +33,39 @@ AGENT_DISCONNECTED_TIMEOUT = 20
 AGENT_HEARTBEAT_INTERVAL = 10
 AGENT_HEARTBEAT_RESPONSE_TIMEOUT = 5
 
+# Redis endpoint the agent queue (broadcast -> agent delivery) talks to.
+AGENT_REDIS_HOST = conf.redis.host
+AGENT_REDIS_PORT = conf.redis.port
+
 
 AGENT_HEARTBEAT_NOT_RESPONDED_CODE = 3001
 
+# Per-mode reclaim grace window (seconds). On a disconnect the failure/cascade is delayed
+# this long so a brief blip can reclaim same-session in-flight work before it fires. 0 means
+# no grace (strict). ``PHYSICAL`` overrides the window for effect:physical work, which may
+# warrant a shorter (or zero) window than freely-retryable effect:none work. Consumed by the
+# reclaim/grace backend via ``facade.grace.grace_seconds``.
+REKUEST_GRACE = {
+    "DEFAULT": conf.rekuest.grace_default,
+    "PER_MODE": conf.rekuest.grace_per_mode,
+    "PHYSICAL": conf.rekuest.grace_physical,
+    # Progress lease (seconds): a physical task that has reported progress but then
+    # goes silent this long — while its agent is still connected (wedged-but-alive) — is
+    # failed as terminal. 0 disables the lease (default).
+    "PROGRESS_LEASE": conf.rekuest.progress_lease,
+}
+
+# Capability scopes that gate ``AgentMode`` (see ``facade.capabilities``). Enforcement is
+# opt-in so agents whose tokens predate these scopes keep working until ENFORCE is enabled.
+REKUEST_CAPABILITIES = {
+    "ENFORCE": conf.rekuest.enforce_capabilities,
+    "EXECUTES_WORK_SCOPE": conf.rekuest.executes_work_scope,
+    "CAN_ASSIGN_ROOT_SCOPE": conf.rekuest.can_assign_root_scope,
+}
+
 # Application definition
+USE_X_FORWARDED_HOST = conf.django.use_x_forwarded_host
+
 
 INSTALLED_APPS = [
     "daphne",
@@ -46,28 +74,39 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
+    "django.contrib.postgres",
     "django.contrib.staticfiles",
     "guardian",
     "channels",
     "authentikate",
     "django_probes",
+    "datalayer",
     "kante",
     "facade",
-    'health_check',                             # required
-    'health_check.db',                          # stock Django health checkers
+    "health_check",  # required
 ]
 
 # Authentikate section
 
 AUTH_USER_MODEL = "authentikate.User"
 
-AUTHENTIKATE = {
-    "ISSUERS": [{
-        "iss": "lok",
-        "kind": "rsa",
-        "public_key": conf.lok.get("public_key", None),
-    }],
-    "STATIC_TOKENS": conf.lok.get("static_tokens", {}),
+AUTHENTIKATE = conf.authentikate.model_dump()
+
+
+# Provenance issuer section
+#
+# Rekuest mints a signed (Ed25519) provenance JWT at dispatch and publishes
+# the verifying key at the JWKS endpoint (see ``rekuest/urls.py``). Loaded from the
+# ``provenance`` block of config.yaml; a static ``provenance.private_key`` is
+# required — the facade refuses to start without it (see facade/provenance/keys.py).
+PROVENANCE = {
+    "ISSUER": conf.provenance.issuer,
+    "KID": conf.provenance.kid,
+    "PRIVATE_KEY": conf.provenance.private_key,
+    "PUBLIC_KEY": conf.provenance.public_key,
+    "TOKEN_TTL_SECONDS": int(conf.provenance.token_ttl_seconds),
+    "HUMAN_ROLES": list(conf.provenance.human_roles),
+    "STRICT": bool(conf.provenance.strict),
 }
 
 
@@ -88,7 +127,7 @@ MIDDLEWARE = [
 
 CHANNEL_LAYERS = {
     "default": {
-        # This example app uses the Redis channel layer implementation channels_redis
+        # This example app uses the Redis chasnnel layer implementation channels_redis
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {"hosts": [(conf.redis.host, conf.redis.port)], "prefix": "mikro"},
     },
@@ -96,16 +135,18 @@ CHANNEL_LAYERS = {
 
 STRAWBERRY_DJANGO = {
     "USE_DEPRECATED_FILTERS": True,
+    "DEFAULT_PK_FIELD_NAME": "id",
 }
 
 
-CSRF_TRUSTED_ORIGINS = conf.get(
-    "csrf_trusted_origins", ["http://localhost", "https://localhost"]
-)
-MY_SCRIPT_NAME = conf.get("force_script_name", "") 
+CSRF_TRUSTED_ORIGINS = conf.django.csrf_trusted_origins
+MY_SCRIPT_NAME = conf.django.force_script_name
 
 
 CORS_ALLOW_ALL_ORIGINS = True
+
+
+DATALAYER = conf.datalayer.model_dump(exclude_none=True) if conf.datalayer else {}
 
 
 ROOT_URLCONF = "rekuest.urls"
@@ -135,12 +176,12 @@ ASGI_APPLICATION = "rekuest.asgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": conf.db.engine,
-        "NAME": conf.db.db_name,
-        "USER": conf.db.username,
-        "PASSWORD": conf.db.password,
-        "HOST": conf.db.host,
-        "PORT": conf.db.port,
+        "ENGINE": conf.postgres.engine,
+        "NAME": conf.postgres.db_name,
+        "USER": conf.postgres.username,
+        "PASSWORD": conf.postgres.password,
+        "HOST": conf.postgres.host,
+        "PORT": conf.postgres.port,
     }
 }
 

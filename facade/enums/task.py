@@ -1,0 +1,112 @@
+from enum import Enum
+
+import strawberry
+from django.db.models import TextChoices
+
+
+class TaskStatusChoices(TextChoices):
+    ASSIGNING = "ASSIGNING", "Assigning, (Task is being assigned to an Agent)"
+    BOUND = "BOUND", "Bound (Task was bound to an Agent)"
+    CANCELING = "CANCELING", "Unassign (Task was unassigned from an Agent)"
+    CANCELLED = "CANCELLED", "Unassign (Task was unassigned from an Agent)"
+    ONGOING = "ONGOING", "ONGOING (Task is currently being performed)"
+    DONE = "DONE", "Done (Task finished the Task)"
+    ERROR = "ERROR", "Error (Task resulted in an error)"
+
+
+class TaskEventChoices(TextChoices):
+    """These are the possible events that can happen to a Task.
+
+    The events are ordered by their appearance in the lifecycle of a Task.
+
+
+    """
+
+    QUEUED = "QUEUED", "Queued (Task was queued)"
+    BOUND = "BOUND", "Bound (Task was bound to an Agent)"
+    STARTED = "STARTED", "Started (Agent accepted and began the Task)"
+    UNASSIGN = "UNASSIGN", "Unassign (Agent received the Task)"
+    PROGRESS = "PROGRESS", "Progress (Agent is making progress on the Task)"
+    CANCELLING = "CANCELLING", "Cancelling (a cancel was requested; awaiting the agent's confirmation)"
+    CANCELLED = "CANCELLED", "Cancelled (the agent cancelled the task)"
+    INTERRUPTING = "INTERRUPTING", "Interrupting (an interrupt was requested; awaiting the agent's confirmation)"
+    INTERRUPTED = "INTERRUPTED", "Interrupted (the agent interrupted the task)"
+    PAUSING = "PAUSING", "Pausing (a pause was requested; awaiting the agent's confirmation)"
+    PAUSED = "PAUSED", "Paused (the agent suspended the task)"
+    RESUMING = "RESUMING", "Resuming (a resume was requested; awaiting the agent's confirmation)"
+    RESUMED = "RESUMED", "Resumed (the agent resumed the task)"
+    DELEGATE = "DELEGATE", "Delegate (Task was delegated to another Task)"
+    FAILED = "FAILED"
+    CRITICAL = "CRITICAL"
+    DISCONNECTED = "DISCONNECTED"
+
+    YIELD = (
+        "YIELD",
+        "Yields (Agent yielded the result)",
+    )  # One yield can be interpreted as a return
+    COMPLETED = "COMPLETED", "Completed (Agent finished the Task)"
+    LOG = "LOG", "Log (Agent logged a message)"
+
+
+class TaskInstructChoices(TextChoices):
+    """These are the possible events that are instructed to a Task."""
+
+    ASSIGN = "ASSIGN", "Assign (Agent accepted the Task)"
+    CANCEL = "CANCEL", "Unassign (Agent received the Task)"
+    RESUME = "RESUME", "Resume (Agent resumed the Task)"
+    PAUSE = "PAUSE", "Pause (Agent paused the Task)"
+    INTERRUPT = "INTERRUPT", "Interrupt (Agent interupted the Task)"
+    COLLECT = "COLLECT", "Collect instruction received"
+
+
+@strawberry.enum(description="The event kind of the taskevent")
+class TaskStatus(str, Enum):
+    ASSIGNING = "ASSIGNING"
+    ONGOING = "ONGOING"
+    CRITICAL = "CRITICAL"
+    CANCELLED = "CANCELLED"
+    DONE = "DONE"
+
+
+@strawberry.enum(description="The event kind of the taskevent")
+class TaskInstructKind(str, Enum):
+    """These are the possible events that are instructed to a Task."""
+
+    ASSIGN = "ASSIGN"
+    CANCEL = "CANCEL"
+    RESUME = "RESUME"
+    PAUSE = "PAUSE"
+    INTERRUPT = "INTERRUPT"
+    COLLECT = "COLLECT"
+
+
+@strawberry.enum(description="The event kind of the taskevent")
+class TaskEventKind(str, Enum):
+    """These are the possible events that can happen to a Task.
+
+    The events are ordered by their appearance in the lifecycle of a Task.
+    """
+
+    BOUND = "BOUND"
+    QUEUED = "QUEUED"
+    STARTED = "STARTED"
+    PROGRESS = "PROGRESS"
+    DELEGATE = "DELEGATE"
+
+    DISCONNECTED = "DISCONNECTED"
+
+    YIELD = "YIELD"
+    COMPLETED = "COMPLETED"
+
+    # Log Events
+    LOG = "LOG"
+    CANCELLING = "CANCELLING"
+    CANCELLED = "CANCELLED"
+    INTERRUPTING = "INTERRUPTING"
+    INTERRUPTED = "INTERRUPTED"
+    PAUSING = "PAUSING"
+    PAUSED = "PAUSED"
+    RESUMING = "RESUMING"
+    RESUMED = "RESUMED"
+    FAILED = "FAILED"
+    CRITICAL = "CRITICAL"

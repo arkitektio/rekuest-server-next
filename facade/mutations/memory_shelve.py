@@ -7,7 +7,6 @@ from authentikate.vars import get_user, get_client
 
 @strawberry.input
 class ShelveInMemoryDrawerInput:
-    instance_id: scalars.InstanceId = strawberry.field(description="The instance ID of the agent. This is used to identify the agent in the system.")
     identifier: rscalars.Identifier = strawberry.field(description="The identifier of the drawer. This is used to identify the drawer in the system.")
     resource_id: str = strawberry.field(description="The resource ID of the drawer.")
     label: str | None = strawberry.field(
@@ -21,13 +20,12 @@ class ShelveInMemoryDrawerInput:
 
 
 def shelve_in_memory_drawer(info: Info, input: ShelveInMemoryDrawerInput) -> types.MemoryDrawer:
-    registry, _ = models.Registry.objects.update_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
-
     agent, _ = models.Agent.objects.update_or_create(
-        registry=registry,
-        instance_id=input.instance_id or "default",
+        client=info.context.request.client,
+        user=info.context.request.user,
+        organization=info.context.request.organization,
         defaults=dict(
-            name=f"{str(registry)} on {input.instance_id}",
+            name=f"{info.context.request.client.client_id}",
         ),
     )
 
@@ -54,18 +52,16 @@ def shelve_in_memory_drawer(info: Info, input: ShelveInMemoryDrawerInput) -> typ
 
 @strawberry.input
 class UnshelveMemoryDrawerInput:
-    instance_id: scalars.InstanceId = strawberry.field(description="The instance ID of the agent. This is used to identify the agent in the system.")
     id: str = strawberry.field(description="The resource ID of the drawer.")
 
 
 def unshelve_memory_drawer(info: Info, input: UnshelveMemoryDrawerInput) -> strawberry.ID:
-    registry, _ = models.Registry.objects.update_or_create(client=info.context.request.client, user=info.context.request.user, organization=info.context.request.organization)
-
     agent, _ = models.Agent.objects.update_or_create(
-        registry=registry,
-        instance_id=input.instance_id or "default",
+        client=info.context.request.client,
+        user=info.context.request.user,
+        organization=info.context.request.organization,
         defaults=dict(
-            name=f"{str(registry)} on {input.instance_id}",
+            name=f"{info.context.request.client.client_id}",
         ),
     )
 

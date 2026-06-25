@@ -8,140 +8,87 @@ import strawberry
 logger = logging.getLogger(__name__)
 
 
-def underscore(s: str) -> str:
-    return s.replace(" ", "_").replace("-", "_").lower()
+def log_patches(info: Info, input: inputs.LogPatchesInput) -> strawberry.ID:
+    model = input.to_pydantic()
 
-
-async def set_state(info: Info, input: inputs.SetStateInput) -> types.State:
-    user = info.context.request.user
-    client = info.context.request.client
-
-    registry, _ = await models.Registry.objects.aget_or_create(
-        client=client,
-        user=user,
-        organization=info.context.request.organization,
-    )
-
-    agent, _ = await models.Agent.objects.aget_or_create(
-        registry=registry,
-        instance_id=input.instance_id or "default",
-        defaults=dict(
-            name=f"{str(registry.id)} on {input.instance_id}",
-        ),
-    )
-
-    state = await models.State.objects.aget(interface=input.interface, agent=agent)
-
-    state.value = input.value
-    state.save()
-
-    return state
-
-
-def update_state(info: Info, input: inputs.UpdateStateInput) -> types.State:
-    registry, _ = models.Registry.objects.get_or_create(
+    agent, _ = models.Agent.objects.get_or_create(
         client=info.context.request.client,
         user=info.context.request.user,
         organization=info.context.request.organization,
-    )
-
-    agent, _ = models.Agent.objects.get_or_create(
-        registry=registry,
-        instance_id=input.instance_id or "default",
         defaults=dict(
-            name=f"{str(registry.id)} on {input.instance_id}",
+            name=f"{info.context.request.client.client_id}",
         ),
     )
 
-    state = models.State.objects.get(interface=input.interface, agent=agent)
+    gotten_states = {}
+    gotten_tasks = {}
 
-    old_state = state.value
+    for patch in model.patches:
+        if patch.state_name not in gotten_states:
+            state = models.State.objects.get(interface=patch.state_name, agent=agent, definition__name=patch.state_name)
+            gotten_states[patch.state_name] = state
 
-    patch = jsonpatch.JsonPatch([i for i in input.patches])
+        if patch.correlation_id and patch.correlation_id not in gotten_tasks:
+            task = models.Task.objects.get(id=patch.correlation_id)
+            gotten_tasks[patch.correlation_id] = task
 
-    new_state = patch.apply(old_state)
+        state = gotten_states[patch.state_name]
 
-    state.value = new_state
+        if patch.correlation_id:
+            task = gotten_tasks[patch.correlation_id]
+        else:
+            task = None
 
-    state.save()
+        models.Patch.objects.create(
+            state=state,
+            path=patch.path,
+            global_current_revision=patch.global_current_rev,
+            global_future_revision=patch.global_future_rev,
+            current_revision=patch.current_rev,
+            future_revision=patch.future_rev,
+            session_id=patch.session_id,
+            task=task,
+        )
 
-    return state
 
+def log_snapshot(info: Info, input: inputs.LogSnapshotInput) -> strawberry.ID:
+    model = input.to_pydantic()
 
-async def archive_state(info: Info, input: inputs.ArchiveStateInput) -> types.State:
-    registry, _ = await models.Registry.objects.aget_or_create(
+    agent, _ = models.Agent.objects.get_or_create(
         client=info.context.request.client,
         user=info.context.request.user,
         organization=info.context.request.organization,
-    )
-    agent, _ = await models.Agent.objects.aget_or_create(
-        registry=registry,
-        instance_id=input.instance_id or "default",
         defaults=dict(
-            name=f"{str(registry.id)} on {input.instance_id}",
+            name=f"{info.context.request.client.client_id}",
         ),
     )
 
-    state = await models.State.objects.aget(state_schema_id=input.state_schema, agent=agent)
+    gotten_states = {}
+    gotten_tasks = {}
 
-    historical_state = await models.HistoricalState.objects.create(
-        state=state,
-        value=state.value,
-    )
+    for patch in model.patches:
+        if patch.state_name not in gotten_states:
+            state = models.State.objects.get(interface=patch.state_name, agent=agent, definition__name=patch.state_name)
+            gotten_states[patch.state_name] = state
 
-    return historical_state.state
+        if patch.correlation_id and patch.correlation_id not in gotten_tasks:
+            task = models.Task.objects.get(id=patch.correlation_id)
+            gotten_tasks[patch.correlation_id] = task
 
+        state = gotten_states[patch.state_name]
 
-def set_agent_states(info: Info, input: inputs.SetAgentStatesInput) -> list[types.State]:
-    user = info.context.request.user
-    client = info.context.request.client
+        if patch.correlation_id:
+            task = gotten_tasks[patch.correlation_id]
+        else:
+            task = None
 
-    registry, _ = models.Registry.objects.get_or_create(
-        client=client,
-        user=user,
-        organization=info.context.request.organization,
-    )
-
-    agent, _ = models.Agent.objects.get_or_create(
-        registry=registry,
-        instance_id=input.instance_id or "default",
-        defaults=dict(
-            name=f"{str(registry.id)} on {input.instance_id}",
-        ),
-    )
-
-    states = []
-
-    previous_states_id = models.State.objects.filter(agent=agent).values("id").all()
-
-    new_state_id = []
-    created_implementations = []
-
-    for inputstate in input.implementations:
-        state_schema, _ = models.StateSchema.objects.update_or_create(
-            hash=unique.hash_state_schema(inputstate.state_schema),
-            defaults=dict(
-                name=inputstate.state_schema.name,
-                ports=[strawberry.asdict(i) for i in inputstate.state_schema.ports],
-                description="A state schema",
-            ),
+        models.Patch.objects.create(
+            state=state,
+            patch=patch.path,
+            global_current_revision=patch.global_current_rev,
+            global_future_revision=patch.global_future_rev,
+            current_revision=patch.current_rev,
+            future_revision=patch.future_rev,
+            session_id=patch.session_id,
+            task=task,
         )
-
-        state, _ = models.State.objects.update_or_create(
-            interface=inputstate.interface,
-            agent=agent,
-            defaults=dict(
-                state_schema=state_schema,
-                value=inputstate.initial,
-            ),
-        )
-
-        new_state_id.append(state.id)
-        states.append(state)
-
-    for i in previous_states_id:
-        if i["id"] not in new_state_id:
-            state = models.State.objects.get(id=i["id"])
-            state.delete()
-
-    return states

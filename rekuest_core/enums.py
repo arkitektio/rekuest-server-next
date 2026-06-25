@@ -22,6 +22,7 @@ class PortKind(str, Enum):
     ENUM = "ENUM"
     MODEL = "MODEL"
     MEMORY_STRUCTURE = "MEMORY_STRUCTURE"
+    INTERFACE = "INTERFACE"
 
 
 @strawberry.enum(description="The kind of assign widget.")
@@ -32,12 +33,14 @@ class AssignWidgetKind(str, Enum):
     CUSTOM = "CUSTOM"
     STRING = "STRING"
     STATE_CHOICE = "STATE_CHOICE"
+    PROXY = "PROXY"
 
 
 @strawberry.enum(description="The kind of return widget.")
 class ReturnWidgetKind(str, Enum):
     CHOICE = "CHOICE"
     CUSTOM = "CUSTOM"
+    PROXY = "PROXY"
 
 
 @strawberry.enum(description="The kind of effect.")
@@ -47,9 +50,58 @@ class EffectKind(str, Enum):
     CUSTOM = "CUSTOM"
 
 
+@strawberry.enum(description=("The effect class of an implementation — declared by the implementation, never the caller. NONE work is freely retryable/reclaimable; PHYSICAL work touches the real world (no UPSERT), so an ambiguous failure is terminal and must not be retried."))
+class EffectClass(str, Enum):
+    NONE = "NONE"
+    PHYSICAL = "PHYSICAL"
+
+
 @strawberry.enum(description="The kind of action scope.")
 class ActionScope(str, Enum):
     GLOBAL = "GLOBAL"
     LOCAL = "LOCAL"
     BRIDGE_GLOBAL_TO_LOCAL = "BRIDGE_GLOBAL_TO_LOCAL"
     BRIDGE_LOCAL_TO_GLOBAL = "BRIDGE_LOCAL_TO_GLOBAL"
+
+
+@strawberry.enum(description="The operator for matching descriptors.")
+class RequiresOperator(str, Enum):
+    MATCHES = "MATCHES"
+    EXISTS = "EXISTS"
+    LTE = "LTE"
+    GTE = "GTE"
+    EQUALS = "EQUALS"
+    CONTAINS = "CONTAINS"
+    NOT_EQUALS = "NOT_EQUALS"
+    IN = "IN"
+    NOT_IN = "NOT_IN"
+
+
+@strawberry.enum(description="The operator for matching descriptors.")
+class ProvidesOperator(str, Enum):
+    MATCHES = "MATCHES"
+    EXISTS = "EXISTS"
+    LTE = "LTE"
+    GTE = "GTE"
+    EQUALS = "EQUALS"
+    CONTAINS = "CONTAINS"
+    NOT_EQUALS = "NOT_EQUALS"
+    IN = "IN"
+    NOT_IN = "NOT_IN"
+
+
+@strawberry.enum
+class AssignPolicy(str, Enum):
+    AUTOMATIC = "AUTOMATIC"
+    BALANCED = "BALANCED"
+    ROUND_ROBIN = "ROUND_ROBIN"
+    LEAST_BUSY = "LEAST_BUSY"
+    FASTEST_RESPONSE = "FASTEST_RESPONSE"
+
+
+@strawberry.enum
+class OptionKey(str, Enum):
+    LABEL = "LABEL"
+    DESCRIPTION = "DESCRIPTION"
+    LOGO = "LOGO"
+    VALUE = "VALUE"

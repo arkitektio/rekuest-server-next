@@ -1,5 +1,9 @@
 # Development Guide
 
+> **Architecture / design reference:** for *how the service is structured and why*, read the design
+> docs in [`design/`](design/README.md). This guide covers environment setup and the contributor
+> workflow.
+
 ## Getting Started
 
 This guide will help you set up a development environment for Rekuest Server and understand the codebase structure.
@@ -69,47 +73,59 @@ rekuest-server-next/
 ├── manage.py                 # Django management script
 ├── pyproject.toml           # Project dependencies and settings
 ├── facade/                  # Main application package
-│   ├── models.py           # Database models
-│   ├── schema.py           # GraphQL schema definition
-│   ├── types.py            # GraphQL types
+│   ├── models/             # Database models (package: caller, agent, action, …)
+│   ├── schema.py           # GraphQL schema definition (Query/Mutation/Subscription)
+│   ├── types/              # GraphQL types (package)
 │   ├── inputs.py           # GraphQL input types
-│   ├── filters.py          # Query filters
-│   ├── backend.py          # Business logic backend
+│   ├── filters/            # Query filters + org/auth scoping
+│   ├── backend.py          # Assign/reserve orchestration (RedisControllBackend)
+│   ├── persist_backend.py  # Agent-event persistence (ModelPersistBackend)
+│   ├── descriptors.py      # requires/provides → JSONPath compiler
+│   ├── managers.py         # Relational port-matching engine
+│   ├── channels.py         # Realtime channels
+│   ├── channel_events.py   # Channel payloads
+│   ├── signals.py          # Model signals → channel broadcasts
+│   ├── consumers/          # WebSocket agent protocol + queue
 │   ├── mutations/          # GraphQL mutations
 │   ├── queries/            # GraphQL queries
 │   ├── subscriptions/      # GraphQL subscriptions
 │   └── migrations/         # Database migrations
-├── rekuest/                # Django project settings
-│   ├── settings.py         # Main settings
+├── rekuest/                # Django project settings + ASGI entrypoint
+│   ├── settings.py         # Main settings (loaded from config.yaml)
 │   ├── settings_test.py    # Test settings
+│   ├── asgi.py             # ASGI app: GraphQL HTTP + /agi WebSocket
 │   └── urls.py             # URL routing
-├── rekuest_core/           # Core utilities
-├── rekuest_ui_core/        # UI-related utilities
+├── rekuest_core/           # Shared core: enums, inputs, scalars, objects
+├── datalayer/              # Secondary app: media/data layer
 ├── tests/                  # Test suite
-└── docs/                   # Documentation
+└── docs/                   # Documentation (see docs/design/ for architecture)
 ```
 
 ## Architecture Overview
+
+> A deeper, narrative version of this section (with diagrams) lives in
+> [`design/`](design/README.md). The summary below is enough to start contributing.
 
 ### GraphQL Schema
 
 The API is built using Strawberry GraphQL with Django integration:
 
-- **Types**: Defined in `facade/types.py`, represent data structures
+- **Types**: Defined in the `facade/types/` package, represent data structures
 - **Queries**: Read operations in `facade/queries/`
 - **Mutations**: Write operations in `facade/mutations/`
 - **Subscriptions**: Real-time updates in `facade/subscriptions/`
 
 ### Database Models
 
-Core models in `facade/models.py`:
+Core models in the `facade/models/` package:
 
-- **Registry**: Represents a client application registration
-- **Agent**: Computational entities that execute tasks
-- **Action**: Abstract task definitions
-- **Implementation**: Concrete realizations of actions by agents
-- **State**: Agent configuration and status
-- **Reservation/Assignation**: Task execution lifecycle
+- **Caller**: The `(client, user, organization)` requestor identity — who asks for work
+  (`models/caller.py`). See [`design/identity.md`](design/identity.md).
+- **Agent**: The provider runtime — a connected client that executes work (`models/agent.py`).
+- **Action**: Abstract, versioned task/function contracts.
+- **Implementation**: Concrete realizations of actions by agents.
+- **State / Patch / Snapshot**: Agent state, its incremental history, and checkpoints.
+- **Reservation / Task**: Task routing and the execution log.
 
 ### Authentication
 
@@ -165,7 +181,8 @@ async def test_my_new_query(self, authenticated_context):
 
 #### Adding a New Model
 
-1. **Define the model** in `facade/models.py`:
+1. **Define the model** in the `facade/models/` package (add a module and export it from
+   `facade/models/__init__.py`):
 ```python
 class MyNewModel(models.Model):
     name = models.CharField(max_length=100)
@@ -179,7 +196,7 @@ python manage.py makemigrations
 python manage.py migrate
 ```
 
-3. **Add GraphQL type** in `facade/types.py`:
+3. **Add GraphQL type** in the `facade/types/` package:
 ```python
 @strawberry_django.type(MyNewModel)
 class MyNewType:

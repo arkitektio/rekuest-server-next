@@ -16,13 +16,43 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from kante.path import dynamicpath
+from kante.path import dynamicpath, re_dynamicpath
+from django.http import HttpRequest, JsonResponse
 from django.urls import include, path
-from health_check.views import MainView
+from health_check.views import HealthCheckView
 from django.views.decorators.csrf import csrf_exempt
 
+t = "d"
+
+
+def jwks_view(request: HttpRequest) -> JsonResponse:
+    """Publish the provenance verifying key(s) for offline verification.
+
+    Verifiers fetch-and-cache this document and verify provenance tokens without
+    calling back into Rekuest, so it is served with a public cache header.
+    """
+    from facade.provenance import keys
+
+    response = JsonResponse(keys.get_jwks_document())
+    response["Cache-Control"] = "public, max-age=3600"
+    return response
+
+
+from facade.http_intake import hook_intake  # noqa: E402  (apps are ready when the URLconf loads)
 
 urlpatterns = [
     dynamicpath("admin/", admin.site.urls),
-    dynamicpath("ht",  csrf_exempt(MainView.as_view()), name="health_check"),
+    dynamicpath(".well-known/jwks.json", csrf_exempt(jwks_view), name="provenance_jwks"),
+    re_dynamicpath(r"agi/http/(?P<agent_id>[^/]+)$", csrf_exempt(hook_intake), name="hook_intake"),
+    dynamicpath(
+        "ht",
+        csrf_exempt(
+            HealthCheckView.as_view(
+                checks=[
+                    "health_check.Database",
+                ]
+            )
+        ),
+        name="health_check",
+    ),
 ]

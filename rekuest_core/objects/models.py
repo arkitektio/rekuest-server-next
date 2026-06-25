@@ -1,5 +1,5 @@
 import strawberry
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel
 from typing import Literal, Union
 import datetime
@@ -24,7 +24,7 @@ class SliderAssignWidgetModel(AssignWidgetModel):
     min: float | None = None
     max: float | None = None
     step: float | None = None
- 
+
 
 class ChoiceAssignWidgetModel(AssignWidgetModel):
     kind: Literal["CHOICE"]
@@ -33,7 +33,7 @@ class ChoiceAssignWidgetModel(AssignWidgetModel):
 
 class CustomAssignWidgetModel(AssignWidgetModel):
     kind: Literal["CUSTOM"]
-    hook: str 
+    hook: str
     ward: str
 
 
@@ -45,9 +45,30 @@ class SearchAssignWidgetModel(AssignWidgetModel):
     dependencies: list[str] | None = None
 
 
+class StateAccessorModel(BaseModel):
+    option_key: enums.OptionKey
+    sub_path: str | None = None
+
+
 class StateChoiceAssignWidgetModel(AssignWidgetModel):
     kind: Literal["STATE_CHOICE"]
-    state_choices: str
+    state_path: str
+    dependency: str | None = None
+    state_accessors: list[StateAccessorModel] | None = None
+
+
+class StateChoiceAssignWidgetModel(AssignWidgetModel):
+    kind: Literal["STATE_CHOICE"]
+    state_path: str
+    dependency: str | None = None
+    state_accessors: list[StateAccessorModel] | None = None
+
+
+class ProxyWidgetModel(AssignWidgetModel):
+    kind: Literal["PROXY"]
+    target_port: str
+    target_action: str
+    target_dependency: str | None = None
 
 
 class StringWidgetModel(AssignWidgetModel):
@@ -63,6 +84,7 @@ AssignWidgetModelUnion = Union[
     StateChoiceAssignWidgetModel,
     StringWidgetModel,
     CustomAssignWidgetModel,
+    ProxyWidgetModel,
 ]
 
 
@@ -90,7 +112,7 @@ class EffectModel(BaseModel):
 
 
 class MessageEffectModel(EffectModel):
-    kind: Literal["MESSAGE"] 
+    kind: Literal["MESSAGE"]
     message: str
 
 
@@ -108,13 +130,6 @@ class CustomEffectModel(EffectModel):
 EffectModelUnion = Union[MessageEffectModel, HideEffectModel, CustomEffectModel]
 
 
-class BindsModel(BaseModel):
-    implementations: Optional[list[str]] = None
-    clients: Optional[list[str]] = None
-    desired_instances: int = 1
-    minimum_instances: int = 1
-
-
 class PortGroupModel(BaseModel):
     key: str
     title: str | None
@@ -130,6 +145,33 @@ class ValidatorModel(BaseModel):
     error_message: str | None = None
 
 
+class PortMatchModel(BaseModel):
+    at: int | None = None
+    key: str | None = None
+    kind: str | None = None
+    identifier: str | None = None
+    children: list["PortMatchModel"] | None = None
+    nullable: bool | None = False
+
+
+class RequiresModel(BaseModel):
+    key: str
+    operator: enums.RequiresOperator
+    value: Any
+
+
+class ProvidesModel(BaseModel):
+    key: str
+    operator: enums.ProvidesOperator
+    value: Any
+
+
+class OptimisticModel(BaseModel):
+    state: str
+    path: str
+    accessor: str | None = None
+
+
 class PortModel(BaseModel):
     key: str
     label: str | None = None
@@ -141,9 +183,33 @@ class PortModel(BaseModel):
     default: Any | None = None
     children: list["PortModel"] | None
     choices: list[ChoiceModel] | None = None
-    assign_widget: AssignWidgetModelUnion | None
-    return_widget: ReturnWidgetModelUnion | None
+
+
+class ArgPortModel(PortModel):
     validators: list[ValidatorModel] | None
+    children: list["ArgPortModel"] | None = None
+    widget: Optional[AssignWidgetModelUnion] = None
+    requires: list[RequiresModel] | None = None
+
+
+class ReturnPortModel(PortModel):
+    children: list["ReturnPortModel"] | None = None
+    widget: Optional[ReturnWidgetModelUnion] = None
+    provides: list[ProvidesModel] | None = None
+
+
+class WindowModel(BaseModel):
+    window_function: str
+    label: str | None = None
+
+
+class TrackModel(BaseModel):
+    dependency_key: str | None = None
+    state_key: str
+    value_key: str
+    label: str | None = None
+    description: str | None = None
+    windows: list[WindowModel] | None = None
 
 
 class DefinitionModel(BaseModel):
@@ -160,8 +226,90 @@ class DefinitionModel(BaseModel):
     protocols: list[str]
     defined_at: datetime.datetime
     is_dev: bool = False
-    args: list[PortModel]
-    returns: list[PortModel]
+    args: list[ArgPortModel]
+    returns: list[ReturnPortModel]
+    optimistics: list[OptimisticModel] | None = None
 
 
-SearchAssignWidgetModel.update_forward_refs()
+class DynamicValueModel(BaseModel):
+    """Base model for a dynamic value input, which can reference a variable in a Blok state instance.
+
+    Attributes:
+        literal: An optional static fallback literal value, passed as a serialized string or JSON primitive.
+    """
+
+    literal: str | None = None
+    path: str | None = None
+
+
+class AgentCallModel(BaseModel):
+    """Base model for defining a callback that routes user interactions directly to an Arkitekt Agent via Rekuest.
+
+    Attributes:
+        target_dependency_key: The abstract agent dependency key declared in the Blok manifest (e.g., 'stage_dep').
+        operation_name: The target function name registered on that specific agent's worker thread loop.
+        arguments: An optional list of key-value arguments compiled for the target agent call.
+    """
+
+    dependency: str
+    operation: str
+    arguments: Optional[List["ActionArgumentModel"]] = None
+
+
+class UtilCallModel(BaseModel):
+    operation: str
+    arguments: Optional[List["ActionArgumentModel"]] = None
+
+
+class ActionArgumentModel(BaseModel):
+    """Base model for an action argument input, which can be a static literal or a dynamic state reference.
+
+    Attributes:
+        key: The argument property name.
+        value_literal: An optional static literal string value if not dynamically bound.
+        value_path: An optional JSON Pointer referencing the shared Blok state to inject into this argument slot dynamically.
+    """
+
+    key: str | None = None
+    value_literal: Optional[str | int | float | dict | list] = None
+    value_path: Optional[str] = None
+
+    # Separated nested calls
+    agent_call: Optional["AgentCallModel"] = None
+    util_call: Optional["UtilCallModel"] = None
+
+    value_list: Optional[List["ActionArgumentModel"]] = None
+    value_dict: Optional[List["ActionArgumentModel"]] = None
+
+
+# ============================================================================
+# 2. Abstract Component Property Bindings
+# ============================================================================
+class ComponentPropModel(BaseModel):
+    """Base model for a single key-value prop configuration for a component layout node.
+
+    Attributes:
+        key: The prop key name matching the target UI catalog constraint.
+        static_value: An optional raw scalar or JSON-stringified literal configuration parameter (e.g., '40x' or True).
+        dynamic_value: An optional reactive state data-binding rule.
+        agent_action: An optional imperative interactive network action callback loop.
+    """
+
+    key: str
+    static_value: Optional[str | int | float | dict] = None
+    dynamic_value: Optional[DynamicValueModel] = None
+    declares_value: Optional[str] = None  # If true, this prop declares a new value in the Blok state that can be referenced by other props or actions.
+
+    # Separated top-level callbacks
+    agent_call: Optional[AgentCallModel] = None
+    util_call: Optional[UtilCallModel] = None
+
+
+class ComponentNodeModel(BaseModel):
+    id: str
+    component: str
+    props: Optional[List[ComponentPropModel]] = None
+    children: Optional[List["ComponentNodeModel"]] = None
+
+
+SearchAssignWidgetModel.model_rebuild()

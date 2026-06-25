@@ -8,54 +8,51 @@ from kante.types import Info
 logger = logging.getLogger(__name__)
 
 
-def reserve(info: Info, input: inputs.ReserveInput) -> types.Reservation:
-    return controll_backend.reserve(info, input)
+def assign(info: Info, input: inputs.AssignInput) -> types.Task:
+    model = input.to_pydantic()
+    return controll_backend.assign(info, model)
 
 
-@strawberry.input
-class UnreserveInput:
-    reservation: strawberry.ID
-
-
-def unreserve(info: Info, input: UnreserveInput) -> str:
-    reservation = models.Reservation.objects.get(id=input.reservation)
-    reservation.delete()
-
-    return input.reservation
-
-
-def assign(info: Info, input: inputs.AssignInput) -> types.Assignation:
-    return controll_backend.assign(info, input)
-
-
-def pause(info: Info, input: inputs.PauseInput) -> types.Assignation:
+def pause(info: Info, input: inputs.PauseInput) -> types.Task:
     return controll_backend.pause(input)
 
 
-def resume(info: Info, input: inputs.ResumeInput) -> types.Assignation:
+def resume(info: Info, input: inputs.ResumeInput) -> types.Task:
     return controll_backend.resume(input)
-
-
-def step(info: Info, input: inputs.StepInput) -> types.Assignation:
-    return controll_backend.step(input)
 
 
 @strawberry.input
 class AckInput:
-    assignation: strawberry.ID
+    task: strawberry.ID
 
 
-def ack(info: Info, input: AckInput) -> types.Assignation:
-    return models.Assignation.objects.get(id=input.id)
+def ack(info: Info, input: AckInput) -> types.Task:
+    return models.Task.objects.get(id=input.id)
 
 
-def cancel(info: Info, input: inputs.CancelInput) -> types.Assignation:
+def cancel(info: Info, input: inputs.CancelInput) -> types.Task:
     return controll_backend.cancel(input)
 
 
-def interrupt(info: Info, input: inputs.InterruptInput) -> types.Assignation:
+def interrupt(info: Info, input: inputs.InterruptInput) -> types.Task:
     return controll_backend.interrupt(input)
 
 
 def collect(info: Info, input: inputs.CollectInput) -> list[str]:
     return controll_backend.collect(info, input)
+
+
+def bounce(info: Info, input: inputs.BounceInput) -> types.Agent:
+    return controll_backend.bounce(info, input)
+
+
+def kick(info: Info, input: inputs.KickInput) -> types.Agent:
+    return controll_backend.kick(info, input)
+
+
+def block(info: Info, input: inputs.BlockInput) -> types.Agent:
+    return controll_backend.block(info, input)
+
+
+def unblock(info: Info, input: inputs.UnblockInput) -> types.Agent:
+    return controll_backend.unblock(info, input)
