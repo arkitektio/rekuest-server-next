@@ -112,3 +112,15 @@ prerelease_token = "rc"
 [tool.semantic_release.branches.maintenance]
 match = '^\d+\.x$'
 prerelease = false
+
+# Keep the changelog / release notes focused on user-facing changes. These
+# patterns only filter what's rendered — they do not affect version bumps.
+[tool.semantic_release.changelog]
+exclude_commit_patterns = [
+    '^chore(?:\([^)]*\))?: ', # includes the chore(release): … bump commit
+    '^ci(?:\([^)]*\))?: ',
+    '^build(?:\([^)]*\))?: ',
+    '^style(?:\([^)]*\))?: ',
+    '^test(?:\([^)]*\))?: ',
+    '^Merge ',
+]

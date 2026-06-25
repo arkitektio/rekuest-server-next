@@ -42,10 +42,11 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      # Add the Docker image pull instructions to the freshly-created Release.
-      # This only needs the version string, so it does not wait on the image
-      # build — the docker job (and its registry tags) come from the same version.
-      - name: Add the Docker image to the GitHub Release
+      # Append the Docker image pull instructions and a contributors list to the
+      # freshly-created Release. This only needs the version + git history, so it
+      # does not wait on the image build — the docker job (and its registry tags)
+      # come from the same version.
+      - name: Enrich the GitHub Release notes
         if: steps.release.outputs.released == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -59,12 +60,17 @@ jobs:
             next) channel="next" ;;
             *)    channel="${VERSION%%.*}" ;; # N.x maintenance -> major tag
           esac
+          # Contributors since the previous release tag (empty range on first release).
+          prev="$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)"
+          range="${prev:+$prev..}${TAG}"
+          contributors="$(git log --format='- %an' "$range" | sort -u)"
           body="$(gh release view "$TAG" --json body --jq .body)"
           {
             printf '%s\n\n' "$body"
             printf '## Docker image\n\n'
             printf '```sh\ndocker pull jhnnsrs/rekuest:%s\n```\n\n' "$VERSION"
-            printf 'Also published as `jhnnsrs/rekuest:%s`.\n' "$channel"
+            printf 'Also published as `jhnnsrs/rekuest:%s`.\n\n' "$channel"
+            printf '## Contributors\n\n%s\n' "$contributors"
           } | gh release edit "$TAG" --notes-file -
 
   # 2. Only if a release was actually cut: build the image at the new tag and
