@@ -1,6 +1,9 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.2 (2026-06-25)
+
+
 ## v1.0.0-rc.1 (2026-06-25)
 
 ### Bug Fixes
@@ -19,6 +22,12 @@
 
 - Add descriptors
   ([`482471d`](https://github.com/arkitektio/rekuest-server-next/commit/482471d5dfc5eb09e53c570f63055332e4843599))
+
+- Add github release
+  ([`f9fe7e0`](https://github.com/arkitektio/rekuest-server-next/commit/f9fe7e032f25ec2e6d53afd922bbd53b35f4a831))
+
+- Add github releasre
+  ([`132c726`](https://github.com/arkitektio/rekuest-server-next/commit/132c726250124db31de7331451e738479394c76d))
 
 - Add latest assignation
   ([`20a00d7`](https://github.com/arkitektio/rekuest-server-next/commit/20a00d7669614f40589cdac8d7bdc2c563ea9cdf))
@@ -181,6 +190,9 @@
 
 - Removal of device_id on agent
   ([`0b4439d`](https://github.com/arkitektio/rekuest-server-next/commit/0b4439d2d5a2fb3c184a8aa3c5811c183e2f82e3))
+
+- Removale of old docker containers
+  ([`0f64499`](https://github.com/arkitektio/rekuest-server-next/commit/0f6449970dd5e369c2537f2d3b7414b68142e996))
 
 - Remove filters
   ([`9779e1a`](https://github.com/arkitektio/rekuest-server-next/commit/9779e1a44b6fcce27ba75417ecbea5978ffa2218))
