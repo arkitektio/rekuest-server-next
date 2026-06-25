@@ -105,7 +105,9 @@ def _signed_request(agent, message):
     body = message.model_dump_json().encode("utf-8")
     sig = hooks.sign(agent.hook_url_secret, body)
     return RequestFactory().post(
-        f"/agi/http/{agent.pk}", data=body, content_type="application/json",
+        f"/agi/http/{agent.pk}",
+        data=body,
+        content_type="application/json",
         **{f"HTTP_{hooks.SIGNATURE_HEADER.upper().replace('-', '_')}": sig},
     )
 
@@ -130,7 +132,9 @@ class TestHookIntake:
         agent = await build_webhook_agent("hook-in-bad", secret="sek")
         body = messages.Completed(task="x").model_dump_json().encode("utf-8")
         request = RequestFactory().post(
-            f"/agi/http/{agent.pk}", data=body, content_type="application/json",
+            f"/agi/http/{agent.pk}",
+            data=body,
+            content_type="application/json",
             **{f"HTTP_{hooks.SIGNATURE_HEADER.upper().replace('-', '_')}": "deadbeef"},
         )
         response = await hook_intake(request, str(agent.pk))
@@ -170,7 +174,5 @@ async def test_action_assign_selects_webhook_agent(post_recorder):
 
     ctx = CallerContext.from_agent(agent)
     action_id = str(impl.action_id)
-    task = await sync_to_async(controll_backend.assign)(
-        ctx, inputs.AssignInputModel(action=action_id, args={})
-    )
+    task = await sync_to_async(controll_backend.assign)(ctx, inputs.AssignInputModel(action=action_id, args={}))
     assert str(task.agent_id) == str(agent.pk)

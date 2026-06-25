@@ -18,8 +18,12 @@ class TestAgentDelivery:
         session = await open_agent(agent_ws, "delivery-agent")
 
         assign = messages.Assign(
-            interface="iface", task=str(uuid.uuid4()),
-            args={"a": 1}, user="1", org="test-org", action="some-action",
+            interface="iface",
+            task=str(uuid.uuid4()),
+            args={"a": 1},
+            user="1",
+            org="test-org",
+            action="some-action",
             implementation="impl-1",
         )
         # broadcast() lpushes to the agent's redis queue; listen_for_tasks relays it.

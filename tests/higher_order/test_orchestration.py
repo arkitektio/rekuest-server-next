@@ -29,20 +29,39 @@ def _build_hoi_graph(agent_pk):
     agent = Agent.objects.get(pk=agent_pk)
 
     lower_action = Action.objects.create(
-        app=agent.app, key="lower-key", version="1.0.0", name="lower action",
-        description="lower", hash="lower-action-hash", organization=agent.organization,
+        app=agent.app,
+        key="lower-key",
+        version="1.0.0",
+        name="lower action",
+        description="lower",
+        hash="lower-action-hash",
+        organization=agent.organization,
     )
     lower_impl = Implementation.objects.create(
-        release=agent.release, interface="lower_fn", action=lower_action, agent=agent, dynamic=False,
+        release=agent.release,
+        interface="lower_fn",
+        action=lower_action,
+        agent=agent,
+        dynamic=False,
     )
 
     higher_action = Action.objects.create(
-        app=agent.app, key="higher-key", version="1.0.0", name="higher action",
-        description="higher", hash="higher-action-hash", organization=agent.organization,
+        app=agent.app,
+        key="higher-key",
+        version="1.0.0",
+        name="higher action",
+        description="higher",
+        hash="higher-action-hash",
+        organization=agent.organization,
     )
     higher_impl = Implementation.objects.create(
-        release=agent.release, interface="higher_fn", action=higher_action, agent=agent, dynamic=False,
-        higher_order_for=lower_impl, higher_order_config=HIGHER_ORDER_CONFIG,
+        release=agent.release,
+        interface="higher_fn",
+        action=higher_action,
+        agent=agent,
+        dynamic=False,
+        higher_order_for=lower_impl,
+        higher_order_config=HIGHER_ORDER_CONFIG,
     )
     return higher_impl, lower_impl
 
@@ -64,9 +83,7 @@ class TestHigherOrderOrchestration:
         info = _Info(authenticated_context)
 
         # Assign the higher-order implementation with the caller's typed args.
-        higher_task = await sync_to_async(controll_backend.assign)(
-            info, inputs.AssignInputModel(implementation=str(higher_impl.pk), args={"x": 1})
-        )
+        higher_task = await sync_to_async(controll_backend.assign)(info, inputs.AssignInputModel(implementation=str(higher_impl.pk), args={"x": 1}))
 
         # The lower agent receives a normal Assign for the child, with remapped args.
         received = await communicator.receive_json_from(timeout=RECEIVE_TIMEOUT)
@@ -85,9 +102,7 @@ class TestHigherOrderOrchestration:
         await communicator.disconnect()
 
         # The wrapper task sees the UNFOLDED yield (mapped via return_map) + delegated_to.
-        higher_yield = await TaskEvent.objects.filter(
-            task_id=higher_task.pk, kind="YIELD"
-        ).aget()
+        higher_yield = await TaskEvent.objects.filter(task_id=higher_task.pk, kind="YIELD").aget()
         assert higher_yield.returns == {"result": 42}
         assert str(higher_yield.delegated_to_id) == str(child_id)
 
@@ -104,6 +119,4 @@ class TestHigherOrderOrchestration:
         info = _Info(authenticated_context)
 
         with pytest.raises(ValueError):
-            await sync_to_async(controll_backend.assign)(
-                info, inputs.AssignInputModel(implementation=str(higher_impl.pk), args={"x": 1})
-            )
+            await sync_to_async(controll_backend.assign)(info, inputs.AssignInputModel(implementation=str(higher_impl.pk), args={"x": 1}))

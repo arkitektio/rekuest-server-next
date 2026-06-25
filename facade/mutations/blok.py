@@ -5,7 +5,6 @@ import strawberry
 
 
 def create_blok(info: Info, input: inputs.CreateBlokInput) -> types.Blok:
-
     model = input.to_pydantic()
 
     catalog = models.UICatalog.objects.get_or_create(name=model.catalog)[0] if model.catalog else models.UICatalog.objects.get_or_create(name="default")[0]
@@ -40,7 +39,6 @@ def create_blok(info: Info, input: inputs.CreateBlokInput) -> types.Blok:
 
 
 def delete_blok(info: Info, input: inputs.DeleteBlokInput) -> bool:
-
     try:
         blok = models.Blok.objects.get(id=input.id)
         blok.delete()
@@ -50,7 +48,6 @@ def delete_blok(info: Info, input: inputs.DeleteBlokInput) -> bool:
 
 
 def update_blok(info: Info, input: inputs.UpdateBlokInput) -> types.Blok:
-
     try:
         blok = models.Blok.objects.get(id=input.id)
     except models.Blok.DoesNotExist:

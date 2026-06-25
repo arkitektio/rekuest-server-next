@@ -7,8 +7,6 @@ logger = logging.getLogger(__name__)
 
 
 def create_shortcut(info: Info, input: inputs.CreateShortcutInput) -> types.Shortcut:
-   
-
     toolbox = (
         models.Toolbox.objects.get(id=input.toolbox)
         if input.toolbox

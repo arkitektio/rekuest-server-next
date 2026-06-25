@@ -27,9 +27,7 @@ class TestAgentLocks:
     async def test_unlock_releases(self, agent_ws):
         session = await open_agent(agent_ws, "lock-release-agent")
         task = await build_task_for_agent_caller(session.agent_pk, "lock-rel")
-        await Lock.objects.acreate(
-            agent_id=session.agent_pk, key="res-1", description="a resource", hold_by_id=task.pk
-        )
+        await Lock.objects.acreate(agent_id=session.agent_pk, key="res-1", description="a resource", hold_by_id=task.pk)
 
         await session.send(messages.Unlock(key="res-1"))
         await session.disconnect()

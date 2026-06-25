@@ -65,9 +65,7 @@ def _seed_action_requiring_axes_c(context):
     org = request.organization
     app = App.objects.create(identifier="flt-app")
     release = Release.objects.create(app=app, version="1.0.0")
-    agent = models.Agent.objects.create(
-        app=app, release=release, user=request.user, client=request.client, organization=org, hash="flt-agent-hash"
-    )
+    agent = models.Agent.objects.create(app=app, release=release, user=request.user, client=request.client, organization=org, hash="flt-agent-hash")
     return _create_implementation(_implementation_input(), agent).action
 
 

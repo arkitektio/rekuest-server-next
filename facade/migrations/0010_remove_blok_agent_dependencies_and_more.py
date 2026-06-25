@@ -4,24 +4,23 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('facade', '0009_blokagentmapping_dependency'),
+        ("facade", "0009_blokagentmapping_dependency"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='blok',
-            name='agent_dependencies',
+            model_name="blok",
+            name="agent_dependencies",
         ),
         migrations.AddField(
-            model_name='blokdependency',
-            name='state_demands',
-            field=models.JSONField(default=list, help_text='The state demands this dependency has to meet'),
+            model_name="blokdependency",
+            name="state_demands",
+            field=models.JSONField(default=list, help_text="The state demands this dependency has to meet"),
         ),
         migrations.AddField(
-            model_name='dependency',
-            name='state_demands',
-            field=models.JSONField(default=list, help_text='The state demands this dependency has to meet'),
+            model_name="dependency",
+            name="state_demands",
+            field=models.JSONField(default=list, help_text="The state demands this dependency has to meet"),
         ),
     ]

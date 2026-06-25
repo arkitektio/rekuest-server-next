@@ -21,11 +21,15 @@ def pm(at=None, key=None, kind=None, identifier=None, nullable=None, children=No
 @pytest.fixture
 def state_defs(db):
     counter = models.StateDefinition.objects.create(
-        name="Counter", hash="counter-hash", description="counter",
+        name="Counter",
+        hash="counter-hash",
+        description="counter",
         ports=[{"key": "count", "kind": "INT", "identifier": None, "nullable": False, "children": []}],
     )
     tracker = models.StateDefinition.objects.create(
-        name="Tracker", hash="tracker-hash", description="tracker",
+        name="Tracker",
+        hash="tracker-hash",
+        description="tracker",
         ports=[{"key": "position", "kind": "STRUCTURE", "identifier": "@mikro/roi", "nullable": False, "children": []}],
     )
     return SimpleNamespace(counter=counter, tracker=tracker)

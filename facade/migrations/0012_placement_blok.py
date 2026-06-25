@@ -5,15 +5,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('facade', '0011_blok_demo_state'),
+        ("facade", "0011_blok_demo_state"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='placement',
-            name='blok',
-            field=models.ForeignKey(blank=True, help_text='An optional Blok to represent this placement in a 3D space and to define its interactions', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='placements', to='facade.materializedblok'),
+            model_name="placement",
+            name="blok",
+            field=models.ForeignKey(blank=True, help_text="An optional Blok to represent this placement in a 3D space and to define its interactions", null=True, on_delete=django.db.models.deletion.CASCADE, related_name="placements", to="facade.materializedblok"),
         ),
     ]

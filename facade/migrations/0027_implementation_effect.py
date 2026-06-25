@@ -6,15 +6,20 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('facade', '0026_alter_blokdependency_assign_policy_and_more'),
+        ("facade", "0026_alter_blokdependency_assign_policy_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='implementation',
-            name='effect',
-            field=django_choices_field.fields.TextChoicesField(choices=[('NONE', 'None (no real-world effect; freely retryable)'), ('PHYSICAL', 'Physical (touches the real world; ambiguous failure is terminal)')], choices_enum=facade.enums.action.EffectClassChoices, default='NONE', help_text='The effect class of this implementation. NONE work is freely retryable/reclaimable; PHYSICAL work touches the real world and an ambiguous failure is terminal. Declared by the implementation, read at dispatch from assignation.implementation.effect — never caller-supplied.', max_length=8),
+            model_name="implementation",
+            name="effect",
+            field=django_choices_field.fields.TextChoicesField(
+                choices=[("NONE", "None (no real-world effect; freely retryable)"), ("PHYSICAL", "Physical (touches the real world; ambiguous failure is terminal)")],
+                choices_enum=facade.enums.action.EffectClassChoices,
+                default="NONE",
+                help_text="The effect class of this implementation. NONE work is freely retryable/reclaimable; PHYSICAL work touches the real world and an ambiguous failure is terminal. Declared by the implementation, read at dispatch from assignation.implementation.effect — never caller-supplied.",
+                max_length=8,
+            ),
         ),
     ]

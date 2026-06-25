@@ -20,9 +20,7 @@ from pydantic_settings import (
 
 from authentikate.base_models import AuthentikateSettings
 
-_DEFAULT_CONFIG = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.yaml"
-)
+_DEFAULT_CONFIG = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.yaml")
 
 
 class AdminSettings(BaseModel):

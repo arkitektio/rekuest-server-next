@@ -77,9 +77,7 @@ async def _start(client, query, variables=None, op_id="1"):
     payload = {"query": query}
     if variables:
         payload["variables"] = variables
-    await client.communicator.send_input(
-        {"type": "websocket.receive", "text": json.dumps({"id": op_id, "type": "start", "payload": payload})}
-    )
+    await client.communicator.send_input({"type": "websocket.receive", "text": json.dumps({"id": op_id, "type": "start", "payload": payload})})
 
 
 def _is_data(msg, op_id="1"):
@@ -102,9 +100,7 @@ async def _recv(client, predicate, op_id="1", timeout=6):
 
 async def _stop(client, op_id="1"):
     """Cleanly stop the subscription so the server unwinds it in its own context (no teardown noise)."""
-    await client.communicator.send_input(
-        {"type": "websocket.receive", "text": json.dumps({"id": op_id, "type": "stop"})}
-    )
+    await client.communicator.send_input({"type": "websocket.receive", "text": json.dumps({"id": op_id, "type": "stop"})})
     await asyncio.sleep(0.2)
 
 

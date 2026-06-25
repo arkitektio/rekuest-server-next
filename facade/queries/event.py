@@ -1,4 +1,3 @@
-
 import strawberry
 from facade import models, types
 from kante.types import Info

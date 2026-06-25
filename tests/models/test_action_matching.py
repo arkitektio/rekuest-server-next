@@ -52,9 +52,7 @@ def _make_ports(action, specs, PortModel, descriptor_key, parent=None, parent_pa
             key_path=current_path,
             kind=spec.get("kind"),
             identifier=spec.get("identifier"),
-            compiled_jsonpath=compile_descriptors_to_jsonpath(
-                [SimpleNamespace(**d) for d in spec.get(descriptor_key, [])]
-            ),
+            compiled_jsonpath=compile_descriptors_to_jsonpath([SimpleNamespace(**d) for d in spec.get(descriptor_key, [])]),
             nullable=bool(spec.get("nullable", False)),
         )
         _make_ports(action, spec.get("children", []), PortModel, descriptor_key, parent=row, parent_path=current_path)
@@ -78,28 +76,38 @@ def catalog(db):
 
     # A1: structure input that REQUIRES axes == "c"; returns one INT.
     a1 = make_action(
-        org1, "match-a1",
-        args=[{"key": "image", "kind": "STRUCTURE", "identifier": "@mikro/image", "nullable": False,
-               "requires": [{"key": "axes", "operator": "EQUALS", "value": "c"}]}],
+        org1,
+        "match-a1",
+        args=[{"key": "image", "kind": "STRUCTURE", "identifier": "@mikro/image", "nullable": False, "requires": [{"key": "axes", "operator": "EQUALS", "value": "c"}]}],
         returns=[{"key": "count", "kind": "INT", "nullable": False}],
     )
     # A2: structure input with NO requires (accepts anything) plus a nested DICT tree; nullable input.
     a2 = make_action(
-        org1, "match-a2",
+        org1,
+        "match-a2",
         args=[
             {"key": "image", "kind": "STRUCTURE", "identifier": "@mikro/image", "nullable": True, "requires": []},
-            {"key": "options", "kind": "DICT", "nullable": True, "children": [
-                {"key": "advanced", "kind": "DICT", "children": [
-                    {"key": "mask", "kind": "STRUCTURE", "identifier": "@mikro/mask"},
-                ]},
-            ]},
+            {
+                "key": "options",
+                "kind": "DICT",
+                "nullable": True,
+                "children": [
+                    {
+                        "key": "advanced",
+                        "kind": "DICT",
+                        "children": [
+                            {"key": "mask", "kind": "STRUCTURE", "identifier": "@mikro/mask"},
+                        ],
+                    },
+                ],
+            },
         ],
     )
     # A3: same shape as A1 but in a different organization (isolation check).
     a3 = make_action(
-        org2, "match-a3",
-        args=[{"key": "image", "kind": "STRUCTURE", "identifier": "@mikro/image", "nullable": False,
-               "requires": [{"key": "axes", "operator": "EQUALS", "value": "c"}]}],
+        org2,
+        "match-a3",
+        args=[{"key": "image", "kind": "STRUCTURE", "identifier": "@mikro/image", "nullable": False, "requires": [{"key": "axes", "operator": "EQUALS", "value": "c"}]}],
         returns=[{"key": "count", "kind": "INT", "nullable": False}],
     )
     return SimpleNamespace(org1=org1, org2=org2, a1=a1, a2=a2, a3=a3)
@@ -128,27 +136,29 @@ def test_nullable_macro_match(catalog):
 
 def test_micro_constraint_satisfied(catalog):
     # object satisfies a1's requires (axes == "c"); a2 has no requires so it always matches.
-    ids = managers.get_action_ids_by_demands(
-        [pm(identifier="@mikro/image", descriptors={"axes": "c"})], type="args"
-    )
+    ids = managers.get_action_ids_by_demands([pm(identifier="@mikro/image", descriptors={"axes": "c"})], type="args")
     assert set(ids) == {catalog.a1.id, catalog.a2.id, catalog.a3.id}
 
 
 def test_micro_constraint_rejected(catalog):
     # object violates a1/a3's requires (axes != "c"); a2 (no requires) still matches.
-    ids = managers.get_action_ids_by_demands(
-        [pm(identifier="@mikro/image", descriptors={"axes": "z"})], type="args"
-    )
+    ids = managers.get_action_ids_by_demands([pm(identifier="@mikro/image", descriptors={"axes": "z"})], type="args")
     assert set(ids) == {catalog.a2.id}
 
 
 def test_nested_match_two_levels_deep(catalog):
     # options(DICT) -> advanced(DICT) -> mask(STRUCTURE @mikro/mask): only a2.
-    demand = pm(kind=PortKind.DICT, children=[
-        pm(kind=PortKind.DICT, children=[
-            pm(kind=PortKind.STRUCTURE, identifier="@mikro/mask"),
-        ]),
-    ])
+    demand = pm(
+        kind=PortKind.DICT,
+        children=[
+            pm(
+                kind=PortKind.DICT,
+                children=[
+                    pm(kind=PortKind.STRUCTURE, identifier="@mikro/mask"),
+                ],
+            ),
+        ],
+    )
     ids = managers.get_action_ids_by_demands([demand], type="args")
     assert set(ids) == {catalog.a2.id}
 
@@ -172,9 +182,7 @@ def test_force_non_nullable_length(catalog):
 
 
 def test_organization_isolation(catalog):
-    ids = managers.get_action_ids_by_demands(
-        [pm(identifier="@mikro/image")], type="args", organization_id=catalog.org1.id
-    )
+    ids = managers.get_action_ids_by_demands([pm(identifier="@mikro/image")], type="args", organization_id=catalog.org1.id)
     assert set(ids) == {catalog.a1.id, catalog.a2.id}
     assert catalog.a3.id not in ids
 

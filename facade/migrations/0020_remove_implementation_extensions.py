@@ -4,14 +4,13 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('facade', '0019_remove_agent_extensions_and_more'),
+        ("facade", "0019_remove_agent_extensions_and_more"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='implementation',
-            name='extensions',
+            model_name="implementation",
+            name="extensions",
         ),
     ]

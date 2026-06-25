@@ -95,15 +95,10 @@ def _build_match_exists(
         candidate_object = {descriptor.key: descriptor.value for descriptor in descriptors}
         key = f"obj_{id_path}"
         params[key] = json.dumps(candidate_object)
-        conditions.append(
-            f"({alias}.compiled_jsonpath IS NULL OR "
-            f"jsonb_path_match(%({key})s::jsonb, {alias}.compiled_jsonpath::jsonpath, '{{}}'::jsonb, true))"
-        )
+        conditions.append(f"({alias}.compiled_jsonpath IS NULL OR jsonb_path_match(%({key})s::jsonb, {alias}.compiled_jsonpath::jsonpath, '{{}}'::jsonb, true))")
 
     for child_index, child in enumerate(match.children or []):
-        conditions.append(
-            _build_match_exists(child, table, action_alias, alias, f"{id_path}_{child_index}", params)
-        )
+        conditions.append(_build_match_exists(child, table, action_alias, alias, f"{id_path}_{child_index}", params))
 
     inner = " AND ".join(conditions)
     return f"EXISTS (SELECT 1 FROM {table} {alias} WHERE {inner})"
@@ -112,10 +107,7 @@ def _build_match_exists(
 def _root_count_subquery(table: str, action_alias: str, extra_condition: str, param_key: str, value: int, params: dict[str, t.Any]) -> str:
     """Build a ``(SELECT COUNT(*) ...) = N`` clause over an action's root ports."""
     params[param_key] = value
-    return (
-        f"(SELECT COUNT(*) FROM {table} pc WHERE pc.action_id = {action_alias}.id "
-        f"AND pc.parent_id IS NULL AND {extra_condition}) = %({param_key})s"
-    )
+    return f"(SELECT COUNT(*) FROM {table} pc WHERE pc.action_id = {action_alias}.id AND pc.parent_id IS NULL AND {extra_condition}) = %({param_key})s"
 
 
 def _execute_ids(sql: str, params: dict[str, t.Any]) -> list[t.Any]:

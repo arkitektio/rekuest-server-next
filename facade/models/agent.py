@@ -261,5 +261,3 @@ class HardwareRecord(models.Model):
     cpu_count = models.IntegerField(default=0)
     cpu_vendor_name = models.CharField(max_length=1000, default="Unknown")
     cpu_frequency = models.FloatField(default=0)
-
-

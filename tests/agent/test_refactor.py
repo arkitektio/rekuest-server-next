@@ -80,9 +80,7 @@ class TestReconcileSweep:
 
         ass = async_to_sync(build_task)("sweep-stale", effect="NONE")
         # Disconnected websocket executor, gone well past the grace window.
-        Agent.objects.filter(pk=ass.agent_id).update(
-            kind=enums.AgentKind.WEBSOCKET.value, connected=False, last_seen=timezone.now() - timedelta(minutes=5)
-        )
+        Agent.objects.filter(pk=ass.agent_id).update(kind=enums.AgentKind.WEBSOCKET.value, connected=False, last_seen=timezone.now() - timedelta(minutes=5))
 
         call_command("reconcile_tasks", stdout=StringIO())
 
@@ -96,13 +94,9 @@ class TestReconcileSweep:
         from facade.models import Agent, Task
 
         connected = async_to_sync(build_task)("sweep-conn", effect="NONE")
-        Agent.objects.filter(pk=connected.agent_id).update(
-            kind=enums.AgentKind.WEBSOCKET.value, connected=True, last_seen=timezone.now()
-        )
+        Agent.objects.filter(pk=connected.agent_id).update(kind=enums.AgentKind.WEBSOCKET.value, connected=True, last_seen=timezone.now())
         webhook = async_to_sync(build_task)("sweep-hook", effect="NONE")
-        Agent.objects.filter(pk=webhook.agent_id).update(
-            kind=enums.AgentKind.WEBHOOK.value, connected=False, last_seen=timezone.now() - timedelta(minutes=5)
-        )
+        Agent.objects.filter(pk=webhook.agent_id).update(kind=enums.AgentKind.WEBHOOK.value, connected=False, last_seen=timezone.now() - timedelta(minutes=5))
 
         call_command("reconcile_tasks", stdout=StringIO())
 

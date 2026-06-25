@@ -18,8 +18,15 @@ class TestAgentStateEvents:
 
         await session.send(
             messages.StatePatch(
-                session_id="session-1", global_rev=1, state_name="counter", ts=0.0,
-                op="replace", path="/value", value=5, old_value=None, task_id=None,
+                session_id="session-1",
+                global_rev=1,
+                state_name="counter",
+                ts=0.0,
+                op="replace",
+                path="/value",
+                value=5,
+                old_value=None,
+                task_id=None,
             )
         )
 

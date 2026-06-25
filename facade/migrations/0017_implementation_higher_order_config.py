@@ -4,15 +4,18 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('facade', '0016_remove_waiter_no_multiple_waiters_for_same_app_and_user_allowed_on_same_instance_id_and_more'),
+        ("facade", "0016_remove_waiter_no_multiple_waiters_for_same_app_and_user_allowed_on_same_instance_id_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='implementation',
-            name='higher_order_config',
-            field=models.JSONField(blank=True, default=dict, help_text="Projection config for a higher-order implementation (only meaningful when ``higher_order_for`` is set). Describes how this wrapper's bound params + caller args + caller dependencies are remapped onto the wrapped (lower) implementation, and how the lower implementation's returns are unfolded back. Keys: ``bound`` (dict spread as the lower impl's named args), ``args_key`` (the lower arg port the remaining caller args are packed under), ``arg_map`` (explicit per-port arg remap), ``dependency_map`` (lower dep key -> source), ``return_map`` (lower return key -> wrapper return key)."),
+            model_name="implementation",
+            name="higher_order_config",
+            field=models.JSONField(
+                blank=True,
+                default=dict,
+                help_text="Projection config for a higher-order implementation (only meaningful when ``higher_order_for`` is set). Describes how this wrapper's bound params + caller args + caller dependencies are remapped onto the wrapped (lower) implementation, and how the lower implementation's returns are unfolded back. Keys: ``bound`` (dict spread as the lower impl's named args), ``args_key`` (the lower arg port the remaining caller args are packed under), ``arg_map`` (explicit per-port arg remap), ``dependency_map`` (lower dep key -> source), ``return_map`` (lower return key -> wrapper return key).",
+            ),
         ),
     ]

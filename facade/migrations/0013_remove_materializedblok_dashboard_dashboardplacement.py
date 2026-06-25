@@ -5,25 +5,24 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('facade', '0012_placement_blok'),
+        ("facade", "0012_placement_blok"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='materializedblok',
-            name='dashboard',
+            model_name="materializedblok",
+            name="dashboard",
         ),
         migrations.CreateModel(
-            name='DashboardPlacement',
+            name="DashboardPlacement",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('position', models.JSONField(blank=True, help_text='The position of this Blok in the Dashboard (e.g. x and y coordinates)', null=True)),
-                ('blok', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='dashboard_placements', to='facade.materializedblok')),
-                ('dashboard', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='placements', to='facade.dashboard')),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("position", models.JSONField(blank=True, help_text="The position of this Blok in the Dashboard (e.g. x and y coordinates)", null=True)),
+                ("blok", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="dashboard_placements", to="facade.materializedblok")),
+                ("dashboard", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="placements", to="facade.dashboard")),
             ],
         ),
     ]

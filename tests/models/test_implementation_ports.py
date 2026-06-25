@@ -44,8 +44,12 @@ def _arg_object_demand(identifier, obj):
     descriptors = [SimpleNamespace(key=k, value=v) for k, v in obj.items()]
     match = SimpleNamespace(at=None, key=None, kind=None, identifier=identifier, descriptors=descriptors, nullable=None, children=None)
     return SimpleNamespace(
-        hash=None, name=None, force_arg_length=None, force_return_length=None,
-        arg_matches=[match], return_matches=None,
+        hash=None,
+        name=None,
+        force_arg_length=None,
+        force_return_length=None,
+        arg_matches=[match],
+        return_matches=None,
     )
 
 
@@ -64,14 +68,10 @@ def test_rebuild_builds_relational_ports_and_matches():
     assert arg.compiled_jsonpath == '$.axes == "c"'
 
     # The matcher finds the action by a satisfying descriptor and rejects a violating one.
-    matching = managers.get_action_ids_by_action_demand(
-        _arg_object_demand("@mikro/image", {"axes": "c"}), organization_id=org.id
-    )
+    matching = managers.get_action_ids_by_action_demand(_arg_object_demand("@mikro/image", {"axes": "c"}), organization_id=org.id)
     assert action.id in matching
 
-    rejecting = managers.get_action_ids_by_action_demand(
-        _arg_object_demand("@mikro/image", {"axes": "z"}), organization_id=org.id
-    )
+    rejecting = managers.get_action_ids_by_action_demand(_arg_object_demand("@mikro/image", {"axes": "z"}), organization_id=org.id)
     assert action.id not in rejecting
 
 

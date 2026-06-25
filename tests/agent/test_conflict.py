@@ -61,10 +61,5 @@ class TestAgentConnectionConflict:
         await incumbent.expect_close(AGENT_REPLACED_CODE)  # let the displaced connection finish closing
         await asyncio.sleep(0.1)
 
-        disconnected = [
-            e
-            async for e in TaskEvent.objects.filter(
-                task_id=task.pk, kind=enums.TaskEventKind.DISCONNECTED
-            )
-        ]
+        disconnected = [e async for e in TaskEvent.objects.filter(task_id=task.pk, kind=enums.TaskEventKind.DISCONNECTED)]
         assert disconnected == []

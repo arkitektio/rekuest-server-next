@@ -7,7 +7,6 @@ logger = logging.getLogger(__name__)
 
 
 def create_dashboard(info: Info, input: inputs.CreateDashboardInput) -> types.Dashboard:
-
     dashboard = models.Dashboard.objects.create(
         name=input.name,
     )
@@ -16,7 +15,6 @@ def create_dashboard(info: Info, input: inputs.CreateDashboardInput) -> types.Da
 
 
 def delete_dashboard(info: Info, input: inputs.DeleteDashboardInput) -> bool:
-
     try:
         dashboard = models.Dashboard.objects.get(id=input.id)
         dashboard.delete()
@@ -27,7 +25,6 @@ def delete_dashboard(info: Info, input: inputs.DeleteDashboardInput) -> bool:
 
 
 def update_dashboard(info: Info, input: inputs.UpdateDashboardInput) -> types.Dashboard:
-
     try:
         dashboard = models.Dashboard.objects.get(id=input.id)
     except models.Dashboard.DoesNotExist:

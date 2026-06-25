@@ -4,16 +4,15 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('facade', '0001_initial'),
+        ("facade", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='patch',
-            name='interface',
-            field=models.CharField(default='xxx', help_text='The interface of the state in the agent', max_length=1000),
+            model_name="patch",
+            name="interface",
+            field=models.CharField(default="xxx", help_text="The interface of the state in the agent", max_length=1000),
             preserve_default=False,
         ),
     ]

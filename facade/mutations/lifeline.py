@@ -3,8 +3,6 @@ import strawberry
 from facade.persist_backend import persist_backend
 
 
-
-
 @strawberry.input
 class ReInitInput:
     agent: strawberry.ID | None = None

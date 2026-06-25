@@ -381,9 +381,7 @@ class ModelPersistBackend:
         """
         self._caller_grace.cancel(session_id or connection_id)
         if session_id is not None and connection_id is not None:
-            await models.Task.objects.filter(originating_session_id=session_id, is_done=False).aupdate(
-                originating_connection_id=connection_id
-            )
+            await models.Task.objects.filter(originating_session_id=session_id, is_done=False).aupdate(originating_connection_id=connection_id)
 
     async def on_caller_disconnected(self, agent_id: int, connection_id: str | None = None, session_id: str | None = None, mode: str | None = None) -> None:
         """A participant that may originate work disconnected — cascade-cancel its roots.

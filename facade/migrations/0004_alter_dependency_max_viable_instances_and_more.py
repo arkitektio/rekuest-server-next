@@ -4,25 +4,24 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('facade', '0003_rename_minimal_viable_instances_dependency_min_viable_instances_and_more'),
+        ("facade", "0003_rename_minimal_viable_instances_dependency_min_viable_instances_and_more"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='dependency',
-            name='max_viable_instances',
-            field=models.IntegerField(help_text='The maximal viable instance count for this dependency', null=True),
+            model_name="dependency",
+            name="max_viable_instances",
+            field=models.IntegerField(help_text="The maximal viable instance count for this dependency", null=True),
         ),
         migrations.AlterField(
-            model_name='dependency',
-            name='min_viable_instances',
-            field=models.IntegerField(help_text='The minimal viable instance count for this dependency', null=True),
+            model_name="dependency",
+            name="min_viable_instances",
+            field=models.IntegerField(help_text="The minimal viable instance count for this dependency", null=True),
         ),
         migrations.AlterField(
-            model_name='dependency',
-            name='prefered_instances',
-            field=models.IntegerField(help_text='The prefered instance count for this dependency', null=True),
+            model_name="dependency",
+            name="prefered_instances",
+            field=models.IntegerField(help_text="The prefered instance count for this dependency", null=True),
         ),
     ]

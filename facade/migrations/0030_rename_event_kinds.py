@@ -45,7 +45,6 @@ def backwards(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("facade", "0029_agent_active_session_id"),
     ]

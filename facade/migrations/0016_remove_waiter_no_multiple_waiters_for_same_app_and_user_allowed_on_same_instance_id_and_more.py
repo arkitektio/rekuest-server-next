@@ -6,63 +6,62 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('authentikate', '0005_alter_client_client_id'),
-        ('facade', '0015_action_logo'),
+        ("authentikate", "0005_alter_client_client_id"),
+        ("facade", "0015_action_logo"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.RemoveConstraint(
-            model_name='waiter',
-            name='No multiple Waiters for same App and User allowed on same instance_id',
+            model_name="waiter",
+            name="No multiple Waiters for same App and User allowed on same instance_id",
         ),
         migrations.RemoveField(
-            model_name='assignationinstruct',
-            name='waiter',
+            model_name="assignationinstruct",
+            name="waiter",
         ),
         migrations.RemoveField(
-            model_name='reservation',
-            name='waiter',
+            model_name="reservation",
+            name="waiter",
         ),
         migrations.RemoveField(
-            model_name='assignation',
-            name='waiter',
+            model_name="assignation",
+            name="waiter",
         ),
         migrations.RemoveConstraint(
-            model_name='agent',
-            name='No multiple Agents for same App and User allowed on same identifier',
+            model_name="agent",
+            name="No multiple Agents for same App and User allowed on same identifier",
         ),
         migrations.AddField(
-            model_name='agent',
-            name='active_connection_id',
-            field=models.CharField(blank=True, help_text='Identifies the websocket connection currently owning this Agent. Used to reject/displace duplicate connections and to guard disconnect handling against a displaced connection.', max_length=1000, null=True),
+            model_name="agent",
+            name="active_connection_id",
+            field=models.CharField(blank=True, help_text="Identifies the websocket connection currently owning this Agent. Used to reject/displace duplicate connections and to guard disconnect handling against a displaced connection.", max_length=1000, null=True),
         ),
         migrations.AddField(
-            model_name='assignation',
-            name='registry',
-            field=models.ForeignKey(blank=True, help_text='The registry (client/user/organization) that created this Assignation', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='assignations', to='facade.registry'),
+            model_name="assignation",
+            name="registry",
+            field=models.ForeignKey(blank=True, help_text="The registry (client/user/organization) that created this Assignation", null=True, on_delete=django.db.models.deletion.CASCADE, related_name="assignations", to="facade.registry"),
         ),
         migrations.AddField(
-            model_name='assignationinstruct',
-            name='registry',
-            field=models.ForeignKey(blank=True, help_text='Which registry created this Instruction (if any?)', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='assignation_instructs', to='facade.registry'),
+            model_name="assignationinstruct",
+            name="registry",
+            field=models.ForeignKey(blank=True, help_text="Which registry created this Instruction (if any?)", null=True, on_delete=django.db.models.deletion.CASCADE, related_name="assignation_instructs", to="facade.registry"),
         ),
         migrations.AddField(
-            model_name='reservation',
-            name='registry',
-            field=models.ForeignKey(blank=True, help_text='Which registry created this Reservation (if any?)', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='reservations', to='facade.registry'),
+            model_name="reservation",
+            name="registry",
+            field=models.ForeignKey(blank=True, help_text="Which registry created this Reservation (if any?)", null=True, on_delete=django.db.models.deletion.CASCADE, related_name="reservations", to="facade.registry"),
         ),
         migrations.AddConstraint(
-            model_name='agent',
-            constraint=models.UniqueConstraint(fields=('registry',), name='one_agent_per_registry'),
+            model_name="agent",
+            constraint=models.UniqueConstraint(fields=("registry",), name="one_agent_per_registry"),
         ),
         migrations.RemoveField(
-            model_name='agent',
-            name='instance_id',
+            model_name="agent",
+            name="instance_id",
         ),
         migrations.DeleteModel(
-            name='Waiter',
+            name="Waiter",
         ),
     ]

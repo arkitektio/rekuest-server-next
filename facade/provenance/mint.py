@@ -103,10 +103,7 @@ def mint_token_for_task(task: Any, ctx: Any) -> Optional[str]:
             root_human = principal.is_human_caller(root_caller)
 
     if not root_human:
-        message = (
-            f"Refusing to mint provenance token for task {task.pk}: "
-            f"root principal (root_caused_by={root_caused_by}) is not an accountable human."
-        )
+        message = f"Refusing to mint provenance token for task {task.pk}: root principal (root_caused_by={root_caused_by}) is not an accountable human."
         if settings.PROVENANCE["STRICT"]:
             raise ValueError(message)
         logger.warning(message)

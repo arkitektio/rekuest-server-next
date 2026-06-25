@@ -11,7 +11,6 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("facade", "0030_rename_event_kinds"),
     ]

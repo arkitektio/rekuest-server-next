@@ -56,10 +56,7 @@ def _load() -> None:
 
         if not private_pem:
             raise ImproperlyConfigured(
-                "No provenance private key configured (settings.PROVENANCE['PRIVATE_KEY']). "
-                "Set the `provenance.private_key` field in config.yaml (or the "
-                "`PROVENANCE__PRIVATE_KEY` environment variable) — a static Ed25519 key is "
-                "required so tokens verify across process restarts and replicas."
+                "No provenance private key configured (settings.PROVENANCE['PRIVATE_KEY']). Set the `provenance.private_key` field in config.yaml (or the `PROVENANCE__PRIVATE_KEY` environment variable) — a static Ed25519 key is required so tokens verify across process restarts and replicas."
             )
 
         kid = _kid()

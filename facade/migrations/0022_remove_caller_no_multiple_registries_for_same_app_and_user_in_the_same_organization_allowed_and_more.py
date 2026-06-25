@@ -6,45 +6,44 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('authentikate', '0005_alter_client_client_id'),
-        ('facade', '0021_collapse_registry_to_caller'),
+        ("authentikate", "0005_alter_client_client_id"),
+        ("facade", "0021_collapse_registry_to_caller"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.RemoveConstraint(
-            model_name='caller',
-            name='No multiple Registries for same App and User in the same organization allowed',
+            model_name="caller",
+            name="No multiple Registries for same App and User in the same organization allowed",
         ),
         migrations.AlterField(
-            model_name='assignation',
-            name='caller',
-            field=models.ForeignKey(blank=True, help_text='The caller (client/user/organization) that created this Assignation', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='assignations', to='facade.caller'),
+            model_name="assignation",
+            name="caller",
+            field=models.ForeignKey(blank=True, help_text="The caller (client/user/organization) that created this Assignation", null=True, on_delete=django.db.models.deletion.CASCADE, related_name="assignations", to="facade.caller"),
         ),
         migrations.AlterField(
-            model_name='assignationinstruct',
-            name='caller',
-            field=models.ForeignKey(blank=True, help_text='Which caller created this Instruction (if any?)', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='assignation_instructs', to='facade.caller'),
+            model_name="assignationinstruct",
+            name="caller",
+            field=models.ForeignKey(blank=True, help_text="Which caller created this Instruction (if any?)", null=True, on_delete=django.db.models.deletion.CASCADE, related_name="assignation_instructs", to="facade.caller"),
         ),
         migrations.AlterField(
-            model_name='caller',
-            name='organization',
-            field=models.ForeignKey(help_text='The Organization this Caller belongs to', on_delete=django.db.models.deletion.CASCADE, to='authentikate.organization'),
+            model_name="caller",
+            name="organization",
+            field=models.ForeignKey(help_text="The Organization this Caller belongs to", on_delete=django.db.models.deletion.CASCADE, to="authentikate.organization"),
         ),
         migrations.AlterField(
-            model_name='implementation',
-            name='agent',
-            field=models.ForeignKey(help_text='The associated agent for this Implementation', on_delete=django.db.models.deletion.CASCADE, related_name='implementations', to='facade.agent'),
+            model_name="implementation",
+            name="agent",
+            field=models.ForeignKey(help_text="The associated agent for this Implementation", on_delete=django.db.models.deletion.CASCADE, related_name="implementations", to="facade.agent"),
         ),
         migrations.AlterField(
-            model_name='reservation',
-            name='caller',
-            field=models.ForeignKey(blank=True, help_text='Which caller created this Reservation (if any?)', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='reservations', to='facade.caller'),
+            model_name="reservation",
+            name="caller",
+            field=models.ForeignKey(blank=True, help_text="Which caller created this Reservation (if any?)", null=True, on_delete=django.db.models.deletion.CASCADE, related_name="reservations", to="facade.caller"),
         ),
         migrations.AddConstraint(
-            model_name='caller',
-            constraint=models.UniqueConstraint(fields=('client', 'user', 'organization'), name='No multiple Callers for same App and User in the same organization allowed'),
+            model_name="caller",
+            constraint=models.UniqueConstraint(fields=("client", "user", "organization"), name="No multiple Callers for same App and User in the same organization allowed"),
         ),
     ]

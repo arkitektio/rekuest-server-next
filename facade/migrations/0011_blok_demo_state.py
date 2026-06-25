@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('facade', '0010_remove_blok_agent_dependencies_and_more'),
+        ("facade", "0010_remove_blok_agent_dependencies_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='blok',
-            name='demo_state',
-            field=models.JSONField(default=dict, help_text='The initial state for this Blok (to display in the ui a fake version)'),
+            model_name="blok",
+            name="demo_state",
+            field=models.JSONField(default=dict, help_text="The initial state for this Blok (to display in the ui a fake version)"),
         ),
     ]

@@ -378,9 +378,7 @@ class TestAgentProtocolUnit:
         backend = FakeBackend()
         protocol, sent, closed, _ = make_protocol(backend=backend)
         await protocol.receive(_register_frame())
-        await protocol.receive(
-            messages.Log(task=str(uuid.uuid4()), message="hello", level="INFO").model_dump_json()
-        )
+        await protocol.receive(messages.Log(task=str(uuid.uuid4()), message="hello", level="INFO").model_dump_json())
         assert any(call[0] == "log" for call in backend.calls)
         await protocol.shutdown()
 

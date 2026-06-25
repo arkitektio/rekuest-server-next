@@ -38,6 +38,7 @@ class Agent:
     @strawberry_django.field(description="Device associated with the agent, via its client (if any).")
     def device(self, info: Info) -> Device | None:
         return self.client.device
+
     implementations: list["Implementation"] = strawberry_django.field(description="Implementations the agent can run.")
     memory_shelve: Optional["MemoryShelve"] = strawberry_django.field(description="Agent's associated memory shelve.")
     file_system_shelves: list["FilesystemShelve"] = strawberry_django.field(description="Filesystem shelves available on the agent.")

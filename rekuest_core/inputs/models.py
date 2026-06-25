@@ -121,7 +121,9 @@ class DescriptorSchemaInputModel(BaseModel):
 
 class OptimisticInputModel(BaseModel):
     state: str = Field(description="The state to optimistically set when the action is assigned")
-    path: str = Field(description="The path to the state.value to optimistically set the value, always traverse from top to bottom level. i.e state.x for state.x and state.x.y for state.x.y. You can also use an arrow function to specify a dynamic path based on the other arguments, e.g. (args) => state[args.foo]")
+    path: str = Field(
+        description="The path to the state.value to optimistically set the value, always traverse from top to bottom level. i.e state.x for state.x and state.x.y for state.x.y. You can also use an arrow function to specify a dynamic path based on the other arguments, e.g. (args) => state[args.foo]"
+    )
     accessor: str | None = Field(default=None, description="The accessor to get the value to optimistically set. This is used when the value to optimistically set is not the same as the value of the port")
 
 
@@ -196,10 +198,18 @@ class ActionDependencyInputModel(BaseModel):
         default=None,
         description="Which app this dependency corresponds to (i.e. do you want to use a stardist agent for that or imagej agents needs to be a world unique classsifier (reverse domain notation) that identifies the type of agent you want to use, and then we can have multiple agents of the same type running in the system, e.g. startdist could be the app for all agents that correpsond to a startdist instance)",
     )
-    arg_matches: list[PortMatchInputModel] | None = Field(default=None, description="The demands for the action args, this can be additionaly specified so that when we loosen the matching criteria for an action in a resolver, we can still make sure to match the right action based on the demands for the args. This is used to identify the demand in the system.")
-    return_matches: list[PortMatchInputModel] | None = Field(default=None, description="The demands for the action returns, this can be additionaly specified so that when we loosen the matching criteria for an action in a resolver, we can still make sure to match the right action based on the demands for the returns. This is used to identify the demand in the system.")
+    arg_matches: list[PortMatchInputModel] | None = Field(
+        default=None,
+        description="The demands for the action args, this can be additionaly specified so that when we loosen the matching criteria for an action in a resolver, we can still make sure to match the right action based on the demands for the args. This is used to identify the demand in the system.",
+    )
+    return_matches: list[PortMatchInputModel] | None = Field(
+        default=None,
+        description="The demands for the action returns, this can be additionaly specified so that when we loosen the matching criteria for an action in a resolver, we can still make sure to match the right action based on the demands for the returns. This is used to identify the demand in the system.",
+    )
     protocols: list[str] | None = Field(default=None, description="The protocols that the action is implementing or relying on. This is used to identify the demand in the system, and can be used to match actions that are implementing the same protocol together.")
-    force_arg_length: int | None = Field(default=None, description="Require that the action has a specific number of args. When loosing the matching criteria for an action in a resolver, we can still make sure to match the right action based on the demands for the args. This is used to identify the demand in the system.")
+    force_arg_length: int | None = Field(
+        default=None, description="Require that the action has a specific number of args. When loosing the matching criteria for an action in a resolver, we can still make sure to match the right action based on the demands for the args. This is used to identify the demand in the system."
+    )
     force_return_length: int | None = Field(default=None, description="Require that the action has a specific number of returns. This is used to identify the demand in the system.")
     optional: bool = Field(default=False, description="Whether the dependency is optional or not. If the dependency is optional, the agent doesn't have to provide it to be potentially callable")
     allow_inactive: bool = Field(default=True, description="Allow inactive nodes, defaults to true")
@@ -215,7 +225,10 @@ class StateDependencyInputModel(BaseModel):
         default=None,
         description="Which app this dependency corresponds to (i.e. do you want to use a stardist agent for that or imagej agents needs to be a world unique classsifier (reverse domain notation) that identifies the type of agent you want to use, and then we can have multiple agents of the same type running in the system, e.g. startdist could be the app for all agents that correpsond to a startdist instance)",
     )
-    port_matches: list[PortMatchInputModel] | None = Field(default=None, description="The demands for the state ports, this can be additionaly specified so that when we loosen the matching criteria for a state in a resolver, we can still make sure to match the right state based on the demands for the ports. This is used to identify the demand in the system.")
+    port_matches: list[PortMatchInputModel] | None = Field(
+        default=None,
+        description="The demands for the state ports, this can be additionaly specified so that when we loosen the matching criteria for a state in a resolver, we can still make sure to match the right state based on the demands for the ports. This is used to identify the demand in the system.",
+    )
     protocols: list[str] | None = Field(default=None, description="The protocols that the state is implementing or relying on. This is used to identify the demand in the system, and can be used to match states that are implementing the same protocol together.")
     optional: bool = Field(default=False, description="Whether the dependency is optional or not. If the dependency is optional, the agent doesn't have to provide it to be potentially callable")
     allow_inactive: bool = Field(default=True, description="Allow inactive nodes, defaults to true")
@@ -236,9 +249,14 @@ class AgentDependencyInputModel(BaseModel):
     # Filters for selecting which instances of the agent are valid for this dependency
     action_demands: list[ActionDependencyInputModel] | None = Field(default=None, description="The action demands of the agent. This is used to identify the demand in the system.")
     state_demands: list[StateDependencyInputModel] | None = Field(default=None, description="The state demands of the agent. This is used to identify the demand in the system.")
-    auto_resolvable: bool = Field(default=False, description="Whether this dependency is auto resolvable or not. If so we will try to automatically resolve it based on the demands specified in the dependency and the capabilities of the available agents in the system. This is used to identify the demand in the system. Attention if any of the dependencies of this agent dependency is not auto resolvable, this dependency will also not be auto resolvable")
+    auto_resolvable: bool = Field(
+        default=False,
+        description="Whether this dependency is auto resolvable or not. If so we will try to automatically resolve it based on the demands specified in the dependency and the capabilities of the available agents in the system. This is used to identify the demand in the system. Attention if any of the dependencies of this agent dependency is not auto resolvable, this dependency will also not be auto resolvable",
+    )
 
-    mutually_exclusive_keys: list[str] | None = Field(default=None, description="A list of keys of other agent dependencies that are mutually exclusive with this one. This means two agent dependencies with mutually exclusive keys cannot be assigned to the same implementing agent. This is used to identify the demand in the system.")
+    mutually_exclusive_keys: list[str] | None = Field(
+        default=None, description="A list of keys of other agent dependencies that are mutually exclusive with this one. This means two agent dependencies with mutually exclusive keys cannot be assigned to the same implementing agent. This is used to identify the demand in the system."
+    )
     min_viable_instances: int | None = Field(default=None, description="The minimum amount of viable instances for the agent. This is used to identify the demand in the system.")
     max_viable_instances: int | None = Field(default=None, description="The maximum amount of viable instances for the agent. This is used to identify the demand in the system.")
     prefered_instances: int | None = Field(default=None, description="The prefered amount of instances for the agent. This is used to identify the demand in the system.")
@@ -346,7 +364,9 @@ class ImplementationInputModel(BaseModel):
     manipulates: list[str] | None = Field(default=None, description="The states that the implementation manipulates. This is used to identify which states are manipulated by the implementation, and can be use to enhance state safety in the system")
     needs_token: bool = Field(default=True, description="Whether Rekuest should mint a signed provenance token when this implementation is assigned. Default true (provenance-by-default); set false for trivial/internal tasks that never produce external provenance.")
     provenance_audience: list[str] | None = Field(default=None, description="The downstream service(s) the provenance token should be scoped to (the token's `aud`). If omitted, Rekuest derives the audience from the structures the assignment acts on.")
-    effect: enums.EffectClass = Field(default=enums.EffectClass.NONE, description="The effect class of this implementation. NONE work is freely retryable/reclaimable; PHYSICAL work touches the real world and an ambiguous failure is terminal (never retried). Declared by the implementation here — never by the caller.")
+    effect: enums.EffectClass = Field(
+        default=enums.EffectClass.NONE, description="The effect class of this implementation. NONE work is freely retryable/reclaimable; PHYSICAL work touches the real world and an ambiguous failure is terminal (never retried). Declared by the implementation here — never by the caller."
+    )
 
 
 class StateDefinitionInputModel(BaseModel):

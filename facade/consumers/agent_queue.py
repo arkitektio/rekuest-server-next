@@ -99,9 +99,7 @@ class RedisAgentQueue(AgentQueue):
 
         # Move into this agent's processing list but leave it there; ``ack``
         # removes it only after the caller has delivered the message.
-        task = await self._async_connection.blmove(
-            f"{agent_id}{QUEUE_SUFFIX}", _processing_key(agent_id), timeout=0, src="RIGHT", dest="LEFT"
-        )
+        task = await self._async_connection.blmove(f"{agent_id}{QUEUE_SUFFIX}", _processing_key(agent_id), timeout=0, src="RIGHT", dest="LEFT")
         if task is None:
             return None
         return task.decode("utf-8")

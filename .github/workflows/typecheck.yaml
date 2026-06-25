@@ -2,9 +2,9 @@ name: Type Check
 
 on:
   push:
-    branches: [main, dev, next]
+    branches: [main, next]
   pull_request:
-    branches: [main, dev, next]
+    branches: [main, next]
 
 jobs:
   basedpyright:

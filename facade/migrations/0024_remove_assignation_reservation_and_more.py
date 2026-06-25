@@ -5,32 +5,31 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('facade', '0023_implementation_needs_token_and_more'),
+        ("facade", "0023_implementation_needs_token_and_more"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='assignation',
-            name='reservation',
+            model_name="assignation",
+            name="reservation",
         ),
         migrations.AlterField(
-            model_name='assignationevent',
-            name='assignation',
-            field=models.ForeignKey(help_text='The assignation this log item belongs to', on_delete=django.db.models.deletion.CASCADE, related_name='events', to='facade.assignation'),
+            model_name="assignationevent",
+            name="assignation",
+            field=models.ForeignKey(help_text="The assignation this log item belongs to", on_delete=django.db.models.deletion.CASCADE, related_name="events", to="facade.assignation"),
         ),
         migrations.AlterField(
-            model_name='assignationinstruct',
-            name='assignation',
-            field=models.ForeignKey(help_text='The assignation this log item belongs to', on_delete=django.db.models.deletion.CASCADE, related_name='instructs', to='facade.assignation'),
+            model_name="assignationinstruct",
+            name="assignation",
+            field=models.ForeignKey(help_text="The assignation this log item belongs to", on_delete=django.db.models.deletion.CASCADE, related_name="instructs", to="facade.assignation"),
         ),
         migrations.AlterField(
-            model_name='implementation',
-            name='dynamic',
-            field=models.BooleanField(help_text='Dynamic Implementations will be able to create new assignations on runtime'),
+            model_name="implementation",
+            name="dynamic",
+            field=models.BooleanField(help_text="Dynamic Implementations will be able to create new assignations on runtime"),
         ),
         migrations.DeleteModel(
-            name='Reservation',
+            name="Reservation",
         ),
     ]

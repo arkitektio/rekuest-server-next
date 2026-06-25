@@ -16,4 +16,3 @@ async def new_actions(
             yield await models.Action.objects.aget(id=message.create)
         if message.update:
             yield await models.Action.objects.aget(id=message.update)
-       

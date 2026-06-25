@@ -50,13 +50,7 @@ class EffectKind(str, Enum):
     CUSTOM = "CUSTOM"
 
 
-@strawberry.enum(
-    description=(
-        "The effect class of an implementation — declared by the implementation, never the "
-        "caller. NONE work is freely retryable/reclaimable; PHYSICAL work touches the real "
-        "world (no UPSERT), so an ambiguous failure is terminal and must not be retried."
-    )
-)
+@strawberry.enum(description=("The effect class of an implementation — declared by the implementation, never the caller. NONE work is freely retryable/reclaimable; PHYSICAL work touches the real world (no UPSERT), so an ambiguous failure is terminal and must not be retried."))
 class EffectClass(str, Enum):
     NONE = "NONE"
     PHYSICAL = "PHYSICAL"

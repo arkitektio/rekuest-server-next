@@ -73,6 +73,8 @@ jobs:
             type=semver,pattern={{version}},value=${{ needs.release.outputs.tag }}
             type=semver,pattern={{major}}.{{minor}},value=${{ needs.release.outputs.tag }}
             type=semver,pattern={{major}},value=${{ needs.release.outputs.tag }}
+            # Moving staging tag: deployments/next pins jhnnsrs/rekuest:next.
+            type=raw,value=next,enable=${{ github.ref_name == 'next' }}
           # Only main (the newest major) owns `latest`. Maintenance releases off
           # an N.x branch still get their moving N / N.M tags but must NOT claim
           # `latest`, or shipping 1.5.3 would point latest back at the old major.
@@ -94,15 +96,3 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      # Deploy to production only for stable releases — never for -rc prereleases.
-      - name: Refresh Go-Arkitekt-live (stable releases only)
-        if: ${{ !contains(needs.release.outputs.tag, '-') }}
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.GO_LIVE_HOST }}
-          key: ${{ secrets.GO_LIVE_SSH_KEY }}
-          username: ${{ secrets.GO_LIVE_USERNAME }}
-          script: |
-            cd /home/kontrol
-            docker compose pull
-            docker compose up -d

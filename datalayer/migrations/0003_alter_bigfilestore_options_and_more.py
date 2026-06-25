@@ -4,30 +4,29 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('datalayer', '0002_alter_bigfilestore_options_and_more'),
+        ("datalayer", "0002_alter_bigfilestore_options_and_more"),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='bigfilestore',
+            name="bigfilestore",
             options={},
         ),
         migrations.AlterModelOptions(
-            name='datalayerstore',
+            name="datalayerstore",
             options={},
         ),
         migrations.AlterModelOptions(
-            name='mediastore',
+            name="mediastore",
             options={},
         ),
         migrations.AlterModelOptions(
-            name='parquetstore',
+            name="parquetstore",
             options={},
         ),
         migrations.AlterModelOptions(
-            name='zarrstore',
+            name="zarrstore",
             options={},
         ),
     ]

@@ -5,7 +5,6 @@ import strawberry
 
 
 def materialize_blok(info: Info, input: inputs.MaterializeBlokInput) -> types.MaterializedBlok:
-
     mblok, _ = models.MaterializedBlok.objects.update_or_create(
         blok_id=input.blok,
     )
@@ -42,7 +41,6 @@ def materialize_blok(info: Info, input: inputs.MaterializeBlokInput) -> types.Ma
 
 
 def delete_materialized_blok(info: Info, input: inputs.DeleteMaterializedBlokInput) -> bool:
-
     try:
         mblok = models.MaterializedBlok.objects.get(id=input.id)
         mblok.delete()
@@ -52,7 +50,6 @@ def delete_materialized_blok(info: Info, input: inputs.DeleteMaterializedBlokInp
 
 
 def update_materialized_blok(info: Info, input: inputs.UpdateMaterializedBlokInput) -> types.MaterializedBlok:
-
     try:
         mblok = models.MaterializedBlok.objects.get(id=input.id)
     except models.MaterializedBlok.DoesNotExist:

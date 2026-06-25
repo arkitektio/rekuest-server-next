@@ -85,12 +85,7 @@ class TestAgentProtocol:
 
         await session.disconnect()
 
-        events = [
-            e
-            async for e in TaskEvent.objects.filter(
-                task_id=task.pk, kind=enums.TaskEventKind.DISCONNECTED
-            )
-        ]
+        events = [e async for e in TaskEvent.objects.filter(task_id=task.pk, kind=enums.TaskEventKind.DISCONNECTED)]
         assert len(events) == 1
 
     async def test_register_for_uncreated_agent_is_rejected(self, agent_ws):

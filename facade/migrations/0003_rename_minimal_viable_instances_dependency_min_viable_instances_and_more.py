@@ -4,20 +4,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('facade', '0002_patch_interface'),
+        ("facade", "0002_patch_interface"),
     ]
 
     operations = [
         migrations.RenameField(
-            model_name='dependency',
-            old_name='minimal_viable_instances',
-            new_name='min_viable_instances',
+            model_name="dependency",
+            old_name="minimal_viable_instances",
+            new_name="min_viable_instances",
         ),
         migrations.AddField(
-            model_name='dependency',
-            name='max_viable_instances',
-            field=models.IntegerField(default=1, help_text='The maximal viable instance count for this dependency'),
+            model_name="dependency",
+            name="max_viable_instances",
+            field=models.IntegerField(default=1, help_text="The maximal viable instance count for this dependency"),
         ),
     ]

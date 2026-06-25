@@ -25,14 +25,26 @@ def _build_impls(prefix, lower_kind="FUNCTION", higher_kind="FUNCTION"):
     agent = create_agent_for_registry(registry=registry, user=user, organization=org, prefix=prefix)
 
     lower_action = Action.objects.create(
-        app=agent.app, key=f"{prefix}-l", version="1.0.0", name="l", description="l",
-        hash=f"{prefix}-l-hash", organization=org, kind=lower_kind,
+        app=agent.app,
+        key=f"{prefix}-l",
+        version="1.0.0",
+        name="l",
+        description="l",
+        hash=f"{prefix}-l-hash",
+        organization=org,
+        kind=lower_kind,
     )
     lower = Implementation.objects.create(release=agent.release, interface=f"{prefix}_l", action=lower_action, agent=agent, dynamic=False)
 
     higher_action = Action.objects.create(
-        app=agent.app, key=f"{prefix}-h", version="1.0.0", name="h", description="h",
-        hash=f"{prefix}-h-hash", organization=org, kind=higher_kind,
+        app=agent.app,
+        key=f"{prefix}-h",
+        version="1.0.0",
+        name="h",
+        description="h",
+        hash=f"{prefix}-h-hash",
+        organization=org,
+        kind=higher_kind,
     )
     higher = Implementation.objects.create(release=agent.release, interface=f"{prefix}_h", action=higher_action, agent=agent, dynamic=False)
 
@@ -47,16 +59,28 @@ def _build_cross_agent_impls(prefix):
     h_user, _, h_org, h_registry = create_registry_bundle(f"{prefix}-h")
     h_agent = create_agent_for_registry(registry=h_registry, user=h_user, organization=h_org, prefix=f"{prefix}-h")
     higher_action = Action.objects.create(
-        app=h_agent.app, key=f"{prefix}-h", version="1.0.0", name="h", description="h",
-        hash=f"{prefix}-h-hash", organization=h_org, kind="FUNCTION",
+        app=h_agent.app,
+        key=f"{prefix}-h",
+        version="1.0.0",
+        name="h",
+        description="h",
+        hash=f"{prefix}-h-hash",
+        organization=h_org,
+        kind="FUNCTION",
     )
     higher = Implementation.objects.create(release=h_agent.release, interface=f"{prefix}_h", action=higher_action, agent=h_agent, dynamic=False)
 
     l_user, _, l_org, l_registry = create_registry_bundle(f"{prefix}-l")
     l_agent = create_agent_for_registry(registry=l_registry, user=l_user, organization=l_org, prefix=f"{prefix}-l")
     lower_action = Action.objects.create(
-        app=l_agent.app, key=f"{prefix}-l", version="1.0.0", name="l", description="l",
-        hash=f"{prefix}-l-hash", organization=l_org, kind="FUNCTION",
+        app=l_agent.app,
+        key=f"{prefix}-l",
+        version="1.0.0",
+        name="l",
+        description="l",
+        hash=f"{prefix}-l-hash",
+        organization=l_org,
+        kind="FUNCTION",
     )
     lower = Implementation.objects.create(release=l_agent.release, interface=f"{prefix}_l", action=lower_action, agent=l_agent, dynamic=False)
 

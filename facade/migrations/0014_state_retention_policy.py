@@ -4,15 +4,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('facade', '0013_remove_materializedblok_dashboard_dashboardplacement'),
+        ("facade", "0013_remove_materializedblok_dashboard_dashboardplacement"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='state',
-            name='retention_policy',
-            field=models.CharField(choices=[('KEEP_ALL', 'KEEP_ALL'), ('KEEP_LAST_10', 'KEEP_LAST_10'), ('KEEP_LAST_100', 'KEEP_LAST_100'), ('KEEP_LAST_1000', 'KEEP_LAST_1000'), ('KEEP_LAST_10000', 'KEEP_LAST_10000'), ('KEEP_LAST_100000', 'KEEP_LAST_100000')], default='KEEP_ALL', help_text='The retention policy for this state (e.g. how many patches and snapshots should we keep for this state?)', max_length=1000),
+            model_name="state",
+            name="retention_policy",
+            field=models.CharField(
+                choices=[("KEEP_ALL", "KEEP_ALL"), ("KEEP_LAST_10", "KEEP_LAST_10"), ("KEEP_LAST_100", "KEEP_LAST_100"), ("KEEP_LAST_1000", "KEEP_LAST_1000"), ("KEEP_LAST_10000", "KEEP_LAST_10000"), ("KEEP_LAST_100000", "KEEP_LAST_100000")],
+                default="KEEP_ALL",
+                help_text="The retention policy for this state (e.g. how many patches and snapshots should we keep for this state?)",
+                max_length=1000,
+            ),
         ),
     ]

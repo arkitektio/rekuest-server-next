@@ -4,14 +4,13 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('facade', '0024_remove_assignation_reservation_and_more'),
+        ("facade", "0024_remove_assignation_reservation_and_more"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='agent',
-            name='device',
+            model_name="agent",
+            name="device",
         ),
     ]

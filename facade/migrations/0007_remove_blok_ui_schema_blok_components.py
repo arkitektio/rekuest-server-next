@@ -4,19 +4,18 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('facade', '0006_uicatalog_remove_statemapping_materialized_blok_and_more'),
+        ("facade", "0006_uicatalog_remove_statemapping_materialized_blok_and_more"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='blok',
-            name='ui_schema',
+            model_name="blok",
+            name="ui_schema",
         ),
         migrations.AddField(
-            model_name='blok',
-            name='components',
-            field=models.JSONField(default=list, help_text='The UI schema for this Blok'),
+            model_name="blok",
+            name="components",
+            field=models.JSONField(default=list, help_text="The UI schema for this Blok"),
         ),
     ]

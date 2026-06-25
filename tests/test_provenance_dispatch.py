@@ -33,12 +33,21 @@ def _decode(token):
 def _build_impl(agent_pk, *, needs_token=True):
     agent = Agent.objects.get(pk=agent_pk)
     action = Action.objects.create(
-        app=agent.app, key="prov-key", version="1.0.0", name="prov action",
-        description="prov", hash="prov-action-hash", organization=agent.organization,
+        app=agent.app,
+        key="prov-key",
+        version="1.0.0",
+        name="prov action",
+        description="prov",
+        hash="prov-action-hash",
+        organization=agent.organization,
     )
     return Implementation.objects.create(
-        release=agent.release, interface="prov_fn", action=action, agent=agent,
-        dynamic=False, needs_token=needs_token,
+        release=agent.release,
+        interface="prov_fn",
+        action=action,
+        agent=agent,
+        dynamic=False,
+        needs_token=needs_token,
     )
 
 
@@ -56,9 +65,7 @@ class TestProvenanceDispatch:
         await register(communicator, instance_id="prov-agent")
 
         info = _Info(authenticated_context)
-        task = await sync_to_async(controll_backend.assign)(
-            info, inputs.AssignInputModel(implementation=str(impl.pk), args={"x": 1})
-        )
+        task = await sync_to_async(controll_backend.assign)(info, inputs.AssignInputModel(implementation=str(impl.pk), args={"x": 1}))
 
         received = await communicator.receive_json_from(timeout=RECEIVE_TIMEOUT)
         await communicator.disconnect()
@@ -86,9 +93,7 @@ class TestProvenanceDispatch:
         await register(communicator, instance_id="prov-agent-2")
 
         info = _Info(authenticated_context)
-        await sync_to_async(controll_backend.assign)(
-            info, inputs.AssignInputModel(implementation=str(impl.pk), args={"x": 1})
-        )
+        await sync_to_async(controll_backend.assign)(info, inputs.AssignInputModel(implementation=str(impl.pk), args={"x": 1}))
 
         received = await communicator.receive_json_from(timeout=RECEIVE_TIMEOUT)
         await communicator.disconnect()

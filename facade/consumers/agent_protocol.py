@@ -250,9 +250,7 @@ class RegisteredSession:
             await self.backend.on_agent_disconnected(self.agent.pk, self.connection_id)
         # Caller-death drives the cascade over ORIGINATED roots — independent of execution,
         # so it runs for every mode (the backend no-ops it for observers).
-        await self.backend.on_caller_disconnected(
-            self.agent.pk, self.connection_id, session_id=self.session_id, mode=self.mode.value
-        )
+        await self.backend.on_caller_disconnected(self.agent.pk, self.connection_id, session_id=self.session_id, mode=self.mode.value)
 
 
 class AgentProtocol:
@@ -290,12 +288,8 @@ class AgentProtocol:
         # Identifies this connection so the backend can tell, on disconnect,
         # whether we are still the agent's active connection or were displaced.
         self.connection_id = connection_id or str(uuid.uuid4())
-        self.heartbeat_interval = (
-            heartbeat_interval if heartbeat_interval is not None else settings.AGENT_HEARTBEAT_INTERVAL
-        )
-        self.heartbeat_timeout = (
-            heartbeat_timeout if heartbeat_timeout is not None else settings.AGENT_HEARTBEAT_RESPONSE_TIMEOUT
-        )
+        self.heartbeat_interval = heartbeat_interval if heartbeat_interval is not None else settings.AGENT_HEARTBEAT_INTERVAL
+        self.heartbeat_timeout = heartbeat_timeout if heartbeat_timeout is not None else settings.AGENT_HEARTBEAT_RESPONSE_TIMEOUT
 
         # Built only on a successful Register; until then there is no agent identity.
         self.session: Optional[RegisteredSession] = None
@@ -372,9 +366,7 @@ class AgentProtocol:
         # Capabilities come from the token, never self-declaration: a participant may
         # only operate in a mode its scopes cover.
         if not capabilities.authorize_mode(caps, mode):
-            await self.send_to_agent_message(
-                messages.ProtocolError(error=f"Token is not authorized for mode {mode.value}.")
-            )
+            await self.send_to_agent_message(messages.ProtocolError(error=f"Token is not authorized for mode {mode.value}."))
             await self.close(codes.MODE_NOT_AUTHORIZED_CODE)
             return
 
@@ -393,9 +385,7 @@ class AgentProtocol:
             # second unless ``force`` is set, in which case displace the incumbent.
             was_connected = agent.connected
             if was_connected and not register.force:
-                await self.send_to_agent_message(
-                    messages.ProtocolError(error="Another connection is already registered for this agent. Reconnect with force to take over.")
-                )
+                await self.send_to_agent_message(messages.ProtocolError(error="Another connection is already registered for this agent. Reconnect with force to take over."))
                 await self.close(codes.AGENT_ALREADY_CONNECTED_CODE)
                 return
 

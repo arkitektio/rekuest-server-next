@@ -5,15 +5,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('facade', '0008_blokdependency'),
+        ("facade", "0008_blokdependency"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='blokagentmapping',
-            name='dependency',
-            field=models.ForeignKey(blank=True, help_text='The dependency this mapping is fulfilling (if any)', null=True, on_delete=django.db.models.deletion.SET_NULL, to='facade.blokdependency'),
+            model_name="blokagentmapping",
+            name="dependency",
+            field=models.ForeignKey(blank=True, help_text="The dependency this mapping is fulfilling (if any)", null=True, on_delete=django.db.models.deletion.SET_NULL, to="facade.blokdependency"),
         ),
     ]

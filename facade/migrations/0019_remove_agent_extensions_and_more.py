@@ -4,18 +4,17 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('facade', '0018_backfill_relational_ports'),
+        ("facade", "0018_backfill_relational_ports"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='agent',
-            name='extensions',
+            model_name="agent",
+            name="extensions",
         ),
         migrations.RemoveField(
-            model_name='implementation',
-            name='extension',
+            model_name="implementation",
+            name="extension",
         ),
     ]
