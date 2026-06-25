@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.4 (2026-06-25)
+
+### Bug Fixes
+
+- New sections for the release
+  ([`2cd5836`](https://github.com/arkitektio/rekuest-server-next/commit/2cd5836ace5bec797c6cd034a59857700fb7a9ba))
+
+
 ## v1.0.0-rc.3 (2026-06-25)
 
 
