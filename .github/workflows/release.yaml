@@ -42,6 +42,31 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
+      # Add the Docker image pull instructions to the freshly-created Release.
+      # This only needs the version string, so it does not wait on the image
+      # build — the docker job (and its registry tags) come from the same version.
+      - name: Add the Docker image to the GitHub Release
+        if: steps.release.outputs.released == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          # Moving channel tag that tracks this release line.
+          case "$BRANCH" in
+            main) channel="latest" ;;
+            next) channel="next" ;;
+            *)    channel="${VERSION%%.*}" ;; # N.x maintenance -> major tag
+          esac
+          body="$(gh release view "$TAG" --json body --jq .body)"
+          {
+            printf '%s\n\n' "$body"
+            printf '## Docker image\n\n'
+            printf '```sh\ndocker pull jhnnsrs/rekuest:%s\n```\n\n' "$VERSION"
+            printf 'Also published as `jhnnsrs/rekuest:%s`.\n' "$channel"
+          } | gh release edit "$TAG" --notes-file -
+
   # 2. Only if a release was actually cut: build the image at the new tag and
   #    push it under the semver "multi-tag" regime. metadata-action expands the
   #    tag into the full set, and automatically skips the moving major/minor/
@@ -88,7 +113,6 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push
-        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -96,25 +120,4 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-
-      # The release job (semantic-release) created the GitHub Release before the
-      # image existed, so append the published image coordinates + immutable
-      # digest to its notes now that the build is done.
-      - name: Point the GitHub Release at the Docker image
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ needs.release.outputs.tag }}
-          VERSION: ${{ needs.release.outputs.version }}
-          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
-          DIGEST: ${{ steps.build.outputs.digest }}
-        run: |
-          body="$(gh release view "$TAG" --json body --jq .body)"
-          {
-            printf '%s\n\n' "$body"
-            printf '## Docker image\n\n'
-            printf '```sh\ndocker pull jhnnsrs/rekuest:%s\n```\n\n' "$VERSION"
-            printf 'Published tags:\n\n'
-            printf '%s\n' "$IMAGE_TAGS" | sed 's/^/- `/; s/$/`/'
-            printf '\nImmutable digest: `jhnnsrs/rekuest@%s`\n' "$DIGEST"
-          } | gh release edit "$TAG" --notes-file -
 
