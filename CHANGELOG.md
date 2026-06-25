@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.3 (2026-06-25)
+
+
 ## v1.0.0-rc.2 (2026-06-25)
+
+### Bug Fixes
+
+- Realese notes
+  ([`dbdc672`](https://github.com/arkitektio/rekuest-server-next/commit/dbdc6724af5a73b742ba500c6d702d6d69f4e9a2))
 
 
 ## v1.0.0-rc.1 (2026-06-25)
