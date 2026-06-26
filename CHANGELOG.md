@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.7 (2026-06-26)
+
+### Features
+
+- Removal of stale migrations
+  ([`4bf18ef`](https://github.com/arkitektio/rekuest-server-next/commit/4bf18ef7b3b9587fb4d33b54ff3862b13c6d9ff8))
+
+
 ## v1.0.0-rc.6 (2026-06-26)
 
 ### Features
