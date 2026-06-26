@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.5 (2026-06-26)
+
+### Bug Fixes
+
+- With CONFIG.md
+  ([`bf7d490`](https://github.com/arkitektio/rekuest-server-next/commit/bf7d49041b50496e3a45285f4f8e4048b3a5bd71))
+
+
 ## v1.0.0-rc.4 (2026-06-25)
 
 ### Bug Fixes
