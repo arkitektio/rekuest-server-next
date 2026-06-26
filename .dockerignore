@@ -1,7 +1,12 @@
-# Byte-compiled / optimized / DLL files
+.venv
+.git
+.gitignore
 __pycache__/
-**/__pycache__
+**/__pycache__/
 *.py[cod]
 *$py.class
-*.pyc
-./venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.sqlite3
+.env
