@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.6 (2026-06-26)
+
+### Features
+
+- With white noise and optimized Dockerfile
+  ([`247ff0b`](https://github.com/arkitektio/rekuest-server-next/commit/247ff0b3078febdfea6a3b90a773184da43f06a3))
+
+
 ## v1.0.0-rc.5 (2026-06-26)
 
 ### Bug Fixes
