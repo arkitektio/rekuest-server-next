@@ -1,7 +1,42 @@
 # CHANGELOG
 
 
+## v2.0.0-rc.1 (2026-06-29)
+
+
 ## v1.0.0 (2026-06-25)
+
+
+## v1.0.0-rc.8 (2026-06-29)
+
+### Bug Fixes
+
+- Authentikate update
+  ([`548229d`](https://github.com/arkitektio/rekuest-server-next/commit/548229d8d82beece3226b9b929922f76acc1df75))
+
+
+## v1.0.0-rc.7 (2026-06-26)
+
+### Features
+
+- Removal of stale migrations
+  ([`4bf18ef`](https://github.com/arkitektio/rekuest-server-next/commit/4bf18ef7b3b9587fb4d33b54ff3862b13c6d9ff8))
+
+
+## v1.0.0-rc.6 (2026-06-26)
+
+### Features
+
+- With white noise and optimized Dockerfile
+  ([`247ff0b`](https://github.com/arkitektio/rekuest-server-next/commit/247ff0b3078febdfea6a3b90a773184da43f06a3))
+
+
+## v1.0.0-rc.5 (2026-06-26)
+
+### Bug Fixes
+
+- With CONFIG.md
+  ([`bf7d490`](https://github.com/arkitektio/rekuest-server-next/commit/bf7d49041b50496e3a45285f4f8e4048b3a5bd71))
 
 
 ## v1.0.0-rc.4 (2026-06-25)
