@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.8 (2026-06-29)
+
+### Bug Fixes
+
+- Authentikate update
+  ([`548229d`](https://github.com/arkitektio/rekuest-server-next/commit/548229d8d82beece3226b9b929922f76acc1df75))
+
+
 ## v1.0.0-rc.7 (2026-06-26)
 
 ### Features
