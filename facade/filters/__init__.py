@@ -60,18 +60,12 @@ from .implementation import (
 )
 from .session import SessionFilter, SessionOrder
 from .shelve import (
-    FileDrawerFilter,
-    FilesystemShelveFilter,
     MemoryDrawerFilter,
     MemoryShelveFilter,
     MemoryShelveOrder,
 )
 from .structure import (
-    InputInterfaceUsageFilter,
-    InputStructureUsageFilter,
     InterfaceFilter,
-    OutputInterfaceUsageFilter,
-    OutputStructureUsageFilter,
     StructureFilter,
     StructurePackageFilter,
 )
@@ -87,7 +81,6 @@ from .threed import (
 from .toolbox import (
     ProtocolFilter,
     ProtocolOrder,
-    ShortcutActionFilter,
     ShortcutFilter,
     ShortcutOrder,
     ToolboxFilter,
@@ -106,10 +99,8 @@ __all__ = [
     "AgentOrder",
     "HardwareRecordFilter",
     "ImplementationAgentFilter",
-    "FilesystemShelveFilter",
     "MemoryShelveFilter",
     "MemoryShelveOrder",
-    "FileDrawerFilter",
     "MemoryDrawerFilter",
     "TaskOrder",
     "TaskFilter",
@@ -126,7 +117,6 @@ __all__ = [
     "ToolboxOrder",
     "ProtocolFilter",
     "ToolboxFilter",
-    "ShortcutActionFilter",
     "ShortcutFilter",
     "ActionOrder",
     "ActionFilter",
@@ -136,10 +126,6 @@ __all__ = [
     "StructurePackageFilter",
     "StructureFilter",
     "InterfaceFilter",
-    "InputInterfaceUsageFilter",
-    "OutputInterfaceUsageFilter",
-    "InputStructureUsageFilter",
-    "OutputStructureUsageFilter",
     "ThreeDModelOrder",
     "ThreeDModelFilter",
     "SpaceOrder",

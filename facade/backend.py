@@ -10,6 +10,7 @@ from facade.caller_context import CallerContext
 from facade.consumers.async_consumer import AgentConsumer
 from facade.higher_order import build_lower_args, build_lower_dependencies
 from facade.provenance import mint_token_for_task
+from facade.provenance.canonical import args_hash
 from kante.types import Info
 import logging
 
@@ -33,18 +34,24 @@ def agent_is_available(agent: models.Agent) -> bool:
 
 
 def build_agent_dependency_dict(agent: models.Agent, dep: models.Dependency) -> Dict[str, Any]:
+    # Only action demands map to callable implementations here; the dependency's state
+    # demands are agent-SELECTION criteria (enforced in logic.auto_resolve and the agent
+    # filter) and have no per-call representation.
     implementations: Dict[str, str] = {}
 
-    for action in dep.get_action_demands():
+    for action_dependency in dep.get_action_dependencies():
+        # The demand's app/key identify the target action; the slot key is only the
+        # caller-facing name and doubles as the action key when the demand doesn't pin one.
+        action_key = (action_dependency.demand.key if action_dependency.demand else None) or action_dependency.key
         try:
-            implementation = models.Implementation.objects.get(action__key=action.key, agent=agent)
+            implementation = models.Implementation.objects.get(action__key=action_key, agent=agent)
         except models.Implementation.DoesNotExist:
-            raise ValueError(f"No implementation found for dependency demand {action} on agent {agent}")
+            raise ValueError(f"No implementation found for dependency demand {action_dependency} on agent {agent}")
 
         if implementation.dependencies.exists():
             raise NotImplementedError("Nested dependencies are not supported yet, but they are coming soon!")
 
-        implementations[action.key] = {"implementation": str(implementation.pk), "dependencies": {}}
+        implementations[action_dependency.key] = {"implementation": str(implementation.pk), "dependencies": {}}
 
     return {
         "agent": str(agent.pk),
@@ -187,7 +194,9 @@ class RedisControllBackend:
 
     def assign(self, principal: "CallerContext | Any", input: inputs.AssignInputModel) -> models.Task:
         ctx = CallerContext.coerce(principal)
-        # TODO: Check if function is cached and was
+        # Replay/reuse of prior results is the orchestrator's decision: tasks carry an
+        # indexed ``args_hash`` and the ``reusable_task_for`` query surfaces prior completed
+        # pure runs — the server never short-circuits an assign itself.
 
         # ``org`` is a required field on the Assign message — fail loudly here rather than
         # crashing on ``None.slug`` further down (also covers the higher-order path).
@@ -284,6 +293,7 @@ class RedisControllBackend:
         task = models.Task.objects.create(
             action=action,
             args=input.args,
+            args_hash=args_hash(input.args or {}),
             reference=reference,
             parent_id=input.parent,
             agent=agent,
@@ -373,6 +383,7 @@ class RedisControllBackend:
         higher_task = models.Task.objects.create(
             action=higher.action,
             args=input.args,
+            args_hash=args_hash(input.args or {}),
             reference=reference,
             parent_id=input.parent,
             agent=higher.agent,
@@ -392,6 +403,7 @@ class RedisControllBackend:
         lower_task = models.Task.objects.create(
             action=lower_action,
             args=lower_args,
+            args_hash=args_hash(lower_args or {}),
             reference=self.create_message_id(),
             parent=higher_task,
             root=higher_task.root or higher_task,

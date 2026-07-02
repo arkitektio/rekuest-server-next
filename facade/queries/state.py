@@ -7,6 +7,7 @@ from django.db.models import Min, Max, QuerySet
 from django.core.exceptions import ObjectDoesNotExist
 
 from facade import models, types, inputs, managers
+from rekuest_core.inputs import types as ritypes
 from kante.types import Info
 from facade.logic import get_latest_state
 
@@ -101,14 +102,13 @@ def state_for(
     info: Info,
     agent: strawberry.ID,
     state_hash: str | None = None,
-    demand: inputs.SchemaDemandInput | None = None,
+    demand: ritypes.StateDemandInput | None = None,
 ) -> types.State:
     """Get a state for an agent."""
     agent_inst = models.Agent.objects.get(id=agent)
 
-    if demand and demand.matches:
-        state_ids = managers.get_state_ids_by_demands(demand.matches)
-        return models.State.objects.get(agent=agent_inst, definition__id__in=state_ids)
+    if demand:
+        return models.State.objects.get(agent=agent_inst, **managers.state_demand_state_filters(demand))
 
     if state_hash:
         return models.State.objects.get(agent=agent_inst, definition__hash=state_hash)

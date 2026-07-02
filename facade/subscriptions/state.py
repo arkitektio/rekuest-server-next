@@ -98,7 +98,7 @@ async def watch_state(
             interface=interface,
         )
 
-    returned: dict[Unknown, Unknown] = await sync_to_async(logic.get_latest_state)(state.agent, state_id=state.id)
+    returned = await sync_to_async(logic.get_latest_state)(state.agent, state_id=state.id)
 
     yield StateSnapshotEvent(
         state_id=strawberry.ID(str(state_id)),
@@ -114,8 +114,6 @@ async def watch_state(
         f"state_{state.id}",
         f"patches_state_{state.id}",
     ]
-
-    print("Watching state with topics:", topics)
 
     async for message in patch_channel.listen(info.context, topics):
         # TODO: optimize by NOT using a model here but sending the raw patch data in the channel message (from the agent to this receiver)
@@ -155,16 +153,16 @@ async def watch_agent(
     agent = await models.Agent.objects.aget(id=agent_id)
 
     # Yield a snapshot for each state of this agent
-    state: dict[Unknown, Unknown] = logic.get_latest_state(agent)
+    state = await sync_to_async(logic.get_latest_state)(agent)
 
     topics = [f"patches_agent_{agent.pk}"]
 
     yield AgentSnapshotEvent(
         agent_id=strawberry.ID(str(agent.id)),
-        values=state.get("values", {}),
+        values=state.get("states", {}),
         global_revision=state.get("global_revision", 0),
-        session_id=latest_snapshot.session_id if latest_snapshot else None,
-        timestamp=state.updated_at,
+        session_id=state.get("session_id"),
+        timestamp=state.get("timestamp"),
     )
 
     async for message in patch_channel.listen(info.context, topics):

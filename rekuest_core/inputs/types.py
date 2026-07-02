@@ -204,6 +204,9 @@ class ArgPortInput:
     children: list[Annotated["ArgPortInput", strawberry.lazy(__name__)]] | None = strawberry.field(default_factory=list)
     widget: Optional["AssignWidgetInput"] = None
     requires: list[RequiresInput] | None = strawberry.field(default_factory=list)
+    reference_unit: str | None = None
+    proposed_units: list[str] | None = None
+    dimension: str | None = None
 
 
 @pydantic.input(
@@ -241,6 +244,9 @@ class ReturnPortInput:
     children: list[Annotated["ReturnPortInput", strawberry.lazy(__name__)]] | None = strawberry.field(default_factory=list)
     widget: Optional["ReturnWidgetInput"] = None
     provides: list[ProvidesInput] | None = strawberry.field(default_factory=list)
+    reference_unit: str | None = None
+    proposed_units: list[str] | None = None
+    dimension: str | None = None
 
 
 @strawberry.input(
@@ -255,9 +261,20 @@ class PortGroupInput:
 
 
 @pydantic.input(
+    models.DescriptorInputModel,
+    description="A single runtime descriptor key/value pair carried by a candidate object.",
+)
+class DescriptorInput:
+    key: str
+    value: scalars.Arg
+
+
+@pydantic.input(
     models.PortMatchInputModel,
-    description="""A dependency for a implementation. By defining dependencies, you can
-    create a dependency graph for your implementations and actions""",
+    description="""A structural (and optionally object-level) match against a port. Purely
+    structural fields target the port shape; the optional ``descriptors`` carry a concrete
+    runtime object's key/value pairs, evaluated against the port's compiled requires
+    micro-constraint to find actions the object can actually be passed to.""",
 )
 class PortMatchInput:
     at: int | None = None
@@ -265,45 +282,70 @@ class PortMatchInput:
     kind: enums.PortKind | None = None
     identifier: str | None = None
     nullable: bool | None = None
+    dimension: str | None = None
+    descriptors: list[DescriptorInput] | None = None
     children: Optional[list[Annotated["PortMatchInput", strawberry.lazy(__name__)]]] = None
 
 
 @pydantic.input(
+    models.ActionDemandInputModel,
+    description="""Pure matching criteria for an action: hash or name short-circuits, arg/return
+    port matches, protocols and forced port counts. Used directly by query filters and, wrapped
+    in an ActionDependencyInput, by dependency declarations.""",
+)
+class ActionDemandInput:
+    hash: str | None = None
+    key: str | None = None
+    app: str | None = None
+    version: str | None = None
+    name: str | None = None
+    arg_matches: list[PortMatchInput] | None = None
+    return_matches: list[PortMatchInput] | None = None
+    protocols: list[str] | None = None
+    force_arg_length: int | None = None
+    force_return_length: int | None = None
+    pure: bool | None = None
+    idempotent: bool | None = None
+    stateful: bool | None = None
+
+
+@pydantic.input(
+    models.StateDemandInputModel,
+    description="""Pure matching criteria for a state definition: hash short-circuits, port
+    matches and protocols. Used directly by query filters and, wrapped in a
+    StateDependencyInput, by dependency declarations.""",
+)
+class StateDemandInput:
+    hash: str | None = None
+    key: str | None = None
+    app: str | None = None
+    matches: list[PortMatchInput] | None = None
+    protocols: list[str] | None = None
+
+
+@pydantic.input(
     models.ActionDependencyInputModel,
-    description="""A dependency for a implementation. By defining dependencies, you can
-    create a dependency graph for your implementations and actions""",
+    description="""A named action requirement of a dependency: a slot key plus the demand the
+    resolved action must satisfy, and resolution-lifecycle filters.""",
 )
 class ActionDependencyInput:
     key: str
-    version: str | None = None
-    app: str | None = None
     allow_inactive: bool | None = None
-    name: str | None = None
-    action_key: str | None = None
     description: str | None = None
-    arg_matches: list[PortMatchInput] | None = None
-    return_matches: list[PortMatchInput] | None = None
-    protocols: list[strawberry.ID] | None = None
-    force_arg_length: int | None = None
-    force_return_length: int | None = None
+    demand: ActionDemandInput | None = None
     optional: bool = False
 
 
 @pydantic.input(
     models.StateDependencyInputModel,
-    description="""A dependency for a implementation. By defining dependencies, you can
-    create a dependency graph for your implementations and actions""",
+    description="""A named state requirement of a dependency: a slot key plus the demand the
+    agent's state must satisfy, and resolution-lifecycle filters.""",
 )
 class StateDependencyInput:
     key: str
-    version: str | None = None
-    app: str | None = None
-    state_key: str | None = None
     allow_inactive: bool | None = None
-    name: str | None = None
     description: str | None = None
-    port_matches: list[PortMatchInput] | None = None
-    protocols: list[strawberry.ID] | None = None
+    demand: StateDemandInput | None = None
     optional: bool = False
 
 
@@ -320,8 +362,8 @@ class AgentDependencyInput:
     name: str | None = None
     description: str | None = None
     optional: bool = False
-    action_demands: list[ActionDependencyInput] | None = None
-    state_demands: list[StateDependencyInput] | None = None
+    action_dependencies: list[ActionDependencyInput] | None = None
+    state_dependencies: list[StateDependencyInput] | None = None
     min_viable_instances: int | None = None
     max_viable_instances: int | None = None
     mutually_exclusive_keys: list[str] | None = None
@@ -361,6 +403,14 @@ class DefinitionInput:
     stateful: bool = strawberry.field(
         default=False,
         description="Whether the definition is stateful or not. If the definition is stateful, it can be used to create a stateful action. If the definition is not stateful, it cannot be used to create a stateful action",
+    )
+    pure: bool = strawberry.field(
+        default=False,
+        description="Whether the action is pure: same args always produce the same result and no side effects — its results are replayable/cacheable. Implies idempotent. Incompatible with stateful and with a PHYSICAL effect class.",
+    )
+    idempotent: bool = strawberry.field(
+        default=False,
+        description="Whether the action is idempotent: safe to run multiple times with the same args without changing the outcome — on ambiguous executor loss it may be freely re-dispatched.",
     )
     port_groups: list[PortGroupInput] = strawberry.field(
         default_factory=list,
@@ -448,6 +498,8 @@ class StateDefinitionInput:
 class StateImplementationInput:
     interface: str
     definition: StateDefinitionInput
+    key: str | None = None
+    app: str | None = None
 
 
 @pydantic.input(
@@ -492,25 +544,6 @@ class InterfaceInput:
     description: str | None = None
     default_widget: Optional["AssignWidgetInput"] = None
     default_return_widget: Optional["ReturnWidgetInput"] = None
-
-
-@pydantic.input(models.DescriptorSchemaInputModel, description="A descriptor model")
-class DescriptorSchemaInput:
-    key: str
-    description: str | None = None
-
-
-@pydantic.input(
-    models.StructurePackageInputModel,
-    description="A structure schema model",
-)
-class StructurePackageInput:
-    key: str
-    version: str = "0.1.0"
-    description: str | None = None
-    descriptors: list[DescriptorSchemaInput] | None = None
-    interfaces: list[InterfaceInput] | None = None
-    structures: list[StructureInput] | None = None
 
 
 @pydantic.input(models.DynamicValueInputModel, description="A bound state pointer referencing a variable inside a Blok state instance.")

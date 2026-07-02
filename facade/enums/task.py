@@ -4,16 +4,6 @@ import strawberry
 from django.db.models import TextChoices
 
 
-class TaskStatusChoices(TextChoices):
-    ASSIGNING = "ASSIGNING", "Assigning, (Task is being assigned to an Agent)"
-    BOUND = "BOUND", "Bound (Task was bound to an Agent)"
-    CANCELING = "CANCELING", "Unassign (Task was unassigned from an Agent)"
-    CANCELLED = "CANCELLED", "Unassign (Task was unassigned from an Agent)"
-    ONGOING = "ONGOING", "ONGOING (Task is currently being performed)"
-    DONE = "DONE", "Done (Task finished the Task)"
-    ERROR = "ERROR", "Error (Task resulted in an error)"
-
-
 class TaskEventChoices(TextChoices):
     """These are the possible events that can happen to a Task.
 

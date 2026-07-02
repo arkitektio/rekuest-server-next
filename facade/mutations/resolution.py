@@ -1,20 +1,18 @@
-from sys import implementation
 from kante.types import Info
-from facade import types, models, inputs, enums, logic
-import uuid
+from facade import types, models, inputs, logic
 import strawberry
 
 
 def auto_resolve(info: Info, input: inputs.AutoResolveInput) -> types.Resolution:
-    action = models.Action.objects.get(id=input.action)
+    implementation = models.Implementation.objects.get(id=input.implementation)
     resolution = models.Resolution.objects.create(
-        name=f"Auto-resolve for {implementation.name}",
+        name=f"Auto-resolve for {implementation.action.name}",
         creator=info.context.request.user,
         organization=info.context.request.organization,
-        action=action,
+        implementation=implementation,
     )
 
-    logic.auto_resolve(info, action, resolution)
+    logic.auto_resolve(info, implementation, resolution)
     return resolution
 
 
@@ -25,7 +23,7 @@ def create_resolution(info: Info, input: inputs.CreateResolutionInput) -> types.
         name=input.name,
         creator=info.context.request.user,
         organization=info.context.request.organization,
-        implementation=implementation,
+        implementation=cimplementation,
     )
 
     if input.resolved_dependencies:
@@ -34,7 +32,7 @@ def create_resolution(info: Info, input: inputs.CreateResolutionInput) -> types.
                 resolution=resolution,
                 implementation=models.Implementation.objects.get(id=rd_input.implementation),
                 key=rd_input.key,
-                depedency=models.Dependency.objects.get(key=rd_input.key, implementation=cimplementation),
+                dependency=models.Dependency.objects.get(key=rd_input.key, implementation=cimplementation),
                 resolution_key=rd_input.resolution_key,
             )
 

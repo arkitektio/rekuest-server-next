@@ -6,7 +6,6 @@ from .agent import ensure_agent, pin_agent, delete_agent
 from .dashboard import create_dashboard, delete_dashboard, update_dashboard
 from .shortcut import create_shortcut, delete_shortcut
 from .toolbox import create_toolbox, delete_toolbox
-from .state import log_patches, log_snapshot
 from .blok import create_blok, delete_blok, update_blok
 from .materialized_blok import materialize_blok, delete_materialized_blok, update_materialized_blok
 from .lifeline import reinit
@@ -32,8 +31,6 @@ __all__ = [
     "kick",
     "implement_agent",
     "delete_toolbox",
-    "log_patches",
-    "log_snapshot",
     "auto_resolve",
     "create_resolution",
     "update_resolution",

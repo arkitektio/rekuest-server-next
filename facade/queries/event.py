@@ -5,6 +5,6 @@ from kante.types import Info
 
 def event(
     info: Info,
-    id: strawberry.ID | None = None,
-) -> list[types.TaskEvent]:
+    id: strawberry.ID,
+) -> types.TaskEvent:
     return models.TaskEvent.objects.get(id=id)

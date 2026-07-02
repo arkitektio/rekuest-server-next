@@ -29,6 +29,8 @@ class Action:
     version: str = strawberry_django.field(description="Version string of the action.")
     kind: renums.ActionKind = strawberry_django.field(description="The kind or category of the action.")
     stateful: bool = strawberry_django.field(description="Indicates whether the action maintains state.")
+    pure: bool = strawberry_django.field(description="Whether the action is pure: same args always produce the same result, no side effects — replayable.")
+    idempotent: bool = strawberry_django.field(description="Whether the action is idempotent: safe to re-run with the same args — re-dispatchable on ambiguous executor loss.")
     description: str | None = strawberry_django.field(description="Optional description of the action.")
     collections: list["Collection"] = strawberry_django.field(description="Collections to which this action belongs.")
     implementations: list["Implementation"] = strawberry_django.field(description="List of implementations for this action.")
@@ -53,9 +55,7 @@ class Action:
 
     @strawberry_django.field(description="Input arguments (ports) for the action.")
     def args(self) -> list[rtypes.ArgPort]:
-        x = [rmodels.ArgPortModel(**i) for i in self.args]
-        print(x)
-        return x
+        return [rmodels.ArgPortModel(**i) for i in self.args]
 
     @strawberry_django.field(description="Output values (ports) returned by the action.")
     def returns(self) -> list[rtypes.ReturnPort]:

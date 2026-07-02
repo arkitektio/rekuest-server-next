@@ -23,6 +23,7 @@ class PortKind(str, Enum):
     MODEL = "MODEL"
     MEMORY_STRUCTURE = "MEMORY_STRUCTURE"
     INTERFACE = "INTERFACE"
+    QUANTITY = "QUANTITY"
 
 
 @strawberry.enum(description="The kind of assign widget.")

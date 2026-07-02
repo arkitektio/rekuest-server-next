@@ -29,16 +29,10 @@ class State:
     definition: StateDefinition = strawberry_django.field(description="The schema definition for this state.")
     agent: Agent = strawberry_django.field(description="The agent to which this state belongs.")
     interface: str = strawberry_django.field(description="The interface this state is associated with.")
+    key: str | None = strawberry_django.field(description="The stable identity key of this state, matched by state demands (defaults to the interface at registration).")
+    app_identifier: str | None = strawberry_django.field(description="The identifier of the app providing this state (defaults to the owning agent's app identifier).")
     created_at: datetime.datetime = strawberry_django.field(description="Timestamp when this state was created.")
     updated_at: datetime.datetime = strawberry_django.field(description="Timestamp when this state was last updated.")
-
-
-@strawberry_django.type(models.HistoricalState)
-class HistoricalState:
-    id: strawberry.ID
-    state: State
-    value: scalars.Args
-    archived_at: datetime.datetime
 
 
 @strawberry.type
@@ -46,12 +40,6 @@ class JSONPatch:
     op: enums.JSONPatchOperation
     path: str
     value: scalars.Args
-
-
-@strawberry.type
-class StateUpdateEvent:
-    state_id: str
-    patches: list[JSONPatch]
 
 
 @strawberry_django.type(models.Patch)

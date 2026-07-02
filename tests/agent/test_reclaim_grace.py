@@ -189,3 +189,88 @@ class TestProgressLease:
 
         await backend.on_agent_progress("a", messages.Progress(task=key, progress=10))
         assert key not in backend._progress_leases  # only physical work gets a lease
+
+
+class TestIdempotentRedispatch:
+    """The third level of the retry axis: PHYSICAL (terminal) < default (fate unknown) <
+    idempotent (freely re-dispatchable — QUEUED + Assign re-broadcast into the agent queue,
+    which retains messages for offline agents)."""
+
+    @pytest.fixture
+    def broadcasts(self, monkeypatch):
+        from facade.consumers.async_consumer import AgentConsumer
+
+        recorded = []
+        monkeypatch.setattr(AgentConsumer, "broadcast", staticmethod(lambda agent_id, message: recorded.append((agent_id, message))))
+        return recorded
+
+    async def test_idempotent_expiry_requeues(self, settings, broadcasts):
+        _grace(settings, 0.05)
+        ass = await build_task("recl-idem", effect="NONE", idempotent=True)
+        backend = ModelPersistBackend()
+        agent_id = str(ass.agent_id)
+
+        await backend.on_agent_connected(agent_id, "c1", session_id="S1")
+        await backend.on_agent_disconnected(agent_id, "c1")
+        await asyncio.wait_for(backend._executor_grace[agent_id], timeout=2)
+
+        kinds = await _event_kinds(ass.pk)
+        assert enums.TaskEventKind.QUEUED in kinds
+        assert enums.TaskEventKind.DISCONNECTED not in kinds
+        refreshed = await Task.objects.aget(pk=ass.pk)
+        assert refreshed.is_done is False
+        assert refreshed.latest_event_kind == enums.TaskEventKind.QUEUED
+
+        assert len(broadcasts) == 1
+        target_agent, message = broadcasts[0]
+        assert isinstance(message, messages.Assign)
+        assert message.task == str(ass.pk)
+        assert message.args == (ass.args or {})
+        assert message.reference == str(ass.reference)
+
+    async def test_idempotent_physical_still_terminal(self, settings, broadcasts):
+        _grace(settings, 0.05)
+        ass = await build_task("recl-idem-phys", effect="PHYSICAL", idempotent=True)
+        backend = ModelPersistBackend()
+        agent_id = str(ass.agent_id)
+
+        await backend.on_agent_connected(agent_id, "c1", session_id="S1")
+        await backend.on_agent_disconnected(agent_id, "c1")
+        await asyncio.wait_for(backend._executor_grace[agent_id], timeout=2)
+
+        refreshed = await Task.objects.aget(pk=ass.pk)
+        assert refreshed.is_done is True
+        assert refreshed.latest_event_kind == enums.TaskEventKind.CRITICAL
+        assert broadcasts == []
+
+    async def test_sweep_is_reentrant_single_requeue(self, settings, broadcasts):
+        _grace(settings, 30)
+        ass = await build_task("recl-idem-sweep", effect="NONE", idempotent=True)
+        backend = ModelPersistBackend()
+        agent_id = str(ass.agent_id)
+
+        await backend.on_agent_connected(agent_id, "c1", session_id="S1")
+        await backend.on_agent_disconnected(agent_id, "c1")
+        # The periodic sweep may reconcile repeatedly — only ONE requeue may result.
+        await backend.reconcile_orphaned_executor_work(agent_id)
+        await backend.reconcile_orphaned_executor_work(agent_id)
+
+        kinds = await _event_kinds(ass.pk)
+        assert kinds.count(enums.TaskEventKind.QUEUED) == 1
+        assert len(broadcasts) == 1
+
+    async def test_callerless_idempotent_falls_back_disconnected(self, settings, broadcasts):
+        _grace(settings, 30)
+        ass = await build_task("recl-idem-nocaller", effect="NONE", idempotent=True)
+        await Task.objects.filter(pk=ass.pk).aupdate(caller=None)
+        backend = ModelPersistBackend()
+        agent_id = str(ass.agent_id)
+
+        await backend.on_agent_connected(agent_id, "c1", session_id="S1")
+        await backend.on_agent_disconnected(agent_id, "c1")
+        await backend.reconcile_orphaned_executor_work(agent_id)
+
+        kinds = await _event_kinds(ass.pk)
+        assert enums.TaskEventKind.DISCONNECTED in kinds
+        assert enums.TaskEventKind.QUEUED not in kinds
+        assert broadcasts == []

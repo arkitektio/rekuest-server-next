@@ -36,6 +36,18 @@ class State(models.Model):
         max_length=1000,
         help_text="The interface this state is for (e.g. Function)",
     )
+    key = models.CharField(
+        max_length=1000,
+        null=True,
+        blank=True,
+        help_text="The stable identity key of this state, matched by state demands (defaults to the interface at registration)",
+    )
+    app_identifier = models.CharField(
+        max_length=1000,
+        null=True,
+        blank=True,
+        help_text="The identifier of the app providing this state (defaults to the owning agent's app identifier at registration)",
+    )
     agent = models.ForeignKey("Agent", on_delete=models.CASCADE, related_name="states")
     value = models.JSONField(default=dict, help_text=" The current value of this state")
     created_at = models.DateTimeField(auto_now_add=True, help_text="Date this State was first ever written to")

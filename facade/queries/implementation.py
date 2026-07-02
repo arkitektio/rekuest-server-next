@@ -1,5 +1,6 @@
 import strawberry
 from facade import models, types, inputs, managers
+from rekuest_core.inputs import types as ritypes
 from kante.types import Info
 
 
@@ -8,13 +9,13 @@ def implementation_at(
     agent: strawberry.ID,
     interface: str | None = None,
     action_hash: str | None = None,
-    demand: inputs.ActionDemandInput | None = None,
+    demand: ritypes.ActionDemandInput | None = None,
 ) -> types.Implementation:
     if action_hash:
         return models.Implementation.objects.get(agent_id=agent, action__hash=action_hash)
 
     if demand:
-        action_ids = managers.get_action_ids_by_action_demand(demand)
+        action_ids = managers.get_action_ids_by_action_demands([demand])[0]
         return models.Implementation.objects.get(agent_id=agent, action_id__in=action_ids)
 
     return models.Implementation.objects.get(agent_id=agent, interface=interface)

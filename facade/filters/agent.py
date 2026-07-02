@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import strawberry
 import strawberry_django
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from strawberry import UNSET, auto
 from strawberry.types import Info
 from strawberry_django.fields.filter_order import filter_field
 
 from facade import inputs, managers, models
+from rekuest_core.inputs import types as ritypes
 
 
 @strawberry_django.filter_type(models.Agent, description="A way to filter agents")
@@ -73,38 +74,32 @@ class AgentFilter:
         return queryset.distinct(), Q()
 
     @filter_field
-    def action_demands(self, info: Info, queryset, value: list[inputs.ActionDemandInput], prefix: str):
-        for ports_demand in value:
-            new_ids = managers.get_action_ids_by_action_demand(
-                action_demand=ports_demand,
-                organization_id=info.context.request.organization.id,
-            )
+    def action_demands(self, info: Info, queryset, value: list[ritypes.ActionDemandInput], prefix: str):
+        # One matcher round trip for all demands. The agent must satisfy EVERY demand, but each
+        # demand may be met by a different implementation — hence one Exists() per demand
+        # (ANDed) rather than one merged id set or chained M2M joins (which multiply rows).
+        per_demand_ids = managers.get_action_ids_by_action_demands(
+            value,
+            organization_id=info.context.request.organization.id,
+        )
 
+        for ports_demand, new_ids in zip(value, per_demand_ids):
             if len(new_ids) == 0:
                 raise ValueError(f"No actions found that match the given action demands {ports_demand}")
 
-            queryset = queryset.filter(**{f"{prefix}implementations__action__id__in": new_ids})
+            queryset = queryset.filter(Exists(models.Implementation.objects.filter(agent=OuterRef(f"{prefix}pk"), action_id__in=new_ids)))
 
         return queryset, Q()
 
     @filter_field
-    def state_demands(self, info: Info, queryset, value: list[inputs.SchemaDemandInput], prefix: str):
-        filtered_ids: set[str] = set()
-
+    def state_demands(self, info: Info, queryset, value: list[ritypes.StateDemandInput], prefix: str):
+        # The agent must satisfy EVERY state demand (one Exists() per demand, ANDed) — each
+        # demand may be met by a different State of the agent, mirroring action_demands.
+        # app/key match the State's identity columns; matches resolve via the port matcher.
         for state_demand in value:
-            fitting_schema_ids = managers.get_state_ids_by_demands(
-                state_demand.matches,
-                model="facade_stateschema",
-            )
+            queryset = queryset.filter(Exists(models.State.objects.filter(agent=OuterRef(f"{prefix}pk"), **managers.state_demand_state_filters(state_demand))))
 
-            if len(fitting_schema_ids) == 0:
-                return queryset.none(), Q()
-
-            for new_id in fitting_schema_ids:
-                if new_id not in filtered_ids:
-                    filtered_ids.add(new_id)
-
-        return queryset.filter(**{f"{prefix}states__definition__id__in": list(filtered_ids)}), Q()
+        return queryset, Q()
 
     @filter_field(description="Filter by user ID")
     def user(self, info: Info, queryset, value: strawberry.ID, prefix: str):

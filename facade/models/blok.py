@@ -1,16 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.db import models
-from rekuest_core.inputs.models import ActionDependencyInputModel
+from rekuest_core.inputs.models import ActionDependencyInputModel, StateDependencyInputModel
 
 from facade import enums
-
-
-class Widget(models.Model):
-    structure = models.ForeignKey("Structure", on_delete=models.CASCADE, null=True, blank=True)
-    name = models.CharField(max_length=2000)
-    kind = models.CharField(max_length=2000)
-    hash = models.CharField(max_length=2000, unique=True)
-    values = models.JSONField(null=True, blank=True)
 
 
 class Dashboard(models.Model):
@@ -109,8 +101,11 @@ class BlokDependency(models.Model):
         help_text="The assign policy for this dependency",
     )
 
-    def get_action_demands(self):
+    def get_action_dependencies(self):
         return [ActionDependencyInputModel(**demand) for demand in self.action_demands]
+
+    def get_state_dependencies(self):
+        return [StateDependencyInputModel(**demand) for demand in self.state_demands]
 
 
 class MaterializedBlok(models.Model):

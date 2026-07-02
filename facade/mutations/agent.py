@@ -39,6 +39,30 @@ class DeleteAgentInput:
     id: strawberry.ID = strawberry.field(description="The ID of the agent to delete. This is used to identify the agent in the system.")
 
 
+def _register_state(agent: models.Agent, inputstate: StateImplementationInputModel) -> models.State:
+    """Upsert one of the agent's states, defaulting the identity fields: ``key`` falls back
+    to the interface, ``app_identifier`` to the agent's app identifier."""
+    state_definition, _ = models.StateDefinition.objects.update_or_create(
+        hash=unique.hash_state_definition(inputstate.definition),
+        defaults=dict(
+            name=inputstate.definition.name,
+            ports=[i.model_dump() for i in inputstate.definition.ports],
+            description="A state definition",
+        ),
+    )
+
+    state, _ = models.State.objects.update_or_create(
+        interface=inputstate.interface,
+        agent=agent,
+        defaults=dict(
+            definition=state_definition,
+            key=inputstate.key or inputstate.interface,
+            app_identifier=inputstate.app or agent.app.identifier,
+        ),
+    )
+    return state
+
+
 def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
     # TODO: Hasch this
 
@@ -145,22 +169,7 @@ def implement_agent(info: Info, input: ImplementAgentInput) -> types.Agent:
         created_implementations.append(created_implementation)
 
     for inputstate in input.states or []:
-        state_definition, _ = models.StateDefinition.objects.update_or_create(
-            hash=unique.hash_state_definition(inputstate.definition),
-            defaults=dict(
-                name=inputstate.definition.name,
-                ports=[i.model_dump() for i in inputstate.definition.ports],
-                description="A state definition",
-            ),
-        )
-
-        state, _ = models.State.objects.update_or_create(
-            interface=inputstate.interface,
-            agent=agent,
-            defaults=dict(
-                definition=state_definition,
-            ),
-        )
+        state = _register_state(agent, inputstate)
 
         created_states_id.append(state.id)
         created_states.append(state)
@@ -201,8 +210,8 @@ def implement_agent(info: Info, input: ImplementAgentInput) -> types.Agent:
                     blok=x,
                     key=i.key,
                     defaults=dict(
-                        action_demands=[x.model_dump() for x in i.action_demands] if i.action_demands else [],
-                        state_demands=[x.model_dump() for x in i.state_demands] if i.state_demands else [],
+                        action_demands=[x.model_dump() for x in i.action_dependencies] if i.action_dependencies else [],
+                        state_demands=[x.model_dump() for x in i.state_dependencies] if i.state_dependencies else [],
                         app_filter=i.app,
                         version_filter=i.version,
                     ),

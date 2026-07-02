@@ -17,6 +17,7 @@ from strawberry_django.fields.filter_order import filter_field
 from strawberry_django.filters import FilterLookup
 
 from facade import inputs, managers, models
+from rekuest_core.inputs import types as ritypes
 
 
 @strawberry_django.filter_type(models.Action)
@@ -35,27 +36,11 @@ class ImplementationActionFilter:
 
     @filter_field
     def demands(self, info: Info, queryset, value: list[inputs.PortDemandInput], prefix: str):
-        filtered_ids = None
-
-        for ports_demand in value:
-            new_ids = managers.get_action_ids_by_demands(
-                ports_demand.matches,
-                type=ports_demand.kind.value,
-                force_length=ports_demand.force_length,
-                force_non_nullable_length=ports_demand.force_non_nullable_length,
-                force_structure_length=ports_demand.force_structure_length,
-                organization_id=info.context.request.organization.id,
-            )
-
-            if filtered_ids is None:
-                filtered_ids = set(new_ids)
-            else:
-                filtered_ids = filtered_ids.intersection(new_ids)
-
-        if filtered_ids is None:
+        if len(value) == 0:
             return queryset, Q()
 
-        return queryset.filter(**{f"{prefix}id__in": filtered_ids}), Q()
+        ids = managers.get_action_ids_by_port_demands(value, organization_id=info.context.request.organization.id)
+        return queryset.filter(**{f"{prefix}id__in": ids}), Q()
 
     @filter_field
     def kind(self, info: Info, queryset, value: renums.ActionKind, prefix: str):
@@ -118,9 +103,9 @@ class ImplementationFilter:
         return queryset.filter(Q(**{f"{prefix}action__name__icontains": value}) | Q(**{f"{prefix}agent__name__icontains": value}) | Q(**{f"{prefix}interface__icontains": value})), Q()
 
     @filter_field
-    def action_demand(self, info: Info, queryset, value: inputs.ActionDemandInput, prefix: str):
-        new_ids = managers.get_action_ids_by_action_demand(
-            action_demand=value,
+    def action_demand(self, info: Info, queryset, value: ritypes.ActionDemandInput, prefix: str):
+        new_ids = managers.get_action_ids_by_action_demands(
+            [value],
             organization_id=info.context.request.organization.id,
-        )
+        )[0]
         return queryset.filter(**{f"{prefix}action__id__in": new_ids}), Q()

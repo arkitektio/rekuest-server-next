@@ -31,7 +31,7 @@ from . import (
     toolbox,
 )
 from .action import Action, ActionStats, ActionStatsResolver
-from .agent import Agent, AgentEvent, HardwareRecord
+from .agent import Agent, HardwareRecord
 from .task import (
     Task,
     TaskEvent,
@@ -46,38 +46,34 @@ from .dashboard import Dashboard, DashboardPlacement, UICatalog
 from .demand import (
     ActionDemand,
     ActionDemandModel,
-    DynamicValueModel,
+    ActionDependency,
+    ActionDependencyModel,
     StateDemand,
     StateDemandModel,
+    StateDependency,
+    StateDependencyModel,
 )
 from .dependency import (
     AgentMapping,
     Dependency,
-    DependencyMatch,
     ImplementationMapping,
-    MethodMatch,
     ResolvedAgentDependency,
     ResolvedDependency,
     Resolution,
 )
 from .implementation import Implementation
 from .session import Session, SessionBoundary, TaskBoundary
-from .shelve import FileDrawer, FilesystemShelve, MemoryDrawer, MemoryShelve
+from .shelve import MemoryDrawer, MemoryShelve
 from .state import (
-    HistoricalState,
     JSONPatch,
     Patch,
     Snapshot,
     State,
     StateDefinition,
-    StateUpdateEvent,
 )
 from .structure import (
-    InputInterfaceUsage,
-    InputStructureUsage,
     Interface,
-    OutputInterfaceUsage,
-    OutputStructureUsage,
+    PortUsage,
     Structure,
     StructurePackage,
 )
@@ -92,10 +88,11 @@ __all__ = [
     "ActionStats",
     "ActionStatsResolver",
     "ActionDemand",
+    "ActionDependency",
     "ActionDemandModel",
     "StateDemand",
+    "StateDependency",
     "StateDemandModel",
-    "DynamicValueModel",
     "User",
     "Device",
     "App",
@@ -109,8 +106,6 @@ __all__ = [
     "Shortcut",
     "Dependency",
     "ResolvedDependency",
-    "MethodMatch",
-    "DependencyMatch",
     "Resolution",
     "ImplementationMapping",
     "AgentMapping",
@@ -118,10 +113,7 @@ __all__ = [
     "Implementation",
     "HardwareRecord",
     "Agent",
-    "AgentEvent",
     "MemoryShelve",
-    "FilesystemShelve",
-    "FileDrawer",
     "MemoryDrawer",
     "Task",
     "TaskStats",
@@ -139,18 +131,13 @@ __all__ = [
     "BlokAgentMapping",
     "StateDefinition",
     "State",
-    "HistoricalState",
     "JSONPatch",
-    "StateUpdateEvent",
     "Patch",
     "Snapshot",
     "StructurePackage",
     "Interface",
     "Structure",
-    "InputStructureUsage",
-    "OutputStructureUsage",
-    "InputInterfaceUsage",
-    "OutputInterfaceUsage",
+    "PortUsage",
     "TaskBoundary",
     "SessionBoundary",
     "Session",

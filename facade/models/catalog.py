@@ -74,16 +74,6 @@ class UICatalog(models.Model):
         return True
 
 
-class IconPack(models.Model):
-    """An IconPack is a collection of icons that are used to
-    represent actions in the UI. You can create your own icon packs
-    and use them to customize the look of your actions.
-
-    """
-
-    name = models.CharField(max_length=1000)
-
-
 class Toolbox(models.Model):
     name = models.CharField(max_length=1000)
     description = models.TextField()
@@ -141,10 +131,3 @@ class Shortcut(models.Model):
         default=False,
         help_text="Use the result of this Shortcut (e.g. use the result in the next Shortcut)",
     )
-
-
-class Icon(models.Model):
-    pack = models.ForeignKey(IconPack, on_delete=models.CASCADE)
-    icon_url = models.CharField(max_length=10000)
-    hash = models.CharField(max_length=1000)
-    action = models.ForeignKey("Action", on_delete=models.SET_NULL, null=True, related_name="icons")

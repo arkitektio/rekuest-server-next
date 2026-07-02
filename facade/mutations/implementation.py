@@ -1,12 +1,13 @@
 import logging
 
 import strawberry
+from django.db import transaction
 from facade import inputs, models, types
 from facade.descriptors import compile_descriptors_to_jsonpath, compile_returndescriptors_to_jsonpath
 from facade.protocol import infer_protocols
 from facade.unique import assert_non_statefullness, infer_action_scope
 from kante.types import Info
-from rekuest_core.inputs.models import ArgPortInputModel, DefinitionInputModel, ImplementationInputModel, PortInputModel, ReturnPortInputModel
+from rekuest_core.inputs.models import DefinitionInputModel, ImplementationInputModel, PortInputModel
 from rekuest_core.enums import PortKind
 from rekuest_core import scalars as rscalars
 from authentikate.vars import get_user, get_client
@@ -53,173 +54,74 @@ def identifier_to_package_key(identifier: str) -> str:
 
 
 # =========================================================
-# 2. THE RECURSIVE PORT EXTRACTOR (The Relational Engine Builder)
+# 2. THE PORT EXTRACTOR (The Relational Engine Builder)
 # =========================================================
-def extract_ports_recursively(
-    port_data: ArgPortInputModel,
-    action_instance: models.Action,  # The saved Action Django model instance to link to
-    parent_instance: t.Any = None,  # The saved Parent Port Django model (if nested)
-    index: int = 0,
-    parent_path: str = "",  # The semantic materialized string path
+def _bulk_create_ports_level_by_level(
+    port_datas: t.Sequence[t.Any],
+    action: models.Action,
+    port_model: type[models.ArgPort] | type[models.ReturnPort],
+    descriptor_field: str,  # "requires" (args) | "provides" (returns)
+    compiler: t.Callable[[t.Any], str | None],
 ) -> None:
-    """
-    Recursively flattens the Pydantic tree into relational DB objects.
-    Because of the `parent` ForeignKey, we MUST save the parent to the database
-    first to get its ID before we can save its children.
-    """
+    """Flatten the pydantic port tree into relational rows, one bulk_create per depth level.
 
-    # 1. Build the Semantic Materialized Path (e.g., "options.advanced.mask")
-    current_path = f"{parent_path}.{port_data.key}" if parent_path else port_data.key
-
-    # 2. Extract the input-side descriptors (children might be base PortInputModels without requires)
-    descriptors = getattr(port_data, "requires", None) or []
-    compiled_path = compile_descriptors_to_jsonpath(descriptors)
-
-    # 3. Create and Save the Current Port
-    current_port = models.ArgPort(
-        action=action_instance, parent=parent_instance, index=index, key=port_data.key, key_path=current_path, kind=port_data.kind.value if hasattr(port_data.kind, "value") else port_data.kind, identifier=port_data.identifier, compiled_jsonpath=compiled_path, nullable=port_data.nullable
-    )
-
-    # The Write-Time Hit: We save immediately to get the Primary Key (ID)
-    current_port.save()
-
-    # 4. Recurse for Children (e.g., items inside a LIST or properties of a DICT/STRUCTURE)
-    if port_data.children:
-        for child_idx, child_data in enumerate(port_data.children):
-            extract_ports_recursively(
-                port_data=child_data,
-                action_instance=action_instance,
-                parent_instance=current_port,  # Link the child to this newly saved port
-                index=child_idx,
-                parent_path=current_path,  # Pass the materialized path down
-            )
-
-
-# =========================================================
-# 2. THE RECURSIVE PORT EXTRACTOR (The Relational Engine Builder)
-# =========================================================
-def extract_returnports_recursively(
-    port_data: ReturnPortInputModel,
-    action_instance: models.Action,  # The saved Action Django model instance to link to
-    parent_instance: t.Any = None,  # The saved Parent Port Django model (if nested)
-    index: int = 0,
-    parent_path: str = "",  # The semantic materialized string path
-) -> None:
-    """
-    Recursively flattens the Pydantic tree into relational DB objects.
-    Because of the `parent` ForeignKey, we MUST save the parent to the database
-    first to get its ID before we can save its children.
+    Children reference their parent row's PK, so each level is built only after the previous
+    level's bulk_create (Postgres RETURNING populates the pks) — O(tree depth) INSERT statements
+    instead of one per port.
     """
 
-    # 1. Build the Semantic Materialized Path (e.g., "options.advanced.mask")
-    current_path = f"{parent_path}.{port_data.key}" if parent_path else port_data.key
-
-    # 2. Extract the output-side descriptors (children might be base PortInputModels without provides)
-    descriptors = getattr(port_data, "provides", None) or []
-    compiled_path = compile_returndescriptors_to_jsonpath(descriptors)
-
-    # 3. Create and Save the Current Port
-    current_port = models.ReturnPort(
-        action=action_instance, parent=parent_instance, index=index, key=port_data.key, key_path=current_path, kind=port_data.kind.value if hasattr(port_data.kind, "value") else port_data.kind, identifier=port_data.identifier, compiled_jsonpath=compiled_path, nullable=port_data.nullable
-    )
-
-    # The Write-Time Hit: We save immediately to get the Primary Key (ID)
-    current_port.save()
-
-    # 4. Recurse for Children (e.g., items inside a LIST or properties of a DICT/STRUCTURE)
-    if port_data.children:
-        for child_idx, child_data in enumerate(port_data.children):
-            extract_returnports_recursively(
-                port_data=child_data,
-                action_instance=action_instance,
-                parent_instance=current_port,  # Link the child to this newly saved port
-                index=child_idx,
-                parent_path=current_path,  # Pass the materialized path down
-            )
-
-
-def recursive_create_input_usages(action: models.Action, port: PortInputModel, index: int, key: str, modifiers: list[str]) -> None:
-    if port.kind == PortKind.STRUCTURE and port.identifier:
-        package, _ = models.StructurePackage.objects.get_or_create(key=identifier_to_package_key(port.identifier).lower())
-
-        structure, _ = models.Structure.objects.get_or_create(key=identifier_to_key(port.identifier).lower(), package=package)
-
-        x = models.InputStructureUsage.objects.update_or_create(
-            structure=structure,
-            action=action,
-            port_index=index,
-            port_key=key,
-            defaults=dict(
-                modifiers=list(modifiers or []),
+    def build(port_data, parent, index, parent_path):
+        # The Semantic Materialized Path (e.g., "options.advanced.mask")
+        path = f"{parent_path}.{port_data.key}" if parent_path else port_data.key
+        # children might be base PortInputModels without requires/provides
+        descriptors = getattr(port_data, descriptor_field, None) or []
+        return (
+            port_data,
+            path,
+            port_model(
+                action=action,
+                parent=parent,
+                index=index,
+                key=port_data.key,
+                key_path=path,
+                kind=port_data.kind.value if hasattr(port_data.kind, "value") else port_data.kind,
+                identifier=port_data.identifier,
+                compiled_jsonpath=compiler(descriptors),
+                nullable=port_data.nullable,
+                dimension=port_data.dimension,
             ),
         )
 
-    if port.kind == PortKind.INTERFACE and port.identifier:
-        interface, _ = models.Interface.objects.get_or_create(key=identifier_to_key(port.identifier).lower(), package__key=identifier_to_package_key(port.identifier).lower())
-
-        x = models.InputInterfaceUsage.objects.update_or_create(
-            interface=interface,
-            action=action,
-            port_index=index,
-            port_key=key,
-            defaults=dict(
-                modifiers=list(modifiers or []),
-            ),
-        )
-
-    if port.kind == PortKind.DICT:
-        for i, child in enumerate(port.children or []):
-            recursive_create_input_usages(action, child, index, key, modifiers + ["dict"])
-
-    if port.kind == PortKind.LIST:
-        for i, child in enumerate(port.children or []):
-            recursive_create_input_usages(action, child, index, key, modifiers + ["list"])
+    level = [build(port_data, None, index, "") for index, port_data in enumerate(port_datas or [])]
+    while level:
+        port_model.objects.bulk_create([row for _, _, row in level])
+        level = [
+            build(child, instance, child_index, path)
+            for port_data, path, instance in level
+            for child_index, child in enumerate(port_data.children or [])
+        ]
 
 
-def recursive_create_output_usages(action: models.Action, port: PortInputModel, index: int, key: str, modifiers: list[str]) -> None:
-    if port.kind == PortKind.STRUCTURE and port.identifier:
-        package, _ = models.StructurePackage.objects.get_or_create(key=identifier_to_package_key(port.identifier).lower())
+def register_catalog_entities(definition: DefinitionInputModel) -> None:
+    """Ensure the Structure/Interface/StructurePackage catalog entities for a definition exist.
 
-        structure, _ = models.Structure.objects.get_or_create(key=identifier_to_key(port.identifier).lower(), package=package)
+    The catalog is the only derived state the ports don't already carry — usage lookups
+    ("which actions consume @mikro/image?") are answered directly from the relational
+    ArgPort/ReturnPort rows via their indexed ``identifier``.
+    """
+    structures: list[str] = []
+    interfaces: list[str] = []
+    for port in list(definition.args or []) + list(definition.returns or []):
+        extract_structure_recursively(structures, port)
+        extract_interfaces_recursively(interfaces, port)
 
-        x = models.OutputStructureUsage.objects.update_or_create(
-            structure=structure,
-            action=action,
-            port_index=index,
-            port_key=key,
-            defaults=dict(
-                modifiers=modifiers,
-            ),
-        )
+    for identifier in set(structures):
+        package, _ = models.StructurePackage.objects.get_or_create(key=identifier_to_package_key(identifier).lower())
+        models.Structure.objects.get_or_create(key=identifier_to_key(identifier).lower(), package=package)
 
-    if port.kind == PortKind.INTERFACE and port.identifier:
-        interface, _ = models.Interface.objects.get_or_create(key=identifier_to_key(port.identifier).lower(), package__key=identifier_to_package_key(port.identifier).lower())
-
-        x = models.OutputInterfaceUsage.objects.update_or_create(
-            interface=interface,
-            action=action,
-            port_index=index,
-            port_key=key,
-            defaults=dict(
-                modifiers=modifiers,
-            ),
-        )
-
-    if port.kind == PortKind.DICT:
-        for i, child in enumerate(port.children or []):
-            recursive_create_input_usages(action, child, index, key, modifiers + ["dict"])
-
-    if port.kind == PortKind.LIST:
-        for i, child in enumerate(port.children or []):
-            recursive_create_input_usages(action, child, index, key, modifiers + ["list"])
-
-
-def create_usages(action: models.Action, definition: DefinitionInputModel) -> None:
-    for i, port in enumerate(definition.args):
-        recursive_create_input_usages(action, port, i, port.key, [])
-
-    for i, port in enumerate(definition.returns):
-        recursive_create_output_usages(action, port, i, port.key, [])
+    for identifier in set(interfaces):
+        package, _ = models.StructurePackage.objects.get_or_create(key=identifier_to_package_key(identifier).lower())
+        models.Interface.objects.get_or_create(key=identifier_to_key(identifier).lower(), package=package)
 
 
 def rebuild_relational_ports(action: models.Action, definition: DefinitionInputModel) -> None:
@@ -233,17 +135,54 @@ def rebuild_relational_ports(action: models.Action, definition: DefinitionInputM
     action.arg_ports.all().delete()
     action.return_ports.all().delete()
 
-    for idx, arg in enumerate(definition.args or []):
-        extract_ports_recursively(port_data=arg, action_instance=action, index=idx)
-
-    for idx, ret in enumerate(definition.returns or []):
-        extract_returnports_recursively(port_data=ret, action_instance=action, index=idx)
+    _bulk_create_ports_level_by_level(definition.args, action, models.ArgPort, "requires", compile_descriptors_to_jsonpath)
+    _bulk_create_ports_level_by_level(definition.returns, action, models.ReturnPort, "provides", compile_returndescriptors_to_jsonpath)
 
     action.arg_count = len(definition.args or [])
     action.return_count = len(definition.returns or [])
     action.save(update_fields=["arg_count", "return_count"])
 
 
+def _sync_dependencies(implementation: models.Implementation, dependencies: t.Any) -> None:
+    """Upsert the implementation's declared dependencies with the full persisted shape.
+
+    Single writer for both the create and update flows — previously the two inline copies
+    persisted different subsets (the create path dropped ``state_demands``, the update path
+    dropped the instance-count fields).
+    """
+    for dependency in dependencies or []:
+        models.Dependency.objects.update_or_create(
+            implementation=implementation,
+            key=dependency.key,
+            defaults=dict(
+                action_demands=[x.model_dump() for x in dependency.action_dependencies] if dependency.action_dependencies else [],
+                state_demands=[x.model_dump() for x in dependency.state_dependencies] if dependency.state_dependencies else [],
+                app_filter=dependency.app,
+                version_filter=dependency.version,
+                min_viable_instances=dependency.min_viable_instances,
+                max_viable_instances=dependency.max_viable_instances,
+                prefered_instances=dependency.prefered_instances,
+                auto_resolvable=dependency.auto_resolvable,
+            ),
+        )
+
+
+def _relational_state_is_current(action: models.Action, definition: DefinitionInputModel) -> bool:
+    """Whether the action's relational port rows already reflect ``definition``.
+
+    Guards the skip-unchanged fast path: actions registered before the relational engine
+    existed have stale zero counts (or counts without rows) and must still be rebuilt.
+    """
+    if action.arg_count != len(definition.args or []) or action.return_count != len(definition.returns or []):
+        return False
+    if definition.args and not action.arg_ports.exists():
+        return False
+    if definition.returns and not action.return_ports.exists():
+        return False
+    return True
+
+
+@transaction.atomic
 def _create_implementation(input: ImplementationInputModel, agent: models.Agent) -> models.Implementation:
     definition = input.definition
 
@@ -257,10 +196,22 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
     if definition.stateful is False:
         assert_non_statefullness(definition)
 
+    # Qualifier coherence — the only place both the definition's semantic claims and the
+    # implementation's effect class are visible together.
+    if definition.pure and getattr(input.effect, "value", input.effect) == "PHYSICAL":
+        raise ValueError(f"Action {definition.key} is declared pure but its implementation has a PHYSICAL effect class — a pure action cannot touch the real world.")
+    if definition.pure and definition.stateful:
+        raise ValueError(f"Action {definition.key} is declared both pure and stateful — a pure action cannot depend on or change state.")
+
+    # A pure function is definitionally idempotent — upgrade rather than reject, so consumers
+    # only ever check `idempotent` for the retry axis and `pure` for replayability.
+    desired_idempotent = definition.idempotent or definition.pure
+
+    definition_changed = True
     try:
         action = models.Action.objects.get(key=key, version=version, app=app, organization=agent.organization)
         if action.hash != hash:
-            print("We are in the update flow, but the hash is different. This means the definition has changed. We need to check if the app matches to prevent malicious updates.")
+            # Update flow with a changed definition: check the app matches to prevent malicious updates.
             if action.app == agent.app:
                 action.hash = hash
                 action.args = [i.model_dump() for i in definition.args]
@@ -273,6 +224,10 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
                 action.save()
             else:
                 raise ValueError(f"Action with key {key} and version {version} already exists but has different hash and you are not the owner. Please update the version or key of your action definition.")
+        else:
+            # Identical hash ⇒ the persisted args/returns JSON and all derived state are
+            # already current — the expensive rewrites below can be skipped.
+            definition_changed = False
     except models.Action.DoesNotExist:
         action = models.Action.objects.create(
             key=key,
@@ -284,32 +239,50 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
             args=[i.model_dump() for i in definition.args],
             scope=scope,
             stateful=definition.stateful,
+            pure=definition.pure,
+            idempotent=desired_idempotent,
+            is_dev=definition.is_dev,
             kind=definition.kind,
             port_groups=[i.model_dump() for i in definition.port_groups],
             returns=[i.model_dump() for i in definition.returns],
             name=definition.name,
         )
 
-    # 2. (Re)build the relational ArgPort/ReturnPort rows (The Micro-Filtering Engine that
-    #    the matching layer queries). This runs on every (re)registration, so we must clear
-    #    the previous rows first to avoid accumulating duplicate/stale ports.
-    rebuild_relational_ports(action, definition)
+    # Qualifiers are not identity-bearing (deliberately excluded from unique_hash so flipping
+    # them doesn't force fleet re-registration) — sync them unconditionally, covering the
+    # update path AND the unchanged-hash fast path.
+    qualifier_updates = []
+    for field, desired in (("pure", definition.pure), ("idempotent", desired_idempotent), ("is_dev", definition.is_dev)):
+        if getattr(action, field) != desired:
+            setattr(action, field, desired)
+            qualifier_updates.append(field)
+    if qualifier_updates:
+        action.save(update_fields=qualifier_updates)
 
-    create_usages(action, definition)
-    protocols = infer_protocols(definition)
-    action.protocols.add(*protocols)
+    if definition_changed or not _relational_state_is_current(action, definition):
+        # 2. (Re)build the relational ArgPort/ReturnPort rows (The Micro-Filtering Engine that
+        #    the matching layer queries), plus the usages/protocols/collections derived from the
+        #    definition. On agent reconnects with an unchanged hash this whole block is skipped —
+        #    everything in it is a pure function of the definition. Trade-off: reconnecting no
+        #    longer heals manually edited port rows (only count/existence divergence triggers a
+        #    rebuild).
+        rebuild_relational_ports(action, definition)
 
-    if definition.is_test_for:
-        for actionhash in definition.is_test_for:
-            action.is_test_for.add(models.Action.objects.get(hash=actionhash))
+        register_catalog_entities(definition)
+        protocols = infer_protocols(definition)
+        action.protocols.add(*protocols)
 
-    if definition.collections:
-        for collection_name in definition.collections:
-            c, _ = models.Collection.objects.get_or_create(name=collection_name, defaults=dict(creator=agent.user, organization=agent.organization))
-            action.collections.add(c)
+        if definition.is_test_for:
+            for actionhash in definition.is_test_for:
+                action.is_test_for.add(models.Action.objects.get(hash=actionhash))
 
-    logger.info(f"Created {action}")
-    action.save()
+        if definition.collections:
+            for collection_name in definition.collections:
+                c, _ = models.Collection.objects.get_or_create(name=collection_name, defaults=dict(creator=agent.user, organization=agent.organization))
+                action.collections.add(c)
+
+        logger.info(f"Created {action}")
+        action.save()
 
     # Resolve the provenance audience once, at registration: an explicit declaration
     # wins, otherwise derive it from the action's structure ports (e.g. @mikro/image
@@ -337,32 +310,6 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
         implementation.provenance_audience = resolved_audience
         implementation.effect = getattr(input.effect, "value", input.effect)
         implementation.save()
-
-        new_deps = []
-
-        if input.dependencies:
-            for i in input.dependencies:
-                dep, _ = models.Dependency.objects.update_or_create(
-                    implementation=implementation,
-                    key=i.key,
-                    defaults=dict(
-                        action_demands=[x.model_dump() for x in i.action_demands] if i.action_demands else [],
-                        state_demands=[x.model_dump() for x in i.state_demands] if i.state_demands else [],
-                        app_filter=i.app,
-                        version_filter=i.version,
-                    ),
-                )
-                new_deps.append(dep)
-
-        if input.manipulates:
-            print("Updating manipulates for implementation", implementation.pk, input.manipulates)
-            states = models.State.objects.filter(agent=agent, interface__in=input.manipulates)
-            implementation.manipulates.set(states)
-
-        if input.tracks:
-            implementation.tracks = [t.model_dump() for t in input.tracks]
-            implementation.save()
-
     except models.Implementation.DoesNotExist:
         implementation = models.Implementation.objects.create(
             interface=input.interface,
@@ -376,33 +323,15 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
             effect=getattr(input.effect, "value", input.effect),
         )
 
-        new_deps = []
+    _sync_dependencies(implementation, input.dependencies)
 
-        if input.dependencies:
-            for i in input.dependencies:
-                dep, _ = models.Dependency.objects.update_or_create(
-                    implementation=implementation,
-                    key=i.key,
-                    defaults=dict(
-                        action_demands=[x.model_dump() for x in i.action_demands] if i.action_demands else [],
-                        app_filter=i.app,
-                        version_filter=i.version,
-                        min_viable_instances=i.min_viable_instances,
-                        max_viable_instances=i.max_viable_instances,
-                        prefered_instances=i.prefered_instances,
-                        auto_resolvable=i.auto_resolvable,
-                    ),
-                )
-                new_deps.append(dep)
+    if input.manipulates:
+        states = models.State.objects.filter(agent=agent, interface__in=input.manipulates)
+        implementation.manipulates.set(states)
 
-        if input.manipulates:
-            print("Updating manipulates for implementation", implementation.pk, input.manipulates)
-            states = models.State.objects.filter(agent=agent, interface__in=input.manipulates)
-            implementation.manipulates.set(states)
-
-        if input.tracks:
-            implementation.tracks = [t.model_dump() for t in input.tracks]
-            implementation.save()
+    if input.tracks:
+        implementation.tracks = [t.model_dump() for t in input.tracks]
+        implementation.save()
 
     return implementation
 
@@ -472,7 +401,7 @@ def delete_implementation(info: Info, input: inputs.DeleteImplementationInput) -
 
     implementation.delete()
 
-    return input.id
+    return input.implementation
 
 
 def pin_implementation(info: Info, input: inputs.PinInput) -> types.Implementation:

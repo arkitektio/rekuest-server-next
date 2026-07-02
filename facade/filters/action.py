@@ -46,60 +46,24 @@ class ActionFilter:
         if len(value) == 0:
             return queryset, Q()
 
-        filtered_ids = None
-
-        for ports_demand in value:
-            new_ids = managers.get_action_ids_by_demands(
-                ports_demand.matches,
-                type=ports_demand.kind.value,
-                force_length=ports_demand.force_length,
-                force_non_nullable_length=ports_demand.force_non_nullable_length,
-                force_structure_length=ports_demand.force_structure_length,
-                organization_id=info.context.request.organization.id,
-            )
-
-            if filtered_ids is None:
-                filtered_ids = set(new_ids)
-            else:
-                filtered_ids = filtered_ids.intersection(new_ids)
-
-        if filtered_ids is None:
-            return queryset, Q()
-
-        return queryset.filter(**{f"{prefix}id__in": filtered_ids}), Q()
+        ids = managers.get_action_ids_by_port_demands(value, organization_id=info.context.request.organization.id)
+        return queryset.filter(**{f"{prefix}id__in": ids}), Q()
 
     @filter_field
-    def object_demands(self, info: Info, queryset, value: list[inputs.ObjectDemandInput], prefix: str):
+    def object_demands(self, info: Info, queryset, value: list[inputs.PortDemandInput], prefix: str):
         """Filter to actions whose ports accept the given concrete runtime objects.
 
-        Like ``demands`` but each match carries the object's runtime ``descriptors``, which are
-        evaluated against the port's compiled ``requires`` micro-constraint — so this keeps only
-        actions a real object can actually be passed to, not merely structurally-compatible ones.
+        Same input shape as ``demands``; kept as a separate entry point for the "what accepts
+        this concrete object" use case, where each match carries the object's runtime
+        ``descriptors``, evaluated against the port's compiled ``requires`` micro-constraint —
+        so this keeps only actions a real object can actually be passed to, not merely
+        structurally-compatible ones.
         """
         if len(value) == 0:
             return queryset, Q()
 
-        filtered_ids = None
-
-        for object_demand in value:
-            new_ids = managers.get_action_ids_by_demands(
-                object_demand.matches,
-                type=object_demand.kind.value,
-                force_length=object_demand.force_length,
-                force_non_nullable_length=object_demand.force_non_nullable_length,
-                force_structure_length=object_demand.force_structure_length,
-                organization_id=info.context.request.organization.id,
-            )
-
-            if filtered_ids is None:
-                filtered_ids = set(new_ids)
-            else:
-                filtered_ids = filtered_ids.intersection(new_ids)
-
-        if filtered_ids is None:
-            return queryset, Q()
-
-        return queryset.filter(**{f"{prefix}id__in": filtered_ids}), Q()
+        ids = managers.get_action_ids_by_port_demands(value, organization_id=info.context.request.organization.id)
+        return queryset.filter(**{f"{prefix}id__in": ids}), Q()
 
     @filter_field
     def protocols(self, info: Info, queryset, value: list[str], prefix: str):

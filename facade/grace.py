@@ -69,6 +69,9 @@ def grace_seconds(mode: AgentMode | str | None = None, *, physical: bool = False
     Resolution order: explicit ``PHYSICAL`` override (when ``physical``) → per-mode override
     → ``DEFAULT``. 0 means no grace (strict). Returned as a float so sub-second windows
     (e.g. in tests) are not truncated to 0.
+
+    NOTE: no call site currently passes ``physical=`` — effect-awareness lives in the
+    fail/reclaim branching of ``persist_backend``, not in the grace timer.
     """
     cfg = getattr(settings, "REKUEST_GRACE", {}) or {}
 

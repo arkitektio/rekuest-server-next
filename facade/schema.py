@@ -47,8 +47,8 @@ class Query:
     shortcuts: list[types.Shortcut] = field(description="List of shortcuts.")
     toolboxes: list[types.Toolbox] = field(description="List of toolboxes containing shortcuts.")
     action = field(resolver=queries.action, description="Fetch a specific action.")
-    tasks = field(resolver=queries.tasks, description="Fetch tasks.")
     my_tasks = field(resolver=queries.my_tasks, description="Fetch the root tasks this client created (caller-scoped).")
+    reusable_task_for = field(resolver=queries.reusable_task_for, description="The latest completed run of a PURE action with these exact args, or null — the replay primitive. Reuse decisions belong to the orchestrator.")
     event = field(resolver=queries.event, description="Fetch a specific event.")
     implementation_at = field(resolver=queries.implementation_at, description="Find implementation at given interface.")
     my_implementation_at = field(resolver=queries.my_implementation_at, description="Find your implementation at a specific interface.")
@@ -203,14 +203,12 @@ class Mutation:
     create_shortcut = mutation(resolver=mutations.create_shortcut, description="Create a shortcut to an action.")
     delete_shortcut = mutation(resolver=mutations.delete_shortcut, description="Delete a shortcut.")
     create_toolbox = mutation(resolver=mutations.create_toolbox, description="Create a new toolbox with shortcuts.")
+    delete_toolbox = mutation(resolver=mutations.delete_toolbox, description="Delete a toolbox by ID.")
     cleanup_actions = mutation(resolver=mutations.cleanup_actions, description="Delete unreferenced actions from the system.")
     auto_resolve = mutation(resolver=mutations.auto_resolve, description="Automatically resolve dependencies for an implementation.")
-    create_resolution = mutation(resolver=mutations.create_resolution, description="Create sa resolution from")
+    create_resolution = mutation(resolver=mutations.create_resolution, description="Create a resolution for an implementation.")
     update_resolution = mutation(resolver=mutations.update_resolution, description="Update an existing resolution.")
     delete_resolution = mutation(resolver=mutations.delete_resolution, description="Delete a resolution by ID.")
-
-    log_patches = mutation(resolver=mutations.log_patches, description="Log state patches")
-    log_snapshot = mutation(resolver=mutations.log_snapshot, description="Log a state snapshot ")
 
     # Datalayer
     request_media_upload = kante.django_mutation(
@@ -228,7 +226,7 @@ class Mutation:
 
     # Dashboard
     delete_dashboard = mutation(resolver=mutations.delete_dashboard, description="Delete a dashboard by ID.")
-    update_dashboard = mutation(resolver=mutations.update_dashboard, description="Update properties of a    dashboard such as its name, associated bloks, or organization.")
+    update_dashboard = mutation(resolver=mutations.update_dashboard, description="Update properties of a dashboard such as its name, associated bloks, or organization.")
 
     # Blok
     delete_blok = mutation(resolver=mutations.delete_blok, description="Delete a blok by ID.")
