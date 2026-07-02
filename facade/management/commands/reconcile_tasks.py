@@ -27,6 +27,12 @@ class Command(BaseCommand):
     help = "Fail orphaned in-flight work of websocket executors that are disconnected past the grace window."
 
     def handle(self, *args, **options) -> None:
+        # Phase 0 — heal agents whose ``connected`` is stuck True past the stale window (crashed
+        # worker / half-open socket). Without this they never match the connected=False filter
+        # below, so their orphaned work would stay is_done=False forever. Runs first so the just-
+        # healed agents are reconciled in the same pass.
+        healed = async_to_sync(persist_backend.reconcile_stale_agents)()
+
         cutoff = timezone.now() - timedelta(seconds=grace_seconds(AgentMode.EXECUTOR))
         # Webhook agents never set connected/last_seen (no socket) — only sweep websocket
         # executors that are disconnected and have been gone longer than the grace window.
@@ -43,4 +49,4 @@ class Command(BaseCommand):
         for agent_id in agent_ids:
             async_to_sync(persist_backend.reconcile_orphaned_executor_work)(agent_id)
 
-        self.stdout.write(self.style.SUCCESS(f"reconcile_tasks: reconciled {len(agent_ids)} orphaned executor(s)."))
+        self.stdout.write(self.style.SUCCESS(f"reconcile_tasks: healed {healed} stuck agent(s), reconciled {len(agent_ids)} orphaned executor(s)."))

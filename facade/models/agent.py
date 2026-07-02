@@ -1,5 +1,3 @@
-import datetime
-from django.utils import timezone
 import uuid
 
 from authentikate.models import App, Client, Organization, Release, User
@@ -7,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.db import models
 from django_choices_field import TextChoicesField
 
-from facade import enums
+from facade import enums, liveness
 
 
 class Lock(models.Model):
@@ -125,7 +123,7 @@ class Agent(models.Model):
 
     @property
     def is_active(self):
-        return self.connected and self.last_seen > timezone.now() - datetime.timedelta(minutes=5)
+        return liveness.agent_is_live(self.connected, self.last_seen)
 
 
 class MemoryShelve(models.Model):

@@ -102,3 +102,60 @@ class TestReconcileSweep:
 
         assert Task.objects.get(pk=connected.pk).latest_event_kind == enums.TaskEventKind.STARTED
         assert Task.objects.get(pk=webhook.pk).latest_event_kind == enums.TaskEventKind.STARTED
+
+
+@pytest.mark.django_db(transaction=True)
+class TestReconcileStaleAgents:
+    """The reaper: heal websocket agents whose ``connected`` is stuck True past the stale window."""
+
+    def test_stale_connected_agent_is_reaped_and_work_reconciled(self, settings):
+        settings.REKUEST_GRACE = {"DEFAULT": 30, "PER_MODE": {}, "PHYSICAL": 30}
+        from asgiref.sync import async_to_sync
+
+        from facade.models import Agent, Task
+
+        ass = async_to_sync(build_task)("reap-stale", effect="NONE")
+        # connected stuck True but the heartbeat expired — the crashed-worker case.
+        Agent.objects.filter(pk=ass.agent_id).update(kind=enums.AgentKind.WEBSOCKET.value, connected=True, last_seen=timezone.now() - timedelta(minutes=5))
+
+        healed = async_to_sync(persist_backend.reconcile_stale_agents)()
+
+        assert healed == 1
+        assert Agent.objects.get(pk=ass.agent_id).connected is False
+        # its orphaned in-flight work is reconciled in the same pass.
+        assert Task.objects.get(pk=ass.pk).latest_event_kind == enums.TaskEventKind.DISCONNECTED
+
+    def test_fresh_connected_agent_not_reaped(self, settings):
+        settings.REKUEST_GRACE = {"DEFAULT": 30, "PER_MODE": {}, "PHYSICAL": 30}
+        from asgiref.sync import async_to_sync
+
+        from facade.models import Agent, Task
+
+        ass = async_to_sync(build_task)("reap-fresh", effect="NONE")
+        Agent.objects.filter(pk=ass.agent_id).update(kind=enums.AgentKind.WEBSOCKET.value, connected=True, last_seen=timezone.now())
+
+        healed = async_to_sync(persist_backend.reconcile_stale_agents)()
+
+        assert healed == 0
+        assert Agent.objects.get(pk=ass.agent_id).connected is True
+        assert Task.objects.get(pk=ass.pk).latest_event_kind == enums.TaskEventKind.STARTED
+
+    def test_reaper_heal_fires_agent_subscription(self, settings, monkeypatch):
+        # The heal must go through Model.save() so agent_post_save fires and the GraphQL
+        # agents/active subscriptions (and dashboards) refresh to reality.
+        settings.REKUEST_GRACE = {"DEFAULT": 30, "PER_MODE": {}, "PHYSICAL": 30}
+        from asgiref.sync import async_to_sync
+
+        from facade import channels
+        from facade.models import Agent
+
+        ass = async_to_sync(build_task)("reap-signal", effect="NONE")
+        Agent.objects.filter(pk=ass.agent_id).update(kind=enums.AgentKind.WEBSOCKET.value, connected=True, last_seen=timezone.now() - timedelta(minutes=5))
+
+        events = []
+        # Patch after seeding so only the heal save is captured.
+        monkeypatch.setattr(channels.agent_updated_channel, "broadcast", lambda event, groups=None: events.append((event, groups)))
+
+        async_to_sync(persist_backend.reconcile_stale_agents)()
+
+        assert any(getattr(e, "update", None) == ass.agent_id for e, _ in events)

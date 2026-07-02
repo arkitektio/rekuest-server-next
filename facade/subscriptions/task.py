@@ -2,10 +2,10 @@ import datetime
 
 from kante.types import Info
 import strawberry
-from facade import models, enums
+from facade import models, enums, types
 from rekuest_core import scalars as rscalars
 from typing import AsyncGenerator
-from facade.channels import task_event_channel, child_task_channel
+from facade.channels import task_event_channel, child_task_channel, agent_task_channel
 
 
 @strawberry.type(description="Slim, non-traversable snapshot of a task for change feeds.")
@@ -116,6 +116,28 @@ async def tasks(
 
     async for message in task_event_channel.listen(info.context, [f"root_tasks_org_{organization.id}"]):
         yield await _build_change(message)
+
+
+@strawberry.type
+class AgentTaskUpdate:
+    create: types.Task | None
+    update: types.Task | None
+
+
+async def agent_tasks(
+    self,
+    info: Info,
+    agent: strawberry.ID,
+) -> AsyncGenerator[AgentTaskUpdate, None]:
+    """Subscribe to task create/update for a single agent (its detail-page "latest tasks" feed)."""
+
+    async for message in agent_task_channel.listen(info.context, [f"agent_tasks_{agent}"]):
+        if message.create:
+            task = await models.Task.objects.aget(id=message.create)
+            yield AgentTaskUpdate(create=task, update=None)
+        elif message.update:
+            task = await models.Task.objects.aget(id=message.update)
+            yield AgentTaskUpdate(create=None, update=task)
 
 
 async def child_tasks(

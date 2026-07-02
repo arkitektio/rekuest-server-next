@@ -12,11 +12,13 @@ to this module.
 """
 
 import asyncio
+import datetime
 import json
 import uuid
 from types import SimpleNamespace
 
 import pytest
+from django.utils import timezone
 
 from facade import messages
 from facade.codes import (
@@ -36,15 +38,23 @@ FULL_CAPABILITIES = Capabilities(executes_work=True, can_assign_root=True)
 from tests.factories import TEST_TOKEN
 
 
-class FakeAgent:
-    """Stand-in for the ``Agent`` model the authenticator would return."""
+_UNSET = object()
 
-    def __init__(self, pk="agent-1", instance_id="unit-agent", blocked=False, connected=False):
+
+class FakeAgent:
+    """Stand-in for the ``Agent`` model the authenticator would return.
+
+    ``last_seen`` defaults to *now* when ``connected`` (a genuinely-LIVE incumbent) and to
+    ``None`` otherwise, matching the real model — so the reconnect gate's staleness check sees
+    a fresh heartbeat. Pass ``last_seen`` explicitly to model a STALE incumbent.
+    """
+
+    def __init__(self, pk="agent-1", instance_id="unit-agent", blocked=False, connected=False, last_seen=_UNSET):
         self.pk = pk
         self.instance_id = instance_id
         self.blocked = blocked
         self.connected = connected
-        self.last_seen = None
+        self.last_seen = (timezone.now() if connected else None) if last_seen is _UNSET else last_seen
         self.active_connection_id = None
         self.saves = 0
 
@@ -232,6 +242,43 @@ class TestAgentProtocolUnit:
 
         assert kicked == []
         assert json.loads(sent[0])["type"] == messages.ToAgentMessageType.INIT.value
+        await protocol.shutdown()
+
+    async def test_live_incumbent_rejected_without_force(self):
+        # A LIVE incumbent (connected + a fresh heartbeat) still wins: no force -> 4004, no Init,
+        # nobody displaced. This is the singleton invariant the gate must keep protecting.
+        kicked = []
+
+        async def kick_others():
+            kicked.append(True)
+
+        agent = FakeAgent(connected=True, last_seen=timezone.now())
+        protocol, sent, closed, _ = make_protocol(agent=agent, kick_others=kick_others)
+        await protocol.receive(_register_frame(force=False))
+
+        assert json.loads(sent[0])["type"] == messages.ToAgentMessageType.PROTOCOL_ERROR.value
+        assert closed == [AGENT_ALREADY_CONNECTED_CODE]
+        assert kicked == []
+        assert protocol.session is None
+
+    async def test_stale_incumbent_auto_takeover_without_force(self):
+        # A STALE incumbent (connected stuck True but its heartbeat expired) is auto-displaced
+        # WITHOUT force: no 4004, a normal Init, and kick_others is called to boot any lingering
+        # half-open socket. This is the fix for "had to reconnect with --force".
+        kicked = []
+
+        async def kick_others():
+            kicked.append(True)
+
+        stale = timezone.now() - datetime.timedelta(seconds=120)
+        agent = FakeAgent(connected=True, last_seen=stale)
+        protocol, sent, closed, _ = make_protocol(agent=agent, kick_others=kick_others)
+        await protocol.receive(_register_frame(force=False))
+
+        assert json.loads(sent[0])["type"] == messages.ToAgentMessageType.INIT.value
+        assert closed == []
+        assert kicked == [True]
+        assert protocol.session is not None
         await protocol.shutdown()
 
     # ----------------------------------------------------------------------- #

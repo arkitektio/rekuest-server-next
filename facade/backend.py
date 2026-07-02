@@ -1,11 +1,10 @@
-from datetime import datetime, timedelta, timezone
 import uuid
 from random import choice
 from typing import Dict, List, Any
 
 from django.db.models import Q
 
-from facade import enums, inputs, models, types, messages
+from facade import enums, inputs, liveness, models, types, messages
 from facade.caller_context import CallerContext
 from facade.consumers.async_consumer import AgentConsumer
 from facade.higher_order import build_lower_args, build_lower_dependencies
@@ -19,18 +18,18 @@ def agent_available_q(prefix: str = "agent") -> Q:
     """Q matching an agent that can receive work: a live WEBSOCKET, OR any WEBHOOK HookAgent.
 
     HookAgents never set ``connected``/``last_seen`` (no socket), so they would otherwise be
-    invisible to action/dependency resolution — this predicate makes them selectable.
+    invisible to action/dependency resolution — this predicate makes them selectable. Liveness
+    uses the unified ``facade.liveness`` window shared with the reconnect gate and reaper.
     """
-    recent = datetime.now(timezone.utc) - timedelta(minutes=1)
     p = f"{prefix}__" if prefix else ""
-    return Q(**{f"{p}kind": enums.AgentKind.WEBHOOK.value}) | Q(**{f"{p}connected": True, f"{p}last_seen__gt": recent})
+    return Q(**{f"{p}kind": enums.AgentKind.WEBHOOK.value}) | liveness.live_agent_q(prefix)
 
 
 def agent_is_available(agent: models.Agent) -> bool:
     """Whether a concrete agent can receive work (a live websocket or a webhook agent)."""
     if agent.kind == enums.AgentKind.WEBHOOK.value:
         return True
-    return bool(agent.connected and agent.last_seen and agent.last_seen > datetime.now(timezone.utc) - timedelta(minutes=1))
+    return liveness.agent_is_live(agent.connected, agent.last_seen)
 
 
 def build_agent_dependency_dict(agent: models.Agent, dep: models.Dependency) -> Dict[str, Any]:

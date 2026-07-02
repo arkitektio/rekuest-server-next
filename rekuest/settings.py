@@ -29,9 +29,14 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
 
-AGENT_DISCONNECTED_TIMEOUT = 20
 AGENT_HEARTBEAT_INTERVAL = 10
 AGENT_HEARTBEAT_RESPONSE_TIMEOUT = 5
+
+# Seconds without a heartbeat after which a ``connected`` agent is presumed dead. The single
+# window unifying every liveness decision (reconnect gate, availability query, GraphQL
+# ``active`` field, healing reaper) — see ``facade.liveness``. 3× the heartbeat interval, so a
+# live agent must miss two heartbeats before it is stale.
+AGENT_STALE_AFTER = 3 * AGENT_HEARTBEAT_INTERVAL
 
 # Redis endpoint the agent queue (broadcast -> agent delivery) talks to.
 AGENT_REDIS_HOST = conf.redis.host

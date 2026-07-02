@@ -48,6 +48,11 @@ class AgentConsumer(AsyncWebsocketConsumer):
 
     async def connect(self) -> None:
         """Accept the socket and build a protocol bound to this transport."""
+        # Lazily start the process-wide stale-agent reaper (idempotent). Under daphne there is
+        # no lifespan hook, so the first websocket connection is our startup signal.
+        from facade.reaper import ensure_reaper_started  # lazy: avoids import at app-load time
+
+        ensure_reaper_started()
         await self.accept()
         # Identifies this connection within its agent group so a force-register
         # can displace the others without closing itself.

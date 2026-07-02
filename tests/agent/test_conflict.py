@@ -7,15 +7,17 @@ group_send from one communicator reaches the other in the same process).
 """
 
 import asyncio
+from datetime import timedelta
 
 import pytest
+from django.utils import timezone
 
 from facade import enums, messages
 from facade.codes import AGENT_ALREADY_CONNECTED_CODE, AGENT_REPLACED_CODE
 from facade.models import Agent, TaskEvent
 
 from tests.agent.helpers import connect_agent, open_agent
-from tests.factories import TEST_TOKEN, build_unimplemented_task_for_agent
+from tests.factories import TEST_TOKEN, build_unimplemented_task_for_agent, seed_agent
 
 
 @pytest.mark.django_db(transaction=True)
@@ -63,3 +65,17 @@ class TestAgentConnectionConflict:
 
         disconnected = [e async for e in TaskEvent.objects.filter(task_id=task.pk, kind=enums.TaskEventKind.DISCONNECTED)]
         assert disconnected == []
+
+    async def test_stale_incumbent_reconnects_without_force(self, agent_ws):
+        # The ticket, end to end: a crashed connection left ``connected`` stuck True with a stale
+        # ``last_seen`` (its disconnect never ran). A brand-new connection with NO force must take
+        # over automatically instead of being rejected with 4004 — no more ``--force`` dance.
+        agent = await seed_agent("stale-agent")
+        await Agent.objects.filter(pk=agent.pk).aupdate(connected=True, last_seen=timezone.now() - timedelta(minutes=5))
+
+        taker = await connect_agent(agent_ws)
+        init = await taker.register(force=False)  # plain reconnect, no force
+        assert init.agent == str(agent.pk)
+
+        agent = await Agent.objects.aget(pk=agent.pk)
+        assert agent.connected is True

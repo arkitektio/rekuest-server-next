@@ -32,7 +32,7 @@ from django.conf import settings
 from django.utils import timezone
 from pydantic import BaseModel, Field
 
-from facade import capabilities, codes, messages, models
+from facade import capabilities, codes, liveness, messages, models
 from facade.capabilities import Capabilities
 from facade.consumers.agent_queue import AgentQueue
 from facade.message_router import UnknownAgentMessage, route_from_agent_message
@@ -381,10 +381,15 @@ class AgentProtocol:
         await self.backend.on_caller_connected(agent.pk, self.connection_id, session_id)
 
         if executes_work:
-            # The executor is a singleton: only one live connection per agent. Reject a
-            # second unless ``force`` is set, in which case displace the incumbent.
+            # The executor is a singleton: only one LIVE connection per agent. Reject a second
+            # only when the incumbent is provably live (``connected`` AND a fresh heartbeat) and
+            # ``force`` is not set. A STALE incumbent — ``connected`` stuck True but its heartbeat
+            # expired (crashed/killed worker, half-open socket, in-memory timers lost on restart) —
+            # is auto-displaced WITHOUT ``force``, so a genuinely-dead connection never wedges the
+            # agent behind a ``--force`` reconnect. Liveness uses the same window as availability.
             was_connected = agent.connected
-            if was_connected and not register.force:
+            incumbent_live = liveness.agent_is_live(agent.connected, agent.last_seen)
+            if incumbent_live and not register.force:
                 await self.send_to_agent_message(messages.ProtocolError(error="Another connection is already registered for this agent. Reconnect with force to take over."))
                 await self.close(codes.AGENT_ALREADY_CONNECTED_CODE)
                 return
@@ -397,7 +402,11 @@ class AgentProtocol:
             # guarded on ``active_connection_id`` — if we kicked before claiming, it could
             # still see itself as active and wrongly mark the agent disconnected.
             tasks = await self.backend.on_agent_connected(agent.pk, self.connection_id, session_id=session_id)
-            if was_connected and register.force:
+            # Displace any prior connection whenever there was one — a forced takeover of a live
+            # incumbent OR an auto-takeover of a stale one whose socket may still be half-open on
+            # another worker. ``kick_others`` is keyed on our ``connection_id`` (never closes us)
+            # and is a harmless no-op when the group is empty (the dead-worker case).
+            if was_connected:
                 await self.kick_others()
         else:
             # Non-executors (frontend/observer/caller) are NOT the singleton: no

@@ -265,6 +265,7 @@ class Subscription:
     watch_state = subscription(resolver=subscriptions.watch_state, description="Watch a state: yields the current snapshot then streams patches.")
     watch_agent = subscription(resolver=subscriptions.watch_agent, description="Watch an agent: yields snapshots for all states then streams patches.")
     child_tasks = subscription(resolver=subscriptions.child_tasks, description="Subscribe to all descendant task changes of a task.")
+    agent_tasks = subscription(resolver=subscriptions.agent_tasks, description="Subscribe to task create/update for a specific agent.")
 
 
 schema = kante.Schema(

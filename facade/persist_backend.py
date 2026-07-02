@@ -5,7 +5,7 @@ from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
 from django.utils import timezone
 
-from facade import inputs, models, enums, messages
+from facade import inputs, liveness, models, enums, messages
 from facade.grace import GraceScheduler, grace_seconds, progress_lease_seconds
 from facade.higher_order import project_returns
 from facade.messages import AgentMode
@@ -112,6 +112,36 @@ class ModelPersistBackend:
             return
         in_flight = [a async for a in models.Task.objects.select_related("implementation", "action").filter(agent_id=agent_id, is_done=False)]
         await self._fail_and_cascade_inflight(in_flight)
+
+    async def reconcile_stale_agents(self) -> int:
+        """Heal websocket agents whose ``connected`` is stuck True past the stale window.
+
+        The disconnect handler only runs on a clean socket close; a crashed/killed worker (or a
+        half-open socket) leaves ``connected=True`` with a stale ``last_seen`` forever, and the
+        in-memory grace timers die with the process. This is the DB-authoritative safety net:
+        flip such rows back to ``connected=False`` and reconcile their orphaned in-flight work.
+
+        Idempotent and multi-worker-safe (shares the ``reconcile_orphaned_executor_work`` op with
+        the grace timer and the reconnect trigger). Driven by both the in-process reaper loop and
+        the ``reconcile_tasks`` management command. Returns the number of agents healed.
+
+        Uses ``Model.save()`` (NOT ``.aupdate``) so ``agent_post_save`` fires and the GraphQL
+        agent/``active`` subscriptions + dashboards refresh to reality. ``last_seen`` and
+        ``active_connection_id`` are deliberately left untouched: ``last_seen`` is the true
+        last-contact time the orphan cutoff depends on, and clearing ``active_connection_id``
+        could let a still-wedged socket's later disconnect pass the generation guard.
+        """
+        stale = [
+            a
+            async for a in models.Agent.objects.select_related("organization")
+            .filter(kind=enums.AgentKind.WEBSOCKET.value)
+            .filter(liveness.stale_agent_q(prefix=""))
+        ]
+        for agent in stale:
+            agent.connected = False
+            await agent.asave(update_fields=["connected"])  # fires agent_post_save → subscription heal
+            await self.reconcile_orphaned_executor_work(agent.pk)  # now matches connected=False
+        return len(stale)
 
     def _build_redispatch_assign_sync(self, task_id: int) -> "messages.Assign | None":
         """Rebuild the Assign message for an idempotent task's re-dispatch, or None.

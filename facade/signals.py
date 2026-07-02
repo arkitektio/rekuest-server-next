@@ -61,6 +61,13 @@ def task_post_save(sender, instance: models.Task = None, created=None, **kwargs)
             ],
         )
 
+    # Agent feed: any task (root or child) run by an agent is fanned out to that agent's
+    # detail-page feed, so the agent's "latest tasks" list updates live on create and on
+    # every status/is_done transition (which re-saves the Task row → arrives here as update).
+    if instance.agent_id:
+        event = channel_events.ChildTaskEvent(create=str(instance.id)) if created else channel_events.ChildTaskEvent(update=str(instance.id))
+        channels.agent_task_channel.broadcast(event, [f"agent_tasks_{instance.agent_id}"])
+
     # Detail feed: notify the direct parent AND the root, so a subscription on the root task
     # sees the whole subtree while an intermediate task still sees its direct children.
     if instance.parent_id:
