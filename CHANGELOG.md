@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v2.1.1 (2026-07-02)
+
+### Bug Fixes
+
+- New liveness routine
+  ([`49c561a`](https://github.com/arkitektio/rekuest-server-next/commit/49c561a51a4911fd1c5e5f15cc91265475adce9f))
+
+
 ## v2.1.0 (2026-07-02)
 
 
