@@ -1,6 +1,6 @@
 [project]
 name = "rekuest-server"
-version = "2.1.0"
+version = "2.1.1"
 description = "High-performance Rekuest server"
 authors = [{ name = "jhnnsrs", email = "jhnnsrs@gmail.com" }]
 requires-python = ">=3.12,<4"
