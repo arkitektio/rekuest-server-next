@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
+## v2.0.0-rc.4 (2026-07-02)
+
+
 ## v2.0.0-rc.3 (2026-07-02)
+
+### Bug Fixes
+
+- Removal of unused types
+  ([`1b5c099`](https://github.com/arkitektio/rekuest-server-next/commit/1b5c099b4fcca760d05a2d04316e71817fc4a97f))
 
 
 ## v2.0.0-rc.2 (2026-07-02)
