@@ -5,14 +5,6 @@ from rekuest_core.inputs.models import ActionDependencyInputModel, StateDependen
 from facade import enums
 
 
-class Widget(models.Model):
-    structure = models.ForeignKey("Structure", on_delete=models.CASCADE, null=True, blank=True)
-    name = models.CharField(max_length=2000)
-    kind = models.CharField(max_length=2000)
-    hash = models.CharField(max_length=2000, unique=True)
-    values = models.JSONField(null=True, blank=True)
-
-
 class Dashboard(models.Model):
     name = models.CharField(max_length=2000)
     structure = models.ForeignKey("Structure", on_delete=models.CASCADE, null=True, blank=True)

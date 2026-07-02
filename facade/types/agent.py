@@ -41,7 +41,6 @@ class Agent:
 
     implementations: list["Implementation"] = strawberry_django.field(description="Implementations the agent can run.")
     memory_shelve: Optional["MemoryShelve"] = strawberry_django.field(description="Agent's associated memory shelve.")
-    file_system_shelves: list["FilesystemShelve"] = strawberry_django.field(description="Filesystem shelves available on the agent.")
     last_seen: datetime.datetime | None = strawberry_django.field(description="Last timestamp this agent was seen.")
     connected: bool = strawberry_django.field(description="Is the agent currently connected.")
     name: str = strawberry_django.field(description="Agent name.")
@@ -80,17 +79,3 @@ class Agent:
     @strawberry_django.field(description="Get the count of implementations available on this agent.")
     def blocked(self) -> bool:
         return self.blocked
-
-
-@strawberry_django.type(models.AgentEvent, filters=filters.TaskEventFilter, pagination=True, description="Event representing agent status or lifecycle change.")
-class AgentEvent:
-    id: strawberry.ID = strawberry_django.field(description="ID of the agent event.")
-    status: enums.AgentStatus = strawberry_django.field(description="Status of the agent during this event.")
-
-    @strawberry_django.field(description="Default log level for agent events.")
-    def level(self) -> enums.LogLevel:
-        return enums.LogLevel.INFO
-
-    @strawberry_django.field(description="Reference back to the task.")
-    def reference(self) -> str:
-        return self.task.reference

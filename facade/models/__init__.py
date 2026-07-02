@@ -15,8 +15,6 @@ from .action import (
 )
 from .agent import (
     Agent,
-    FileDrawer,
-    FilesystemShelve,
     HardwareRecord,
     Lock,
     MemoryDrawer,
@@ -35,12 +33,9 @@ from .blok import (
     Dashboard,
     DashboardPlacement,
     MaterializedBlok,
-    Widget,
 )
 from .catalog import (
     Collection,
-    Icon,
-    IconPack,
     Protocol,
     Shortcut,
     Toolbox,
@@ -72,10 +67,8 @@ __all__ = [
     "Collection",
     "Protocol",
     "UICatalog",
-    "IconPack",
     "Toolbox",
     "Shortcut",
-    "Icon",
     # structure
     "StructurePackage",
     "Interface",
@@ -89,8 +82,6 @@ __all__ = [
     # agent
     "Lock",
     "Agent",
-    "FilesystemShelve",
-    "FileDrawer",
     "MemoryShelve",
     "MemoryDrawer",
     "HardwareRecord",
@@ -115,7 +106,6 @@ __all__ = [
     "Snapshot",
     "HistoricalState",
     # blok
-    "Widget",
     "Dashboard",
     "Blok",
     "BlokDependency",

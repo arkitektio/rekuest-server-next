@@ -35,25 +35,11 @@ class State:
     updated_at: datetime.datetime = strawberry_django.field(description="Timestamp when this state was last updated.")
 
 
-@strawberry_django.type(models.HistoricalState)
-class HistoricalState:
-    id: strawberry.ID
-    state: State
-    value: scalars.Args
-    archived_at: datetime.datetime
-
-
 @strawberry.type
 class JSONPatch:
     op: enums.JSONPatchOperation
     path: str
     value: scalars.Args
-
-
-@strawberry.type
-class StateUpdateEvent:
-    state_id: str
-    patches: list[JSONPatch]
 
 
 @strawberry_django.type(models.Patch)

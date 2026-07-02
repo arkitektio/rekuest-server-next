@@ -22,6 +22,6 @@ def cleanup_actions(info: Info, action_ids: list[strawberry.ID] | None = None) -
     # Delete them in bulk (efficiently)
     deleted_count, _ = runreferenced_actions.delete()
 
-    print(f"Successfully deleted {deleted_count} unreferenced actions.")
+    logger.info(f"Successfully deleted {deleted_count} unreferenced actions.")
 
     return deleted_count

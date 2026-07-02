@@ -12,13 +12,6 @@ from strawberry_django.fields.filter_order import filter_field
 from facade import models
 
 
-@strawberry_django.filter_type(models.FilesystemShelve, description="A way to filter shelved items")
-class FilesystemShelveFilter:
-    @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
-        return queryset.filter(**{f"{prefix}id__in": value}), Q()
-
-
 @strawberry_django.filter_type(models.MemoryShelve, description="A way to filter shelved items")
 class MemoryShelveFilter:
     agent: strawberry.ID | None
@@ -31,17 +24,6 @@ class MemoryShelveFilter:
 @strawberry_django.order_type(models.MemoryShelve)
 class MemoryShelveOrder:
     name: auto
-
-
-@strawberry_django.filter_type(models.FileDrawer, description="A way to filter shelved items")
-class FileDrawerFilter:
-    shelve: strawberry.ID | None
-    agent: strawberry.ID | None
-    identifier: str | None
-
-    @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
-        return queryset.filter(**{f"{prefix}id__in": value}), Q()
 
 
 @strawberry_django.filter_type(models.MemoryDrawer, description="A way to filter shelved items")

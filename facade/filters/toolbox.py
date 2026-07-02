@@ -57,37 +57,6 @@ class ToolboxFilter:
         return queryset.filter(**{f"{prefix}name__icontains": value}), Q()
 
 
-@strawberry_django.filter_type(models.Action)
-class ShortcutActionFilter:
-    @filter_field
-    def search(self, info: Info, queryset, value: str, prefix: str):
-        return queryset.filter(**{f"{prefix}name__icontains": value}), Q()
-
-    @filter_field
-    def name(self, info: Info, queryset, value: str, prefix: str):
-        return queryset.filter(**{f"{prefix}name": value}), Q()
-
-    @filter_field
-    def ids(self, info: Info, queryset, value: list[strawberry.ID], prefix: str):
-        return queryset.filter(**{f"{prefix}id__in": value}), Q()
-
-    @filter_field
-    def demands(self, info: Info, queryset, value: list[inputs.PortDemandInput], prefix: str):
-        if len(value) == 0:
-            return queryset, Q()
-
-        ids = managers.get_action_ids_by_port_demands(value, organization_id=info.context.request.organization.id)
-        return queryset.filter(**{f"{prefix}id__in": ids}), Q()
-
-    @filter_field
-    def kind(self, info: Info, queryset, value: renums.ActionKind, prefix: str):
-        return queryset.filter(**{f"{prefix}kind": value}), Q()
-
-    @filter_field
-    def protocols(self, info: Info, queryset, value: list[str], prefix: str):
-        return queryset.filter(**{f"{prefix}protocols__name__in": value}), Q()
-
-
 @strawberry_django.filter_type(models.Shortcut)
 class ShortcutFilter:
     @filter_field

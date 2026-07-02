@@ -10,8 +10,6 @@ from .agent import (
     AgentEventKind,
     AgentKind,
     AgentStatus,
-    AgentStatusChoices,
-    WaiterStatusChoices,
 )
 from rekuest_core.enums import AssignPolicy
 from .task import (
@@ -20,9 +18,7 @@ from .task import (
     TaskInstructChoices,
     TaskInstructKind,
     TaskStatus,
-    TaskStatusChoices,
 )
-from .dashboard import PanelKind, PanelKindChoices
 from .log import LogLevel, LogLevelChoices
 from .state import JSONPatchOperation, RetentionPolicyChoices
 
@@ -38,19 +34,13 @@ __all__ = [
     "AgentEventKind",
     "AgentKind",
     "AgentStatus",
-    "AgentStatusChoices",
-    "WaiterStatusChoices",
     # task
     "TaskEventChoices",
     "TaskEventKind",
     "TaskInstructChoices",
     "TaskInstructKind",
     "TaskStatus",
-    "TaskStatusChoices",
     "AssignPolicy",
-    # dashboard
-    "PanelKind",
-    "PanelKindChoices",
     # log
     "LogLevel",
     "LogLevelChoices",

@@ -97,14 +97,3 @@ class StateDependency:
     description: str | None = None
     optional: bool = False
     demand: StateDemand | None = None
-
-
-class DynamicValueModel(BaseModel):
-    """Base model for a dynamic value input, which can reference a variable in a Blok state instance.
-
-    Attributes:
-        literal: An optional static fallback literal value, passed as a serialized string or JSON primitive.
-    """
-
-    literal: str | None = None
-    path: str | None = None

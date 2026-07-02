@@ -546,25 +546,6 @@ class InterfaceInput:
     default_return_widget: Optional["ReturnWidgetInput"] = None
 
 
-@pydantic.input(models.DescriptorSchemaInputModel, description="A descriptor model")
-class DescriptorSchemaInput:
-    key: str
-    description: str | None = None
-
-
-@pydantic.input(
-    models.StructurePackageInputModel,
-    description="A structure schema model",
-)
-class StructurePackageInput:
-    key: str
-    version: str = "0.1.0"
-    description: str | None = None
-    descriptors: list[DescriptorSchemaInput] | None = None
-    interfaces: list[InterfaceInput] | None = None
-    structures: list[StructureInput] | None = None
-
-
 @pydantic.input(models.DynamicValueInputModel, description="A bound state pointer referencing a variable inside a Blok state instance.")
 class DynamicValueInput:
     path: Optional[str] = None

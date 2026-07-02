@@ -69,14 +69,6 @@ from .implementation import (
     DeleteImplementationInputModel,
     PortDemandInput,
 )
-from .state import (
-    LogPatchesInput,
-    LogPatchesInputModel,
-    LogSnapshotInput,
-    LogSnapshotInputModel,
-    PatchInput,
-    PatchInputModel,
-)
 from .threed import (
     CreatePlacementInput,
     CreatePlacementInputModel,
@@ -171,12 +163,6 @@ __all__ = [
     "DeleteImplementationInputModel",
     "PortDemandInput",
     # state
-    "LogPatchesInput",
-    "LogPatchesInputModel",
-    "LogSnapshotInput",
-    "LogSnapshotInputModel",
-    "PatchInput",
-    "PatchInputModel",
     # threed
     "CreatePlacementInput",
     "CreatePlacementInputModel",

@@ -401,7 +401,7 @@ def delete_implementation(info: Info, input: inputs.DeleteImplementationInput) -
 
     implementation.delete()
 
-    return input.id
+    return input.implementation
 
 
 def pin_implementation(info: Info, input: inputs.PinInput) -> types.Implementation:

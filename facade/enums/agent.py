@@ -4,20 +4,6 @@ import strawberry
 from django.db.models import TextChoices
 
 
-class AgentStatusChoices(TextChoices):
-    ACTIVE = "ACTIVE", "Active"
-    KICKED = "KICKED", "Just kicked"
-    DISCONNECTED = "DISCONNECTED", "Disconnected"
-    VANILLA = "VANILLA", "Complete Vanilla Scenario after a forced restart of"
-
-
-class WaiterStatusChoices(TextChoices):
-    ACTIVE = "ACTIVE", "Active"
-    KICKED = "KICKED", "Just kicked"
-    DISCONNECTED = "DISCONNECTED", "Disconnected"
-    VANILLA = "VANILLA", "Complete Vanilla Scenario after a forced restart of"
-
-
 class AgentEventChoices(TextChoices):
     DISCONNECT = "DISCONNECT", "Disconnect (Agent disconnected)"
     CONNECT = "CONNECT", "Connect (Agent connected)"

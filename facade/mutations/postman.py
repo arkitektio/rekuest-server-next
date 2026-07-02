@@ -27,7 +27,7 @@ class AckInput:
 
 
 def ack(info: Info, input: AckInput) -> types.Task:
-    return models.Task.objects.get(id=input.id)
+    return models.Task.objects.get(id=input.task)
 
 
 def cancel(info: Info, input: inputs.CancelInput) -> types.Task:

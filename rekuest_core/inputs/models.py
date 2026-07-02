@@ -114,11 +114,6 @@ class ProvidesInputModel(BaseModel):
     value: Any = Field(description="The value of the provision. This can be any JSON serializable value")
 
 
-class DescriptorSchemaInputModel(BaseModel):
-    key: str = Field(description="The key of the descriptor. This is used to uniquely identify the descriptor")
-    description: str | None = Field(default=None, description="Describe the descriptor a bit")
-
-
 class OptimisticInputModel(BaseModel):
     state: str = Field(description="The state to optimistically set when the action is assigned")
     path: str = Field(
@@ -444,15 +439,6 @@ class StructureInputModel(BaseModel):
     default_return_widget: Optional[ReturnWidgetInputModel] = Field(default=None, description="The default return widget for ports of this structure.")
     qet_query: str | None = Field(default=None, description="The query used to get a single instance of this structure.")
     describe_query: str | None = Field(default=None, description="The query used to describe and search instances of this structure.")
-
-
-class StructurePackageInputModel(BaseModel):
-    key: str = Field(description="The key of the structure package. This is used to uniquely identify the package")
-    version: str = Field(default="0.1.0", description="The version of the structure package.")
-    description: str | None = Field(default=None, description="Describe the package a bit")
-    interfaces: list[InterfaceInputModel] | None = Field(default=None, description="The interfaces declared by this package.")
-    structures: list[StructureInputModel] | None = Field(default=None, description="The structures declared by this package.")
-    descriptors: list[DescriptorSchemaInputModel] | None = Field(default=None, description="The descriptors declared by this package.")
 
 
 class DynamicValueInputModel(BaseModel):

@@ -65,18 +65,6 @@ class ResolvedDependency:
     down_stream_resolution: "Resolution | None" = strawberry_django.field(description="Resolution for streaming data down to this dependency.")
 
 
-@strawberry.type
-class MethodMatch:
-    implementation: "Implementation"
-    down_stream_resolution: "Resolution | None" = strawberry_django.field(description="Resolution for streaming data down to this dependency.")
-
-
-@strawberry.type
-class DependencyMatch:
-    dependency: "Dependency"
-    methods: list["MethodMatch"]
-
-
 @strawberry_django.type(models.Resolution, filters=filters.ResolutionFilter, pagination=True, description="Represents a resolution for a blok.")
 class Resolution:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the resolution.")
