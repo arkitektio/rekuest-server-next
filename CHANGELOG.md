@@ -1,12 +1,20 @@
 # CHANGELOG
 
 
+## v2.0.0-rc.3 (2026-07-02)
+
+
 ## v2.0.0-rc.2 (2026-07-02)
 
 ### Bug Fixes
 
 - With unit support
   ([`a3d2c79`](https://github.com/arkitektio/rekuest-server-next/commit/a3d2c79803e7890f31d823e57b9e6c706a54e7b9))
+
+### Features
+
+- New logic
+  ([`57ca714`](https://github.com/arkitektio/rekuest-server-next/commit/57ca714ed37c790a036668deeed73137cacbba86))
 
 
 ## v2.0.0-rc.1 (2026-06-29)
