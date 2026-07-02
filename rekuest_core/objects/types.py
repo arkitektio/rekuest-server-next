@@ -136,6 +136,10 @@ class PortMatch:
         default=None,
         description="Whether the port is nullable. ",
     )
+    dimension: str | None = strawberry.field(
+        default=None,
+        description="The canonical pint dimensionality the port must have (QUANTITY wiring-compatibility key).",
+    )
     children: list[Annotated["PortMatch", strawberry.lazy(__name__)]] | None = strawberry.field(
         default=None,
         description="Child ports to match. ",

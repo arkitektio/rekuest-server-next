@@ -4,15 +4,14 @@ import typing as t
 
 from django.db import connection
 
-from rekuest_core.inputs.types import PortMatchInput
-from .inputs import ActionDemandInput, ObjectMatchInput
+from rekuest_core.inputs.types import ActionDemandInput, PortMatchInput
 
 qt = re.compile(r"@(?P<package>[^\/]*)\/(?P<interface>[^\/]*)")
 
-# A match is duck-typed: the type-level ``PortMatchInput`` (structural only), the runtime
-# ``ObjectMatchInput`` (structural + ``descriptors``), and test ``SimpleNamespace`` stand-ins are
-# all accepted — only attribute access is used.
-MatchInput = t.Union[PortMatchInput, ObjectMatchInput]
+# A match is duck-typed: ``PortMatchInput`` (structural fields plus optional runtime
+# ``descriptors``) and test ``SimpleNamespace`` stand-ins are both accepted — only attribute
+# access is used.
+MatchInput = PortMatchInput
 
 
 # =========================================================================
@@ -42,9 +41,9 @@ def _build_match_exists(
 ) -> str:
     """Build one correlated ``EXISTS`` clause for a single match.
 
-    Accepts both the type-level ``PortMatchInput`` (structural targeting only) and the runtime
-    ``ObjectMatchInput`` (same structural fields plus ``descriptors``) — the two are handled
-    uniformly via attribute access; only the descriptor branch differs.
+    A match is a ``PortMatchInput``-shaped object, handled purely via attribute access:
+    structural fields target the port shape, and the optional ``descriptors`` activate the
+    object-level ``jsonb_path_match`` branch.
 
     Root matches correlate to the outer action row (``action_id = <action>.id`` and
     ``parent_id IS NULL``); nested matches correlate to their parent port row
@@ -79,7 +78,7 @@ def _build_match_exists(
         params[key] = match.identifier
         conditions.append(f"{alias}.identifier = %({key})s")
 
-    # getattr: demand objects are duck-typed (SimpleNamespace in tests, ObjectMatchInput at
+    # getattr: demand objects are duck-typed (SimpleNamespace in tests, PortMatchInput at
     # runtime) and not all shapes carry the QUANTITY dimension field.
     dimension = getattr(match, "dimension", None)
     if dimension is not None:
@@ -98,8 +97,8 @@ def _build_match_exists(
         # the candidate object, assembled here from the runtime descriptor key/value pairs
         # (duplicate keys: last wins). A NULL compiled_jsonpath means the port declares no
         # constraints, so it accepts any object. ``silent => true`` makes structurally-invalid
-        # evaluations return NULL instead of raising. Type-level PortMatchInput carries no
-        # descriptors, so this branch is skipped and the match stays purely structural.
+        # evaluations return NULL instead of raising. Matches without descriptors skip this
+        # branch and stay purely structural.
         candidate_object = {descriptor.key: descriptor.value for descriptor in descriptors}
         key = f"obj_{id_path}"
         params[key] = json.dumps(candidate_object)
@@ -124,35 +123,51 @@ def _execute_ids(sql: str, params: dict[str, t.Any]) -> list[t.Any]:
         return [row[0] for row in cursor.fetchall()]
 
 
-def get_action_ids_by_demands(
-    demands: t.Sequence[MatchInput] | None = None,
-    type: t.Literal["args", "returns"] = "args",
-    force_length: t.Optional[int] = None,
-    force_non_nullable_length: t.Optional[int] = None,
-    force_structure_length: t.Optional[int] = None,
+def _execute_rows(sql: str, params: dict[str, t.Any]) -> list[tuple[t.Any, ...]]:
+    with connection.cursor() as cursor:
+        cursor.execute(sql, params)
+        return cursor.fetchall()
+
+
+def _demand_kind_value(kind: t.Any) -> t.Literal["args", "returns"]:
+    """Normalize a demand kind (DemandKind enum, raw "args"/"returns" string) to the table key."""
+    kind_value = kind.value if hasattr(kind, "value") else kind
+    if kind_value not in PORT_TABLE:
+        raise ValueError("Type must be either 'args' or 'returns'")
+    return t.cast(t.Literal["args", "returns"], kind_value)
+
+
+def get_action_ids_by_port_demands(
+    demands: t.Sequence[t.Any],
     model: str = "facade_action",
     organization_id: str | None = None,
 ) -> list[t.Any]:
-    """Return ids of rows in ``model`` whose ports of ``type`` satisfy every demand.
+    """Return ids of rows in ``model`` whose ports satisfy EVERY demand, in one query.
+
+    Each demand is duck-typed (``PortDemandInput``/test stand-ins):
+    ``kind`` ("args"/"returns"), ``matches``, ``force_length``, ``force_non_nullable_length``,
+    ``force_structure_length``. All demands' clauses are conjunctive, so ANDing them into a
+    single statement is exactly the set intersection of per-demand results — without the
+    N round trips.
 
     For ``facade_action`` this uses the indexed relational port engine. Other models
     (e.g. ``facade_shortcut``) keep their own ``args``/``returns`` JSONB and fall back to
-    the JSONB-scan matcher, since only Actions own relational port rows.
+    the JSONB-scan matcher per demand, since only Actions own relational port rows.
     """
-    if type not in ("args", "returns"):
-        raise ValueError("Type must be either 'args' or 'returns'")
-
     if model != "facade_action":
-        return _json_scan_ids(
-            demands,
-            type=type,
-            force_length=force_length,
-            force_non_nullable_length=force_non_nullable_length,
-            force_structure_length=force_structure_length,
-            model=model,
-        )
+        ids: set[t.Any] | None = None
+        for demand in demands:
+            new_ids = _json_scan_ids(
+                demand.matches,
+                type=_demand_kind_value(demand.kind),
+                force_length=demand.force_length,
+                force_non_nullable_length=demand.force_non_nullable_length,
+                force_structure_length=demand.force_structure_length,
+                model=model,
+            )
+            ids = set(new_ids) if ids is None else ids.intersection(new_ids)
+        return list(ids or [])
 
-    table = PORT_TABLE[type]
     action_alias = "a"
     clauses: list[str] = []
     params: dict[str, t.Any] = {}
@@ -161,19 +176,23 @@ def get_action_ids_by_demands(
         params["org"] = organization_id
         clauses.append(f"{action_alias}.organization_id = %(org)s")
 
-    for index, match in enumerate(demands or []):
-        clauses.append(_build_match_exists(match, table, action_alias, None, str(index), params))
+    for demand_index, demand in enumerate(demands):
+        table = PORT_TABLE[_demand_kind_value(demand.kind)]
 
-    if force_length is not None:
-        column = "arg_count" if type == "args" else "return_count"
-        params["force_length"] = force_length
-        clauses.append(f"{action_alias}.{column} = %(force_length)s")
+        for match_index, match in enumerate(demand.matches or []):
+            clauses.append(_build_match_exists(match, table, action_alias, None, f"{demand_index}_{match_index}", params))
 
-    if force_non_nullable_length is not None:
-        clauses.append(_root_count_subquery(table, action_alias, "pc.nullable = false", "force_non_nullable", force_non_nullable_length, params))
+        if demand.force_length is not None:
+            column = "arg_count" if table == PORT_TABLE["args"] else "return_count"
+            key = f"force_length_{demand_index}"
+            params[key] = demand.force_length
+            clauses.append(f"{action_alias}.{column} = %({key})s")
 
-    if force_structure_length is not None:
-        clauses.append(_root_count_subquery(table, action_alias, "pc.kind = 'STRUCTURE'", "force_structure", force_structure_length, params))
+        if demand.force_non_nullable_length is not None:
+            clauses.append(_root_count_subquery(table, action_alias, "pc.nullable = false", f"force_non_nullable_{demand_index}", demand.force_non_nullable_length, params))
+
+        if demand.force_structure_length is not None:
+            clauses.append(_root_count_subquery(table, action_alias, "pc.kind = 'STRUCTURE'", f"force_structure_{demand_index}", demand.force_structure_length, params))
 
     if not clauses:
         raise ValueError("No search params provided")
@@ -182,87 +201,115 @@ def get_action_ids_by_demands(
     return _execute_ids(sql, params)
 
 
-def get_action_ids_by_action_demand(
-    action_demand: ActionDemandInput,
-    model: str = "facade_action",
-    organization_id: str | None = None,
-) -> list[t.Any]:
-    """Return Action ids matching a full ``ActionDemandInput`` (args + returns together)."""
-    action_alias = "a"
+def _action_demand_clauses(
+    action_demand: ActionDemandInput | t.Any,
+    action_alias: str,
+    prefix: str,
+    params: dict[str, t.Any],
+) -> list[str]:
+    """Build the WHERE clauses for one action demand (args + returns together).
+
+    Demands are duck-typed via attribute access — ``ActionDemandInput`` (query filters and
+    dependency declarations) and test ``SimpleNamespace`` stand-ins both work. The matching
+    core is ``hash`` / ``key`` / ``app`` / ``version`` / ``name`` / ``arg_matches`` /
+    ``return_matches`` / ``force_arg_length`` / ``force_return_length`` / ``protocols``.
+    ``app`` + ``key`` are the preferred identification ("imagej/open_image"); the structural
+    matches loosen the demand to equivalent actions of other apps.
+    ``prefix`` namespaces every param key so several demands can share one statement.
+    """
     clauses: list[str] = []
-    params: dict[str, t.Any] = {}
 
-    if organization_id is not None:
-        params["org"] = organization_id
-        clauses.append(f"{action_alias}.organization_id = %(org)s")
-
-    if action_demand.hash:
-        params["hash"] = action_demand.hash
-        clauses.append(f"{action_alias}.hash = %(hash)s")
+    # getattr: demands are duck-typed — ActionDependencyInput (facade/queries/action.py,
+    # facade/logic.py) carries the same match fields but no ``hash``.
+    demand_hash = getattr(action_demand, "hash", None)
+    if demand_hash:
+        params[f"{prefix}_hash"] = demand_hash
+        clauses.append(f"{action_alias}.hash = %({prefix}_hash)s")
     else:
+        # getattr: SimpleNamespace test stand-ins may omit the identity fields.
+        if getattr(action_demand, "key", None):
+            params[f"{prefix}_key"] = action_demand.key
+            clauses.append(f"{action_alias}.key = %({prefix}_key)s")
+
+        if getattr(action_demand, "app", None):
+            params[f"{prefix}_app"] = action_demand.app
+            clauses.append(f"{action_alias}.app_id IN (SELECT id FROM authentikate_app WHERE identifier = %({prefix}_app)s)")
+
+        if getattr(action_demand, "version", None):
+            params[f"{prefix}_version"] = action_demand.version
+            clauses.append(f"{action_alias}.version = %({prefix}_version)s")
+
         if action_demand.name:
-            params["name"] = action_demand.name
-            clauses.append(f"{action_alias}.name = %(name)s")
+            params[f"{prefix}_name"] = action_demand.name
+            clauses.append(f"{action_alias}.name = %({prefix}_name)s")
 
         for index, match in enumerate(action_demand.arg_matches or []):
-            clauses.append(_build_match_exists(match, PORT_TABLE["args"], action_alias, None, f"arg_{index}", params))
+            clauses.append(_build_match_exists(match, PORT_TABLE["args"], action_alias, None, f"{prefix}_arg_{index}", params))
 
         for index, match in enumerate(action_demand.return_matches or []):
-            clauses.append(_build_match_exists(match, PORT_TABLE["returns"], action_alias, None, f"ret_{index}", params))
+            clauses.append(_build_match_exists(match, PORT_TABLE["returns"], action_alias, None, f"{prefix}_ret_{index}", params))
 
         if action_demand.force_arg_length is not None:
-            params["force_arg_length"] = action_demand.force_arg_length
-            clauses.append(f"{action_alias}.arg_count = %(force_arg_length)s")
+            params[f"{prefix}_force_arg_length"] = action_demand.force_arg_length
+            clauses.append(f"{action_alias}.arg_count = %({prefix}_force_arg_length)s")
 
         if action_demand.force_return_length is not None:
-            params["force_return_length"] = action_demand.force_return_length
-            clauses.append(f"{action_alias}.return_count = %(force_return_length)s")
+            params[f"{prefix}_force_return_length"] = action_demand.force_return_length
+            clauses.append(f"{action_alias}.return_count = %({prefix}_force_return_length)s")
+
+        # getattr: only the newer demand shapes carry ``protocols``. The action must
+        # implement ALL requested protocols (one EXISTS per name, ANDed) — mirrors the
+        # name-based matching of ``ActionFilter.protocols``.
+        for protocol_index, protocol_name in enumerate(getattr(action_demand, "protocols", None) or []):
+            key = f"{prefix}_protocol_{protocol_index}"
+            params[key] = protocol_name
+            clauses.append(f"EXISTS (SELECT 1 FROM facade_action_protocols ap_{key} JOIN facade_protocol p_{key} ON p_{key}.id = ap_{key}.protocol_id WHERE ap_{key}.action_id = {action_alias}.id AND p_{key}.name = %({key})s)")
+
+        # Semantic qualifiers: tri-state — None matches either.
+        for qualifier in ("pure", "idempotent", "stateful"):
+            value = getattr(action_demand, qualifier, None)
+            if value is not None:
+                params[f"{prefix}_{qualifier}"] = value
+                clauses.append(f"{action_alias}.{qualifier} = %({prefix}_{qualifier})s")
 
     if not clauses:
         raise ValueError(f"No search params provided {action_demand}")
 
-    sql = f"SELECT {action_alias}.id FROM {model} {action_alias} WHERE " + " AND ".join(clauses)
-    return _execute_ids(sql, params)
+    return clauses
 
 
-def get_implementation_ids_by_demands(
-    demands: t.Sequence[MatchInput] | None = None,
-    type: t.Literal["args", "returns"] = "args",
-    force_length: t.Optional[int] = None,
-    force_non_nullable_length: t.Optional[int] = None,
-    force_structure_length: t.Optional[int] = None,
-    agent: str | None = None,
-    model: str = "facade_action",
-) -> list[t.Any]:
-    """Return Action ids matching the demands (kept for API compatibility)."""
-    return get_action_ids_by_demands(
-        demands,
-        type=type,
-        force_length=force_length,
-        force_non_nullable_length=force_non_nullable_length,
-        force_structure_length=force_structure_length,
-        model=model,
-    )
+def get_action_ids_by_action_demands(
+    action_demands: t.Sequence[ActionDemandInput | t.Any],
+    organization_id: str | None = None,
+) -> list[list[t.Any]]:
+    """Return the matching Action ids for EACH demand, index-aligned, in one round trip.
 
+    The demands stay independent — a caller enforcing "must satisfy all demands" (e.g. the
+    agent filter) does so on its side, where each demand may be met by a different action.
+    What is consolidated here is the SQL: one ``UNION ALL`` statement instead of one query
+    per demand.
+    """
+    action_alias = "a"
+    params: dict[str, t.Any] = {}
+    selects: list[str] = []
 
-def filter_actions_by_demands(
-    qs: t.Any,
-    demands: t.Sequence[MatchInput] | None = None,
-    type: t.Literal["args", "returns"] = "args",
-    force_length: t.Optional[int] = None,
-    force_non_nullable_length: t.Optional[int] = None,
-    force_structure_length: t.Optional[int] = None,
-    model: str = "facade_action",
-) -> t.Any:
-    ids = get_action_ids_by_demands(
-        demands,
-        type=type,
-        force_length=force_length,
-        force_non_nullable_length=force_non_nullable_length,
-        force_structure_length=force_structure_length,
-        model=model,
-    )
-    return qs.filter(id__in=ids)
+    if organization_id is not None:
+        params["org"] = organization_id
+
+    for index, action_demand in enumerate(action_demands):
+        clauses = _action_demand_clauses(action_demand, action_alias, f"d{index}", params)
+        if organization_id is not None:
+            clauses.insert(0, f"{action_alias}.organization_id = %(org)s")
+        # ``index`` is a loop counter, never user input — safe to inline as the demand tag.
+        selects.append(f"SELECT {index} AS demand_index, {action_alias}.id FROM facade_action {action_alias} WHERE " + " AND ".join(clauses))
+
+    if not selects:
+        return []
+
+    results: list[list[t.Any]] = [[] for _ in action_demands]
+    for demand_index, action_id in _execute_rows("\nUNION ALL\n".join(selects), params):
+        results[demand_index].append(action_id)
+    return results
 
 
 # =========================================================================
@@ -406,3 +453,25 @@ def get_state_ids_by_demands(
 ) -> list[t.Any]:
     full_sql, all_params = build_state_params(matches, model=model)
     return _execute_ids(full_sql, all_params)
+
+
+def state_demand_state_filters(demand: t.Any) -> dict[str, t.Any]:
+    """State-queryset filter kwargs for one state demand.
+
+    ``app`` + ``key`` match the State's own identity columns (the preferred identification);
+    non-empty ``matches`` resolve StateDefinition ids via the port matcher. Shared by the
+    agent filter, dependency resolution and the ``state_for`` query so their semantics stay
+    in lockstep. Raises when the demand carries no criteria at all.
+    """
+    filters: dict[str, t.Any] = {}
+    if getattr(demand, "key", None):
+        filters["key"] = demand.key
+    if getattr(demand, "app", None):
+        filters["app_identifier"] = demand.app
+    if getattr(demand, "hash", None):
+        filters["definition__hash"] = demand.hash
+    if demand.matches:
+        filters["definition_id__in"] = get_state_ids_by_demands(demand.matches)
+    if not filters:
+        raise ValueError(f"No search params provided {demand}")
+    return filters

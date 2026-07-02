@@ -63,16 +63,11 @@ from .dependency import (
     UpdateResolutionInputModel,
 )
 from .implementation import (
-    ActionDemandInput,
     CreateImplementationInput,
     CreateImplementationInputModel,
     DeleteImplementationInput,
     DeleteImplementationInputModel,
-    DescriptorInput,
-    ObjectDemandInput,
-    ObjectMatchInput,
     PortDemandInput,
-    SchemaDemandInput,
 )
 from .state import (
     LogPatchesInput,
@@ -170,16 +165,11 @@ __all__ = [
     "UpdateResolutionInput",
     "UpdateResolutionInputModel",
     # implementation
-    "ActionDemandInput",
-    "DescriptorInput",
-    "ObjectDemandInput",
-    "ObjectMatchInput",
     "CreateImplementationInput",
     "CreateImplementationInputModel",
     "DeleteImplementationInput",
     "DeleteImplementationInputModel",
     "PortDemandInput",
-    "SchemaDemandInput",
     # state
     "LogPatchesInput",
     "LogPatchesInputModel",

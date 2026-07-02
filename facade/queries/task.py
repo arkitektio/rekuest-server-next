@@ -1,5 +1,35 @@
-from facade import models, types
+from typing import Optional
+
+from facade import enums, models, scalars, types
+from facade.provenance.canonical import args_hash
 from kante.types import Info
+
+
+def reusable_task_for(
+    info: Info,
+    action_hash: str,
+    args: scalars.Args,
+) -> Optional[types.Task]:
+    """The latest completed run of a PURE action with these exact (canonical) args, or null.
+
+    This is the replay primitive: the server only makes prior results discoverable — whether
+    to reference the returned task instead of re-assigning (and any freshness policy) is the
+    orchestrating workflow's decision. Non-pure actions always return null; their runs are
+    never offered for replay.
+    """
+    return (
+        models.Task.objects.filter(
+            action__hash=action_hash,
+            action__pure=True,
+            action__organization=info.context.request.organization,
+            args_hash=args_hash(args or {}),
+            is_done=True,
+            latest_event_kind=enums.TaskEventKind.COMPLETED,
+            ephemeral=False,
+        )
+        .order_by("-finished_at")
+        .first()
+    )
 
 
 def tasks(

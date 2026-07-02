@@ -110,15 +110,61 @@ class ModelPersistBackend:
         agent = await models.Agent.objects.aget(id=agent_id)
         if agent.connected:
             return
-        in_flight = [a async for a in models.Task.objects.select_related("implementation").filter(agent_id=agent_id, is_done=False)]
+        in_flight = [a async for a in models.Task.objects.select_related("implementation", "action").filter(agent_id=agent_id, is_done=False)]
         await self._fail_and_cascade_inflight(in_flight)
 
+    def _build_redispatch_assign_sync(self, task_id: int) -> "messages.Assign | None":
+        """Rebuild the Assign message for an idempotent task's re-dispatch, or None.
+
+        Sync (run via ``database_sync_to_async``): token minting walks lazy FK chains.
+        Returns None when the task lacks the identity needed to re-mint (no caller/
+        implementation) or when a strict provenance policy refuses — the caller then falls
+        back to the DISCONNECTED fate-unknown path.
+        """
+        from facade.caller_context import CallerContext
+        from facade.provenance import mint_token_for_task
+
+        task = models.Task.objects.select_related(
+            "agent", "implementation", "action", "caller__user", "caller__client", "caller__organization"
+        ).get(pk=task_id)
+
+        if task.implementation is None or task.caller is None or task.caller.user is None or task.caller.organization is None:
+            return None
+
+        ctx = CallerContext(user=task.caller.user, client=task.caller.client, organization=task.caller.organization, roles=[])
+        try:
+            token = mint_token_for_task(task, ctx)
+        except ValueError:
+            return None
+
+        return messages.Assign(
+            task=str(task.pk),
+            args=task.args or {},
+            user=str(task.caller.user.sub),
+            org=str(task.caller.organization.slug),
+            reference=str(task.reference) if task.reference is not None else None,
+            capture=task.capture,
+            resolution=str(task.resolution_id) if task.resolution_id else None,
+            interface=task.implementation.interface,
+            action=str(task.action.hash),
+            implementation=str(task.implementation_id),
+            parent=str(task.parent_id) if task.parent_id else None,
+            root=str(task.root_id) if task.root_id else None,
+            token=token,
+        )
+
     async def _fail_and_cascade_inflight(self, tasks: List[models.Task]) -> None:
-        """Mark orphaned in-flight work, effect-aware: physical is terminal, none is recoverable.
+        """Mark orphaned in-flight work along the retry axis.
 
         ``effect:physical`` failed ambiguously (the executor vanished) → CRITICAL (terminal,
-        never retried). ``effect:none`` → DISCONNECTED (fate unknown, recoverable/retryable).
+        never retried). Idempotent actions → QUEUED + the Assign re-broadcast into the
+        agent's redis queue (which retains messages for offline agents), so the work re-runs
+        on reconnect — a same-session reclaim after grace expiry may double-execute, which is
+        safe by the idempotent contract. Everything else → DISCONNECTED (fate unknown,
+        recoverable but never automatically resolved).
         """
+        from facade.consumers.async_consumer import AgentConsumer  # lazy: avoids import cycle
+
         for task in tasks:
             self._auto_interrupt.cancel(task.pk)
             implementation = task.implementation
@@ -133,14 +179,31 @@ class ModelPersistBackend:
                 task.finished_at = timezone.now()
                 task.latest_event_kind = enums.TaskEventKind.CRITICAL
                 await task.asave(update_fields=["latest_event_kind", "is_done", "finished_at"])
-            else:
-                await models.TaskEvent.objects.acreate(
-                    task=task,
-                    kind=enums.TaskEventKind.DISCONNECTED,
-                    message="Agent disconnected. Fate unknown",
-                )
-                task.latest_event_kind = enums.TaskEventKind.DISCONNECTED
-                await task.asave(update_fields=["latest_event_kind"])
+                continue
+
+            # The ``!= QUEUED`` guard makes the periodic sweep re-entrant: reconciling an
+            # already-requeued task again must not pile duplicate Assigns into the queue.
+            if task.action is not None and task.action.idempotent and task.latest_event_kind != enums.TaskEventKind.QUEUED:
+                assign_message = await database_sync_to_async(self._build_redispatch_assign_sync)(task.pk)
+                if assign_message is not None:
+                    await models.TaskEvent.objects.acreate(
+                        task=task,
+                        kind=enums.TaskEventKind.QUEUED,
+                        message="Executor lost — idempotent action re-queued for redelivery.",
+                    )
+                    task.latest_event_kind = enums.TaskEventKind.QUEUED
+                    await task.asave(update_fields=["latest_event_kind"])
+                    await sync_to_async(AgentConsumer.broadcast)(task.agent_id, assign_message)
+                    continue
+                # No re-dispatchable identity → fall through to fate-unknown.
+
+            await models.TaskEvent.objects.acreate(
+                task=task,
+                kind=enums.TaskEventKind.DISCONNECTED,
+                message="Agent disconnected. Fate unknown",
+            )
+            task.latest_event_kind = enums.TaskEventKind.DISCONNECTED
+            await task.asave(update_fields=["latest_event_kind"])
 
     async def on_agent_connected(self, agent_id: int, connection_id: str | None = None, session_id: str | None = None) -> List[models.Task]:
         agent = await models.Agent.objects.aget(id=agent_id)
@@ -155,7 +218,7 @@ class ModelPersistBackend:
         agent.active_session_id = session_id
         await agent.asave(update_fields=["connected", "last_seen", "active_connection_id", "active_session_id"])
 
-        in_flight = [a async for a in models.Task.objects.select_related("implementation").filter(agent_id=agent_id, is_done=False)]
+        in_flight = [a async for a in models.Task.objects.select_related("implementation", "action").filter(agent_id=agent_id, is_done=False)]
 
         # A different session means a FRESH process took over (the old one died): the prior
         # in-flight work is orphaned and must fail-and-cascade rather than be reclaimed.

@@ -67,11 +67,7 @@ from .shelve import (
     MemoryShelveOrder,
 )
 from .structure import (
-    InputInterfaceUsageFilter,
-    InputStructureUsageFilter,
     InterfaceFilter,
-    OutputInterfaceUsageFilter,
-    OutputStructureUsageFilter,
     StructureFilter,
     StructurePackageFilter,
 )
@@ -136,10 +132,6 @@ __all__ = [
     "StructurePackageFilter",
     "StructureFilter",
     "InterfaceFilter",
-    "InputInterfaceUsageFilter",
-    "OutputInterfaceUsageFilter",
-    "InputStructureUsageFilter",
-    "OutputStructureUsageFilter",
     "ThreeDModelOrder",
     "ThreeDModelFilter",
     "SpaceOrder",

@@ -1,4 +1,4 @@
-from .task import tasks, my_tasks
+from .task import reusable_task_for, tasks, my_tasks
 from .event import event
 from .action import action
 from .implementation import implementation_at, my_implementation_at, resolved_implementations
@@ -18,6 +18,7 @@ from .agent import agent
 
 __all__ = [
     "tasks",
+    "reusable_task_for",
     "my_tasks",
     "action",
     "event",

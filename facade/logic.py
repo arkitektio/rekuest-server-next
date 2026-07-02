@@ -1,3 +1,6 @@
+from django.db.models import Exists, OuterRef
+from rekuest_core.inputs.models import ActionDemandInputModel
+
 from facade import models, managers
 from kante.types import Info
 from dataclasses import dataclass
@@ -15,18 +18,33 @@ def auto_resolve(info: Info, implementation: models.Implementation, resolution: 
 
         matched_ids: dict[str, list[int]] = {}
 
-        for ports_demand in dependency.get_action_demands():
-            new_ids = managers.get_action_ids_by_action_demand(
-                action_demand=ports_demand,
-                organization_id=info.context.request.organization.id,
-            )
+        action_dependencies = dependency.get_action_dependencies()
+        # An empty demand still hits the matcher's "No search params provided" guard.
+        per_demand_ids = managers.get_action_ids_by_action_demands(
+            [action_dependency.demand or ActionDemandInputModel() for action_dependency in action_dependencies],
+            organization_id=info.context.request.organization.id,
+        )
 
+        for action_dependency, new_ids in zip(action_dependencies, per_demand_ids):
             if len(new_ids) == 0:
-                raise ValueError(f"No actions found that match the given action demands {ports_demand}")
+                raise ValueError(f"No actions found that match the given action demands {action_dependency}")
 
             # Further logic to create resolution would go here.
             agentsqs = agentsqs.filter(implementations__action__id__in=new_ids)
-            matched_ids[ports_demand.key] = new_ids
+            matched_ids[action_dependency.key] = new_ids
+
+        # The agent must ALSO satisfy every state demand of the dependency — each demand may
+        # be met by a different State of the agent (same AND pattern as the action demands).
+        for state_dependency in dependency.get_state_dependencies():
+            if not state_dependency.demand:
+                continue
+
+            state_filters = managers.state_demand_state_filters(state_dependency.demand)
+
+            if "definition_id__in" in state_filters and not state_filters["definition_id__in"]:
+                raise ValueError(f"No state definitions found that match the given state demand {state_dependency}")
+
+            agentsqs = agentsqs.filter(Exists(models.State.objects.filter(agent=OuterRef("pk"), **state_filters)))
 
         # todo: select best agent from agentsqs
         selected_agent = agentsqs.first()

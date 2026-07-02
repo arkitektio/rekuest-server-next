@@ -27,8 +27,8 @@ def create_blok(info: Info, input: inputs.CreateBlokInput) -> types.Blok:
                 blok=x,
                 key=i.key,
                 defaults=dict(
-                    action_demands=[x.model_dump() for x in i.action_demands] if i.action_demands else [],
-                    state_demands=[x.model_dump() for x in i.state_demands] if i.state_demands else [],
+                    action_demands=[x.model_dump() for x in i.action_dependencies] if i.action_dependencies else [],
+                    state_demands=[x.model_dump() for x in i.state_dependencies] if i.state_dependencies else [],
                     app_filter=i.app,
                     version_filter=i.version,
                 ),
@@ -75,8 +75,8 @@ def update_blok(info: Info, input: inputs.UpdateBlokInput) -> types.Blok:
                 blok=blok,
                 key=i.key,
                 defaults=dict(
-                    action_demands=[x.model_dump() for x in i.action_demands] if i.action_demands else [],
-                    state_demands=[x.model_dump() for x in i.state_demands] if i.state_demands else [],
+                    action_demands=[x.model_dump() for x in i.action_dependencies] if i.action_dependencies else [],
+                    state_demands=[x.model_dump() for x in i.state_dependencies] if i.state_dependencies else [],
                     app_filter=i.app,
                     version_filter=i.version,
                 ),

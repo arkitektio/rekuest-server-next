@@ -49,6 +49,7 @@ class Query:
     action = field(resolver=queries.action, description="Fetch a specific action.")
     tasks = field(resolver=queries.tasks, description="Fetch tasks.")
     my_tasks = field(resolver=queries.my_tasks, description="Fetch the root tasks this client created (caller-scoped).")
+    reusable_task_for = field(resolver=queries.reusable_task_for, description="The latest completed run of a PURE action with these exact args, or null — the replay primitive. Reuse decisions belong to the orchestrator.")
     event = field(resolver=queries.event, description="Fetch a specific event.")
     implementation_at = field(resolver=queries.implementation_at, description="Find implementation at given interface.")
     my_implementation_at = field(resolver=queries.my_implementation_at, description="Find your implementation at a specific interface.")

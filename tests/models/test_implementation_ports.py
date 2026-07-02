@@ -68,10 +68,10 @@ def test_rebuild_builds_relational_ports_and_matches():
     assert arg.compiled_jsonpath == '$.axes == "c"'
 
     # The matcher finds the action by a satisfying descriptor and rejects a violating one.
-    matching = managers.get_action_ids_by_action_demand(_arg_object_demand("@mikro/image", {"axes": "c"}), organization_id=org.id)
+    matching = managers.get_action_ids_by_action_demands([_arg_object_demand("@mikro/image", {"axes": "c"})], organization_id=org.id)[0]
     assert action.id in matching
 
-    rejecting = managers.get_action_ids_by_action_demand(_arg_object_demand("@mikro/image", {"axes": "z"}), organization_id=org.id)
+    rejecting = managers.get_action_ids_by_action_demands([_arg_object_demand("@mikro/image", {"axes": "z"})], organization_id=org.id)[0]
     assert action.id not in rejecting
 
 

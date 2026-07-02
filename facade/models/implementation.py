@@ -2,7 +2,7 @@ from authentikate.models import Organization, Release
 from django.contrib.auth import get_user_model
 from django.db import models
 from django_choices_field import TextChoicesField
-from rekuest_core.inputs.models import ActionDependencyInputModel
+from rekuest_core.inputs.models import ActionDependencyInputModel, StateDependencyInputModel
 
 from facade import enums
 
@@ -77,8 +77,11 @@ class Dependency(models.Model):
         help_text="The assign policy for this dependency",
     )
 
-    def get_action_demands(self):
+    def get_action_dependencies(self):
         return [ActionDependencyInputModel(**demand) for demand in self.action_demands]
+
+    def get_state_dependencies(self):
+        return [StateDependencyInputModel(**demand) for demand in self.state_demands]
 
 
 class Resolution(models.Model):

@@ -17,7 +17,7 @@ def action(
     agent: strawberry.ID | None = None,
     interface: str | None = None,
     hash: rscalars.ActionHash | None = None,
-    matching: rinputs.ActionDependencyInput | None = None,
+    matching: rinputs.ActionDemandInput | None = None,
 ) -> types.Action:
     if task:
         return models.Task.objects.get(id=task).action
@@ -28,11 +28,10 @@ def action(
         return models.Action.objects.get(hash=hash, organization=info.context.request.organization)
 
     if matching:
-        ids = managers.get_action_ids_by_action_demand(
-            matching,
-            model="facade_action",
+        ids = managers.get_action_ids_by_action_demands(
+            [matching],
             organization_id=info.context.request.organization.id,
-        )
+        )[0]
 
         return models.Action.objects.get(id=ids[0])
 

@@ -17,18 +17,24 @@ from rekuest_core.enums import PortKind
 from tests.factories import create_action_for_organization, create_registry_bundle
 
 
+def port_demand_ids(matches, type="args", force_length=None, force_non_nullable_length=None, force_structure_length=None, organization_id=None):
+    """Single port demand through the consolidated matcher entry point."""
+    demand = SimpleNamespace(kind=type, matches=matches, force_length=force_length, force_non_nullable_length=force_non_nullable_length, force_structure_length=force_structure_length)
+    return managers.get_action_ids_by_port_demands([demand], organization_id=organization_id)
+
+
 def pm(at=None, key=None, kind=None, identifier=None, descriptors=None, nullable=None, children=None):
     """Build a match-shaped object (attribute access is all the manager needs).
 
     ``descriptors`` is given as a plain ``{key: value}`` dict for brevity and expanded to the
-    ``[{key, value}]`` shape the runtime matcher (ObjectMatchInput) consumes; omitting it yields a
+    ``[{key, value}]`` shape the runtime matcher (PortMatchInput.descriptors) consumes; omitting it yields a
     purely structural (PortMatchInput-style) match.
     """
     descriptor_list = [SimpleNamespace(key=k, value=v) for k, v in (descriptors or {}).items()] or None
     return SimpleNamespace(at=at, key=key, kind=kind, identifier=identifier, descriptors=descriptor_list, nullable=nullable, children=children)
 
 
-def action_demand(hash=None, name=None, arg_matches=None, return_matches=None, force_arg_length=None, force_return_length=None):
+def action_demand(hash=None, name=None, arg_matches=None, return_matches=None, force_arg_length=None, force_return_length=None, protocols=None):
     return SimpleNamespace(
         hash=hash,
         name=name,
@@ -36,6 +42,7 @@ def action_demand(hash=None, name=None, arg_matches=None, return_matches=None, f
         return_matches=return_matches,
         force_arg_length=force_arg_length,
         force_return_length=force_return_length,
+        protocols=protocols,
     )
 
 
@@ -114,35 +121,35 @@ def catalog(db):
 
 
 def test_macro_match_by_kind(catalog):
-    ids = managers.get_action_ids_by_demands([pm(kind=PortKind.STRUCTURE)], type="args")
+    ids = port_demand_ids([pm(kind=PortKind.STRUCTURE)], type="args")
     assert set(ids) == {catalog.a1.id, catalog.a2.id, catalog.a3.id}
 
 
 def test_macro_match_by_identifier(catalog):
-    ids = managers.get_action_ids_by_demands([pm(identifier="@mikro/image")], type="args")
+    ids = port_demand_ids([pm(identifier="@mikro/image")], type="args")
     assert set(ids) == {catalog.a1.id, catalog.a2.id, catalog.a3.id}
 
 
 def test_match_by_return_kind(catalog):
-    ids = managers.get_action_ids_by_demands([pm(kind=PortKind.INT)], type="returns")
+    ids = port_demand_ids([pm(kind=PortKind.INT)], type="returns")
     assert set(ids) == {catalog.a1.id, catalog.a3.id}
 
 
 def test_nullable_macro_match(catalog):
     # Only a2's structure input is nullable.
-    ids = managers.get_action_ids_by_demands([pm(identifier="@mikro/image", nullable=True)], type="args")
+    ids = port_demand_ids([pm(identifier="@mikro/image", nullable=True)], type="args")
     assert set(ids) == {catalog.a2.id}
 
 
 def test_micro_constraint_satisfied(catalog):
     # object satisfies a1's requires (axes == "c"); a2 has no requires so it always matches.
-    ids = managers.get_action_ids_by_demands([pm(identifier="@mikro/image", descriptors={"axes": "c"})], type="args")
+    ids = port_demand_ids([pm(identifier="@mikro/image", descriptors={"axes": "c"})], type="args")
     assert set(ids) == {catalog.a1.id, catalog.a2.id, catalog.a3.id}
 
 
 def test_micro_constraint_rejected(catalog):
     # object violates a1/a3's requires (axes != "c"); a2 (no requires) still matches.
-    ids = managers.get_action_ids_by_demands([pm(identifier="@mikro/image", descriptors={"axes": "z"})], type="args")
+    ids = port_demand_ids([pm(identifier="@mikro/image", descriptors={"axes": "z"})], type="args")
     assert set(ids) == {catalog.a2.id}
 
 
@@ -159,30 +166,30 @@ def test_nested_match_two_levels_deep(catalog):
             ),
         ],
     )
-    ids = managers.get_action_ids_by_demands([demand], type="args")
+    ids = port_demand_ids([demand], type="args")
     assert set(ids) == {catalog.a2.id}
 
 
 def test_force_length(catalog):
     # a2 has 2 root args; a1/a3 have 1.
-    ids = managers.get_action_ids_by_demands([pm(kind=PortKind.STRUCTURE)], type="args", force_length=2)
+    ids = port_demand_ids([pm(kind=PortKind.STRUCTURE)], type="args", force_length=2)
     assert set(ids) == {catalog.a2.id}
 
 
 def test_force_structure_length(catalog):
     # Root structure ports: a1=1, a3=1, a2=1 (image; the nested mask is not a root).
-    ids = managers.get_action_ids_by_demands([pm(identifier="@mikro/image")], type="args", force_structure_length=1)
+    ids = port_demand_ids([pm(identifier="@mikro/image")], type="args", force_structure_length=1)
     assert set(ids) == {catalog.a1.id, catalog.a2.id, catalog.a3.id}
 
 
 def test_force_non_nullable_length(catalog):
     # a1/a3 have 1 non-nullable root arg; a2 has 0 (both roots nullable).
-    ids = managers.get_action_ids_by_demands([pm(kind=PortKind.STRUCTURE)], type="args", force_non_nullable_length=1)
+    ids = port_demand_ids([pm(kind=PortKind.STRUCTURE)], type="args", force_non_nullable_length=1)
     assert set(ids) == {catalog.a1.id, catalog.a3.id}
 
 
 def test_organization_isolation(catalog):
-    ids = managers.get_action_ids_by_demands([pm(identifier="@mikro/image")], type="args", organization_id=catalog.org1.id)
+    ids = port_demand_ids([pm(identifier="@mikro/image")], type="args", organization_id=catalog.org1.id)
     assert set(ids) == {catalog.a1.id, catalog.a2.id}
     assert catalog.a3.id not in ids
 
@@ -192,10 +199,10 @@ def test_action_demand_combines_args_and_returns(catalog):
         arg_matches=[pm(kind=PortKind.STRUCTURE, descriptors={"axes": "c"})],
         return_matches=[pm(kind=PortKind.INT)],
     )
-    ids = managers.get_action_ids_by_action_demand(demand, organization_id=catalog.org1.id)
+    ids = managers.get_action_ids_by_action_demands([demand], organization_id=catalog.org1.id)[0]
     assert set(ids) == {catalog.a1.id}
 
 
 def test_action_demand_by_name(catalog):
-    ids = managers.get_action_ids_by_action_demand(action_demand(name=catalog.a1.name))
+    ids = managers.get_action_ids_by_action_demands([action_demand(name=catalog.a1.name)])[0]
     assert set(ids) == {catalog.a1.id}

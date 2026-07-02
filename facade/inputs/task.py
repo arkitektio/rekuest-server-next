@@ -88,7 +88,7 @@ class AssignInputModel(BaseModel):
         default=None,
         description="The parent ID of the task. This is used to identify the task in the system.",
     )
-    cached: bool | None = Field(default=None, description="Whether the task should be cached")
+    cached: bool | None = Field(default=None, description="Deprecated — has no effect. Replay decisions are caller-side: use the reusableTaskFor query and reference the prior task instead of re-assigning.")
     log: bool | None = Field(default=None, description="Whether the task should be logged")
     capture: bool | None = Field(default=None, description="Whether to capture the task.")
     ephemeral: bool | None = Field(default=None, description="Whether the task is ephemeral")

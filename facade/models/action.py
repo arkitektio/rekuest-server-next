@@ -1,6 +1,7 @@
 from authentikate.models import App, Organization
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.db.models.functions import Upper
 from django_choices_field import TextChoicesField
 
 from facade import enums
@@ -125,8 +126,15 @@ class BasePort(models.Model):
         indexes = [
             # Composite index for instant payload resolution at execution time
             models.Index(fields=["action", "key_path"]),
-            # Index for fast reverse-matching graph searches
-            models.Index(fields=["identifier"]),
+            # Partial root-port indexes for the matcher: the correlated EXISTS clauses and the
+            # force_* count subqueries all filter exactly on
+            # (action_id, parent_id IS NULL, kind|nullable). Nested children are reached via the
+            # FK index on parent with tiny fan-out, so only root rows are worth indexing.
+            models.Index(fields=["action", "kind"], condition=models.Q(parent__isnull=True), name="%(class)s_root_kind_idx"),
+            models.Index(fields=["action", "nullable"], condition=models.Q(parent__isnull=True), name="%(class)s_root_null_idx"),
+            # Case-insensitive reverse lookup ("which actions use @mikro/image?") — the catalog
+            # entities are lower-cased at registration while port identifiers keep original case.
+            models.Index(Upper("identifier"), name="%(class)s_ident_upper_idx"),
         ]
 
 
@@ -150,73 +158,3 @@ class ReturnPort(BasePort):
         return f"Return: {self.key_path} ({self.identifier})"
 
 
-class InputStructureUsage(models.Model):
-    action = models.ForeignKey(
-        Action,
-        on_delete=models.CASCADE,
-        related_name="input_structures_usages",
-        help_text="The action this usage is for",
-    )
-    structure = models.ForeignKey(
-        "Structure",
-        on_delete=models.CASCADE,
-        related_name="input_usages",
-        help_text="The structure this usage is for",
-    )
-    port_index = models.IntegerField(help_text="The index of the port this structure is used for")
-    port_key = models.CharField(max_length=2000, help_text="The key of the port this structure is used for")
-    modifiers = models.JSONField(default=list)
-
-
-class InputInterfaceUsage(models.Model):
-    action = models.ForeignKey(
-        Action,
-        on_delete=models.CASCADE,
-        related_name="input_interface_usages",
-        help_text="The action this usage is for",
-    )
-    interface = models.ForeignKey(
-        "Interface",
-        on_delete=models.CASCADE,
-        related_name="input_usages",
-        help_text="The structure this usage is for",
-    )
-    port_index = models.IntegerField(help_text="The index of the port this structure is used for")
-    port_key = models.CharField(max_length=2000, help_text="The key of the port this structure is used for")
-    modifiers = models.JSONField(default=list)
-
-
-class OutputStructureUsage(models.Model):
-    action = models.ForeignKey(
-        Action,
-        on_delete=models.CASCADE,
-        related_name="output_structure_usages",
-        help_text="The action this usage is for",
-    )
-    structure = models.ForeignKey(
-        "Structure",
-        on_delete=models.CASCADE,
-        related_name="output_usages",
-        help_text="The structure this usage is for",
-    )
-    port_index = models.IntegerField(help_text="The index of the port this structure is used for")
-    port_key = models.CharField(max_length=2000, help_text="The key of the port this structure is used for")
-    modifiers = models.JSONField(default=list)
-
-
-class OutputInterfaceUsage(models.Model):
-    action = models.ForeignKey(
-        Action,
-        on_delete=models.CASCADE,
-        related_name="output_interface_usages",
-        help_text="The action this usage is for",
-    )
-    interface = models.ForeignKey(
-        "Interface",
-        on_delete=models.CASCADE,
-        related_name="output_usages",
-        help_text="The interface this usage is for",
-    )
-    port_index = models.IntegerField(help_text="The index of the port this structure is used for")
-    port_key = models.CharField(max_length=2000, help_text="The key of the port this structure is used for")
-    modifiers = models.JSONField(default=list)

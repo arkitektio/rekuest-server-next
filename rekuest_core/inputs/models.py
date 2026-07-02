@@ -187,6 +187,11 @@ class PortGroupInputModel(BaseModel):
     ports: list[str] = Field(description="The keys of the ports that belong to this group.")
 
 
+class DescriptorInputModel(BaseModel):
+    key: str = Field(description="The descriptor key, e.g. 'axes'.")
+    value: Any = Field(description="The descriptor value. Any JSON-serializable value.")
+
+
 class PortMatchInputModel(BaseModel):
     at: int | None = Field(default=None, description="The index of the port to match.")
     key: str | None = Field(default=None, description="The key of the port to match.")
@@ -194,51 +199,67 @@ class PortMatchInputModel(BaseModel):
     identifier: str | None = Field(default=None, description="The identifier of the port to match.")
     nullable: bool | None = Field(default=None, description="Whether the port is nullable.")
     dimension: str | None = Field(default=None, description="The canonical pint dimensionality the port must have (QUANTITY wiring-compatibility key).")
+    descriptors: list[DescriptorInputModel] | None = Field(default=None, description="Runtime descriptors of a candidate object, evaluated against the port's compiled requires micro-constraint. Omit for purely structural matching.")
     children: Optional[list["PortMatchInputModel"]] = Field(default=None, description="The matches for the children of the port to match.")
 
 
+class ActionDemandInputModel(BaseModel):
+    """Pure matching criteria for an action — the single demand shape used by query filters
+    and (wrapped in a dependency) by dependency declarations.
+
+    The preferred identification is ``app`` + ``key`` (e.g. "imagej" / "open_image"); the
+    structural matches describe what the action must look like, so a resolver (or the user,
+    when assigning) can progressively loosen the demand to equivalent actions of other apps.
+    """
+
+    hash: str | None = Field(default=None, description="The exact hash of the action. When set, matching short-circuits on the hash and everything else is ignored.")
+    key: str | None = Field(default=None, description="The action's key within its app, e.g. 'open_image'. Together with `app` this is the preferred identification of the demanded action.")
+    app: str | None = Field(default=None, description="The identifier of the app providing the action, e.g. 'imagej'. Omit (or drop when loosening) to allow equivalent actions from any app.")
+    version: str | None = Field(default=None, description="The exact version of the action.")
+    name: str | None = Field(default=None, description="The display name of the action to match.")
+    arg_matches: list[PortMatchInputModel] | None = Field(default=None, description="The matches the action's arg ports must satisfy.")
+    return_matches: list[PortMatchInputModel] | None = Field(default=None, description="The matches the action's return ports must satisfy.")
+    protocols: list[str] | None = Field(default=None, description="Protocols (by name) the action must implement, e.g. 'predicate'.")
+    force_arg_length: int | None = Field(default=None, description="Require that the action has exactly this number of root args.")
+    force_return_length: int | None = Field(default=None, description="Require that the action has exactly this number of root returns.")
+    pure: bool | None = Field(default=None, description="Require the action to be (or not be) pure. Omit to match either.")
+    idempotent: bool | None = Field(default=None, description="Require the action to be (or not be) idempotent. Omit to match either.")
+    stateful: bool | None = Field(default=None, description="Require the action to be (or not be) stateful. Omit to match either.")
+
+
+class StateDemandInputModel(BaseModel):
+    """Pure matching criteria for a state — the single state demand shape.
+
+    The preferred identification is ``app`` + ``key`` (matched against the State's own
+    identity columns); the structural ``matches`` on the state definition's ports loosen
+    the demand to equivalent states of other apps.
+    """
+
+    hash: str | None = Field(default=None, description="The exact hash of the state definition. When set, matching short-circuits on the hash.")
+    key: str | None = Field(default=None, description="The state's identity key on the agent (defaults to the interface at registration).")
+    app: str | None = Field(default=None, description="The identifier of the app providing the state.")
+    matches: list[PortMatchInputModel] | None = Field(default=None, description="The matches the state definition's ports must satisfy.")
+    protocols: list[str] | None = Field(default=None, description="Protocols (by name) the state must implement.")
+
+
 class ActionDependencyInputModel(BaseModel):
-    key: str = Field(description="The key of the action. This is used to identify the dependency in the system.")
-    version: str | None = Field(default=None, description="The version of the action this dependency corresponds to.")
-    description: str | None = Field(default=None, description="The description of the action. This can describe the action and its purpose.")
-    name: str | None = Field(default=None, description="The name of the action. This is used to identify the action in the system.")
-    action_key: str | None = Field(default=None, description="The key of the state this dependency corresponds to. (i.e frame:acquireimage)")
-    app: str | None = Field(
-        default=None,
-        description="Which app this dependency corresponds to (i.e. do you want to use a stardist agent for that or imagej agents needs to be a world unique classsifier (reverse domain notation) that identifies the type of agent you want to use, and then we can have multiple agents of the same type running in the system, e.g. startdist could be the app for all agents that correpsond to a startdist instance)",
-    )
-    arg_matches: list[PortMatchInputModel] | None = Field(
-        default=None,
-        description="The demands for the action args, this can be additionaly specified so that when we loosen the matching criteria for an action in a resolver, we can still make sure to match the right action based on the demands for the args. This is used to identify the demand in the system.",
-    )
-    return_matches: list[PortMatchInputModel] | None = Field(
-        default=None,
-        description="The demands for the action returns, this can be additionaly specified so that when we loosen the matching criteria for an action in a resolver, we can still make sure to match the right action based on the demands for the returns. This is used to identify the demand in the system.",
-    )
-    protocols: list[str] | None = Field(default=None, description="The protocols that the action is implementing or relying on. This is used to identify the demand in the system, and can be used to match actions that are implementing the same protocol together.")
-    force_arg_length: int | None = Field(
-        default=None, description="Require that the action has a specific number of args. When loosing the matching criteria for an action in a resolver, we can still make sure to match the right action based on the demands for the args. This is used to identify the demand in the system."
-    )
-    force_return_length: int | None = Field(default=None, description="Require that the action has a specific number of returns. This is used to identify the demand in the system.")
+    """A named action requirement of a dependency: a local slot ``key`` mapped to the
+    ``demand`` the resolved action must satisfy."""
+
+    key: str = Field(description="The local slot key of this action requirement — callers reference it when assigning.")
+    description: str | None = Field(default=None, description="The description of the dependency, why it is needed and what it is used for.")
+    demand: ActionDemandInputModel | None = Field(default=None, description="The matching criteria the resolved action must satisfy (app/key preferred; matches loosen).")
     optional: bool = Field(default=False, description="Whether the dependency is optional or not. If the dependency is optional, the agent doesn't have to provide it to be potentially callable")
     allow_inactive: bool = Field(default=True, description="Allow inactive nodes, defaults to true")
 
 
 class StateDependencyInputModel(BaseModel):
-    key: str = Field(description="The key of the state. This is used to identify the dependency in the system.")
-    version: str | None = Field(default=None, description="The version of the state this dependency corresponds to.")
-    description: str | None = Field(default=None, description="The description of the state. This can describe the state and its purpose.")
-    name: str | None = Field(default=None, description="The name of the state. This is used to identify the state in the system.")
-    state_key: str | None = Field(default=None, description="The key of the state this dependency corresponds to. (i.e frame:count)")
-    app: str | None = Field(
-        default=None,
-        description="Which app this dependency corresponds to (i.e. do you want to use a stardist agent for that or imagej agents needs to be a world unique classsifier (reverse domain notation) that identifies the type of agent you want to use, and then we can have multiple agents of the same type running in the system, e.g. startdist could be the app for all agents that correpsond to a startdist instance)",
-    )
-    port_matches: list[PortMatchInputModel] | None = Field(
-        default=None,
-        description="The demands for the state ports, this can be additionaly specified so that when we loosen the matching criteria for a state in a resolver, we can still make sure to match the right state based on the demands for the ports. This is used to identify the demand in the system.",
-    )
-    protocols: list[str] | None = Field(default=None, description="The protocols that the state is implementing or relying on. This is used to identify the demand in the system, and can be used to match states that are implementing the same protocol together.")
+    """A named state requirement of a dependency: a local slot ``key`` mapped to the
+    ``demand`` the agent's state must satisfy."""
+
+    key: str = Field(description="The local slot key of this state requirement — callers reference it when assigning.")
+    description: str | None = Field(default=None, description="The description of the dependency, why it is needed and what it is used for.")
+    demand: StateDemandInputModel | None = Field(default=None, description="The matching criteria the agent's state must satisfy (app/key preferred; matches loosen).")
     optional: bool = Field(default=False, description="Whether the dependency is optional or not. If the dependency is optional, the agent doesn't have to provide it to be potentially callable")
     allow_inactive: bool = Field(default=True, description="Allow inactive nodes, defaults to true")
 
@@ -256,8 +277,8 @@ class AgentDependencyInputModel(BaseModel):
     optional: bool = Field(default=False, description="Whether the dependency is optional or not. If the dependency is optional, users can choose to not provide it")
 
     # Filters for selecting which instances of the agent are valid for this dependency
-    action_demands: list[ActionDependencyInputModel] | None = Field(default=None, description="The action demands of the agent. This is used to identify the demand in the system.")
-    state_demands: list[StateDependencyInputModel] | None = Field(default=None, description="The state demands of the agent. This is used to identify the demand in the system.")
+    action_dependencies: list[ActionDependencyInputModel] | None = Field(default=None, description="The named action requirements of the agent — each a slot key plus the demand the resolved action must satisfy.")
+    state_dependencies: list[StateDependencyInputModel] | None = Field(default=None, description="The named state requirements of the agent — each a slot key plus the demand the agent's state must satisfy.")
     auto_resolvable: bool = Field(
         default=False,
         description="Whether this dependency is auto resolvable or not. If so we will try to automatically resolve it based on the demands specified in the dependency and the capabilities of the available agents in the system. This is used to identify the demand in the system. Attention if any of the dependencies of this agent dependency is not auto resolvable, this dependency will also not be auto resolvable",
@@ -282,6 +303,8 @@ class DefinitionInputModel(BaseModel):
     package: str | None = Field(default=None, description="The package of the function. Will default to the currents agent's app if not specified. This is used to group definitions together in the UI and provide a better user experience")
     name: str = Field(description="The name of the actions. This is used to uniquely identify the definition")
     stateful: bool = Field(default=False, description="Whether the definition is stateful or not. If the definition is stateful, it can be used to create a stateful action. If the definition is not stateful, it cannot be used to create a stateful action")
+    pure: bool = Field(default=False, description="Whether the action is pure: same args always produce the same result and no side effects — its results are replayable/cacheable. Implies idempotent. Incompatible with stateful and with a PHYSICAL effect class.")
+    idempotent: bool = Field(default=False, description="Whether the action is idempotent: safe to run multiple times with the same args without changing the outcome — on ambiguous executor loss it may be freely re-dispatched.")
     port_groups: list[PortGroupInputModel] = Field(default_factory=list, description="The port groups of the definition. This is used to group ports together in the UI")
     args: list[ArgPortInputModel] = Field(default_factory=list, description="The args of the definition. This is the input ports of the definition")
     returns: list[ReturnPortInputModel] = Field(default_factory=list, description="The returns of the definition. This is the output ports of the definition")
@@ -385,6 +408,8 @@ class StateDefinitionInputModel(BaseModel):
 
 class StateImplementationInputModel(BaseModel):
     interface: str = Field(description="The key of the state implementation. This is used to uniquely identify the state implementation")
+    key: str | None = Field(default=None, description="The stable identity key of the state, matched by state demands. Defaults to the interface when omitted.")
+    app: str | None = Field(default=None, description="The identifier of the app providing this state. Defaults to the registering agent's app identifier when omitted.")
     definition: StateDefinitionInputModel = Field(description="The schema of the state implementation. This is used to define the structure of the state")
 
 

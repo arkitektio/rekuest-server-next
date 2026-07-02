@@ -119,7 +119,7 @@ async def seed_agent(instance_id, token=TEST_TOKEN, blocked=False):
 # --------------------------------------------------------------------------- #
 # Object-graph builders (run synchronously, wrapped via sync_to_async)
 # --------------------------------------------------------------------------- #
-def _build_task(prefix, *, effect="NONE", originating_connection_id=None, originating_session_id=None, parent=None):
+def _build_task(prefix, *, effect="NONE", idempotent=False, pure=False, originating_connection_id=None, originating_session_id=None, parent=None):
     """Create a standalone Action -> Implementation -> Task graph.
 
     The persist backend looks tasks up by id (not by the registered agent),
@@ -152,6 +152,8 @@ def _build_task(prefix, *, effect="NONE", originating_connection_id=None, origin
         description=f"{prefix} description",
         hash=f"{prefix}-action-hash",
         organization=org,
+        idempotent=idempotent,
+        pure=pure,
     )
     implementation = Implementation.objects.create(
         release=release,

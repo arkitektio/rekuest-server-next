@@ -21,6 +21,7 @@ class Task:
     reference: str | None = strawberry_django.field(description="Optional external reference for tracking.")
     is_done: bool = strawberry_django.field(description="Indicates if the task is completed.")
     args: rscalars.AnyDefault = strawberry_django.field(description="Arguments used in the task.")
+    args_hash: str | None = strawberry_django.field(description="Canonical sha256 of the assign args — the replay-discovery key.")
     dependencies: rscalars.AnyDefault = strawberry_django.field(description="The used dependencies for this assignemnet")
     resolution: Optional["Resolution"] = strawberry.field(description="Resolution used to resolve dependencies for this task.")
     root: Optional["Task"] = strawberry.field(description="Root task in the creation chain.")

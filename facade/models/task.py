@@ -75,6 +75,13 @@ class Task(models.Model):
         related_name="all_children",
     )
     args = models.JSONField(blank=True, null=True, help_text="The Args", default=dict)
+    args_hash = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Canonical sha256 of the assign args (provenance canonicalization v1) — the replay-discovery key",
+    )
     dependencies = models.JSONField(blank=True, null=True, help_text="The Args", default=dict)
     caller = models.ForeignKey(
         "Caller",

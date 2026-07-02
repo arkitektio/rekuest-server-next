@@ -46,9 +46,13 @@ from .dashboard import Dashboard, DashboardPlacement, UICatalog
 from .demand import (
     ActionDemand,
     ActionDemandModel,
+    ActionDependency,
+    ActionDependencyModel,
     DynamicValueModel,
     StateDemand,
     StateDemandModel,
+    StateDependency,
+    StateDependencyModel,
 )
 from .dependency import (
     AgentMapping,
@@ -73,11 +77,8 @@ from .state import (
     StateUpdateEvent,
 )
 from .structure import (
-    InputInterfaceUsage,
-    InputStructureUsage,
     Interface,
-    OutputInterfaceUsage,
-    OutputStructureUsage,
+    PortUsage,
     Structure,
     StructurePackage,
 )
@@ -92,8 +93,10 @@ __all__ = [
     "ActionStats",
     "ActionStatsResolver",
     "ActionDemand",
+    "ActionDependency",
     "ActionDemandModel",
     "StateDemand",
+    "StateDependency",
     "StateDemandModel",
     "DynamicValueModel",
     "User",
@@ -147,10 +150,7 @@ __all__ = [
     "StructurePackage",
     "Interface",
     "Structure",
-    "InputStructureUsage",
-    "OutputStructureUsage",
-    "InputInterfaceUsage",
-    "OutputInterfaceUsage",
+    "PortUsage",
     "TaskBoundary",
     "SessionBoundary",
     "Session",

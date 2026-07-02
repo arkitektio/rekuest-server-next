@@ -11,10 +11,6 @@ from .action import (
     Action,
     ArgPort,
     BasePort,
-    InputInterfaceUsage,
-    InputStructureUsage,
-    OutputInterfaceUsage,
-    OutputStructureUsage,
     ReturnPort,
 )
 from .agent import (
@@ -90,10 +86,6 @@ __all__ = [
     "BasePort",
     "ArgPort",
     "ReturnPort",
-    "InputStructureUsage",
-    "InputInterfaceUsage",
-    "OutputStructureUsage",
-    "OutputInterfaceUsage",
     # agent
     "Lock",
     "Agent",

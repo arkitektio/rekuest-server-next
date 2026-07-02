@@ -5,7 +5,7 @@ Exercises the full filter pipeline end-to-end: the ``ActionFilter.object_demands
 ``requires`` JSONPath on the relational ArgPort rows, evaluated against the runtime ``descriptors``
 of a candidate object. This is the "pass a runtime object with descriptors and find actions that
 accept it" path. ``PortMatchInput`` stays purely structural; the descriptors live on the separate
-``ObjectMatchInput``.
+the optional ``descriptors`` on ``PortMatchInput``.
 """
 
 import pytest
@@ -20,7 +20,7 @@ from facade.mutations.implementation import _create_implementation
 from facade.schema import schema
 
 FILTER_QUERY = """
-    query FilterActions($demands: [ObjectDemandInput!]) {
+    query FilterActions($demands: [PortDemandInput!]) {
         actions(filters: { objectDemands: $demands }) {
             id
             name

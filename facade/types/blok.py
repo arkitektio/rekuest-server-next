@@ -10,7 +10,7 @@ from rekuest_core.objects import models as rmodels
 from rekuest_core.objects import types as rtypes
 
 from facade import filters, models, scalars
-from facade.types.demand import ActionDemandModel, StateDemandModel
+from facade.types.demand import ActionDependencyModel, StateDependencyModel
 
 
 @strawberry_django.type(models.Blok)
@@ -73,13 +73,14 @@ class BlokDependency:
         """Whether this dependency is singular or not. A singular dependency is a dependency that can only be resolved to one agent, meaning that if there are multiple implementations that match the filters and demands of this dependency, it will not be considered singular."""
         return self.min_viable_instances == 1 and (self.max_viable_instances is None or self.max_viable_instances == 1)
 
-    @strawberry_django.field(description="List of action demands")
-    def action_demands(self) -> list["ActionDemand"]:
-        return [ActionDemandModel(**i) for i in self.action_demands]
+    @strawberry_django.field(description="The named action requirements of this dependency.")
+    def action_dependencies(self) -> list["ActionDependency"]:
+        # get_action_dependencies normalizes legacy flat JSON into the demand wrapper.
+        return [ActionDependencyModel(**d.model_dump()) for d in self.get_action_dependencies()]
 
-    @strawberry_django.field(description="List of state demands")
-    def state_demands(self) -> list["StateDemand"]:
-        return [StateDemandModel(**i) for i in self.state_demands]
+    @strawberry_django.field(description="The named state requirements of this dependency.")
+    def state_dependencies(self) -> list["StateDependency"]:
+        return [StateDependencyModel(**d.model_dump()) for d in self.get_state_dependencies()]
 
 
 @strawberry_django.type(models.MaterializedBlok, filters=filters.MaterializedBlokFilter, pagination=True, ordering=filters.MaterializedBlokOrder, description="A materialized instance of a Blok that can be placed on dashboards and linked to agent states.")

@@ -26,6 +26,12 @@ def qpm(dimension=None, kind=PortKind.QUANTITY):
     return SimpleNamespace(at=None, key=None, kind=kind, identifier=None, descriptors=None, nullable=None, children=None, dimension=dimension)
 
 
+def port_demand_ids(matches, type="args"):
+    """Single port demand through the consolidated matcher entry point."""
+    demand = SimpleNamespace(kind=type, matches=matches, force_length=None, force_non_nullable_length=None, force_structure_length=None)
+    return managers.get_action_ids_by_port_demands([demand])
+
+
 def make_quantity_action(org, prefix, arg_unit, return_unit):
     definition = DefinitionInputModel.model_validate(
         {
@@ -66,25 +72,25 @@ def test_rebuild_persists_dimension_on_relational_rows(catalog):
 
 
 def test_demand_with_dimension_matches_only_compatible_action(catalog):
-    ids = managers.get_action_ids_by_demands([qpm(dimension=VOLT_DIM)], type="args")
+    ids = port_demand_ids([qpm(dimension=VOLT_DIM)], type="args")
     assert set(ids) == {catalog.voltage.id}
 
-    ids = managers.get_action_ids_by_demands([qpm(dimension=FARAD_DIM)], type="args")
+    ids = port_demand_ids([qpm(dimension=FARAD_DIM)], type="args")
     assert set(ids) == {catalog.capacitance.id}
 
 
 def test_dimensionless_demand_matches_all_quantities(catalog):
-    ids = managers.get_action_ids_by_demands([qpm()], type="args")
+    ids = port_demand_ids([qpm()], type="args")
     assert set(ids) == {catalog.voltage.id, catalog.capacitance.id}
 
 
 def test_return_side_dimension_matching(catalog):
     # Both actions' return units are non-reference spellings (mV, pF); the derived
     # canonical dimension is what makes them matchable.
-    ids = managers.get_action_ids_by_demands([qpm(dimension=VOLT_DIM)], type="returns")
+    ids = port_demand_ids([qpm(dimension=VOLT_DIM)], type="returns")
     assert set(ids) == {catalog.voltage.id}
 
 
 def test_dimension_of_wrong_value_matches_nothing(catalog):
-    ids = managers.get_action_ids_by_demands([qpm(dimension="[luminosity]")], type="args")
+    ids = port_demand_ids([qpm(dimension="[luminosity]")], type="args")
     assert ids == []
