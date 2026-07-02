@@ -152,6 +152,7 @@ class PortMatchModel(BaseModel):
     identifier: str | None = None
     children: list["PortMatchModel"] | None = None
     nullable: bool | None = False
+    dimension: str | None = None
 
 
 class RequiresModel(BaseModel):
@@ -183,6 +184,9 @@ class PortModel(BaseModel):
     default: Any | None = None
     children: list["PortModel"] | None
     choices: list[ChoiceModel] | None = None
+    reference_unit: str | None = None
+    proposed_units: list[str] | None = None
+    dimension: str | None = None
 
 
 class ArgPortModel(PortModel):

@@ -114,6 +114,7 @@ class BasePort(models.Model):
 
     kind = models.CharField(max_length=50, null=True, help_text="The structural kind (e.g. LIST, DICT, INT)")
     identifier = models.CharField(max_length=255, null=True, db_index=True, help_text="The macro-type (e.g. '@mikro/image')")
+    dimension = models.CharField(max_length=255, null=True, blank=True, db_index=True, help_text="Canonical pint dimensionality for QUANTITY ports (the wiring-compatibility key)")
 
     # The ECS JSONPath string compiler output
     compiled_jsonpath = models.CharField(max_length=1000, null=True, blank=True, help_text="PostgreSQL JSONPath string for micro-constraints")

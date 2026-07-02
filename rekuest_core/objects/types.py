@@ -207,6 +207,18 @@ class ArgPort:
     widget: AssignWidget | None = None
     validators: list[Validator] | None = None
     requires: list[Requires] | None = None
+    reference_unit: str | None = strawberry.field(
+        default=None,
+        description="For QUANTITY ports: the canonical/reference unit, e.g. 'volt'. Default selection; other units of the same dimension are still allowed.",
+    )
+    proposed_units: list[str] | None = strawberry.field(
+        default=None,
+        description="For QUANTITY ports: units offered as a dropdown in the UI (proposals only; any unit of the same dimension is still valid).",
+    )
+    dimension: str | None = strawberry.field(
+        default=None,
+        description="For QUANTITY ports: the pint dimensionality string. This is the wiring-compatibility key between quantity ports.",
+    )
 
 
 @pydantic.type(models.ReturnPortModel)
@@ -226,6 +238,18 @@ class ReturnPort:
     choices: list[Choice] | None = None
     widget: ReturnWidget | None = None
     provides: list[Provides] | None = None
+    reference_unit: str | None = strawberry.field(
+        default=None,
+        description="For QUANTITY ports: the canonical/reference unit, e.g. 'volt'. Default selection; other units of the same dimension are still allowed.",
+    )
+    proposed_units: list[str] | None = strawberry.field(
+        default=None,
+        description="For QUANTITY ports: units offered as a dropdown in the UI (proposals only; any unit of the same dimension is still valid).",
+    )
+    dimension: str | None = strawberry.field(
+        default=None,
+        description="For QUANTITY ports: the pint dimensionality string. This is the wiring-compatibility key between quantity ports.",
+    )
 
 
 @pydantic.type(models.SearchAssignWidgetModel)

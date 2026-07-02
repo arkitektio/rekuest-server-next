@@ -79,6 +79,14 @@ def _build_match_exists(
         params[key] = match.identifier
         conditions.append(f"{alias}.identifier = %({key})s")
 
+    # getattr: demand objects are duck-typed (SimpleNamespace in tests, ObjectMatchInput at
+    # runtime) and not all shapes carry the QUANTITY dimension field.
+    dimension = getattr(match, "dimension", None)
+    if dimension is not None:
+        key = f"dim_{id_path}"
+        params[key] = dimension
+        conditions.append(f"{alias}.dimension = %({key})s")
+
     if match.nullable is not None:
         key = f"null_{id_path}"
         params[key] = match.nullable

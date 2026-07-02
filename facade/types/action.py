@@ -53,9 +53,7 @@ class Action:
 
     @strawberry_django.field(description="Input arguments (ports) for the action.")
     def args(self) -> list[rtypes.ArgPort]:
-        x = [rmodels.ArgPortModel(**i) for i in self.args]
-        print(x)
-        return x
+        return [rmodels.ArgPortModel(**i) for i in self.args]
 
     @strawberry_django.field(description="Output values (ports) returned by the action.")
     def returns(self) -> list[rtypes.ReturnPort]:

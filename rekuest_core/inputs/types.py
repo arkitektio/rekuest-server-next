@@ -204,6 +204,9 @@ class ArgPortInput:
     children: list[Annotated["ArgPortInput", strawberry.lazy(__name__)]] | None = strawberry.field(default_factory=list)
     widget: Optional["AssignWidgetInput"] = None
     requires: list[RequiresInput] | None = strawberry.field(default_factory=list)
+    reference_unit: str | None = None
+    proposed_units: list[str] | None = None
+    dimension: str | None = None
 
 
 @pydantic.input(
@@ -241,6 +244,9 @@ class ReturnPortInput:
     children: list[Annotated["ReturnPortInput", strawberry.lazy(__name__)]] | None = strawberry.field(default_factory=list)
     widget: Optional["ReturnWidgetInput"] = None
     provides: list[ProvidesInput] | None = strawberry.field(default_factory=list)
+    reference_unit: str | None = None
+    proposed_units: list[str] | None = None
+    dimension: str | None = None
 
 
 @strawberry.input(
@@ -265,6 +271,7 @@ class PortMatchInput:
     kind: enums.PortKind | None = None
     identifier: str | None = None
     nullable: bool | None = None
+    dimension: str | None = None
     children: Optional[list[Annotated["PortMatchInput", strawberry.lazy(__name__)]]] = None
 
 

@@ -77,7 +77,7 @@ def extract_ports_recursively(
 
     # 3. Create and Save the Current Port
     current_port = models.ArgPort(
-        action=action_instance, parent=parent_instance, index=index, key=port_data.key, key_path=current_path, kind=port_data.kind.value if hasattr(port_data.kind, "value") else port_data.kind, identifier=port_data.identifier, compiled_jsonpath=compiled_path, nullable=port_data.nullable
+        action=action_instance, parent=parent_instance, index=index, key=port_data.key, key_path=current_path, kind=port_data.kind.value if hasattr(port_data.kind, "value") else port_data.kind, identifier=port_data.identifier, compiled_jsonpath=compiled_path, nullable=port_data.nullable, dimension=port_data.dimension
     )
 
     # The Write-Time Hit: We save immediately to get the Primary Key (ID)
@@ -120,7 +120,7 @@ def extract_returnports_recursively(
 
     # 3. Create and Save the Current Port
     current_port = models.ReturnPort(
-        action=action_instance, parent=parent_instance, index=index, key=port_data.key, key_path=current_path, kind=port_data.kind.value if hasattr(port_data.kind, "value") else port_data.kind, identifier=port_data.identifier, compiled_jsonpath=compiled_path, nullable=port_data.nullable
+        action=action_instance, parent=parent_instance, index=index, key=port_data.key, key_path=current_path, kind=port_data.kind.value if hasattr(port_data.kind, "value") else port_data.kind, identifier=port_data.identifier, compiled_jsonpath=compiled_path, nullable=port_data.nullable, dimension=port_data.dimension
     )
 
     # The Write-Time Hit: We save immediately to get the Primary Key (ID)

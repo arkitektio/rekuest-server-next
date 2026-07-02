@@ -1,7 +1,7 @@
 import hashlib
 import json
 from typing import Any, List, Optional
-from rekuest_core import enums
+from rekuest_core import enums, units
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
 
@@ -138,11 +138,31 @@ class PortInputModel(BaseModel):
     effects: list[EffectInputModel] | None = Field(default=None, description="The effects of the port")
     default: Any | None = Field(default=None, description="The default value for the port.")
     choices: list[ChoiceInputModel] | None = Field(default=None, description="The options for the port. This is used for dropdowns and text inputs")
+    reference_unit: str | None = Field(default=None, description="For QUANTITY ports: the canonical/reference unit of the physical quantity, e.g. \"volt\" or \"farad\". It is the default selection and the key used to resolve the concrete quantity type; other units of the same dimension are still allowed.")
+    proposed_units: list[str] | None = Field(default=None, description="For QUANTITY ports: units offered as a dropdown in the UI, e.g. [\"pF\", \"nF\", \"uF\"]. Proposals only — any unit of the same dimension remains valid input.")
+    dimension: str | None = Field(default=None, description="For QUANTITY ports: the pint dimensionality string, e.g. \"[mass] * [length] ** 2 / [time] ** 3 / [current]\". This is the wiring-compatibility key between quantity ports.")
+    children: Optional[list["PortInputModel"]] = Field(default=None, description="The child ports (used for list, dict, union and model ports).")
 
     @model_validator(mode="after")
-    def check_children_for_port(self) -> Self:
+    def check_kind_specific_fields(self) -> Self:
         if self.kind == enums.PortKind.LIST and (self.children is None or len(self.children) != 1):
-            raise ValueError("Port of kind LIST must have exactly on children")
+            raise ValueError("Port of kind LIST must have exactly one child")
+
+        if self.kind == enums.PortKind.QUANTITY:
+            if not self.reference_unit:
+                raise ValueError(f"QUANTITY port '{self.key}' must declare a reference_unit")
+            derived = units.dimensionality_of(self.reference_unit)
+            if self.dimension is not None and units.dimensionality_of(self.dimension) != derived:
+                raise ValueError(f"QUANTITY port '{self.key}': dimension '{self.dimension}' is inconsistent with reference_unit '{self.reference_unit}' (dimensionality '{derived}')")
+            self.dimension = derived  # derive or canonicalize the wiring-compatibility key
+            for unit in self.proposed_units or []:
+                unit_dim = units.dimensionality_of(unit)
+                if unit_dim != derived:
+                    raise ValueError(f"QUANTITY port '{self.key}': proposed unit '{unit}' has dimensionality '{unit_dim}', expected '{derived}'")
+        else:
+            offending = [f for f in ("reference_unit", "proposed_units", "dimension") if getattr(self, f) is not None]
+            if offending:
+                raise ValueError(f"Port '{self.key}' of kind {self.kind.value} must not set QUANTITY-only fields: {', '.join(offending)}")
         return self
 
 
@@ -152,23 +172,11 @@ class ArgPortInputModel(PortInputModel):
     requires: list[RequiresInputModel] | None = Field(default=None, description="The descriptors for the port. Descriptors are key-value pairs that can be used to add additional metadata to a port. When using rekuest's action search, you can filter actions based on their port descriptors")
     children: Optional[list["ArgPortInputModel"]] = Field(default=None, description="The child ports (used for list, dict, union and model ports).")
 
-    @model_validator(mode="after")
-    def check_children_for_port(self) -> Self:
-        if self.kind == enums.PortKind.LIST and (self.children is None or len(self.children) != 1):
-            raise ValueError("Port of kind LIST must have exactly on children")
-        return self
-
 
 class ReturnPortInputModel(PortInputModel):
     widget: Optional["ReturnWidgetInputModel"] = Field(default=None, description="The return widget to use for this port.")
     provides: list[ProvidesInputModel] | None = Field(default=None, description="The provisions for the port. Provisions are key-value pairs that can be used to add additional metadata to a port. When using rekuest's action search, you can filter actions based on their port provisions")
     children: Optional[list["ReturnPortInputModel"]] = Field(default=None, description="The child ports (used for list, dict, union and model ports).")
-
-    @model_validator(mode="after")
-    def check_children_for_port(self) -> Self:
-        if self.kind == enums.PortKind.LIST and (self.children is None or len(self.children) != 1):
-            raise ValueError("Port of kind LIST must have exactly on children")
-        return self
 
 
 class PortGroupInputModel(BaseModel):
@@ -185,6 +193,7 @@ class PortMatchInputModel(BaseModel):
     kind: enums.PortKind | None = Field(default=None, description="The kind of the port to match.")
     identifier: str | None = Field(default=None, description="The identifier of the port to match.")
     nullable: bool | None = Field(default=None, description="Whether the port is nullable.")
+    dimension: str | None = Field(default=None, description="The canonical pint dimensionality the port must have (QUANTITY wiring-compatibility key).")
     children: Optional[list["PortMatchInputModel"]] = Field(default=None, description="The matches for the children of the port to match.")
 
 
