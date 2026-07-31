@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v2.1.2 (2026-07-31)
+
+### Bug Fixes
+
+- Removal of structure
+  ([`9ec05ab`](https://github.com/arkitektio/rekuest-server-next/commit/9ec05ab1dce25da68205b9c037aaa5246e02a877))
+
+
 ## v2.1.1 (2026-07-02)
 
 ### Bug Fixes
