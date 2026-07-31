@@ -49,14 +49,12 @@ from .implementation import (
 )
 from .caller import Caller
 from .state import (
-    HistoricalState,
     Patch,
     Session,
     Snapshot,
     State,
     StateDefinition,
 )
-from .structure import Descriptor, Interface, Structure, StructurePackage
 from .testcase import TestCase, TestResult
 from .threed import Placement, Space, ThreeDModel
 
@@ -69,11 +67,6 @@ __all__ = [
     "UICatalog",
     "Toolbox",
     "Shortcut",
-    # structure
-    "StructurePackage",
-    "Interface",
-    "Descriptor",
-    "Structure",
     # action
     "Action",
     "BasePort",
@@ -104,7 +97,6 @@ __all__ = [
     "Session",
     "Patch",
     "Snapshot",
-    "HistoricalState",
     # blok
     "Dashboard",
     "Blok",

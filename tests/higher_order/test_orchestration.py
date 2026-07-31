@@ -42,7 +42,6 @@ def _build_hoi_graph(agent_pk):
         interface="lower_fn",
         action=lower_action,
         agent=agent,
-        dynamic=False,
     )
 
     higher_action = Action.objects.create(
@@ -59,7 +58,6 @@ def _build_hoi_graph(agent_pk):
         interface="higher_fn",
         action=higher_action,
         agent=agent,
-        dynamic=False,
         higher_order_for=lower_impl,
         higher_order_config=HIGHER_ORDER_CONFIG,
     )

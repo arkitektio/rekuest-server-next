@@ -62,9 +62,9 @@ class Query:
     state_definitions: list[types.StateDefinition] = field(description="Available state schemas.")
     memory_shelves: list[types.MemoryShelve] = field(description="All memory shelves.")
     memory_drawers: list[types.MemoryDrawer] = field(description="All memory drawers.")
-    structures: list[types.Structure] = field(description="All registered structures.")
-    structure_packages: list[types.StructurePackage] = field(description="All registered structure packages.")
-    interfaces: list[types.Interface] = field(description="All registered interfaces.")
+    structures = field(resolver=types.structure.list_structures, description="All structures referenced by the org's action ports (derived, not registered).")
+    structure_packages = field(resolver=types.structure.list_structure_packages, description="All structure packages referenced by the org's action ports (derived, not registered).")
+    interfaces = field(resolver=types.structure.list_interfaces, description="All interfaces referenced by the org's action ports (derived, not registered).")
     tasks: list[types.Task] = field(description="All tasks.")
     resolved_implementations = field(resolver=queries.resolved_implementations, description="Fetch resolved dependencies for a resolution.")
 
@@ -102,17 +102,9 @@ class Query:
     def state(self, info: Info, id: strawberry.ID) -> types.State:
         return cast(types.State, models.State.objects.get(id=id))
 
-    @field(description="Fetch a client by ID.")
-    def structure_package(self, info: Info, id: strawberry.ID) -> types.StructurePackage:
-        return cast(types.StructurePackage, models.StructurePackage.objects.get(id=id))
-
-    @field(description="Fetch an interface by ID.")
-    def interface(self, info: Info, id: strawberry.ID) -> types.Interface:
-        return cast(types.Interface, models.Interface.objects.get(id=id))
-
-    @field(description="Fetch a structure by ID.")
-    def structure(self, info: Info, id: strawberry.ID) -> types.Structure:
-        return cast(types.Structure, models.Structure.objects.get(id=id))
+    structure_package = field(resolver=types.structure.get_structure_package, description="Fetch a structure package by its key (derived from port identifiers).")
+    interface = field(resolver=types.structure.get_interface, description="Fetch an interface by its '@package/key' identifier (derived from port identifiers).")
+    structure = field(resolver=types.structure.get_structure, description="Fetch a structure by its '@package/key' identifier (derived from port identifiers).")
 
     @field(description="Fetch a memory shelve by ID.")
     def memory_shelve(self, info: Info, id: strawberry.ID) -> types.MemoryShelve:

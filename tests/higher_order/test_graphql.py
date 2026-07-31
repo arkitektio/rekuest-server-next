@@ -34,7 +34,7 @@ def _build_impls(prefix, lower_kind="FUNCTION", higher_kind="FUNCTION"):
         organization=org,
         kind=lower_kind,
     )
-    lower = Implementation.objects.create(release=agent.release, interface=f"{prefix}_l", action=lower_action, agent=agent, dynamic=False)
+    lower = Implementation.objects.create(release=agent.release, interface=f"{prefix}_l", action=lower_action, agent=agent)
 
     higher_action = Action.objects.create(
         app=agent.app,
@@ -46,7 +46,7 @@ def _build_impls(prefix, lower_kind="FUNCTION", higher_kind="FUNCTION"):
         organization=org,
         kind=higher_kind,
     )
-    higher = Implementation.objects.create(release=agent.release, interface=f"{prefix}_h", action=higher_action, agent=agent, dynamic=False)
+    higher = Implementation.objects.create(release=agent.release, interface=f"{prefix}_h", action=higher_action, agent=agent)
 
     return str(higher.id), str(lower.id)
 
@@ -68,7 +68,7 @@ def _build_cross_agent_impls(prefix):
         organization=h_org,
         kind="FUNCTION",
     )
-    higher = Implementation.objects.create(release=h_agent.release, interface=f"{prefix}_h", action=higher_action, agent=h_agent, dynamic=False)
+    higher = Implementation.objects.create(release=h_agent.release, interface=f"{prefix}_h", action=higher_action, agent=h_agent)
 
     l_user, _, l_org, l_registry = create_registry_bundle(f"{prefix}-l")
     l_agent = create_agent_for_registry(registry=l_registry, user=l_user, organization=l_org, prefix=f"{prefix}-l")
@@ -82,7 +82,7 @@ def _build_cross_agent_impls(prefix):
         organization=l_org,
         kind="FUNCTION",
     )
-    lower = Implementation.objects.create(release=l_agent.release, interface=f"{prefix}_l", action=lower_action, agent=l_agent, dynamic=False)
+    lower = Implementation.objects.create(release=l_agent.release, interface=f"{prefix}_l", action=lower_action, agent=l_agent)
 
     return str(higher.id), str(lower.id)
 

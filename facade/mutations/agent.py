@@ -1,10 +1,11 @@
 import uuid
 
+from django.db import transaction
 from kante.types import Info
 from facade.mutations.implementation import _create_implementation
 import strawberry
 from facade import types, models, inputs, scalars, enums
-from rekuest_core.inputs.types import BlokImplementationInput, StructureInput, InterfaceInput, ImplementationInput, LockImplementationInput, StateImplementationInput
+from rekuest_core.inputs.types import BlokImplementationInput, ImplementationInput, LockImplementationInput, StateImplementationInput
 from rekuest_core.inputs.models import BlokImplementationInputModel, ImplementationInputModel, StateImplementationInputModel, LockImplementationInputModel
 import logging
 from facade import types, models, inputs, unique
@@ -130,7 +131,14 @@ class ImplementAgentInput:
     hash: str | None = None
 
 
+@transaction.atomic
 def implement_agent(info: Info, input: ImplementAgentInput) -> types.Agent:
+    """Reconcile an agent's declared implementations/states/locks/bloks in one transaction.
+
+    Atomicity matters here: a validation error on the Nth implementation (e.g. a malformed
+    requires/provides descriptor key) must not leave the agent half-registered with the
+    stale-implementation reap skipped — either the whole declared set lands, or none of it.
+    """
     input = input.to_pydantic()
 
     agent, _ = models.Agent.objects.update_or_create(
@@ -145,16 +153,15 @@ def implement_agent(info: Info, input: ImplementAgentInput) -> types.Agent:
         ),
     )
 
-    previous_implementation_ids = models.Implementation.objects.filter(agent=agent).values("id").all()
-    previous_states_id = models.State.objects.filter(agent=agent).values("id").all()
-
     created_implementations_id = []
     created_implementations = []
     created_states_id = []
     created_states = []
 
     for lock in input.locks or []:
-        lock = models.Lock.objects.get_or_create(
+        # update_or_create: a redeclared description takes effect instead of being
+        # silently kept from the first registration.
+        models.Lock.objects.update_or_create(
             agent=agent,
             key=lock.key,
             defaults=dict(
@@ -162,8 +169,27 @@ def implement_agent(info: Info, input: ImplementAgentInput) -> types.Agent:
             ),
         )
 
-    for implementation in input.implementations or []:
-        created_implementation = _create_implementation(implementation, agent)
+    # Batch prefetch for the per-implementation loop: one Action query + one Implementation
+    # query for the whole declared set instead of two lookups per implementation. Scoped to
+    # the agent's app/org, exactly what _create_implementation's per-row lookups filter on.
+    declared_implementations = input.implementations or []
+    action_map = None
+    implementation_map = None
+    if declared_implementations:
+        wanted = {(impl.definition.key, impl.definition.version) for impl in declared_implementations}
+        action_map = {
+            (action.key, action.version): action
+            for action in models.Action.objects.filter(
+                app=agent.app,
+                organization=agent.organization,
+                key__in={key for key, _ in wanted},
+                version__in={version for _, version in wanted},
+            )
+        }
+        implementation_map = {implementation.interface: implementation for implementation in models.Implementation.objects.filter(agent=agent).select_related("action")}
+
+    for implementation in declared_implementations:
+        created_implementation = _create_implementation(implementation, agent, action_map=action_map, implementation_map=implementation_map)
 
         created_implementations_id.append(created_implementation.id)
         created_implementations.append(created_implementation)
@@ -174,15 +200,10 @@ def implement_agent(info: Info, input: ImplementAgentInput) -> types.Agent:
         created_states_id.append(state.id)
         created_states.append(state)
 
-    for i in previous_states_id:
-        if i["id"] not in created_states_id:
-            state = models.State.objects.get(id=i["id"])
-            state.delete()
-
-    for i in previous_implementation_ids:
-        if i["id"] not in created_implementations_id:
-            implementation = models.Implementation.objects.get(id=i["id"])
-            implementation.delete()
+    # Reap everything the agent no longer declares. Queryset delete still emits per-instance
+    # signals (the subscription fan-out in facade.signals), without the per-row get() loops.
+    models.State.objects.filter(agent=agent).exclude(id__in=created_states_id).delete()
+    models.Implementation.objects.filter(agent=agent).exclude(id__in=created_implementations_id).delete()
 
     for blok in input.bloks or []:
         catalog = models.UICatalog.objects.get_or_create(name=blok.catalog)[0] if blok.catalog else models.UICatalog.objects.get_or_create(name="default")[0]

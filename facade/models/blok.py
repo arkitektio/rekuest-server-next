@@ -7,7 +7,6 @@ from facade import enums
 
 class Dashboard(models.Model):
     name = models.CharField(max_length=2000)
-    structure = models.ForeignKey("Structure", on_delete=models.CASCADE, null=True, blank=True)
     ui_tree = models.JSONField(null=True, blank=True)
 
 

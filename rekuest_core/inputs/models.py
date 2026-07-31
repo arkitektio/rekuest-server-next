@@ -288,6 +288,23 @@ class AgentDependencyInputModel(BaseModel):
     assign_policy: enums.AssignPolicy = Field(default=enums.AssignPolicy.BALANCED, description="The policy used to pick which instance of the agent to assign to.")
 
 
+class TestTargetInputModel(BaseModel):
+    """Identifies the action(s) a test action tests: by exact hash, or by an (app, key,
+    version) coordinate. When ``key`` is used, ``app`` defaults to the registering agent's
+    app and omitting ``version`` matches every version of that action."""
+
+    hash: str | None = Field(default=None, description="The exact hash of the target action.")
+    app: str | None = Field(default=None, description="The app identifier owning the target action. Defaults to the registering agent's app.")
+    key: str | None = Field(default=None, description="The key of the target action. Matches every version unless version is given.")
+    version: str | None = Field(default=None, description="Restrict a key target to one specific version.")
+
+    @model_validator(mode="after")
+    def check_target(self) -> Self:
+        if not self.hash and not self.key:
+            raise ValueError("A test target must provide either a hash or a key")
+        return self
+
+
 class DefinitionInputModel(BaseModel):
     """A definition for a implementation"""
 
@@ -295,7 +312,6 @@ class DefinitionInputModel(BaseModel):
     version: str = Field(default="1", description="The version of the definition. This is used to differentiate if the underyling algorithm has changed, i.e we would expect different results for the same input")
     description: str | None = Field(default=None, description="The description of the definition. This is the text that is displayed in the UI")
     collections: list[str] = Field(default_factory=list, description="The collections of the definition. This is used to group definitions together in the UI")
-    package: str | None = Field(default=None, description="The package of the function. Will default to the currents agent's app if not specified. This is used to group definitions together in the UI and provide a better user experience")
     name: str = Field(description="The name of the actions. This is used to uniquely identify the definition")
     stateful: bool = Field(default=False, description="Whether the definition is stateful or not. If the definition is stateful, it can be used to create a stateful action. If the definition is not stateful, it cannot be used to create a stateful action")
     pure: bool = Field(default=False, description="Whether the action is pure: same args always produce the same result and no side effects — its results are replayable/cacheable. Implies idempotent. Incompatible with stateful and with a PHYSICAL effect class.")
@@ -304,11 +320,8 @@ class DefinitionInputModel(BaseModel):
     args: list[ArgPortInputModel] = Field(default_factory=list, description="The args of the definition. This is the input ports of the definition")
     returns: list[ReturnPortInputModel] = Field(default_factory=list, description="The returns of the definition. This is the output ports of the definition")
     kind: enums.ActionKind = Field(description="The kind of the definition. This is the type of the definition. Can be either a function or a generator")
-    tests: ActionDependencyInputModel | None = Field(default=None, description="The test dependency for the definition.")
-    is_test_for: list["str"] = Field(default_factory=list, description="The actions this definition is a test for. This is used to group definitions together in the UI")
-    interfaces: list[str] = Field(default_factory=list, description="The interfaces of the definition. This is used to group definitions together in the UI")
+    is_test_for: list[TestTargetInputModel] = Field(default_factory=list, description="The actions this definition is a test for, each identified by hash or by (app, key, version).")
     is_dev: bool = Field(default=False, description="Whether the definition is a dev definition or not. If the definition is a dev definition, it can be used to create a dev action. If the definition is not a dev definition, it cannot be used to create a dev action")
-    logo: str | None = Field(default=None, description="The logo of the definition. This is used to display the logo in the UI")
 
     @model_validator(mode="after")
     def check_dependencies(self) -> Self:
@@ -384,8 +397,6 @@ class ImplementationInputModel(BaseModel):
     interface: str = Field(description="The interface of the implementation. This is used to group implementations together in the UI")
     params: dict[str, Any] | None = Field(default=None, description="The params of the implementation. This is used to pass parameters to the implementation")
     instance_id: str | None = Field(default=None, description="The instance id of the agent this implementation is bound to.")
-    dynamic: bool = Field(default=False, description="Whether the implementation is dynamic or not. If the implementation is dynamic, it can be used to create a dynamic action. If the implementation is not dynamic, it cannot be used to create a dynamic action")
-    logo: str | None = Field(default=None, description="The logo of the implementation. This is used to display the logo in the UI either it should be 'custom:svg-paths' or a lucide icon name like 'lucide:activity' urls are not supported at the moment")
     locks: list[str] | None = Field(default=None, description="The locks of the implementation. This is used to specify which resources the implementation needs to run")
     optimistics: list[OptimisticInputModel] | None = Field(default=None, description="The optimistics of the definition. This is used to optimistically set state values when the action is assigned, to provide a better user experience.")
     manipulates: list[str] | None = Field(default=None, description="The states that the implementation manipulates. This is used to identify which states are manipulated by the implementation, and can be use to enhance state safety in the system")
@@ -421,24 +432,6 @@ class LockImplementationInputModel(BaseModel):
 class BlokImplementationInputModel(BaseModel):
     key: str = Field(description="The key of the blok implementation.")
     definition: LockDefinitionInputModel = Field(description="The definition this blok implementation fulfills.")
-
-
-class InterfaceInputModel(BaseModel):
-    key: str = Field(description="The key of the interface. This is used to uniquely identify the interface")
-    description: str | None = Field(default=None, description="Describe the interface a bit")
-    default_widget: Optional[AssignWidgetInputModel] = Field(default=None, description="The default assign widget for ports implementing this interface.")
-    default_return_widget: Optional[ReturnWidgetInputModel] = Field(default=None, description="The default return widget for ports implementing this interface.")
-
-
-class StructureInputModel(BaseModel):
-    key: str = Field(description="The key of the structure. This is used to uniquely identify the structure")
-    description: str | None = Field(default=None, description="Describe the structure a bit")
-    implements: list[str] = Field(default=None, description="The interfaces this structure implements.")
-    descriptors: list[str] = Field(default=None, description="The descriptors that annotate this structure.")
-    default_widget: Optional[AssignWidgetInputModel] = Field(default=None, description="The default assign widget for ports of this structure.")
-    default_return_widget: Optional[ReturnWidgetInputModel] = Field(default=None, description="The default return widget for ports of this structure.")
-    qet_query: str | None = Field(default=None, description="The query used to get a single instance of this structure.")
-    describe_query: str | None = Field(default=None, description="The query used to describe and search instances of this structure.")
 
 
 class DynamicValueInputModel(BaseModel):

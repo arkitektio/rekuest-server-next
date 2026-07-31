@@ -16,7 +16,7 @@ class Lock(models.Model):
         help_text="The agent this lock belongs to",
     )
     key = models.CharField(max_length=2000, help_text="A unique identifier for this lock within the agent")
-    description = models.TextField(help_text="A description for the Lock")
+    description = models.TextField(null=True, blank=True, help_text="A description for the Lock")
     created_at = models.DateTimeField(auto_created=True, auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     hold_by = models.ForeignKey(

@@ -160,7 +160,6 @@ def _build_task(prefix, *, effect="NONE", idempotent=False, pure=False, originat
         interface=f"{prefix}-iface",
         action=action,
         agent=agent,
-        dynamic=False,
         effect=effect,
     )
 
@@ -235,7 +234,6 @@ def _build_task_for_agent_caller(agent_pk, prefix, parent=None, root=None):
         interface=f"{prefix}-iface",
         action=action,
         agent=agent,
-        dynamic=False,
     )
     return Task.objects.create(
         caller=caller,
@@ -288,7 +286,6 @@ def _build_implementation_for_agent(agent_pk, prefix, needs_token=True):
         interface=f"{prefix}-iface",
         action=action,
         agent=agent,
-        dynamic=False,
         needs_token=needs_token,
     )
 
