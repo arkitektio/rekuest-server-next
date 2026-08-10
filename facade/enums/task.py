@@ -50,15 +50,6 @@ class TaskInstructChoices(TextChoices):
 
 
 @strawberry.enum(description="The event kind of the taskevent")
-class TaskStatus(str, Enum):
-    ASSIGNING = "ASSIGNING"
-    ONGOING = "ONGOING"
-    CRITICAL = "CRITICAL"
-    CANCELLED = "CANCELLED"
-    DONE = "DONE"
-
-
-@strawberry.enum(description="The event kind of the taskevent")
 class TaskInstructKind(str, Enum):
     """These are the possible events that are instructed to a Task."""
 

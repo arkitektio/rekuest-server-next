@@ -33,6 +33,7 @@ from .task import (
     TaskEventFilter,
     TaskEventOrder,
     TaskFilter,
+    TaskInstructFilter,
     TaskOrder,
 )
 from .auth import (
@@ -100,6 +101,7 @@ __all__ = [
     "TaskFilter",
     "TaskEventOrder",
     "TaskEventFilter",
+    "TaskInstructFilter",
     "TestCaseFilter",
     "TestResultFilter",
     "ResolutionFilter",
