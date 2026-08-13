@@ -1,9 +1,12 @@
 """Cross-agent dispatch: one agent (the caller) assigns work to a *different* agent (the executor).
 
 Two distinct identities (two static tokens → two Agents in the same org) connect over two
-sockets. The caller originates a ``AssignRequest`` targeting the executor's implementation; the
-backend dispatches the ``Assign`` to the executor, and — because the caller is the
-task's caller — the executor's events flow back to the caller as ``Caller*`` mirrors.
+sockets. The assigning agent sends an ``AssignRequest`` targeting the executor's
+implementation; the backend dispatches the ``Assign`` to the executor, and — because the
+assigner is the task's caller — the executor's events flow back to it as ``Caller*`` mirrors.
+
+Every socket assign is *dependent* work, so each test seeds a ``parent`` task to hang it
+beneath: roots come only from the GraphQL ``assign`` mutation.
 
 The executor connects first so it is available for resolution and receives the broadcast.
 """
@@ -14,7 +17,7 @@ from facade import messages
 from facade.models import Task
 
 from tests.agent.helpers import open_agent
-from tests.factories import build_implementation_for_agent
+from tests.factories import build_implementation_for_agent, build_task
 
 EXECUTOR_TOKEN = "test2"  # a second identity, distinct from the default "test"
 
@@ -26,9 +29,10 @@ class TestCrossAgentAssign:
         executor = await open_agent(agent_ws, "executor-agent", token=EXECUTOR_TOKEN)
         impl = await build_implementation_for_agent(executor.agent_pk, "xagent")
         caller = await open_agent(agent_ws, "caller-agent")  # default token → a different identity
+        parent = await build_task("xagent-parent")
 
         # The caller originates work targeting the *executor's* implementation.
-        await caller.send(messages.AssignRequest(reference="x-1", implementation=str(impl.pk), args={"k": 1}))
+        await caller.send(messages.AssignRequest(reference="x-1", parent=str(parent.pk), implementation=str(impl.pk), args={"k": 1}))
         result = await caller.receive(messages.AssignResponse)
         assert result.created is True and result.task
 
@@ -50,8 +54,9 @@ class TestCrossAgentAssign:
         executor = await open_agent(agent_ws, "executor2-agent", token=EXECUTOR_TOKEN)
         impl = await build_implementation_for_agent(executor.agent_pk, "xagent2")
         caller = await open_agent(agent_ws, "caller2-agent")
+        parent = await build_task("xagent2-parent")
 
-        await caller.send(messages.AssignRequest(reference="x-2", implementation=str(impl.pk), args={}))
+        await caller.send(messages.AssignRequest(reference="x-2", parent=str(parent.pk), implementation=str(impl.pk), args={}))
         result = await caller.receive(messages.AssignResponse)
         assign = await executor.receive(messages.Assign)
 
@@ -73,8 +78,9 @@ class TestCrossAgentAssign:
         executor = await open_agent(agent_ws, "executor3-agent", token=EXECUTOR_TOKEN)
         impl = await build_implementation_for_agent(executor.agent_pk, "xagent3")
         caller = await open_agent(agent_ws, "caller3-agent")
+        parent = await build_task("xagent3-parent")
 
-        await caller.send(messages.AssignRequest(reference="x-3", action=str(impl.action_id), args={"v": 7}))
+        await caller.send(messages.AssignRequest(reference="x-3", parent=str(parent.pk), action=str(impl.action_id), args={"v": 7}))
         result = await caller.receive(messages.AssignResponse)
         assert result.created is True
 

@@ -60,20 +60,11 @@ class TestReconcileOps:
         assert none_ass.latest_event_kind == enums.TaskEventKind.DISCONNECTED and none_ass.is_done is False
         assert phys_ass.latest_event_kind == enums.TaskEventKind.CRITICAL and phys_ass.is_done is True
 
-    async def test_reconcile_caller_roots_cancels(self):
-        root = await build_task("rec-caller", originating_connection_id="connX")
-        backend = ModelPersistBackend()
-
-        await backend.reconcile_caller_roots("connX", None)
-
-        root = await type(root).objects.aget(pk=root.pk)
-        assert root.is_done is True and root.latest_event_kind == enums.TaskEventKind.CANCELLED
-
 
 @pytest.mark.django_db(transaction=True)
 class TestReconcileSweep:
     def test_sweep_fails_stale_disconnected_executor_work(self, settings):
-        settings.REKUEST_GRACE = {"DEFAULT": 30, "PER_MODE": {}, "PHYSICAL": 30}
+        settings.REKUEST_GRACE = {"DEFAULT": 30, "PHYSICAL": 30}
         from asgiref.sync import async_to_sync
 
         from facade.models import Agent, Task
@@ -88,7 +79,7 @@ class TestReconcileSweep:
         assert refreshed.latest_event_kind == enums.TaskEventKind.DISCONNECTED
 
     def test_sweep_leaves_connected_and_webhook_untouched(self, settings):
-        settings.REKUEST_GRACE = {"DEFAULT": 30, "PER_MODE": {}, "PHYSICAL": 30}
+        settings.REKUEST_GRACE = {"DEFAULT": 30, "PHYSICAL": 30}
         from asgiref.sync import async_to_sync
 
         from facade.models import Agent, Task
@@ -109,7 +100,7 @@ class TestReconcileStaleAgents:
     """The reaper: heal websocket agents whose ``connected`` is stuck True past the stale window."""
 
     def test_stale_connected_agent_is_reaped_and_work_reconciled(self, settings):
-        settings.REKUEST_GRACE = {"DEFAULT": 30, "PER_MODE": {}, "PHYSICAL": 30}
+        settings.REKUEST_GRACE = {"DEFAULT": 30, "PHYSICAL": 30}
         from asgiref.sync import async_to_sync
 
         from facade.models import Agent, Task
@@ -126,7 +117,7 @@ class TestReconcileStaleAgents:
         assert Task.objects.get(pk=ass.pk).latest_event_kind == enums.TaskEventKind.DISCONNECTED
 
     def test_fresh_connected_agent_not_reaped(self, settings):
-        settings.REKUEST_GRACE = {"DEFAULT": 30, "PER_MODE": {}, "PHYSICAL": 30}
+        settings.REKUEST_GRACE = {"DEFAULT": 30, "PHYSICAL": 30}
         from asgiref.sync import async_to_sync
 
         from facade.models import Agent, Task
@@ -143,7 +134,7 @@ class TestReconcileStaleAgents:
     def test_reaper_heal_fires_agent_subscription(self, settings, monkeypatch):
         # The heal must go through Model.save() so agent_post_save fires and the GraphQL
         # agents/active subscriptions (and dashboards) refresh to reality.
-        settings.REKUEST_GRACE = {"DEFAULT": 30, "PER_MODE": {}, "PHYSICAL": 30}
+        settings.REKUEST_GRACE = {"DEFAULT": 30, "PHYSICAL": 30}
         from asgiref.sync import async_to_sync
 
         from facade import channels

@@ -14,7 +14,7 @@ import logging
 
 from django.http import HttpRequest, HttpResponse, JsonResponse
 
-from facade import capabilities, enums, hooks, models
+from facade import enums, hooks, models
 from facade.consumers.agent_protocol import FromAgentPayload
 from facade.hooks import SIGNATURE_HEADER
 from facade.message_router import UnknownAgentMessage, route_from_agent_message
@@ -43,12 +43,8 @@ async def hook_intake(request: HttpRequest, agent_id: str) -> HttpResponse:
     except Exception as e:
         return JsonResponse({"error": f"Invalid message: {e}"}, status=400)
 
-    # No JWT on the HTTP path, so capabilities come from the lenient default (full while
-    # enforcement is off). A per-agent scopes field can tighten this later.
-    caps = capabilities.capabilities_from_scopes([])
-
     try:
-        reply = await route_from_agent_message(persist_backend, agent.pk, caps, payload.message)
+        reply = await route_from_agent_message(persist_backend, agent.pk, payload.message)
     except UnknownAgentMessage as e:
         return JsonResponse({"error": f"Unhandled message: {e}"}, status=400)
     except Exception as e:

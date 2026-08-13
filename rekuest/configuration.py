@@ -71,12 +71,8 @@ class RekuestBlock(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     grace_default: int = Field(default=30, description="Default reclaim grace window (seconds) after a disconnect.")
-    grace_per_mode: Dict[str, int] = Field(default_factory=dict, description="Per-mode overrides for the grace window.")
     grace_physical: int = Field(default=5, description="Grace window (seconds) for effect:physical work.")
     progress_lease: int = Field(default=0, description="Progress lease (seconds); 0 disables the wedged-task lease.")
-    enforce_capabilities: bool = Field(default=False, description="Enforce capability scopes that gate AgentMode.")
-    executes_work_scope: str = Field(default="rekuest:execute", description="Scope required to execute work.")
-    can_assign_root_scope: str = Field(default="rekuest:assign_root", description="Scope required to assign root tasks.")
 
 
 class ProvenanceBlock(BaseModel):

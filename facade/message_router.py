@@ -16,7 +16,6 @@ import logging
 from typing import Optional
 
 from facade import messages
-from facade.capabilities import Capabilities
 from facade.ports import PersistBackend
 
 logger = logging.getLogger(__name__)
@@ -48,7 +47,6 @@ async def _control(op, agent_id, message, connection_id, session_id) -> messages
 async def route_from_agent_message(
     backend: PersistBackend,
     agent_id: int,
-    capabilities: Optional[Capabilities],
     message: messages.FromAgentMessage,
     *,
     connection_id: Optional[str] = None,
@@ -61,13 +59,13 @@ async def route_from_agent_message(
     """
     match message:
         case messages.AssignRequest():
-            # A caller originating work. A bad request NACKs (returns an error result) rather
-            # than propagating — it must never tear down the transport.
+            # An agent assigning dependent work. A bad request (including a parentless root
+            # assign) NACKs with an error result rather than propagating — it must never tear
+            # down the transport.
             try:
                 task, created = await backend.on_caller_assign(
                     agent_id,
                     message,
-                    can_assign_root=bool(capabilities and capabilities.can_assign_root),
                     connection_id=connection_id,
                     session_id=session_id,
                 )

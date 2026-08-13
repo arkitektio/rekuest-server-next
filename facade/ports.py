@@ -9,9 +9,28 @@ class, so it needs no Protocol here.)
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import List, Optional, Protocol, Tuple, runtime_checkable
 
 from facade import messages, models
+
+
+@dataclass
+class LeaseClaim:
+    """The outcome of an executor's attempt to claim an agent's write-lease.
+
+    ``claimed`` False means a genuinely-live incumbent holds the lease and ``force`` was not
+    set — the transport must reject the registration. ``epoch`` is the fencing token the
+    winning connection presents on every later lease renewal; it is ``None`` on a failed claim.
+    ``displaced_incumbent`` says a prior connection existed (live or stale) and should be
+    kicked — an optimization, not a correctness dependency: an unreachable prior connection
+    fences itself as soon as its next heartbeat renewal fails.
+    """
+
+    claimed: bool
+    epoch: Optional[int] = None
+    tasks: List["models.Task"] = field(default_factory=list)
+    displaced_incumbent: bool = False
 
 
 @runtime_checkable
@@ -22,21 +41,21 @@ class PersistBackend(Protocol):
     pk (int); wire ids on ``messages`` are strings (the serialization boundary).
     """
 
-    # --- connection lifecycle (executor + caller liveness) -------------------- #
-    async def on_agent_connected(self, agent_id: int, connection_id: str | None = ..., session_id: str | None = ...) -> List["models.Task"]: ...
-    async def on_observer_connected(self, agent_id: int, connection_id: str | None = ..., mode: str | None = ...) -> List["models.Task"]: ...
+    # --- connection lifecycle (agent liveness) -------------------------------- #
+    # ``on_agent_connected`` both *gates* and *claims* the agent singleton, so it returns a
+    # ``LeaseClaim`` rather than a task list: whether the claim succeeded, the fencing token to
+    # renew with, the in-flight work to re-inquire, and whether a prior connection needs kicking.
+    async def on_agent_connected(self, agent_id: int, connection_id: str | None = ..., session_id: str | None = ..., force: bool = ...) -> LeaseClaim: ...
+    async def renew_agent_lease(self, agent_id: int, lease_epoch: int) -> bool: ...
     async def on_agent_disconnected(self, agent_id: int, connection_id: str | None = ...) -> None: ...
-    async def on_caller_connected(self, agent_id: int, connection_id: str | None = ..., session_id: str | None = ...) -> None: ...
-    async def on_caller_disconnected(self, agent_id: int, connection_id: str | None = ..., session_id: str | None = ..., mode: str | None = ...) -> None: ...
 
     async def get_or_create_caller_id(self, agent_id: int) -> str: ...
 
-    # --- caller origination --------------------------------------------------- #
+    # --- sub-assignment (dependent work only; roots come from GraphQL) --------- #
     async def on_caller_assign(
         self,
         agent_id: int,
         message: messages.AssignRequest,
-        can_assign_root: bool,
         connection_id: str | None = ...,
         session_id: str | None = ...,
     ) -> Tuple["models.Task", bool]: ...

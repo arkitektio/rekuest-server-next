@@ -13,7 +13,6 @@ from typing import Awaitable, Callable, Dict, Optional
 
 from django.conf import settings
 
-from facade.messages import AgentMode
 
 ReconcileAction = Callable[[], Awaitable[None]]
 
@@ -63,12 +62,15 @@ class GraceScheduler:
         return self._tasks.get(str(key))
 
 
-def grace_seconds(mode: AgentMode | str | None = None, *, physical: bool = False) -> float:
-    """Grace window (seconds) for ``mode``; ``physical`` overrides for effect:physical work.
+def grace_seconds(*, physical: bool = False) -> float:
+    """The reclaim grace window (seconds); ``physical`` overrides for effect:physical work.
 
-    Resolution order: explicit ``PHYSICAL`` override (when ``physical``) → per-mode override
-    → ``DEFAULT``. 0 means no grace (strict). Returned as a float so sub-second windows
-    (e.g. in tests) are not truncated to 0.
+    Resolution order: explicit ``PHYSICAL`` override (when ``physical``) → ``DEFAULT``. 0 means
+    no grace (strict). Returned as a float so sub-second windows (e.g. in tests) are not
+    truncated to 0.
+
+    The per-mode dimension is gone with ``AgentMode``: every socket connection is an agent, so
+    there is exactly one kind of disconnect to grace.
 
     NOTE: no call site currently passes ``physical=`` — effect-awareness lives in the
     fail/reclaim branching of ``persist_backend``, not in the grace timer.
@@ -77,12 +79,6 @@ def grace_seconds(mode: AgentMode | str | None = None, *, physical: bool = False
 
     if physical and cfg.get("PHYSICAL") is not None:
         return float(cfg["PHYSICAL"])
-
-    if mode is not None:
-        key = AgentMode(mode).value
-        per_mode = cfg.get("PER_MODE", {}) or {}
-        if key in per_mode:
-            return float(per_mode[key])
 
     return float(cfg.get("DEFAULT", 0))
 

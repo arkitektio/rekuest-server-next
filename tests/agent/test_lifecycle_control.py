@@ -1,5 +1,6 @@
-"""Two-phase lifecycle controls over the socket: a caller drives cancel/interrupt/pause/
-resume on a *different* executor agent, and observes the outcome as Caller* mirrors.
+"""Two-phase lifecycle controls over the socket: an agent drives cancel/interrupt/pause/
+resume on work it assigned to a *different* executor agent, and observes the outcome as
+Caller* mirrors.
 
 Each op is two-phase: the caller's request is acked (`ControlResponse`), the executor
 receives the ToAgent control message and an `-ING` mirror reaches the caller; the resolved
@@ -18,11 +19,16 @@ EXECUTOR_TOKEN = "test2"
 
 
 async def _assigned_pair(agent_ws, prefix):
-    """A connected (caller, executor) pair with one task the caller owns; returns its id."""
+    """A connected (caller, executor) pair with one task the caller owns; returns its id.
+
+    The caller assigns *dependent* work (``parent`` is mandatory over the socket), so the
+    controlled task is a child of a seeded parent.
+    """
     executor = await open_agent(agent_ws, f"{prefix}-exec", token=EXECUTOR_TOKEN)
     impl = await build_implementation_for_agent(executor.agent_pk, prefix)
     caller = await open_agent(agent_ws, f"{prefix}-caller")
-    await caller.send(messages.AssignRequest(reference=f"{prefix}-r", implementation=str(impl.pk), args={}))
+    parent = await build_task(f"{prefix}-parent")
+    await caller.send(messages.AssignRequest(reference=f"{prefix}-r", implementation=str(impl.pk), parent=str(parent.pk), args={}))
     await caller.receive(messages.AssignResponse)
     assign = await executor.receive(messages.Assign)
     return caller, executor, assign.task
