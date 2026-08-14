@@ -107,6 +107,45 @@ class TestOnlyTheLeaseHolderRenews:
         assert await backend.reconcile_stale_agents() == 1
 
 
+class TestReconcileUsesTheOneLivenessPredicate:
+    async def test_stuck_connected_but_stale_agent_still_reconciles(self, settings):
+        # The bail-out in ``reconcile_orphaned_executor_work`` must ask ``agent_is_live``, not
+        # ``connected``. A crashed worker leaves ``connected`` stuck True with an expired lease;
+        # guarding on the raw flag made this a silent no-op and its work stayed in-flight
+        # forever. Called directly here — i.e. WITHOUT the sweep revoking first, which is the
+        # sequencing that used to mask the bug.
+        _grace(settings, 0)
+        task = await build_task("reconcile-stale", effect="NONE")
+        backend = ModelPersistBackend()
+        agent_id = str(task.agent_id)
+
+        await backend.on_agent_connected(agent_id, "c1", session_id="S1")
+        await _expire_lease(agent_id)  # crashed: connected stuck True, lease expired
+
+        agent = await Agent.objects.aget(pk=agent_id)
+        assert agent.connected is True, "precondition: the flag is still stuck True"
+
+        await backend.reconcile_orphaned_executor_work(agent_id)
+
+        kinds = [e.kind async for e in TaskEvent.objects.filter(task_id=task.pk)]
+        assert enums.TaskEventKind.DISCONNECTED in kinds
+
+    async def test_live_agent_is_still_a_no_op(self):
+        # The other direction: a genuinely live agent's work must never be failed — that is the
+        # reclaim guarantee the grace timer depends on.
+        task = await build_task("reconcile-live", effect="NONE")
+        backend = ModelPersistBackend()
+        agent_id = str(task.agent_id)
+
+        await backend.on_agent_connected(agent_id, "c1", session_id="S1")
+
+        await backend.reconcile_orphaned_executor_work(agent_id)
+
+        assert [e.kind async for e in TaskEvent.objects.filter(task_id=task.pk)] == []
+        refreshed = await Task.objects.aget(pk=task.pk)
+        assert refreshed.is_done is False
+
+
 class TestDisplacedConnectionIsFenced:
     async def test_displaced_connection_cannot_renew(self):
         # A force-takeover bumps the epoch, so the incumbent's next heartbeat renewal matches

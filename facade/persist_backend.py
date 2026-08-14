@@ -105,14 +105,21 @@ class ModelPersistBackend:
         self._executor_grace.schedule(agent_id, grace, lambda: self.reconcile_orphaned_executor_work(agent_id))
 
     async def reconcile_orphaned_executor_work(self, agent_id: int) -> None:
-        """Fail an executor's in-flight work after a confirmed loss. Pure, idempotent DB op.
+        """Fail an agent's in-flight work after a confirmed loss. Pure, idempotent DB op.
 
         The authoritative reconcile shared by all three triggers (grace timer, reconnect with
-        a fresh session, and the periodic sweep). No-op if the agent reconnected in the
-        meantime (``connected`` is back True).
+        a fresh session, and the periodic sweep). No-op if the agent is live again — a
+        reconnect in the meantime means the work is being reclaimed, not orphaned.
+
+        The bail-out asks :func:`liveness.agent_is_live`, not ``agent.connected``. Every other
+        liveness decision goes through that one predicate, and this used to be the exception:
+        a stuck-connected agent whose lease had expired would make this a silent no-op, so its
+        work stayed ``is_done=False`` forever. Today the sweep happens to revoke (flipping
+        ``connected``) *before* calling here, which masks it — but that is sequencing luck, not
+        a guarantee, and it breaks the moment a new trigger calls this directly.
         """
         agent = await models.Agent.objects.aget(id=agent_id)
-        if agent.connected:
+        if liveness.agent_is_live(agent.connected, agent.last_seen):
             return
         in_flight = [a async for a in models.Task.objects.select_related("implementation", "action").filter(agent_id=agent_id, is_done=False)]
         await self._fail_and_cascade_inflight(in_flight)
