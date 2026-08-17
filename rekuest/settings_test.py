@@ -1,6 +1,12 @@
 from .settings import *  # noqa
-from .settings import DATABASES, AUTHENTIKATE
+from .settings import DATABASES, AUTHENTIKATE, DATALAYER
 import logging
+
+
+# There is no STS to assume a role against under unit tests, and a grant that cannot be scoped
+# now refuses rather than quietly returning this service's permanent key. Tests that exercise a
+# grant care about its *shape*, not its credentials, so let them have the unscoped one.
+DATALAYER = {**DATALAYER, "allow_unscoped_fallback": True}
 
 DATABASES["default"] = {**DATABASES["default"], "NAME": "testdb", "PORT": 5555, "HOST": "localhost", "USER": "test", "PASSWORD": "test"}
 AUTHENTIKATE = {
