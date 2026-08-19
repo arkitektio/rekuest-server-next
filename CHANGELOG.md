@@ -1,6 +1,25 @@
 # CHANGELOG
 
 
+## v2.2.0 (2026-08-19)
+
+### Bug Fixes
+
+- Datalayer
+  ([`dd420ed`](https://github.com/arkitektio/rekuest-server-next/commit/dd420ed8a76e94833650b21c20a56631bb795818))
+
+- Task filter
+  ([`637ecfa`](https://github.com/arkitektio/rekuest-server-next/commit/637ecfa5b728a5f0c01701d9fb5dd6afa080ce57))
+
+### Features
+
+- Better reconnects and removal of the agent-can-originate-a-root-task feature
+  ([`2af6406`](https://github.com/arkitektio/rekuest-server-next/commit/2af6406f4c3690c3fdd661e8307ad0dbf09b54e5))
+
+- Remove off agent-root-tasks
+  ([`7d3e450`](https://github.com/arkitektio/rekuest-server-next/commit/7d3e450fa457adf4e17d852b1589cb63bb0405b7))
+
+
 ## v2.1.2 (2026-07-31)
 
 ### Bug Fixes
