@@ -49,7 +49,7 @@ caller is stamped on the Task and is the key the caller later subscribes on.
 | --- | --- |
 | `input.dependency` (+ `method`, `parent`) | Look up the parent task's resolved `dependencies`, pick a random agent for that dependency key, and take the implementation for `method`. |
 | `input.reservation` | Pick a random implementation from the reservation's pool; use its agent. |
-| `input.action` | Pick the first implementation whose agent is connected and recently seen (`last_seen > now - 1min`). |
+| `input.action` | Pick the first implementation whose agent is live — `connected` **and** `last_seen > now - AGENT_STALE_AFTER` (`facade.liveness`, the same window the reconnect gate and the stale sweep use). |
 | `input.implementation` | Use the implementation directly. For a normal (non higher-order) implementation, assert the agent is connected and recently seen. |
 | `input.action_hash` | Resolve the action by `hash` within the org, then a connected implementation. |
 

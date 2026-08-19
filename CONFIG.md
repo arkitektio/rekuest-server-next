@@ -170,12 +170,8 @@ scopes that gate agent modes. All optional with sensible defaults.
 | Key | Env var | Type | Default | Description |
 |---|---|---|---|---|
 | `grace_default` | `REKUEST__GRACE_DEFAULT` | int | `30` | Default reclaim grace window (seconds) after a disconnect. |
-| `grace_per_mode` | — (use YAML) | map[str,int] | `{}` | Per-mode overrides for the grace window. |
 | `grace_physical` | `REKUEST__GRACE_PHYSICAL` | int | `5` | Grace window (seconds) for `effect:physical` work. |
 | `progress_lease` | `REKUEST__PROGRESS_LEASE` | int | `0` | Progress lease (seconds); `0` disables the wedged-task lease. |
-| `enforce_capabilities` | `REKUEST__ENFORCE_CAPABILITIES` | bool | `false` | Enforce capability scopes that gate `AgentMode`. |
-| `executes_work_scope` | `REKUEST__EXECUTES_WORK_SCOPE` | str | `rekuest:execute` | Scope required to execute work. |
-| `can_assign_root_scope` | `REKUEST__CAN_ASSIGN_ROOT_SCOPE` | str | `rekuest:assign_root` | Scope required to assign root tasks. |
 
 ### `provenance` — provenance (attestation) signing keypair and policy
 

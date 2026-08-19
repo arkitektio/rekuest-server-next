@@ -44,25 +44,6 @@ class LogLevel(str, Enum):
     CRITICAL = "CRITICAL"
 
 
-class AgentMode(str, Enum):
-    """How a participant intends to use the single agent protocol.
-
-    The mode is requested on ``Register`` but only *granted* if the token carries the
-    matching capability scopes (see ``facade.capabilities``). It maps onto the two
-    independent capability axes ``executes_work`` and ``can_assign_root``:
-
-    - ``EXECUTOR``     — runs tasks (executes_work), may not originate roots.
-    - ``CALLER``       — originates root tasks (can_assign_root), does not execute.
-    - ``ORCHESTRATOR`` — both executes work and originates roots.
-    - ``OBSERVER``     — neither; a read-only dashboard that only streams events.
-    """
-
-    EXECUTOR = "EXECUTOR"
-    CALLER = "CALLER"
-    ORCHESTRATOR = "ORCHESTRATOR"
-    OBSERVER = "OBSERVER"
-
-
 class ToAgentMessageType(str, Enum):
     """The message types that can be sent to the agent from the rekuest backend"""
 
@@ -524,20 +505,21 @@ class Register(Message):
 
     """
 
+    # Strict, unlike every other message: ``mode`` used to live here, and a client still
+    # sending ``mode: "OBSERVER"`` must be told to update rather than be silently promoted to
+    # a full agent — which would claim the write-lease and displace the real executor. A loud
+    # protocol error at registration is the only safe way to retire that field.
+    model_config = ConfigDict(use_enum_values=True, frozen=True, extra="forbid")
+
     type: Literal[FromAgentMessageType.REGISTER] = FromAgentMessageType.REGISTER
     token: str
     force: bool = False
     """If another connection is already registered for this agent, kick it and take over.
 
-    Only honoured for participants that ``executes_work`` (the executor singleton). A
-    non-executor (frontend/observer) never force-displaces — its other connections coexist."""
-    mode: AgentMode = Field(
-        default=AgentMode.EXECUTOR,
-        description="How this participant intends to use the protocol. Granted only if the token carries the matching capability scopes; otherwise the connection is closed with MODE_NOT_AUTHORIZED_CODE.",
-    )
+    Every socket connection is an agent and therefore the singleton, so this applies to all."""
     session_id: Optional[str] = Field(
         default=None,
-        description="Per-process identifier minted in-memory by the executor at start-up (never persisted). Its volatility is the reclaim signal: a reconnect with the SAME session_id means the process survived (reclaim in-flight work); a DIFFERENT session_id means a fresh process (fail-and-cascade). Omitted by non-executors.",
+        description="Per-process identifier minted in-memory by the agent at start-up (never persisted). Its volatility is the reclaim signal: a reconnect with the SAME session_id means the process survived (reclaim in-flight work); a DIFFERENT session_id means a fresh process (fail-and-cascade).",
     )
 
 
@@ -561,12 +543,14 @@ class Init(Message):
 
 
 class AssignRequest(Message):
-    """A caller's request to originate (or resolve) a task over the agent socket.
+    """An agent's request to assign *dependent* work over the agent socket.
 
-    This is the WebSocket equivalent of the GraphQL ``assign`` mutation: a participant
-    holding ``can_assign_root`` (for a parentless root) or running inside a resolved
-    task (for a dependent) asks the backend to create work and dispatch it to an
-    executing agent. The fields mirror ``facade.inputs.AssignInputModel``.
+    Strictly for sub-assignment: an agent running inside a resolved task asks the backend to
+    create a child task and dispatch it to an executing agent. ``parent`` is therefore
+    **required** — a parentless (root) assign is rejected, because a root task must trace to an
+    accountable human and the only user-facing entry point is the GraphQL ``assign`` mutation
+    (see the human-root invariant in ``docs/design/provenance.md``). The fields mirror
+    ``facade.inputs.AssignInputModel``.
 
     Creation safety is by **idempotency, not transport**: ``reference`` must be stable for
     a logical request, so a resend after reconnect returns the same task (see
@@ -581,7 +565,7 @@ class AssignRequest(Message):
     implementation: Optional[str] = Field(default=None, description="A direct implementation ID to assign to.")
     agent: Optional[str] = Field(default=None, description="A direct agent ID to assign to (with interface).")
     interface: Optional[str] = Field(default=None, description="The implementation interface (only with agent).")
-    parent: Optional[str] = Field(default=None, description="The parent task ID. None for a root task (requires can_assign_root).")
+    parent: Optional[str] = Field(default=None, description="The parent task ID. REQUIRED: an agent may only assign dependent work; a parentless (root) assign is rejected, since roots originate solely from the GraphQL assign mutation.")
     dependency: Optional[str] = Field(default=None, description="The dependency key to resolve when running inside a resolved task.")
     method: Optional[str] = Field(default=None, description="The dependency method to assign.")
     resolution: Optional[str] = Field(default=None, description="The resolution ID for an implementation with dependencies.")
@@ -605,7 +589,7 @@ class AssignResponse(Message):
     reference: str = Field(description="The idempotency key echoed from the request.")
     task: Optional[str] = Field(default=None, description="The durable task id, or None when error is set.")
     created: bool = Field(default=True, description="False when an existing task was returned for a duplicate reference.")
-    error: Optional[str] = Field(default=None, description="A human-readable error if the assign was rejected (e.g. missing can_assign_root).")
+    error: Optional[str] = Field(default=None, description="A human-readable error if the assign was rejected (e.g. a parentless root assign).")
 
 
 class ControlRequest(Message):

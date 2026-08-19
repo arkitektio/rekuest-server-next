@@ -55,9 +55,6 @@ class ImplementationActionFilter:
 @strawberry_django.order_type(models.Implementation)
 class ImplementationOrder:
     created_at: auto
-    started_at: auto
-    finished_at: auto
-    status: auto
 
     @strawberry_django.order_field
     def active(self, value: strawberry_django.Ordering, prefix: str) -> list[str]:

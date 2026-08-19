@@ -20,20 +20,18 @@ from types import SimpleNamespace
 import pytest
 from django.utils import timezone
 
-from facade import messages
+from facade import liveness, messages
+from facade.ports import LeaseClaim
 from facade.codes import (
     AGENT_ALREADY_CONNECTED_CODE,
     AGENT_IS_BLOCKED_CODE,
+    AGENT_REPLACED_CODE,
     FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE,
     FROM_AGENT_MESSAGE_IS_NOT_VALID_JSON_CODE,
     HEARTBEAT_NOT_RESPONDED_CODE,
 )
-from facade.capabilities import Capabilities
 from facade.consumers.agent_protocol import AgentProtocol, RegisteredSession
 from facade.consumers.agent_queue import InMemoryAgentQueue
-
-# Full executor-and-caller; mirrors the rollout default (enforcement off).
-FULL_CAPABILITIES = Capabilities(executes_work=True, can_assign_root=True)
 
 from tests.factories import TEST_TOKEN
 
@@ -63,19 +61,28 @@ class FakeAgent:
 
 
 class FakeBackend:
-    """Records which persist-backend hook the protocol routed each message to."""
+    """Records which persist-backend hook the protocol routed each message to.
 
-    def __init__(self, tasks=None, caller_assign_error=None):
+    Also models the *lease* half of the port contract, because the executor-singleton gate
+    lives in the backend (it has to: gating and claiming must happen under one lock). ``agent``
+    is wired by ``make_protocol`` so a ``FakeAgent(connected=...)`` still drives the gate, and
+    ``epoch`` is the fencing token — bumped on every claim, so an older epoch fails renewal
+    exactly as a displaced connection's would.
+    """
+
+    def __init__(self, tasks=None, caller_assign_error=None, agent=None):
         self.tasks = tasks or []
         self.calls = []
         # When set, on_caller_assign raises it (to exercise the nack path).
         self.caller_assign_error = caller_assign_error
+        self.agent = agent
+        self.epoch = 0
 
     async def on_agent_done(self, agent_id, message):
         self.calls.append(("done", agent_id, message))
 
-    async def on_caller_assign(self, agent_id, message, can_assign_root, connection_id=None, session_id=None):
-        self.calls.append(("caller_assign", agent_id, message, can_assign_root))
+    async def on_caller_assign(self, agent_id, message, connection_id=None, session_id=None):
+        self.calls.append(("caller_assign", agent_id, message))
         if self.caller_assign_error is not None:
             raise self.caller_assign_error
         return SimpleNamespace(pk="new-ass-1"), True  # stands in for the created Task
@@ -86,9 +93,21 @@ class FakeBackend:
             raise self.caller_assign_error
         return SimpleNamespace(pk="ctrl-ass-1")
 
-    async def on_agent_connected(self, agent_id, connection_id=None, session_id=None):
+    async def on_agent_connected(self, agent_id, connection_id=None, session_id=None, force=False):
         self.calls.append(("connected", agent_id))
-        return self.tasks
+        connected = getattr(self.agent, "connected", False)
+        last_seen = getattr(self.agent, "last_seen", None)
+        if liveness.agent_is_live(connected, last_seen) and not force:
+            return LeaseClaim(claimed=False)
+        self.epoch += 1
+        if self.agent is not None:
+            self.agent.connected = True
+            self.agent.last_seen = timezone.now()
+        return LeaseClaim(claimed=True, epoch=self.epoch, tasks=self.tasks, displaced_incumbent=bool(connected))
+
+    async def renew_agent_lease(self, agent_id, lease_epoch):
+        self.calls.append(("renew", agent_id, lease_epoch))
+        return lease_epoch == self.epoch
 
     async def get_or_create_caller_id(self, agent_id):
         self.calls.append(("caller_id", agent_id))
@@ -97,21 +116,11 @@ class FakeBackend:
     async def on_agent_disconnected(self, agent_id, connection_id=None):
         self.calls.append(("disconnected", agent_id))
 
-    async def on_observer_connected(self, agent_id, connection_id=None, mode=None):
-        self.calls.append(("observer_connected", agent_id, mode))
-        return self.tasks
-
-    async def on_caller_connected(self, agent_id, connection_id=None, session_id=None):
-        self.calls.append(("caller_connected", agent_id))
-
-    async def on_caller_disconnected(self, agent_id, connection_id=None, session_id=None, mode=None):
-        self.calls.append(("caller_disconnected", agent_id, mode))
-
     async def on_agent_log(self, agent_id, message):
         self.calls.append(("log", agent_id, message))
 
 
-def make_protocol(agent=None, backend=None, queue=None, heartbeat_interval=10.0, heartbeat_timeout=5.0, kick_others=None, register_connection=None, capabilities=FULL_CAPABILITIES):
+def make_protocol(agent=None, backend=None, queue=None, heartbeat_interval=10.0, heartbeat_timeout=5.0, kick_others=None, register_connection=None):
     """Build an ``AgentProtocol`` wired to list-collecting transport callables."""
     sent = []
     closed = []
@@ -123,9 +132,13 @@ def make_protocol(agent=None, backend=None, queue=None, heartbeat_interval=10.0,
         closed.append(code)
 
     agent = agent if agent is not None else FakeAgent()
+    backend = backend if backend is not None else FakeBackend()
+    # The executor-singleton gate lives in the backend now, so the fake needs the row it gates.
+    if getattr(backend, "agent", None) is None:
+        backend.agent = agent
 
     async def authenticator(register):
-        return agent, capabilities
+        return agent
 
     kwargs = {}
     if kick_others is not None:
@@ -137,7 +150,7 @@ def make_protocol(agent=None, backend=None, queue=None, heartbeat_interval=10.0,
         send=send,
         close=close,
         queue=queue if queue is not None else InMemoryAgentQueue(),
-        backend=backend if backend is not None else FakeBackend(),
+        backend=backend,
         authenticator=authenticator,
         heartbeat_interval=heartbeat_interval,
         heartbeat_timeout=heartbeat_timeout,
@@ -157,8 +170,8 @@ async def _wait_for(predicate, timeout=2.0, interval=0.01):
     return predicate()
 
 
-def _register_frame(instance_id="unit-agent", token=TEST_TOKEN, force=False, mode=messages.AgentMode.EXECUTOR, session_id=None):
-    return messages.Register(token=token, force=force, mode=mode, session_id=session_id).model_dump_json()
+def _register_frame(instance_id="unit-agent", token=TEST_TOKEN, force=False, session_id=None):
+    return messages.Register(token=token, force=force, session_id=session_id).model_dump_json()
 
 
 @pytest.mark.asyncio
@@ -282,53 +295,91 @@ class TestAgentProtocolUnit:
         await protocol.shutdown()
 
     # ----------------------------------------------------------------------- #
-    # Capability / mode gating (the single-protocol, capability-bit model).
+    # Lease fencing: a connection that cannot renew must terminate itself.
     # ----------------------------------------------------------------------- #
-    async def test_mode_exceeding_capabilities_is_rejected(self):
-        # A token that only grants executes_work may not register as CALLER (which
-        # requires can_assign_root). Protocol error + MODE_NOT_AUTHORIZED, no Init.
-        from facade.codes import MODE_NOT_AUTHORIZED_CODE
+    async def test_executor_carries_the_claimed_lease_epoch(self):
+        protocol, sent, closed, _ = make_protocol()
+        await protocol.receive(_register_frame())
 
-        exec_only = Capabilities(executes_work=True, can_assign_root=False)
-        protocol, sent, closed, _ = make_protocol(capabilities=exec_only)
-        await protocol.receive(_register_frame(mode=messages.AgentMode.CALLER))
-
-        assert json.loads(sent[0])["type"] == messages.ToAgentMessageType.PROTOCOL_ERROR.value
-        assert closed == [MODE_NOT_AUTHORIZED_CODE]
-        assert protocol.session is None
-
-    async def test_caller_mode_does_not_displace_and_skips_executor_queue(self):
-        # A non-executor (CALLER) is NOT the singleton: even with an already-connected
-        # agent and no force it is admitted (no AGENT_ALREADY_CONNECTED), gets an Init,
-        # does NOT drain the executor task queue, but DOES run a heartbeat loop.
-        backend = FakeBackend()
-        kicked = []
-
-        async def kick_others():
-            kicked.append(True)
-
-        protocol, sent, closed, agent = make_protocol(agent=FakeAgent(connected=True), backend=backend, kick_others=kick_others)
-        await protocol.receive(_register_frame(mode=messages.AgentMode.CALLER, force=False))
-
-        assert json.loads(sent[0])["type"] == messages.ToAgentMessageType.INIT.value
-        assert closed == []
-        assert kicked == []
-        assert ("observer_connected", agent.pk, messages.AgentMode.CALLER.value) in backend.calls
-        assert protocol.session.listen_task is None  # never drains executor commands
-        assert protocol.session.heartbeat_task is not None  # liveness still tracked
+        assert protocol.session.lease_epoch == protocol.backend.epoch
         await protocol.shutdown()
-        assert ("caller_disconnected", agent.pk, messages.AgentMode.CALLER.value) in backend.calls
+
+    async def test_heartbeat_renews_the_lease(self):
+        protocol, sent, closed, _ = make_protocol()
+        await protocol.receive(_register_frame())
+        protocol.session.heartbeat_future = asyncio.get_event_loop().create_future()
+
+        await protocol.session.on_agent_heartbeat()
+
+        assert ("renew", protocol.session.agent.pk, protocol.session.lease_epoch) in protocol.backend.calls
+        assert closed == []
+        await protocol.shutdown()
+
+    async def test_fenced_heartbeat_closes_the_connection(self):
+        # The connection was displaced (or the sweep revoked it) while it was still running: its
+        # renewal matches no row, so it must close rather than keep draining the executor queue
+        # against a lease it no longer holds. ``kick_others`` may never have reached it.
+        protocol, sent, closed, _ = make_protocol()
+        await protocol.receive(_register_frame())
+        protocol.session.heartbeat_future = asyncio.get_event_loop().create_future()
+
+        listen_task = protocol.session.listen_task
+        protocol.backend.epoch += 1  # somebody else claimed the lease behind our back
+        await protocol.session.on_agent_heartbeat()
+
+        assert closed == [AGENT_REPLACED_CODE]
+        # And it must have STOPPED DRAINING, not merely sent a close frame: Channels does not
+        # call disconnect() for a server-initiated close, so shutdown() (which cancels the loops)
+        # may not run until the peer acknowledges — or ever. Until then this connection would go
+        # on popping Assigns off the redis queue against a lease it no longer holds.
+        assert listen_task.done(), "a fenced connection must stop draining the executor queue"
+        await protocol.shutdown()
+
+    async def test_unanswered_heartbeat_also_stops_draining(self):
+        # Same defect class on the pre-existing heartbeat-timeout path: an agent that stopped
+        # answering must stop being handed work immediately, not whenever the close lands.
+        protocol, sent, closed, _ = make_protocol(heartbeat_interval=0.05, heartbeat_timeout=0.1)
+        await protocol.receive(_register_frame())
+        listen_task = protocol.session.listen_task
+
+        assert await _wait_for(lambda: closed == [HEARTBEAT_NOT_RESPONDED_CODE])
+        assert listen_task.done()
+        await protocol.shutdown()
+
+    # ----------------------------------------------------------------------- #
+    # Every connection is an agent: no modes, no capability gating, one lease.
+    # ----------------------------------------------------------------------- #
+    async def test_every_connection_claims_a_lease_and_drains_the_queue(self):
+        # There is no non-executor connection kind any more. Register used to carry a `mode`
+        # that could yield a caller/observer session with no lease and no queue drain; now a
+        # registered session always holds an epoch and always drains.
+        protocol, sent, closed, _ = make_protocol()
+        await protocol.receive(_register_frame())
+
+        assert protocol.session.lease_epoch == protocol.backend.epoch
+        assert protocol.session.listen_task is not None
+        assert protocol.session.heartbeat_task is not None
+        await protocol.shutdown()
+
+    async def test_register_rejects_an_unknown_field(self):
+        # `mode` is gone from the wire. A client still sending it must fail loudly at
+        # validation rather than being silently treated as an executor.
+        protocol, sent, closed, _ = make_protocol()
+        await protocol.receive(json.dumps({"type": "REGISTER", "token": TEST_TOKEN, "mode": "OBSERVER"}))
+
+        assert protocol.session is None
+        assert closed == [FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE]
 
     async def test_executor_threads_session_id_to_backend_connect(self):
         recorded = {}
 
         class RecordingBackend(FakeBackend):
-            async def on_agent_connected(self, agent_id, connection_id=None, session_id=None):
+            async def on_agent_connected(self, agent_id, connection_id=None, session_id=None, force=False):
                 recorded["session_id"] = session_id
-                return self.tasks
+                return await super().on_agent_connected(agent_id, connection_id, session_id, force)
 
         protocol, sent, closed, _ = make_protocol(backend=RecordingBackend())
-        await protocol.receive(_register_frame(mode=messages.AgentMode.EXECUTOR, session_id="proc-xyz"))
+        await protocol.receive(_register_frame(session_id="proc-xyz"))
         assert recorded["session_id"] == "proc-xyz"
         await protocol.shutdown()
 
@@ -341,9 +392,8 @@ class TestAgentProtocolUnit:
         req = messages.AssignRequest(reference="ref-1", action="act-1", args={"x": 1})
         await protocol.receive(req.model_dump_json())
 
-        # routed to the backend with the connection's can_assign_root capability
-        ca = next(c for c in backend.calls if c[0] == "caller_assign")
-        assert ca[3] is True  # FULL_CAPABILITIES.can_assign_root
+        # routed to the backend
+        assert any(c[0] == "caller_assign" for c in backend.calls)
         # and a AssignResponse ack echoing the request id + reference
         result = json.loads(sent[-1])
         assert result["type"] == messages.ToAgentMessageType.ASSIGN_RESPONSE.value
@@ -355,7 +405,7 @@ class TestAgentProtocolUnit:
     async def test_caller_assign_failure_nacks_without_closing(self):
         # A backend error must nack the caller, NOT close the socket (which would kill all
         # the agent's other work).
-        backend = FakeBackend(caller_assign_error=PermissionError("missing can_assign_root"))
+        backend = FakeBackend(caller_assign_error=PermissionError("parent is required"))
         protocol, sent, closed, _ = make_protocol(backend=backend)
         await protocol.receive(_register_frame())
         sent.clear()
@@ -365,7 +415,7 @@ class TestAgentProtocolUnit:
         result = json.loads(sent[-1])
         assert result["type"] == messages.ToAgentMessageType.ASSIGN_RESPONSE.value
         assert result["task"] is None and result["created"] is False
-        assert "missing can_assign_root" in result["error"]
+        assert "parent is required" in result["error"]
         assert closed == []  # crucially, the connection stays open
         await protocol.shutdown()
 
@@ -487,7 +537,7 @@ class TestAgentProtocolUnit:
             pass
 
         async def authenticator(register):
-            return FakeAgent(), FULL_CAPABILITIES
+            return FakeAgent()
 
         protocol = AgentProtocol(
             send=send,
@@ -505,25 +555,25 @@ class TestAgentProtocolUnit:
 
     async def test_heartbeat_answer_resolved_before_persist(self):
         # R2: on_agent_heartbeat must resolve the handshake future BEFORE awaiting
-        # the (slow) DB persist. A blocking asave must not delay resolution.
+        # the (slow) DB write. A blocking lease renewal must not delay resolution.
         agent = FakeAgent()
         release = asyncio.Event()
+        backend = FakeBackend(agent=agent)
 
-        async def blocking_asave(**kwargs):
+        async def blocking_renew(agent_id, lease_epoch):
             await release.wait()
+            return True
 
-        agent.asave = blocking_asave
+        backend.renew_agent_lease = blocking_renew
 
-        protocol, sent, closed, _ = make_protocol(agent=agent)
+        protocol, sent, closed, _ = make_protocol(agent=agent, backend=backend)
         # Build the post-registration session directly to exercise its heartbeat handling.
         session = RegisteredSession(
             agent=agent,
-            capabilities=FULL_CAPABILITIES,
-            mode=messages.AgentMode.EXECUTOR,
-            executes_work=True,
             session_id=None,
             caller_id="caller",
             connection_id=protocol.connection_id,
+            lease_epoch=1,
             backend=protocol.backend,
             queue=protocol.queue,
             send_to_agent_message=protocol.send_to_agent_message,
@@ -538,9 +588,9 @@ class TestAgentProtocolUnit:
 
         task = asyncio.create_task(session.on_agent_heartbeat())
         try:
-            # The future is resolved even though asave is still blocked.
+            # The future is resolved even though the lease renewal is still blocked.
             assert await _wait_for(lambda: future.done())
-            assert not task.done()  # still parked in asave
+            assert not task.done()  # still parked in the renewal
         finally:
             release.set()
             await task

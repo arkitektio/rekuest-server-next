@@ -17,7 +17,6 @@ from .task import (
     TaskEventKind,
     TaskInstructChoices,
     TaskInstructKind,
-    TaskStatus,
 )
 from .log import LogLevel, LogLevelChoices
 from .state import JSONPatchOperation, RetentionPolicyChoices
@@ -39,7 +38,6 @@ __all__ = [
     "TaskEventKind",
     "TaskInstructChoices",
     "TaskInstructKind",
-    "TaskStatus",
     "AssignPolicy",
     # log
     "LogLevel",

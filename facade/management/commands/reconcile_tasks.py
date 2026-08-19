@@ -1,10 +1,10 @@
 """DB-sweep safety net for orphaned executor work.
 
-The in-memory grace timer is the *responsive* trigger for failing a lost executor's
-in-flight work, but it is process-local: if the worker crashes (and the agent never
-reconnects) the timer is gone and the work would stay ``is_done=False`` forever. This sweep
-re-runs the same DB-authoritative reconcile op for any websocket executor that is
-disconnected past the grace window — multi-worker-safe, idempotent. Run it on a schedule.
+The in-memory grace timer is the *responsive* trigger for failing a lost agent's in-flight
+work, but it is process-local: if the worker crashes (and the agent never reconnects) the
+timer is gone and the work would stay ``is_done=False`` forever. This sweep re-runs the same
+DB-authoritative reconcile op for any websocket agent that is disconnected past the grace
+window — multi-worker-safe, idempotent. Run it on a schedule.
 
     python manage.py reconcile_tasks
 """
@@ -19,7 +19,6 @@ from django.utils import timezone
 
 from facade import enums, models
 from facade.grace import grace_seconds
-from facade.messages import AgentMode
 from facade.persist_backend import persist_backend
 
 
@@ -33,7 +32,7 @@ class Command(BaseCommand):
         # healed agents are reconciled in the same pass.
         healed = async_to_sync(persist_backend.reconcile_stale_agents)()
 
-        cutoff = timezone.now() - timedelta(seconds=grace_seconds(AgentMode.EXECUTOR))
+        cutoff = timezone.now() - timedelta(seconds=grace_seconds())
         # Webhook agents never set connected/last_seen (no socket) — only sweep websocket
         # executors that are disconnected and have been gone longer than the grace window.
         agent_ids = list(

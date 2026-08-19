@@ -62,6 +62,17 @@ class Agent(models.Model):
         blank=True,
         help_text="The executor process's volatile session id from the last connect. On reconnect, a matching session means the same process survived (reclaim in-flight work); a different session means a fresh process (fail-and-cascade the orphaned work).",
     )
+    lease_epoch = models.BigIntegerField(
+        default=0,
+        help_text=(
+            "Monotonic fencing token for the executor write-lease. Bumped on every claim (connect) "
+            "and on every revoke (stale sweep). A connection carries the epoch it claimed and renews "
+            "its lease with a compare-and-set on it, so a displaced or revoked connection's heartbeat "
+            "matches no row and the connection terminates itself. Distinct from active_connection_id "
+            "(a socket *name*, unique but not revocable) and active_session_id (the client-supplied "
+            "*process* identity, which must stay equal across a reclaiming reconnect)."
+        ),
+    )
     on_instance = models.CharField(
         max_length=1000,
         help_text="The Instance this Agent is running on",

@@ -1,6 +1,7 @@
 import uuid
 
 from django.contrib.postgres.fields import ArrayField
+from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 from django_choices_field import TextChoicesField
 
@@ -91,18 +92,6 @@ class Task(models.Model):
         blank=True,
         related_name="tasks",
     )
-    originating_connection_id = models.CharField(
-        max_length=1000,
-        null=True,
-        blank=True,
-        help_text="The websocket connection id that originated this (root) task over the agent socket. Identifies which live connection's death should cascade-cancel it. Null for GraphQL-originated or non-root tasks.",
-    )
-    originating_session_id = models.CharField(
-        max_length=1000,
-        null=True,
-        blank=True,
-        help_text="The caller's process session id (volatile, in-memory) at origination. Lets a reconnect with the same session reclaim instead of cascade-cancelling. Null for GraphQL-originated or non-root tasks.",
-    )
     agent = models.ForeignKey(
         "Agent",
         on_delete=models.CASCADE,
@@ -137,7 +126,40 @@ class Task(models.Model):
         return f"{self.latest_event_kind} for {self.action_id}"
 
     class Meta:
-        pass
+        indexes = [
+            # The org-scoped ``tasks`` list. The org restriction lives on Agent (see
+            # ``types.Task.get_queryset`` -> ``agent__organization``), so this is the Task-side
+            # half of that join; it doubles as the ``agent`` filter and supplies the default
+            # ``-created_at`` ordering and the created_before/after range without a sort node.
+            models.Index(fields=["agent", "-created_at"], name="task_agent_created_idx"),
+            # ``TaskFilter.state`` (latest_event_kind__in) org-wide, with the same ordering.
+            # Leading with a ~16-value column is fine because the second column is the sort key.
+            models.Index(fields=["latest_event_kind", "-created_at"], name="task_state_created_idx"),
+            # ``TaskFilter.acted_on`` uses ``acted_on__overlap`` (``&&``) on an ArrayField. A btree
+            # cannot answer overlap at all, so GIN is the only index type that avoids a seq scan.
+            GinIndex(fields=["acted_on"], name="task_acted_on_gin_idx"),
+            # ``queries.my_tasks``: filter(caller=, root__isnull=True, is_done=False)
+            # .order_by("-created_at"). Both booleans are constants of that query, so they belong
+            # in the condition — the partial index only ever holds the small live-root set.
+            models.Index(
+                fields=["caller", "-created_at"],
+                condition=models.Q(root__isnull=True, is_done=False),
+                name="task_my_root_open_idx",
+            ),
+            # ``queries.reusable_task_for``: args_hash is the selective key, the action ids come
+            # from the Action-side hash/pure/organization predicate, ``-finished_at`` is the sort.
+            models.Index(
+                fields=["args_hash", "action", "-finished_at"],
+                condition=models.Q(is_done=True, ephemeral=False, latest_event_kind=enums.TaskEventChoices.COMPLETED),
+                name="task_replay_idx",
+            ),
+            # The agent-disconnect and orphaned-executor sweeps (``ModelPersistBackend``,
+            # ``reconcile_tasks``) all run filter(agent_id=, is_done=False). A partial index holds
+            # only in-flight rows instead of walking that agent's whole history.
+            models.Index(fields=["agent"], condition=models.Q(is_done=False), name="task_agent_open_idx"),
+            # The assign dedupe — filter(caller=, reference=) — on the hottest write path.
+            models.Index(fields=["caller", "reference"], name="task_caller_ref_idx"),
+        ]
 
 
 class TaskEvent(models.Model):

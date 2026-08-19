@@ -221,33 +221,6 @@ class TestTaskSubscriptions:
             assert created["root"] == str(root.id)
             await _stop(client)
 
-    async def test_cross_agent_root_task_visible_on_mytasks(self, agent_ws):
-        # Headline: the cross-agent dispatch flow, observed over the GraphQL mytasks subscription.
-        executor = await open_agent(agent_ws, "sub-x-exec", token="test2")
-        impl = await build_implementation_for_agent(executor.agent_pk, "subx")
-        caller = await open_agent(agent_ws, "sub-x-caller")  # default token "test"
-
-        async with GraphQLWebSocketTestClient(application, connection_params={"token": "test"}) as client:
-            await _start(client, MYTASKS)
-            await asyncio.sleep(WARMUP)
-
-            await caller.send(messages.AssignRequest(reference="subx-1", implementation=str(impl.pk), args={}))
-            result = await caller.receive(messages.AssignResponse)
-            assign = await executor.receive(messages.Assign)
-
-            create = await _recv(client, lambda d: (_create(d) or {}).get("id") == result.task)
-            assert _create(create["payload"]["data"])["root"] is None
-
-            await executor.send(messages.Completed(task=assign.task))
-            await caller.receive(messages.CompletedEvent)
-
-            done = await _recv(client, lambda d: (_event(d) or {}).get("kind") == "COMPLETED")
-            assert _event(done["payload"]["data"])["task"] == result.task
-            await _stop(client)
-
-            await caller.disconnect()
-            await executor.disconnect()
-
     async def test_agents_emits_slim_create_and_update(self, backend_stack):
         # The agents feed carries slim, non-traversable agent snapshots (FKs as bare ids).
         async with GraphQLWebSocketTestClient(application, connection_params={"token": "test"}) as client:
