@@ -1,11 +1,17 @@
 import logging
 
-from facade.backend import controll_backend
+from facade.backend import controll_backend, get_caller_for_context
+from facade.caller_context import CallerContext
 import strawberry
 from facade import inputs, models, types
 from kante.types import Info
 
 logger = logging.getLogger(__name__)
+
+
+def _caller(info: Info) -> models.Caller:
+    """The requesting identity, recorded on the TaskInstruct audit row of a control op."""
+    return get_caller_for_context(CallerContext.coerce(info))
 
 
 def assign(info: Info, input: inputs.AssignInput) -> types.Task:
@@ -14,11 +20,11 @@ def assign(info: Info, input: inputs.AssignInput) -> types.Task:
 
 
 def pause(info: Info, input: inputs.PauseInput) -> types.Task:
-    return controll_backend.pause(input)
+    return controll_backend.pause(input, caller=_caller(info))
 
 
 def resume(info: Info, input: inputs.ResumeInput) -> types.Task:
-    return controll_backend.resume(input)
+    return controll_backend.resume(input, caller=_caller(info))
 
 
 @strawberry.input
@@ -31,11 +37,11 @@ def ack(info: Info, input: AckInput) -> types.Task:
 
 
 def cancel(info: Info, input: inputs.CancelInput) -> types.Task:
-    return controll_backend.cancel(input)
+    return controll_backend.cancel(input, caller=_caller(info))
 
 
 def interrupt(info: Info, input: inputs.InterruptInput) -> types.Task:
-    return controll_backend.interrupt(input)
+    return controll_backend.interrupt(input, caller=_caller(info))
 
 
 def collect(info: Info, input: inputs.CollectInput) -> list[str]:

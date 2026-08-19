@@ -18,6 +18,16 @@ from .agent import (
     UpdateAgentInput,
     UpdateAgentInputModel,
 )
+from .probe import (
+    ProbeInput,
+    ProbeInputModel,
+    CancelProbeInput,
+    CancelProbeInputModel,
+    PauseProbeInput,
+    PauseProbeInputModel,
+    ResumeProbeInput,
+    ResumeProbeInputModel,
+)
 from .task import (
     AssignInput,
     AssignInputModel,
@@ -103,6 +113,15 @@ from .toolbox import (
 )
 
 __all__ = [
+    # probe
+    "ProbeInput",
+    "ProbeInputModel",
+    "CancelProbeInput",
+    "CancelProbeInputModel",
+    "PauseProbeInput",
+    "PauseProbeInputModel",
+    "ResumeProbeInput",
+    "ResumeProbeInputModel",
     # agent
     "BlockInput",
     "BlockInputModel",

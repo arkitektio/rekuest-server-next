@@ -316,6 +316,7 @@ class DefinitionInputModel(BaseModel):
     stateful: bool = Field(default=False, description="Whether the definition is stateful or not. If the definition is stateful, it can be used to create a stateful action. If the definition is not stateful, it cannot be used to create a stateful action")
     pure: bool = Field(default=False, description="Whether the action is pure: same args always produce the same result and no side effects — its results are replayable/cacheable. Implies idempotent. Incompatible with stateful and with a PHYSICAL effect class.")
     idempotent: bool = Field(default=False, description="Whether the action is idempotent: safe to run multiple times with the same args without changing the outcome — on ambiguous executor loss it may be freely re-dispatched.")
+    allow_probe: bool = Field(default=False, description="Whether the action may be invoked as a probe: zero persistence, redis-held state, no history/replay/recovery. Only actions declaring this are callable via the call mutation.")
     port_groups: list[PortGroupInputModel] = Field(default_factory=list, description="The port groups of the definition. This is used to group ports together in the UI")
     args: list[ArgPortInputModel] = Field(default_factory=list, description="The args of the definition. This is the input ports of the definition")
     returns: list[ReturnPortInputModel] = Field(default_factory=list, description="The returns of the definition. This is the output ports of the definition")
@@ -444,7 +445,7 @@ class DynamicValueInputModel(BaseModel):
     path: str | None = Field(default=None, description="JSON Pointer to a variable inside the Blok's isolated data model (e.g., '/microscope/exposure').")
 
 
-class AgentCallInputModel(BaseModel):
+class AgentProbeInputModel(BaseModel):
     """Base model for defining a callback that routes user interactions directly to an Arkitekt Agent via Rekuest.
 
     Attributes:
@@ -458,7 +459,7 @@ class AgentCallInputModel(BaseModel):
     arguments: Optional[List["ActionArgumentInputModel"]] = Field(default=None, description="Key-value arguments map compiled for the target agent call.")
 
 
-class UtilCallInputModel(BaseModel):
+class UtilProbeInputModel(BaseModel):
     operation: str = Field(description="The utility function name to invoke.")
     arguments: Optional[List["ActionArgumentInputModel"]] = Field(default=None, description="Key-value arguments map compiled for the target utility call.")
 
@@ -477,8 +478,8 @@ class ActionArgumentInputModel(BaseModel):
     value_path: Optional[str] = Field(default=None, description="JSON Pointer referencing the shared Blok state to inject into this argument slot dynamically.")
 
     # Separated nested calls
-    agent_call: Optional["AgentCallInputModel"] = Field(default=None, description="Defines a nested agent call if this argument should trigger an agent interaction.")
-    util_call: Optional["UtilCallInputModel"] = Field(default=None, description="Defines a nested utility call if this argument should trigger a system utility interaction.")
+    agent_call: Optional["AgentProbeInputModel"] = Field(default=None, description="Defines a nested agent call if this argument should trigger an agent interaction.")
+    util_call: Optional["UtilProbeInputModel"] = Field(default=None, description="Defines a nested utility call if this argument should trigger a system utility interaction.")
 
     value_list: Optional[List["ActionArgumentInputModel"]] = Field(default=None, description="Defines a list of values if this argument should be an array.")
     value_dict: Optional[List["ActionArgumentInputModel"]] = Field(default=None, description="Defines a list of key-value pairs if this argument should be a dictionary.")
@@ -503,8 +504,8 @@ class ComponentPropInputModel(BaseModel):
     declares_value: Optional[str] = Field(default=None, description="If set, this prop declares a new 'value' in the Blok state that can be referenced by other props or actions. The value of this field should be the name of the declared value (e.g., 'selected_user').")
 
     # Separated top-level callbacks
-    agent_call: Optional["AgentCallInputModel"] = Field(default=None, description="Defines an imperative interactive network action callback loop if this prop should trigger an agent interaction.")
-    util_call: Optional["UtilCallInputModel"] = Field(default=None, description="Defines an imperative interactive network action callback loop if this prop should trigger a system utility interaction.")
+    agent_call: Optional["AgentProbeInputModel"] = Field(default=None, description="Defines an imperative interactive network action callback loop if this prop should trigger an agent interaction.")
+    util_call: Optional["UtilProbeInputModel"] = Field(default=None, description="Defines an imperative interactive network action callback loop if this prop should trigger a system utility interaction.")
 
 
 # 3. The Unified Abstract Component Node Input

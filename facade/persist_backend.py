@@ -7,6 +7,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from facade import inputs, liveness, models, enums, messages
+from facade.probes.persist import probe_event_backend
 from facade.grace import GraceScheduler, grace_seconds, progress_lease_seconds
 from facade.higher_order import project_returns
 from facade.ports import LeaseClaim
@@ -43,14 +44,37 @@ class ModelPersistBackend:
         # auto_interrupt window escalates to an interrupt if not confirmed in time.
         self._auto_interrupt = GraceScheduler()
 
-    async def _unfold_to_higher_order(self, child_task_id: str, kind, returns: Optional[dict] = None, message: Optional[str] = None) -> None:
+    async def _unfold_to_higher_order(
+        self,
+        child_task_id: str,
+        kind,
+        returns: Optional[dict] = None,
+        message: Optional[str] = None,
+        task: Optional[models.Task] = None,
+    ) -> None:
         """If this task is the child of a higher-order wrapper, re-emit a mapped event on it.
 
         The lower implementation runs on a child task; the user watches the wrapper. So we
         project the child's returns back onto the wrapper's return ports and emit the corresponding
         event on the wrapper (linked via ``delegated_to``), which the subscription layer broadcasts.
         Non-higher-order children (hooks, dependency sub-assignments) are ignored.
+
+        The overwhelmingly common case is an ordinary task, so the ``is_higher_order_child``
+        flag gates the parent join: handlers that already hold the row pass ``task`` (zero
+        extra queries); the fire-and-forget Yield path does one slim flag read instead of
+        the two-table ``select_related`` it used to run on every yield.
         """
+        if task is not None:
+            if not task.is_higher_order_child:
+                return
+        else:
+            try:
+                is_higher_order_child = await models.Task.objects.values_list("is_higher_order_child", flat=True).aget(id=child_task_id)
+            except models.Task.DoesNotExist:
+                return
+            if not is_higher_order_child:
+                return
+
         try:
             child = await models.Task.objects.select_related("parent", "parent__implementation").aget(id=child_task_id)
         except models.Task.DoesNotExist:
@@ -93,6 +117,10 @@ class ModelPersistBackend:
         agent.connected = False
         agent.last_seen = timezone.now()
         await agent.asave(update_fields=["connected", "last_seen"])
+
+        # Probes fail fast — hover-grade work is worthless once its executor is
+        # gone, so no grace window applies to them (tasks keep theirs below).
+        await probe_event_backend.fail_all_for_agent(agent_id)
 
         # Grace window: instead of failing in-flight work immediately, wait — a brief blip
         # that reconnects with the same session reclaims it (on_agent_connected cancels the
@@ -175,6 +203,7 @@ class ModelPersistBackend:
         for agent in stale:
             if not await database_sync_to_async(self._revoke_lease_sync)(agent.pk):
                 continue  # another worker's sweep (or a reconnect) got there first
+            await probe_event_backend.fail_all_for_agent(agent.pk)  # calls fail fast, no grace
             await self.reconcile_orphaned_executor_work(agent.pk)  # now matches connected=False
             healed += 1
         return healed
@@ -447,7 +476,6 @@ class ModelPersistBackend:
             resolution=message.resolution,
             hooks=hooks,
             capture=message.capture,
-            ephemeral=message.ephemeral,
             step=message.step,
         )
         # A dependent task's fate follows its parent, so nothing about this connection needs
@@ -473,10 +501,10 @@ class ModelPersistBackend:
 
         ref = str(task_id)
         ops = {
-            "cancel": lambda: controll_backend.cancel(inputs.CancelInputModel(task=ref)),
-            "interrupt": lambda: controll_backend.interrupt(inputs.InterruptInputModel(task=ref)),
-            "pause": lambda: controll_backend.pause(inputs.PauseInputModel(task=ref)),
-            "resume": lambda: controll_backend.resume(inputs.ResumeInputModel(task=ref, step=step)),
+            "cancel": lambda: controll_backend.cancel(inputs.CancelInputModel(task=ref), caller=caller),
+            "interrupt": lambda: controll_backend.interrupt(inputs.InterruptInputModel(task=ref), caller=caller),
+            "pause": lambda: controll_backend.pause(inputs.PauseInputModel(task=ref), caller=caller),
+            "resume": lambda: controll_backend.resume(inputs.ResumeInputModel(task=ref, step=step), caller=caller),
         }
         return ops[op]()
 
@@ -523,12 +551,12 @@ class ModelPersistBackend:
             return
         if x.is_done:
             return
-        await models.TaskEvent.objects.acreate(task_id=message.task, kind=enums.TaskEventKind.INTERRUPTED)
+        await models.TaskEvent.objects.acreate(task=x, kind=enums.TaskEventKind.INTERRUPTED)
         x.is_done = True
         x.finished_at = timezone.now()
         x.latest_event_kind = enums.TaskEventKind.INTERRUPTED
         await x.asave(update_fields=["is_done", "finished_at", "latest_event_kind"])
-        await self._unfold_to_higher_order(message.task, enums.TaskEventKind.INTERRUPTED)
+        await self._unfold_to_higher_order(message.task, enums.TaskEventKind.INTERRUPTED, task=x)
 
     async def _on_nonterminal_confirm(self, task_id: str, kind, *, cancel_lease: bool = False) -> None:
         """Persist a non-terminal lifecycle confirmation (paused/resumed)."""
@@ -540,7 +568,7 @@ class ModelPersistBackend:
             return  # a confirmation for an unknown task must not tear down the transport
         if x.is_done:
             return
-        await models.TaskEvent.objects.acreate(task_id=task_id, kind=kind)
+        await models.TaskEvent.objects.acreate(task=x, kind=kind)
         x.latest_event_kind = kind
         await x.asave(update_fields=["latest_event_kind"])
 
@@ -562,6 +590,7 @@ class ModelPersistBackend:
             task_id=message.task,
             kind=enums.TaskEventKind.LOG,
             message=message.message,
+            level=message.level,
         )
 
     async def on_agent_yield(self, agent_id: int, message: messages.Yield) -> None:
@@ -583,16 +612,13 @@ class ModelPersistBackend:
         if x.is_done:
             return  # dedup: a resent terminal report (the agent retries until EventAck)
 
-        await models.TaskEvent.objects.acreate(
-            task_id=message.task,
-            kind=enums.TaskEventKind.COMPLETED,
-        )
+        await models.TaskEvent.objects.acreate(task=x, kind=enums.TaskEventKind.COMPLETED)
 
         x.is_done = True
         x.finished_at = timezone.now()
         x.latest_event_kind = enums.TaskEventKind.COMPLETED
         await x.asave(update_fields=["is_done", "finished_at", "latest_event_kind"])
-        await self._unfold_to_higher_order(message.task, enums.TaskEventKind.COMPLETED)
+        await self._unfold_to_higher_order(message.task, enums.TaskEventKind.COMPLETED, task=x)
 
     async def on_agent_cancelled(self, agent_id: int, message: messages.Cancelled) -> None:
         logging.info(f"Critical Task {message}")
@@ -603,16 +629,13 @@ class ModelPersistBackend:
         if x.is_done:
             return  # dedup: a resent terminal report (the agent retries until EventAck)
 
-        await models.TaskEvent.objects.acreate(
-            task_id=message.task,
-            kind=enums.TaskEventKind.CANCELLED,
-        )
+        await models.TaskEvent.objects.acreate(task=x, kind=enums.TaskEventKind.CANCELLED)
 
         x.is_done = True
         x.finished_at = timezone.now()
         x.latest_event_kind = enums.TaskEventKind.CANCELLED
         await x.asave(update_fields=["is_done", "finished_at", "latest_event_kind"])
-        await self._unfold_to_higher_order(message.task, enums.TaskEventKind.CANCELLED)
+        await self._unfold_to_higher_order(message.task, enums.TaskEventKind.CANCELLED, task=x)
 
     async def on_agent_error(self, agent_id: int, message: messages.Failed) -> None:
         logging.info(f"Critical Task {message}")
@@ -623,17 +646,13 @@ class ModelPersistBackend:
         if x.is_done:
             return  # dedup: a resent terminal report (the agent retries until EventAck)
 
-        await models.TaskEvent.objects.acreate(
-            task_id=message.task,
-            kind=enums.TaskEventKind.FAILED,
-            message=message.error,
-        )
+        await models.TaskEvent.objects.acreate(task=x, kind=enums.TaskEventKind.FAILED, message=message.error)
 
         x.is_done = True
         x.finished_at = timezone.now()
         x.latest_event_kind = enums.TaskEventKind.FAILED
         await x.asave(update_fields=["is_done", "finished_at", "latest_event_kind"])
-        await self._unfold_to_higher_order(message.task, enums.TaskEventKind.FAILED, message=message.error)
+        await self._unfold_to_higher_order(message.task, enums.TaskEventKind.FAILED, message=message.error, task=x)
 
     async def on_agent_critical(self, agent_id: int, message: messages.Critical) -> None:
         logging.info(f"Criticial Task {message}")
@@ -644,17 +663,13 @@ class ModelPersistBackend:
         if x.is_done:
             return  # dedup: a resent terminal report (the agent retries until EventAck)
 
-        await models.TaskEvent.objects.acreate(
-            task_id=message.task,
-            kind=enums.TaskEventKind.CRITICAL,
-            message=message.error,
-        )
+        await models.TaskEvent.objects.acreate(task=x, kind=enums.TaskEventKind.CRITICAL, message=message.error)
 
         x.is_done = True
         x.finished_at = timezone.now()
         x.latest_event_kind = enums.TaskEventKind.CRITICAL
         await x.asave(update_fields=["is_done", "finished_at", "latest_event_kind"])
-        await self._unfold_to_higher_order(message.task, enums.TaskEventKind.CRITICAL, message=message.error)
+        await self._unfold_to_higher_order(message.task, enums.TaskEventKind.CRITICAL, message=message.error, task=x)
 
     async def on_agent_progress(self, agent_id: int, message: messages.Progress) -> None:
         logging.info(f"Progress Task {message}")
@@ -672,8 +687,13 @@ class ModelPersistBackend:
         lease = progress_lease_seconds()
         if lease <= 0:
             return  # disabled — zero overhead on the progress hot-path
-        task = await models.Task.objects.select_related("implementation").aget(id=task_id)
-        if task.is_done or task.implementation is None or task.implementation.effect != enums.EffectClassChoices.PHYSICAL.value:
+        # One EXISTS instead of a two-table row fetch — this runs per Progress report.
+        is_live_physical = await models.Task.objects.filter(
+            id=task_id,
+            is_done=False,
+            implementation__effect=enums.EffectClassChoices.PHYSICAL.value,
+        ).aexists()
+        if not is_live_physical:
             return
         self._progress_leases.schedule(task_id, lease, lambda: self.reconcile_silent_physical_op(task_id))
 

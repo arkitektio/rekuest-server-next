@@ -1,5 +1,6 @@
 from .implementation import create_implementation, delete_implementation, pin_implementation, set_higher_order
 from .postman import assign, pause, resume, ack, cancel, interrupt, collect, bounce, kick, block, unblock
+from .probe import probe, cancel_probe, pause_probe, resume_probe
 from .test import create_test_case, create_test_result
 from .memory_shelve import shelve_in_memory_drawer, unshelve_memory_drawer
 from .agent import ensure_agent, pin_agent, delete_agent
@@ -56,6 +57,10 @@ __all__ = [
     "create_shortcut",
     "delete_shortcut",
     "assign",
+    "probe",
+    "cancel_probe",
+    "pause_probe",
+    "resume_probe",
     "pause",
     "resume",
     "ack",

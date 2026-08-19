@@ -45,10 +45,6 @@ class AssignInputModel(BaseModel):
         args: Dictionary of arguments/ports and values
         reference: Unique reference identifier for the task
         parent: Optional parent ID of the task
-        cached: Whether the task should be cached
-        log: Whether the task should be logged
-        ephemeral: Whether the task is ephemeral
-        is_hook: Whether the task is a hook
         step: Whether the task should step to breakpoints
     """
 
@@ -88,41 +84,28 @@ class AssignInputModel(BaseModel):
         default=None,
         description="The parent ID of the task. This is used to identify the task in the system.",
     )
-    cached: bool | None = Field(default=None, description="Deprecated — has no effect. Replay decisions are caller-side: use the reusableTaskFor query and reference the prior task instead of re-assigning.")
-    log: bool | None = Field(default=None, description="Whether the task should be logged")
     capture: bool | None = Field(default=None, description="Whether to capture the task.")
-    ephemeral: bool | None = Field(default=None, description="Whether the task is ephemeral")
     dependencies: list[ResolvedDependencyInputModel] | None = Field(
         default=None,
         description="The dependencies of the task. This maps dependency keys to implementation IDs.",
     )
-    is_hook: bool | None = Field(default=None, description="Whether the task is a hook")
     step: bool | None = Field(default=None, description="Whether the task should step. Ie. go to the next breakpoint")
-    policy: enums.AssignPolicy | None = Field(default=None, description="The policy for the task. This defines how the task should be handled.")
 
 
-@pydantic.input(AssignInputModel, description="The input for assigning args to a action.")
+@pydantic.input(AssignInputModel, description="The input for assigning args to a action. A GraphQL assign is a ROOT by definition — children are created only over the agent socket (AssignRequest, where parent is mandatory) and by server-internal paths like init hooks, so parent/dependency/method are deliberately absent here.")
 class AssignInput:
     action: strawberry.ID | None = None
     implementation: strawberry.ID | None = None
     agent: strawberry.ID | None = None
     action_hash: rscalars.ActionHash | None = None
-    dependency: str | None = None
-    method: str | None = None
     interface: str | None = None
     resolution: strawberry.ID | None = None
     hooks: list[HookInput] | None = strawberry.field(default_factory=list)
     capture: bool = False
     args: scalars.Args
     reference: str | None = None
-    parent: strawberry.ID | None = None
     step: bool | None = False
     dependencies: list[ResolvedDependencyInput] | None = None
-    policy: enums.AssignPolicy | None = None
-    cached: bool = False
-    ephemeral: bool = False
-    log: bool = False
-    is_hook: bool | None = False
 
 
 class CancelInputModel(BaseModel):

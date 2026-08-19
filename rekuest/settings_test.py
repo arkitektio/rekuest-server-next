@@ -40,3 +40,9 @@ REKUEST_GRACE = {"DEFAULT": 0, "PHYSICAL": 0}
 # tests/integration/docker-compose.yaml). Replaces the old redis-factory monkeypatch.
 AGENT_REDIS_HOST = "localhost"
 AGENT_REDIS_PORT = 6666
+
+# Probes: short TTLs so expiry behavior is testable without waiting.
+TASK_RETENTION_SECONDS = 0
+PROBE_TTL_SECONDS = 60
+PROBE_LINGER_SECONDS = 30
+PROBE_MAX_INFLIGHT_PER_CALLER = 8

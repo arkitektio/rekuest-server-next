@@ -30,6 +30,7 @@ class Action:
     stateful: bool = strawberry_django.field(description="Indicates whether the action maintains state.")
     pure: bool = strawberry_django.field(description="Whether the action is pure: same args always produce the same result, no side effects — replayable.")
     idempotent: bool = strawberry_django.field(description="Whether the action is idempotent: safe to re-run with the same args — re-dispatchable on ambiguous executor loss.")
+    allow_probe: bool = strawberry_django.field(description="Whether the action may be invoked as a probe (zero persistence, no history/replay/recovery). Declared by the action author.")
     description: str | None = strawberry_django.field(description="Optional description of the action.")
     collections: list["Collection"] = strawberry_django.field(description="Collections to which this action belongs.")
     implementations: list["Implementation"] = strawberry_django.field(description="List of implementations for this action.")

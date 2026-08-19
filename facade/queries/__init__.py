@@ -1,4 +1,5 @@
 from .task import reusable_task_for, my_tasks
+from .probe import probe, probe_stats
 from .event import event
 from .action import action
 from .implementation import implementation_at, my_implementation_at, resolved_implementations
@@ -19,6 +20,8 @@ from .agent import agent
 __all__ = [
     "reusable_task_for",
     "my_tasks",
+    "probe",
+    "probe_stats",
     "action",
     "event",
     "implementation_at",

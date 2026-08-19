@@ -48,6 +48,8 @@ class Query:
     toolboxes: list[types.Toolbox] = field(description="List of toolboxes containing shortcuts.")
     action = field(resolver=queries.action, description="Fetch a specific action.")
     my_tasks = field(resolver=queries.my_tasks, description="Fetch the root tasks this client created (caller-scoped).")
+    probe = field(resolver=queries.probe, description="Fetch a live (or lingering) probe by ID. Expired probes are gone — probes are never persisted.")
+    probe_stats = field(resolver=queries.probe_stats, description="Live probe counts: instance-wide total plus your in-flight count and cap.")
     reusable_task_for = field(resolver=queries.reusable_task_for, description="The latest completed run of a PURE action with these exact args, or null — the replay primitive. Reuse decisions belong to the orchestrator.")
     event = field(resolver=queries.event, description="Fetch a specific event.")
     implementation_at = field(resolver=queries.implementation_at, description="Find implementation at given interface.")
@@ -170,6 +172,10 @@ class Mutation:
     bounce = mutation(resolver=mutations.bounce, description="Bounce an agent so it reconnects.")
     kick = mutation(resolver=mutations.kick, description="Kick an agent to force disconnect. It will fail and not reconnect.")
     assign = mutation(resolver=mutations.assign, description="Assign a task to an agent.")
+    probe = mutation(resolver=mutations.probe, description="Fire a probe at an agent — zero persistence, redis-held state under a TTL, never appears in task history. For high-frequency interactive work (previews, live parameter tweaks).")
+    cancel_probe = mutation(resolver=mutations.cancel_probe, description="Cancel a probe. Idempotent: cancelling a finished probe is a no-op returning its terminal state.")
+    pause_probe = mutation(resolver=mutations.pause_probe, description="Pause a probe. Idempotent on finished probes; the agent's Paused report settles the state.")
+    resume_probe = mutation(resolver=mutations.resume_probe, description="Resume a paused probe. Idempotent on finished probes; the agent's Resumed report settles the state.")
     cancel = mutation(resolver=mutations.cancel, description="Cancel an active task.")
     pause = mutation(resolver=mutations.pause, description="Pause an ongoing task.")
     resume = mutation(resolver=mutations.resume, description="Resume a paused task.")
@@ -258,6 +264,7 @@ class Subscription:
     watch_agent = subscription(resolver=subscriptions.watch_agent, description="Watch an agent: yields snapshots for all states then streams patches.")
     child_tasks = subscription(resolver=subscriptions.child_tasks, description="Subscribe to all descendant task changes of a task.")
     agent_tasks = subscription(resolver=subscriptions.agent_tasks, description="Subscribe to task create/update for a specific agent.")
+    probe_events = subscription(resolver=subscriptions.probe_events, description="Stream the events of one probe (caller-scoped, payload-carrying). Emits a state snapshot first when events already happened.")
 
 
 schema = kante.Schema(

@@ -62,7 +62,7 @@ tasks (fields mirror `facade/inputs.AssignInputModel`):
 | `action` / `action_hash` / `implementation` / `agent`+`interface` | **Targeting** — pick one: assign by action (the backend routes to a providing agent), by action hash, by a direct implementation id, or directly to an agent+interface. |
 | `parent` | The parent task id — **required**. Omitting it is a parentless (root) assign and is refused: roots come only from the GraphQL `assign` mutation. |
 | `dependency` / `method` / `resolution` | Resolve a dependency when running inside a resolved task. |
-| `step` / `capture` / `ephemeral` / `hooks` | Stop at first breakpoint / debug-capture mode / ephemeral / lifecycle hooks. |
+| `step` / `capture` / `hooks` | Stop at first breakpoint / debug-capture mode / lifecycle hooks. |
 
 **Reply — `AssignResponse`:**
 
@@ -208,3 +208,12 @@ that is itself a webhook agent receives its `…Event` mirrors as signed POSTs t
 - [task-lifecycle.md](task-lifecycle.md) — the Task event state machine.
 - [realtime.md](realtime.md) — the `ass_caller_{id}` fan-out the mirrors ride on.
 - [identity.md](identity.md) — the Caller identity and ownership.
+
+## Probes over the socket
+
+`PROBE_REQUEST` fires an ephemeral probe under the requesting agent's own identity
+(the socket twin of the GraphQL `probe` mutation); the backend answers with
+`PROBE_RESPONSE` (`probe` id or `error`). The probe's events then stream back as the
+usual `…Event` mirrors whose `task` is the `p-…` probe id and whose `event`/`seq` come
+from the per-probe counter. Probe frames (Assign/Cancel/Pause/Resume) ride a priority
+lane: they jump the agent's queued task backlog and are LIFO among themselves.

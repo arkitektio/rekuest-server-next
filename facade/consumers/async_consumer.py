@@ -2,7 +2,6 @@ import logging
 import uuid
 from typing import Optional
 
-from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 
 from facade import caller_events, codes, messages, models
@@ -22,6 +21,35 @@ def _caller_group(caller_id: str) -> str:
     return f"task_caller_{caller_id}"
 
 
+class _PayloadEventLike:
+    """Adapts a ``TaskEventPayload`` dict off the channel layer to ``caller_events.EventLike``."""
+
+    def __init__(self, payload: dict) -> None:
+        self.id = int(payload["id"])
+        self.task_id = payload["task"]
+        self.kind = payload["kind"]
+        self.message = payload.get("message")
+        self.progress = payload.get("progress")
+        self.returns = payload.get("returns")
+        self.level = payload.get("level")
+
+
+class _ProbeEventLike:
+    """Adapts a ``ProbeEventBroadcast`` dict to ``caller_events.EventLike``.
+
+    ``id`` is the per-probe seq (there is no row PK), ``task_id`` the probe id.
+    """
+
+    def __init__(self, payload: dict) -> None:
+        self.id = int(payload["seq"])
+        self.task_id = payload["probe"]
+        self.kind = payload["kind"]
+        self.message = payload.get("message")
+        self.progress = payload.get("progress")
+        self.returns = payload.get("returns")
+        self.level = payload.get("level")
+
+
 class AgentConsumer(AsyncWebsocketConsumer):
     """Thin Channels adapter around :class:`AgentProtocol`.
 
@@ -33,18 +61,20 @@ class AgentConsumer(AsyncWebsocketConsumer):
     groups = ["broadcast"]
 
     @classmethod
-    def broadcast(cls, agent_id: int, message: messages.ToAgentMessage) -> None:
+    def broadcast(cls, agent: "models.Agent | int | str", message: messages.ToAgentMessage, *, priority: bool = False) -> None:
         """Send a message to a specific agent over its transport (thin facade).
 
         Kept for the existing backend/signal call sites; delegates to the typed
         :func:`facade.transport.deliver_to_agent`, which picks redis queue (WEBSOCKET) vs
         HMAC-signed POST (WEBHOOK). Called only AFTER the row is persisted, so a failed
-        delivery is recoverable from the DB.
+        delivery is recoverable from the DB. Pass the ``Agent`` row when it is already
+        loaded; an id falls back to the TTL-cached delivery lookup.
         """
         from facade import transport  # lazy: transport imports this consumer's queue module
 
-        agent = models.Agent.objects.only("id", "kind", "hook_url", "hook_url_secret").get(id=agent_id)
-        transport.deliver_to_agent(agent, message)
+        if not isinstance(agent, models.Agent):
+            agent = transport.get_agent_for_delivery(int(agent))
+        transport.deliver_to_agent(agent, message, priority=priority)
 
     async def connect(self) -> None:
         """Accept the socket and build a protocol bound to this transport."""
@@ -82,33 +112,49 @@ class AgentConsumer(AsyncWebsocketConsumer):
     async def channel_TaskEventCreatedEvent(self, event: dict) -> None:
         """Forward a caller-bound task event to this socket as a ``…Event`` mirror.
 
-        Producer side: ``facade/transport.py`` broadcasts ``TaskEventCreatedEvent`` to
-        ``task_caller_{caller_id}`` on every TaskEvent save (this WS forward consumes every
-        caller event, root and child; the slim GraphQL change feeds consume the separate
-        ``root_tasks_*`` topics). We only forward the ``event`` branch — the ``create`` branch
-        is covered authoritatively by ``AssignResponse``, so forwarding it too would race the
-        ack. Best-effort: a brief disconnect simply misses events.
+        Producer side: ``facade/transport.py`` broadcasts a payload-carrying
+        ``TaskEventCreatedEvent`` to ``task_caller_{caller_id}`` on every TaskEvent save
+        (this WS forward consumes every caller event, root and child; the slim GraphQL
+        change feeds consume the separate ``root_tasks_*`` topics). We only forward the
+        ``event`` branch — the ``create`` branch is covered authoritatively by
+        ``AssignResponse``, so forwarding it too would race the ack. The payload carries
+        everything the mirror needs, so no lookup happens here. Best-effort: a brief
+        disconnect simply misses events.
         """
         protocol = getattr(self, "protocol", None)
         if protocol is None or protocol.session is None:
             return  # not registered yet — nothing to correlate against
 
-        event_id = (event.get("message") or {}).get("event")
-        if event_id is None:
+        payload = (event.get("message") or {}).get("event")
+        if not payload:
             return  # a `create` (or malformed) payload — not a task event
 
-        message = await self._build_execution_event(event_id)
+        message = caller_events.build_execution_event(_PayloadEventLike(payload))
         if message is not None:
             await protocol.send_to_agent_message(message)
 
-    @database_sync_to_async
-    def _build_execution_event(self, event_id):
-        """Load the TaskEvent and map it to its …Event mirror (off the event loop)."""
-        try:
-            event = models.TaskEvent.objects.select_related("task").get(id=event_id)
-        except models.TaskEvent.DoesNotExist:
-            return None
-        return caller_events.build_execution_event(event)
+    async def channel_probe_event_broadcast(self, event: dict) -> None:
+        """Forward an agent-originated probe's event to the requester as a ``…Event`` mirror.
+
+        Producer side: :func:`facade.probes.persist.probe_topics` mirrors agent-origin
+        probe events onto ``task_caller_{caller_id}`` — the group this socket joined at
+        registration, so there is no membership race with the executor's first report.
+        The mirror reuses the caller-event vocabulary with ``task`` = the probe id and
+        both ``event``/``seq`` from the per-probe counter (mirrors are unacked, so
+        cross-probe event-id collisions are harmless). Best-effort like all mirrors.
+        """
+        protocol = getattr(self, "protocol", None)
+        if protocol is None or protocol.session is None:
+            return  # not registered yet — nothing to correlate against
+
+        payload = event.get("message") or {}
+        probe_id = payload.get("probe")
+        if not probe_id:
+            return
+
+        message = caller_events.build_execution_event(_ProbeEventLike(payload))
+        if message is not None:
+            await protocol.send_to_agent_message(message)
 
     async def kick_others(self) -> None:
         """Tell every other connection in this agent's group to close."""

@@ -36,13 +36,11 @@ class Task:
     updated_at: datetime.datetime = strawberry_django.field(description="Last update timestamp.")
     finished_at: datetime.datetime | None = strawberry.field(description="Timestamp when the task was finished.")
     acted_on: List[str] = strawberry.field(description="List of resources or entities this task acted upon.")
-    ephemeral: bool = strawberry.field(description="Indicates if the task should be deleted after completion.")
     children: List["Task"] = strawberry.field(description="Child tasks spawned from this one.")
     agent: Agent | None = strawberry.field(description="Agent responsible for this task.")
     events: list["TaskEvent"] = strawberry_django.field(description="The events")
     dependency: str | None = strawberry_django.field(description="The dependency thats linked to the parents execution if applicable.")
     dependency_method: str | None = strawberry_django.field(description="The method of the dependency that caused this task, if applicable.")
-    resolved_dependencies: list["ResolvedAgentDependency"] = strawberry_django.field(description="The resolved dependencies for this task.")
 
     @strawberry_django.field(description="List of recent instructions for this task.")
     def instructs(self) -> list["TaskInstruct"]:
@@ -52,13 +50,9 @@ class Task:
     def arg(self, key: str) -> scalars.Args | None:
         return self.args.get(key, None)
 
-    @strawberry_django.field(description="Get a specific dependency by key.")
+    @strawberry_django.field(description="The resolved dependencies for this task.")
     def resolved_dependencies(self) -> List[ResolvedAgentDependency]:
-        resolved = []
-        for key, item in self.dependencies.items():
-            print("Processing dependency:", key, item)
-            resolved.append(ResolvedAgentDependency(_key=key, _value=item))
-        return resolved
+        return [ResolvedAgentDependency(_key=key, _value=item) for key, item in self.dependencies.items()]
 
     @classmethod
     def get_queryset(cls, queryset, info, **kwargs):
@@ -82,7 +76,6 @@ TaskStats, TaskStatsResolver = create_stats_type(
 @strawberry_django.type(models.TaskEvent, filters=filters.TaskEventFilter, ordering=filters.TaskEventOrder, pagination=True, description="An event that occurred during a task.")
 class TaskEvent:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the event.")
-    name: str = strawberry_django.field(description="Name of the event.")
     returns: rscalars.AnyDefault | None = strawberry_django.field(description="Optional return values.")
     task: "Task" = strawberry_django.field(description="Associated task.")
     kind: enums.TaskEventKind = strawberry_django.field(description="Kind of task event.")
@@ -91,9 +84,9 @@ class TaskEvent:
     created_at: strawberry.auto = strawberry_django.field(description="Time when event was created.")
     delegated_to: Optional["Task"] = strawberry_django.field(description="If this event was delegated, the task it was delegated to.")
 
-    @strawberry_django.field(description="Default log level.")
+    @strawberry_django.field(description="Log level of the event (LOG events; INFO when unset).")
     def level(self) -> enums.LogLevel:
-        return self.level or enums.LogLevel.INFO
+        return enums.LogLevel(str(self.level)) if self.level else enums.LogLevel.INFO
 
     @strawberry_django.field(description="Reference string for the event.")
     def reference(self) -> str:

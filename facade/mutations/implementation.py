@@ -264,6 +264,7 @@ def _create_implementation(
             stateful=definition.stateful,
             pure=definition.pure,
             idempotent=desired_idempotent,
+            allow_probe=definition.allow_probe,
             is_dev=definition.is_dev,
             kind=definition.kind,
             port_groups=[i.model_dump() for i in definition.port_groups],
@@ -277,7 +278,7 @@ def _create_implementation(
     # them doesn't force fleet re-registration) — sync them unconditionally, covering the
     # update path AND the unchanged-hash fast path.
     qualifier_updates = []
-    for field, desired in (("pure", definition.pure), ("idempotent", desired_idempotent), ("is_dev", definition.is_dev)):
+    for field, desired in (("pure", definition.pure), ("idempotent", desired_idempotent), ("allow_probe", definition.allow_probe), ("is_dev", definition.is_dev)):
         if getattr(action, field) != desired:
             setattr(action, field, desired)
             qualifier_updates.append(field)
