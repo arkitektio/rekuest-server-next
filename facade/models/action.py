@@ -46,8 +46,6 @@ class Action(models.Model):
         default=enums.ActionKindChoices.FUNCTION.value,
         help_text="Function, generator? Will this function generate multiple results?",
     )
-    logo = models.CharField(max_length=1000, blank=True, null=True, help_text="An optional icon identifier to represent this Action in the UI (e.g. 'fa-solid fa-dog')")
-    interfaces = models.JSONField(default=list, help_text="Interfaces that we use to interpret the meta data")
     port_groups = models.JSONField(default=list, help_text="Intercae that we use to interpret the meta data")
     name = models.CharField(max_length=1000, help_text="The cleartext name of this Action (e.g. 'Segment Image')", default="Unnamed Action")
     description = models.TextField(help_text="A description for the Action")
@@ -99,6 +97,15 @@ class Action(models.Model):
                 name="No multiple Actions with the same key and version in the same app for an organization allowed",
             )
         ]
+        indexes = [
+            # The matching engine's exact-match short circuits (facade.managers
+            # _action_demand_clauses) and Action.objects.get(hash=...) all hit these columns;
+            # the composite unique constraint above leads with organization+app and covers
+            # none of them on its own.
+            models.Index(fields=["hash"], name="action_hash_idx"),
+            models.Index(fields=["organization", "key"], name="action_org_key_idx"),
+            models.Index(fields=["name"], name="action_name_idx"),
+        ]
 
 
 class BasePort(models.Model):
@@ -117,8 +124,10 @@ class BasePort(models.Model):
     identifier = models.CharField(max_length=255, null=True, db_index=True, help_text="The macro-type (e.g. '@mikro/image')")
     dimension = models.CharField(max_length=255, null=True, blank=True, db_index=True, help_text="Canonical pint dimensionality for QUANTITY ports (the wiring-compatibility key)")
 
-    # The ECS JSONPath string compiler output
-    compiled_jsonpath = models.CharField(max_length=1000, null=True, blank=True, help_text="PostgreSQL JSONPath string for micro-constraints")
+    # The ECS JSONPath string compiler output. TextField: the compiled predicate grows with
+    # every descriptor (and every IN-list element), so a length cap would turn a large-but-valid
+    # requires/provides declaration into a DataError at registration time.
+    compiled_jsonpath = models.TextField(null=True, blank=True, help_text="PostgreSQL JSONPath string for micro-constraints")
     nullable = models.BooleanField(default=False)
 
     class Meta:

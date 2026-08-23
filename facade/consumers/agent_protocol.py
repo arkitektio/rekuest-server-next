@@ -12,8 +12,13 @@ The conversation has two phases, split across two objects so the static types ma
 the runtime contract. :class:`AgentProtocol` is built at connect time and owns the
 pre-register handshake (parse / validate / gate). On a successful ``Register`` it
 constructs a :class:`RegisteredSession`, the post-register half, whose ``agent`` and
-``capabilities`` are therefore non-Optional for its whole lifetime — no defensive
+``lease_epoch`` are therefore non-Optional for its whole lifetime — no defensive
 ``self.agent`` guards scattered through dispatch/heartbeat/shutdown.
+
+Every socket connection is an **agent**: it executes work and holds that agent's write-lease.
+Users originate work only through the GraphQL ``assign`` mutation, so there are no
+caller/observer connection modes, and over this socket an agent may assign *dependent* work
+only (see ``AssignRequest``).
 """
 
 import asyncio
@@ -29,11 +34,9 @@ from authentikate.expand import (
 )
 from authentikate.utils import authenticate_token_or_none
 from django.conf import settings
-from django.utils import timezone
 from pydantic import BaseModel, Field
 
-from facade import capabilities, codes, messages, models
-from facade.capabilities import Capabilities
+from facade import codes, messages, models
 from facade.consumers.agent_queue import AgentQueue
 from facade.message_router import UnknownAgentMessage, route_from_agent_message
 from facade.persist_backend import persist_backend
@@ -48,10 +51,8 @@ CloseCallable = Callable[[int], Awaitable[None]]
 # every outbound frame still funnels through the single outer send-lock.
 SendTextCallable = Callable[[str], Awaitable[None]]
 SendMessageCallable = Callable[[messages.ToAgentMessage], Awaitable[None]]
-# The authenticator resolves a Register to the durable agent identity AND the
-# capabilities granted by its token scopes (the two are decided together, from the
-# same token, so the protocol never has to re-authenticate to learn capabilities).
-Authenticator = Callable[[messages.Register], Awaitable[tuple["models.Agent", Capabilities]]]
+# The authenticator resolves a Register to the durable agent identity.
+Authenticator = Callable[[messages.Register], Awaitable["models.Agent"]]
 # Wired by the adapter so the protocol can join the agent's connection group and
 # displace other live connections — both are no-ops by default (unit tests).
 RegisterConnectionCallable = Callable[[str], Awaitable[None]]
@@ -79,8 +80,8 @@ class FromAgentPayload(BaseModel):
     message: messages.FromAgentMessage = Field(discriminator="type")
 
 
-async def default_authenticator(register: messages.Register) -> tuple["models.Agent", Capabilities]:
-    """Resolve a ``Register`` to its ``Agent`` + granted ``Capabilities`` via the token.
+async def default_authenticator(register: messages.Register) -> "models.Agent":
+    """Resolve a ``Register`` to its ``Agent`` via the token.
 
     NOTE: the ``aget_or_create`` create-branch omits the required
     ``app``/``release`` columns, so this can only *find* an
@@ -104,17 +105,16 @@ async def default_authenticator(register: messages.Register) -> tuple["models.Ag
             name=f"{client.client_id}",
         ),
     )
-    caps = capabilities.capabilities_from_scopes(getattr(token, "scopes", []))
-    return agent, caps
+    return agent
 
 
 class RegisteredSession:
     """The post-registration half of the agent conversation.
 
-    Built by :class:`AgentProtocol.on_register` only once a ``Register`` has
-    authenticated and passed every gate, so ``agent``/``capabilities`` are non-Optional
-    for the object's whole lifetime. It owns dispatch of post-register frames, the
-    executor task-queue drain, the heartbeat loop, and the disconnect cascade.
+    Built by :class:`AgentProtocol.on_register` only once a ``Register`` has authenticated
+    and won the lease, so ``agent``/``lease_epoch`` are non-Optional for the object's whole
+    lifetime. It owns dispatch of post-register frames, the executor task-queue drain, the
+    heartbeat loop, and the disconnect cascade.
 
     Transport access is via the three callables injected by the outer protocol
     (``send_to_agent_message``/``_send``/``close``) rather than a back-reference, so the
@@ -125,12 +125,10 @@ class RegisteredSession:
         self,
         *,
         agent: "models.Agent",
-        capabilities: Capabilities,
-        mode: messages.AgentMode,
-        executes_work: bool,
         session_id: Optional[str],
         caller_id: str,
         connection_id: str,
+        lease_epoch: int,
         backend: PersistBackend,
         queue: AgentQueue,
         send_to_agent_message: SendMessageCallable,
@@ -140,12 +138,12 @@ class RegisteredSession:
         heartbeat_timeout: float,
     ) -> None:
         self.agent = agent
-        self.capabilities = capabilities
-        self.mode = mode
-        self.executes_work = executes_work
         self.session_id = session_id
         self.caller_id = caller_id
         self.connection_id = connection_id
+        # The fencing token this connection claimed. Every connection is an agent, so every
+        # session holds one and renews it on every heartbeat.
+        self.lease_epoch = lease_epoch
         self.backend = backend
         self.queue = queue
         self.send_to_agent_message = send_to_agent_message
@@ -174,7 +172,6 @@ class RegisteredSession:
             reply = await route_from_agent_message(
                 self.backend,
                 self.agent.pk,
-                self.capabilities,
                 message,
                 connection_id=self.connection_id,
                 session_id=self.session_id,
@@ -188,19 +185,50 @@ class RegisteredSession:
             await self.send_to_agent_message(reply)
 
     async def on_agent_heartbeat(self) -> None:
-        """Record liveness and resolve the pending heartbeat future."""
-        # Resolve the handshake BEFORE persisting. ``asave`` is a DB round-trip;
-        # if it ran first a slow write could push resolution past the heartbeat
-        # timeout and the loop would close a connection that actually answered.
+        """Renew the agent's write-lease and resolve the pending heartbeat future.
+
+        Note what this deliberately does NOT do: it does not write ``connected``. That flag is a
+        transition, owned by the claim/release/revoke paths; re-asserting it on every beat is
+        what let a revoked connection resurrect itself after the sweep had already failed its
+        in-flight work.
+        """
+        # Resolve the handshake BEFORE persisting. The renewal is a DB round-trip; if it ran
+        # first a slow write could push resolution past the heartbeat timeout and the loop
+        # would close a connection that actually answered.
         if self.heartbeat_future and not self.heartbeat_future.done():
             self.heartbeat_future.set_result(None)
             self.heartbeat_future = None
         else:
             logger.error("Received heartbeat without future, possible race condition.")
 
-        self.agent.connected = True
-        self.agent.last_seen = timezone.now()
-        await self.agent.asave(update_fields=["connected", "last_seen"])
+        if not await self.backend.renew_agent_lease(self.agent.pk, self.lease_epoch):
+            # Our epoch no longer exists: a newer connection displaced us, or the stale sweep
+            # revoked us. Either way this connection has lost the right to execute work, so it
+            # must terminate rather than keep draining the queue against a lease it lost.
+            logger.warning("Agent %s lost its lease (epoch %s) — closing displaced connection.", self.agent.pk, self.lease_epoch)
+            await self.stop_executing()
+            await self.close(codes.AGENT_REPLACED_CODE)
+
+    async def stop_executing(self) -> None:
+        """Stop draining the executor queue *now*, before closing the socket.
+
+        ``close()`` only sends the close frame: Channels does not invoke ``disconnect()`` for a
+        server-initiated close, so ``shutdown()`` (which cancels the loops) may not run until the
+        peer acknowledges — or at all, if it never does. Until then ``listen_for_tasks`` keeps
+        popping Assigns off the redis queue and acking them, which for a connection that has just
+        been fenced or has stopped answering heartbeats is precisely the work it must no longer
+        do. Cancelling here is idempotent: ``shutdown`` cancels an already-cancelled task safely.
+        """
+        task = self.listen_task
+        if task is None or task.done():
+            return
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            logger.error("Error cancelling the executor listen loop", exc_info=True)
 
     async def heartbeat(self, agent_id: str) -> None:
         """Periodically ping the agent and close if it stops answering."""
@@ -214,6 +242,10 @@ class RegisteredSession:
                     await asyncio.wait_for(self.heartbeat_future, self.heartbeat_timeout)
                 except asyncio.TimeoutError:
                     logger.error(f"Timeout on client {agent_id} for heartbeat")
+                    # Same reasoning as the fenced-lease path: an agent that stopped answering
+                    # must stop being handed work immediately, not whenever the close is
+                    # acknowledged. (Pre-existing: this path closed without stopping the drain.)
+                    await self.stop_executing()
                     await self.close(codes.HEARTBEAT_NOT_RESPONDED_CODE)
                     return
         except asyncio.CancelledError:
@@ -245,12 +277,10 @@ class RegisteredSession:
             except Exception:
                 logger.error("Error cancelling agent task", exc_info=True)
 
-        # Executor teardown drives the in-flight failure/grace cascade over EXECUTED work.
-        if self.executes_work:
-            await self.backend.on_agent_disconnected(self.agent.pk, self.connection_id)
-        # Caller-death drives the cascade over ORIGINATED roots — independent of execution,
-        # so it runs for every mode (the backend no-ops it for observers).
-        await self.backend.on_caller_disconnected(self.agent.pk, self.connection_id, session_id=self.session_id, mode=self.mode.value)
+        # Agent teardown drives the in-flight failure/grace cascade over its executed work.
+        # Dependent work this agent *assigned* needs no separate cascade: a child's fate
+        # follows its parent, and the root belongs to a human on the GraphQL side.
+        await self.backend.on_agent_disconnected(self.agent.pk, self.connection_id)
 
 
 class AgentProtocol:
@@ -348,72 +378,60 @@ class AgentProtocol:
             await self.close(codes.FROM_AGENT_MESSAGE_DOES_NOT_MATCH_SCHEMA_CODE)
 
     async def on_register(self, register: messages.Register) -> None:
-        """Authenticate, authorize the requested mode, send ``Init`` and spawn loops.
+        """Authenticate, claim the agent's write-lease, send ``Init`` and spawn the loops.
 
-        Gate order (each gate may close and return, leaving ``self.session`` None): authenticate →
-        blocked → mode authorization → conflict/displacement (executors only) → build session +
-        Init + loops.
+        Gate order (each gate may close and return, leaving ``self.session`` None):
+        authenticate → blocked → lease claim/displacement → build session + Init + loops.
         """
-        agent, caps = await self.authenticator(register)
-        mode = messages.AgentMode(register.mode)
+        agent = await self.authenticator(register)
         session_id = register.session_id
-        executes_work = capabilities.mode_executes_work(mode)
 
         if agent.blocked:
             await self.close(codes.AGENT_IS_BLOCKED_CODE)
             return
 
-        # Capabilities come from the token, never self-declaration: a participant may
-        # only operate in a mode its scopes cover.
-        if not capabilities.authorize_mode(caps, mode):
-            await self.send_to_agent_message(messages.ProtocolError(error=f"Token is not authorized for mode {mode.value}."))
-            await self.close(codes.MODE_NOT_AUTHORIZED_CODE)
-            return
-
-        # Join the caller event group for EVERY mode: even a pure executor assigns
-        # *dependent* work and must receive its results back over this socket. Done
-        # before Init so no originated-work event is missed.
+        # Join the caller event group: an agent assigns *dependent* work and must receive its
+        # results back over this socket. Done before Init so no event is missed.
         caller_id = await self.backend.get_or_create_caller_id(agent.pk)
         await self.register_caller(caller_id)
 
-        # Caller reclaim: cancel any pending caller-death cascade for this session and adopt
-        # the roots it originated (runs for every mode — any participant may originate work).
-        await self.backend.on_caller_connected(agent.pk, self.connection_id, session_id)
+        # Join the agent's connection group first (so we can later be kicked). Done before the
+        # claim even though we may still lose it: a rejected registration closes the socket,
+        # and ``disconnect`` discards the group membership again.
+        await self.register_connection(agent.pk)
 
-        if executes_work:
-            # The executor is a singleton: only one live connection per agent. Reject a
-            # second unless ``force`` is set, in which case displace the incumbent.
-            was_connected = agent.connected
-            if was_connected and not register.force:
-                await self.send_to_agent_message(messages.ProtocolError(error="Another connection is already registered for this agent. Reconnect with force to take over."))
-                await self.close(codes.AGENT_ALREADY_CONNECTED_CODE)
-                return
+        # An agent is a singleton: only one LIVE connection per agent. Gate and claim happen
+        # together, inside one locked transaction in the backend — reading liveness here and
+        # writing there would let two concurrent registrations both observe the same stale
+        # incumbent and both be handed the in-flight work.
+        #
+        # Rejected only when the incumbent is provably live (``connected`` AND a fresh
+        # heartbeat) and ``force`` is not set. A STALE incumbent — ``connected`` stuck True but
+        # its lease expired (crashed/killed worker, in-memory timers lost on restart) — is
+        # auto-displaced WITHOUT ``force``, so a genuinely-dead connection never wedges the
+        # agent behind a ``--force`` reconnect.
+        claim = await self.backend.on_agent_connected(agent.pk, self.connection_id, session_id=session_id, force=register.force)
+        if not claim.claimed:
+            await self.send_to_agent_message(messages.ProtocolError(error="Another connection is already registered for this agent. Reconnect with force to take over."))
+            await self.close(codes.AGENT_ALREADY_CONNECTED_CODE)
+            return
 
-            # Join the agent's connection group first (so we can later be kicked).
-            await self.register_connection(agent.pk)
-
-            # Claim ownership (sets ``active_connection_id`` to us) BEFORE displacing the
-            # incumbent. Order matters: the displaced connection's disconnect handler is
-            # guarded on ``active_connection_id`` — if we kicked before claiming, it could
-            # still see itself as active and wrongly mark the agent disconnected.
-            tasks = await self.backend.on_agent_connected(agent.pk, self.connection_id, session_id=session_id)
-            if was_connected and register.force:
-                await self.kick_others()
-        else:
-            # Non-executors (frontend/observer/caller) are NOT the singleton: no
-            # displacement, no ``active_connection_id`` claim (that would corrupt the
-            # executor's liveness on a shared Agent row), and no in-flight inquiries.
-            tasks = await self.backend.on_observer_connected(agent.pk, self.connection_id, mode=mode.value)
+        # Displace any prior connection whenever there was one — a forced takeover of a live
+        # incumbent OR an auto-takeover of a stale one whose socket may still be half-open on
+        # another worker. ``kick_others`` is keyed on our ``connection_id`` (never closes us)
+        # and is a harmless no-op when the group is empty (the dead-worker case). Since the
+        # claim bumped ``lease_epoch``, this is now an *optimization*: an unreachable prior
+        # connection fences itself on its next heartbeat regardless.
+        if claim.displaced_incumbent:
+            await self.kick_others()
 
         # Registration succeeded: everything from here is the post-register half.
         self.session = RegisteredSession(
             agent=agent,
-            capabilities=caps,
-            mode=mode,
-            executes_work=executes_work,
             session_id=session_id,
             caller_id=caller_id,
             connection_id=self.connection_id,
+            lease_epoch=claim.epoch,
             backend=self.backend,
             queue=self.queue,
             send_to_agent_message=self.send_to_agent_message,
@@ -426,15 +444,11 @@ class AgentProtocol:
         await self.send_to_agent_message(
             messages.Init(
                 agent=str(agent.pk),
-                inquiries=[messages.AssignInquiry(task=str(a.pk)) for a in tasks],
+                inquiries=[messages.AssignInquiry(task=str(a.pk)) for a in claim.tasks],
             )
         )
 
-        # The redis per-agent task queue carries ToAgent executor commands (Assign,
-        # Cancel, …) — only an executor should drain it. Heartbeat liveness runs for
-        # every mode (a caller's death must be detectable to cascade-cancel its work).
-        if executes_work:
-            self.session.listen_task = asyncio.create_task(self.session.listen_for_tasks(agent.pk))
+        self.session.listen_task = asyncio.create_task(self.session.listen_for_tasks(agent.pk))
         self.session.heartbeat_task = asyncio.create_task(self.session.heartbeat(agent.pk))
 
     async def shutdown(self) -> None:

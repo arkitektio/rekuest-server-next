@@ -35,7 +35,9 @@ The relational engine flattens ports into the indexed `facade_argport` / `facade
 The legacy JSONB-scan matcher still exists in `managers.py` for models that carry `args`/`returns`
 (or `ports`) JSONB but have **no** relational port rows — `Shortcut` and `StateDefinition`. It only
 compares coarse `key`/`kind`/`identifier` and matches children one level deep positionally; that is
-acceptable for those secondary lookups. **Only Actions own relational port rows.**
+acceptable for those secondary lookups. Demands it cannot express — `descriptors` or `nullable` —
+are **rejected with a `ValueError`** rather than silently degraded to structural matching.
+**Only Actions own relational port rows.**
 
 ## Half 1 — compiling descriptors to JSONPath
 
@@ -48,7 +50,7 @@ Each descriptor has a `key`, an `operator`, and a `value`. The operator set
 
 | Operator | JSONPath produced |
 | --- | --- |
-| `EXISTS` (value `True`/`False`) | `exists($.path)` / `!(exists($.path))` |
+| `EXISTS` (value `True`/`False`, strictly boolean — anything else raises) | `exists($.path)` / `!(exists($.path))` |
 | `EQUALS`, `MATCHES` | `$.path == <value>` |
 | `NOT_EQUALS` | `$.path != <value>` |
 | `GTE` | `$.path >= <value>` |

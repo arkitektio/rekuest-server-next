@@ -100,19 +100,3 @@ class Snapshot(models.Model):
     value = models.JSONField(help_text="The value of this snapshot (e.g. the value of the state at the time of the snapshot)")
     timestamp = models.DateTimeField(auto_now_add=True, help_text="The time this snapshot was created")
     global_rev = models.IntegerField(help_text="The revision of the state in the global context at the time of the snapshot (e.g. considering all patches that have been applied to this state)")
-
-
-class HistoricalState(models.Model):
-    """A historical state
-
-    A historical state is a frzoen state of an agent at a specific
-    point in time. Historical states are used to conserve the
-    state of an agent at a specific point in time, for example
-    for debugging or for testing purposes.
-
-
-    """
-
-    state = models.ForeignKey(State, on_delete=models.CASCADE, related_name="historical_states")
-    value = models.JSONField(default=dict, help_text=" The  value of this state atht he time of creation")
-    archived_at = models.DateTimeField(auto_now_add=True, help_text="Date this State was archived")

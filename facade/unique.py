@@ -31,11 +31,6 @@ def has_locals(ports: list[models.PortInputModel]):
     return False
 
 
-def traverse_state_dependency(port: models.PortInputModel):
-    if port.children:
-        return any(traverse_state_dependency(child) for child in port.children)
-
-
 def infer_action_scope(definition: models.DefinitionInputModel):
     has_local_argports = has_locals(definition.args)
     has_local_returnports = has_locals(definition.returns)
@@ -48,10 +43,3 @@ def infer_action_scope(definition: models.DefinitionInputModel):
         return enums.ActionScope.BRIDGE_GLOBAL_TO_LOCAL
     if has_local_argports and not has_local_returnports:
         return enums.ActionScope.BRIDGE_LOCAL_TO_GLOBAL
-
-
-def assert_non_statefullness(definition: models.DefinitionInputModel):
-    """Asserts that the definition is correctly stateful."""
-    for port in definition.args:
-        traverse_state_dependency(port)
-        # TODO: ALLSO CHECK IF THE RETURN OR ARGS HAVE MEMORY STRUCTURES (WHICH WOULD ALSO MAKE IT STATEFUL)

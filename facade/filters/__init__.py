@@ -18,7 +18,6 @@ from . import (
     implementation,
     session,
     shelve,
-    structure,
     testcase,
     threed,
     toolbox,
@@ -34,6 +33,7 @@ from .task import (
     TaskEventFilter,
     TaskEventOrder,
     TaskFilter,
+    TaskInstructFilter,
     TaskOrder,
 )
 from .auth import (
@@ -63,11 +63,6 @@ from .shelve import (
     MemoryDrawerFilter,
     MemoryShelveFilter,
     MemoryShelveOrder,
-)
-from .structure import (
-    InterfaceFilter,
-    StructureFilter,
-    StructurePackageFilter,
 )
 from .testcase import TestCaseFilter, TestResultFilter
 from .threed import (
@@ -106,6 +101,7 @@ __all__ = [
     "TaskFilter",
     "TaskEventOrder",
     "TaskEventFilter",
+    "TaskInstructFilter",
     "TestCaseFilter",
     "TestResultFilter",
     "ResolutionFilter",
@@ -123,9 +119,6 @@ __all__ = [
     "ImplementationOrder",
     "ImplementationActionFilter",
     "ImplementationFilter",
-    "StructurePackageFilter",
-    "StructureFilter",
-    "InterfaceFilter",
     "ThreeDModelOrder",
     "ThreeDModelFilter",
     "SpaceOrder",
@@ -155,7 +148,6 @@ _SUBMODULES = (
     implementation,
     session,
     shelve,
-    structure,
     testcase,
     threed,
     toolbox,

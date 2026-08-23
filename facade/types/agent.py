@@ -7,11 +7,9 @@ from typing import Optional
 
 import strawberry
 import strawberry_django
-from django.conf import settings
-from django.utils import timezone
 from kante.types import Info
 
-from facade import enums, filters, models
+from facade import enums, filters, liveness, models
 from facade.types.base import build_prescoped_queryset
 
 
@@ -61,7 +59,7 @@ class Agent:
 
     @strawberry_django.field(description="Determine if the agent is currently active based on last seen timestamp.")
     def active(self) -> bool:
-        return self.connected and self.last_seen > timezone.now() - datetime.timedelta(seconds=settings.AGENT_DISCONNECTED_TIMEOUT)
+        return liveness.agent_is_live(self.connected, self.last_seen)
 
     @strawberry_django.field(description="Retrieve the latest hardware record for this agent.")
     def latest_hardware_record(self) -> HardwareRecord | None:

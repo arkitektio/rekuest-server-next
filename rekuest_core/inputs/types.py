@@ -371,6 +371,17 @@ class AgentDependencyInput:
     assign_policy: enums.AssignPolicy = enums.AssignPolicy.BALANCED
 
 
+@pydantic.input(
+    models.TestTargetInputModel,
+    description="A test target: the action a test action tests, identified by exact hash or by an (app, key, version) coordinate. app defaults to the registering agent's app; omitting version matches every version.",
+)
+class TestTargetInput:
+    hash: str | None = None
+    app: str | None = None
+    key: str | None = None
+    version: str | None = None
+
+
 @strawberry.input(
     description="""A definition
 
@@ -394,10 +405,6 @@ class DefinitionInput:
         description="The collections of the definition. This is used to group definitions together in the UI",
     )
     key: str = strawberry.field(description="The key of the definition. This is used to uniquely identify the definition")
-    package: str | None = strawberry.field(
-        default=None,
-        description="The package of the function. Will default to the currents agent's app if not specified. This is used to group definitions together in the UI and provide a better user experience",
-    )
     version: str = strawberry.field(description="The version of the definition. This is used to differentiate if the underyling algorithm has changed, i.e we would expect different results for the same input")
     name: str = strawberry.field(description="The name of the actions. This is used to uniquely identify the definition")
     stateful: bool = strawberry.field(
@@ -424,24 +431,14 @@ class DefinitionInput:
         default_factory=list,
         description="The returns of the definition. This is the output ports of the definition",
     )
-    tests: ActionDependencyInput | None = strawberry.field(default=None)
     kind: enums.ActionKind = strawberry.field(description="The kind of the definition. This is the type of the definition. Can be either a function or a generator")
-    is_test_for: list["str"] = strawberry.field(
+    is_test_for: list[TestTargetInput] = strawberry.field(
         default_factory=list,
-        description="The tests for the definition. This is used to group definitions together in the UI",
-    )
-
-    interfaces: list[str] = strawberry.field(
-        default_factory=list,
-        description="""The interfaces of the definition. This is used to group definitions together in the UI""",
+        description="The actions this definition is a test for, each identified by hash or by (app, key, version).",
     )
     is_dev: bool = strawberry.field(
         default=False,
         description="Whether the definition is a dev definition or not. If the definition is a dev definition, it can be used to create a dev action. If the definition is not a dev definition, it cannot be used to create a dev action",
-    )
-    logo: str | None = strawberry.field(
-        default=None,
-        description="The logo of the definition. This is used to display the logo in the UI",
     )
 
 
@@ -470,8 +467,6 @@ class ImplementationInput:
     interface: str | None = None
     instance_id: str | None = None
     params: scalars.AnyDefault | None = None
-    dynamic: bool = False
-    logo: str | None = None
     locks: list[str] | None = None
     optimistics: list[OptimisticInput] | None = None
     tracks: list[TrackInput] | None = None
@@ -518,32 +513,6 @@ class LockDefinitionInput:
 class LockImplementationInput:
     key: str
     definition: LockDefinitionInput
-
-
-@pydantic.input(
-    models.StructureInputModel,
-    description="Which structures does the agent act upon in general",
-)
-class StructureInput:
-    key: str
-    description: str | None = None
-    implements: list[str] | None = None
-    descriptors: list[str] | None = None
-    default_widget: Optional["AssignWidgetInput"] = None
-    default_return_widget: Optional["ReturnWidgetInput"] = None
-    qet_query: str | None = None
-    describe_query: str | None = None
-
-
-@pydantic.input(
-    models.InterfaceInputModel,
-    description="Which interfaces does the agent declare",
-)
-class InterfaceInput:
-    key: str
-    description: str | None = None
-    default_widget: Optional["AssignWidgetInput"] = None
-    default_return_widget: Optional["ReturnWidgetInput"] = None
 
 
 @pydantic.input(models.DynamicValueInputModel, description="A bound state pointer referencing a variable inside a Blok state instance.")

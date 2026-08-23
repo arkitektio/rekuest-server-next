@@ -40,9 +40,9 @@ class Implementation:
         user = info.context.request.user
         return self.pinned_by.filter(id=user.id).exists()
 
-    @strawberry_django.field(description="Tests")
+    @strawberry_django.field(description="Implementations on this agent whose action is a test for this implementation's action.")
     def tests(self, info: Info) -> list["Implementation"]:
-        return []
+        return list(models.Implementation.objects.filter(agent=self.agent, action__in=self.action.tests.all()))
 
     @strawberry_django.field(description="List of action demands")
     def tracks(self) -> list[rtypes.Track]:

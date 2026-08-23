@@ -119,13 +119,12 @@ async def seed_agent(instance_id, token=TEST_TOKEN, blocked=False):
 # --------------------------------------------------------------------------- #
 # Object-graph builders (run synchronously, wrapped via sync_to_async)
 # --------------------------------------------------------------------------- #
-def _build_task(prefix, *, effect="NONE", idempotent=False, pure=False, originating_connection_id=None, originating_session_id=None, parent=None):
+def _build_task(prefix, *, effect="NONE", idempotent=False, pure=False, parent=None):
     """Create a standalone Action -> Implementation -> Task graph.
 
     The persist backend looks tasks up by id (not by the registered agent),
     so this graph is independent of the agent that streams the events. ``effect`` sets the
-    implementation's effect class; ``originating_*``/``parent`` wire the caller-death/grace
-    tests' origination + tree shape.
+    implementation's effect class; ``parent`` wires the tree shape.
     """
     user = User.objects.create(username=f"{prefix}-user", password="x", sub=f"{prefix}-sub")
     device = Device.objects.create(device_id=f"{prefix}-device")
@@ -160,7 +159,6 @@ def _build_task(prefix, *, effect="NONE", idempotent=False, pure=False, originat
         interface=f"{prefix}-iface",
         action=action,
         agent=agent,
-        dynamic=False,
         effect=effect,
     )
 
@@ -170,8 +168,6 @@ def _build_task(prefix, *, effect="NONE", idempotent=False, pure=False, originat
         agent=agent,
         implementation=implementation,
         parent=parent,
-        originating_connection_id=originating_connection_id,
-        originating_session_id=originating_session_id,
         latest_event_kind=enums.TaskEventKind.STARTED,
         latest_instruct_kind=enums.TaskInstructChoices.ASSIGN,
     )
@@ -235,7 +231,6 @@ def _build_task_for_agent_caller(agent_pk, prefix, parent=None, root=None):
         interface=f"{prefix}-iface",
         action=action,
         agent=agent,
-        dynamic=False,
     )
     return Task.objects.create(
         caller=caller,
@@ -288,7 +283,6 @@ def _build_implementation_for_agent(agent_pk, prefix, needs_token=True):
         interface=f"{prefix}-iface",
         action=action,
         agent=agent,
-        dynamic=False,
         needs_token=needs_token,
     )
 

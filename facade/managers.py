@@ -3,6 +3,7 @@ import re
 import typing as t
 
 from django.db import connection
+from django.db.models.expressions import RawSQL
 
 from rekuest_core.inputs.types import ActionDemandInput, PortMatchInput
 
@@ -92,6 +93,14 @@ def _build_match_exists(
         conditions.append(f"{alias}.nullable = %({key})s")
 
     descriptors = getattr(match, "descriptors", None)
+    if descriptors and parent_alias is None:
+        # A root match with ONLY descriptors would evaluate jsonb_path_match against every
+        # root port in the organization — the compiled predicate is unindexable in that
+        # direction, so a structural field must narrow the candidate set first. Nested
+        # children are exempt: their parent already narrows.
+        has_structural_narrowing = any(value is not None for value in (match.at, match.key, match.kind, match.identifier, dimension))
+        if not has_structural_narrowing:
+            raise ValueError("A root port match with descriptors must also narrow structurally (identifier, kind, key, at or dimension) — descriptor-only matches would scan every port in the organization.")
     if descriptors:
         # Micro-constraint: the port's compiled requires/provides JSONPath must be satisfied by
         # the candidate object, assembled here from the runtime descriptor key/value pairs
@@ -137,37 +146,11 @@ def _demand_kind_value(kind: t.Any) -> t.Literal["args", "returns"]:
     return t.cast(t.Literal["args", "returns"], kind_value)
 
 
-def get_action_ids_by_port_demands(
+def _port_demand_sql(
     demands: t.Sequence[t.Any],
-    model: str = "facade_action",
     organization_id: str | None = None,
-) -> list[t.Any]:
-    """Return ids of rows in ``model`` whose ports satisfy EVERY demand, in one query.
-
-    Each demand is duck-typed (``PortDemandInput``/test stand-ins):
-    ``kind`` ("args"/"returns"), ``matches``, ``force_length``, ``force_non_nullable_length``,
-    ``force_structure_length``. All demands' clauses are conjunctive, so ANDing them into a
-    single statement is exactly the set intersection of per-demand results — without the
-    N round trips.
-
-    For ``facade_action`` this uses the indexed relational port engine. Other models
-    (e.g. ``facade_shortcut``) keep their own ``args``/``returns`` JSONB and fall back to
-    the JSONB-scan matcher per demand, since only Actions own relational port rows.
-    """
-    if model != "facade_action":
-        ids: set[t.Any] | None = None
-        for demand in demands:
-            new_ids = _json_scan_ids(
-                demand.matches,
-                type=_demand_kind_value(demand.kind),
-                force_length=demand.force_length,
-                force_non_nullable_length=demand.force_non_nullable_length,
-                force_structure_length=demand.force_structure_length,
-                model=model,
-            )
-            ids = set(new_ids) if ids is None else ids.intersection(new_ids)
-        return list(ids or [])
-
+) -> tuple[str, dict[str, t.Any]]:
+    """Build the (sql, named params) selecting facade_action ids satisfying EVERY demand."""
     action_alias = "a"
     clauses: list[str] = []
     params: dict[str, t.Any] = {}
@@ -198,6 +181,73 @@ def get_action_ids_by_port_demands(
         raise ValueError("No search params provided")
 
     sql = f"SELECT {action_alias}.id FROM facade_action {action_alias} WHERE " + " AND ".join(clauses)
+    return sql, params
+
+
+_NAMED_PARAM_RE = re.compile(r"%\((\w+)\)s")
+
+
+def _to_positional(sql: str, params: dict[str, t.Any]) -> tuple[str, list[t.Any]]:
+    """Convert pyformat named placeholders to positional ``%s`` ones.
+
+    ``RawSQL`` params are combined with the rest of the query's params into one flat
+    sequence by the ORM compiler, so a mapping cannot be passed through — the same
+    statement needs its params positional to be embeddable as a subquery.
+    """
+    ordered_keys = _NAMED_PARAM_RE.findall(sql)
+    return _NAMED_PARAM_RE.sub("%s", sql), [params[key] for key in ordered_keys]
+
+
+def get_action_port_demand_subquery(
+    demands: t.Sequence[t.Any],
+    organization_id: str | None = None,
+) -> RawSQL:
+    """The port-demand statement as a ``RawSQL`` id subquery for ``filter(id__in=...)``.
+
+    Embedding the matching statement as a nested subquery keeps the whole filter one
+    round trip and lets Postgres drive it — instead of materializing every matching id
+    in Python and shipping the list back as an ``IN`` literal (unbounded for
+    unselective demands).
+    """
+    sql, params = _port_demand_sql(demands, organization_id=organization_id)
+    positional_sql, positional_params = _to_positional(sql, params)
+    return RawSQL(positional_sql, positional_params)
+
+
+def get_action_ids_by_port_demands(
+    demands: t.Sequence[t.Any],
+    model: str = "facade_action",
+    organization_id: str | None = None,
+) -> list[t.Any]:
+    """Return ids of rows in ``model`` whose ports satisfy EVERY demand, in one query.
+
+    Each demand is duck-typed (``PortDemandInput``/test stand-ins):
+    ``kind`` ("args"/"returns"), ``matches``, ``force_length``, ``force_non_nullable_length``,
+    ``force_structure_length``. All demands' clauses are conjunctive, so ANDing them into a
+    single statement is exactly the set intersection of per-demand results — without the
+    N round trips.
+
+    For ``facade_action`` this uses the indexed relational port engine. Other models
+    (e.g. ``facade_shortcut``) keep their own ``args``/``returns`` JSONB and fall back to
+    the JSONB-scan matcher per demand, since only Actions own relational port rows.
+    Queryset filters should prefer ``get_action_port_demand_subquery`` (no id
+    materialization); this id-list form serves callers that consume the ids in Python.
+    """
+    if model != "facade_action":
+        ids: set[t.Any] | None = None
+        for demand in demands:
+            new_ids = _json_scan_ids(
+                demand.matches,
+                type=_demand_kind_value(demand.kind),
+                force_length=demand.force_length,
+                force_non_nullable_length=demand.force_non_nullable_length,
+                force_structure_length=demand.force_structure_length,
+                model=model,
+            )
+            ids = set(new_ids) if ids is None else ids.intersection(new_ids)
+        return list(ids or [])
+
+    sql, params = _port_demand_sql(demands, organization_id=organization_id)
     return _execute_ids(sql, params)
 
 
@@ -322,6 +372,22 @@ def get_action_ids_by_action_demands(
 # =========================================================================
 
 
+def _reject_unsupported_legacy_match_fields(matches: t.Sequence[MatchInput] | None, model: str) -> None:
+    """Refuse demands the JSONB scanner cannot express instead of silently degrading them.
+
+    The legacy scanner only compares key/kind/identifier (children positionally, one level
+    deep). ``descriptors`` and ``nullable`` used to be dropped without a word, so a
+    descriptor-bearing demand against e.g. shortcuts would quietly return purely structural
+    matches — results that look right and aren't.
+    """
+    for match in matches or []:
+        if getattr(match, "descriptors", None):
+            raise ValueError(f"Descriptor matching (requires/provides) is not supported for {model}: only Actions have relational port rows with compiled constraints. Remove 'descriptors' from the demand.")
+        if getattr(match, "nullable", None) is not None:
+            raise ValueError(f"'nullable' matching is not supported for {model}: the legacy JSONB scanner only compares key/kind/identifier. Remove 'nullable' from the demand.")
+        _reject_unsupported_legacy_match_fields(getattr(match, "children", None), model)
+
+
 def build_child_recursively(item: MatchInput, prefix, value_path, parts, params):
     if item.key:
         parts.append(f"{prefix}->>'key' = %({value_path}_key)s")
@@ -384,6 +450,7 @@ def _json_scan_params(
     individual_queries = []
     all_params = {}
     if search_params:
+        _reject_unsupported_legacy_match_fields(search_params, model)
         for index, item in enumerate(search_params):
             sql_part, params = build_sql_for_item_recursive(item, index, at_value=item.at)
             subquery = f"EXISTS (SELECT 1 FROM jsonb_array_elements({type}) WITH ORDINALITY AS j(item, idx) WHERE {sql_part})"
@@ -434,6 +501,7 @@ def build_state_params(
     individual_queries = []
     all_params = {}
     if search_params:
+        _reject_unsupported_legacy_match_fields(search_params, model)
         for index, item in enumerate(search_params):
             sql_part, params = build_sql_for_item_recursive(item, index, at_value=item.at)
             subquery = f"EXISTS (SELECT 1 FROM jsonb_array_elements(ports) WITH ORDINALITY AS j(item, idx) WHERE {sql_part})"

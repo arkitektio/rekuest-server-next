@@ -17,6 +17,22 @@ from strawberry_django.filters import FilterLookup
 from facade import inputs, managers, models
 
 
+def _filter_by_port_demands(info: Info, queryset, value: list[inputs.PortDemandInput], prefix: str):
+    """Shared body of ``demands`` and ``object_demands`` — one port-demand resolution path.
+
+    The two filter fields are the same computation; whether a demand is "structural" or
+    "object" is decided by the caller populating ``PortMatchInput.descriptors``, not by
+    which entry point they picked.
+    """
+    if len(value) == 0:
+        return queryset, Q()
+
+    # RawSQL subquery: the matching statement runs nested inside this query — one round
+    # trip, no id materialization in Python.
+    subquery = managers.get_action_port_demand_subquery(value, organization_id=info.context.request.organization.id)
+    return queryset.filter(**{f"{prefix}id__in": subquery}), Q()
+
+
 @strawberry_django.order_type(models.Action)
 class ActionOrder:
     defined_at: auto
@@ -43,11 +59,7 @@ class ActionFilter:
 
     @filter_field
     def demands(self, info: Info, queryset, value: list[inputs.PortDemandInput], prefix: str):
-        if len(value) == 0:
-            return queryset, Q()
-
-        ids = managers.get_action_ids_by_port_demands(value, organization_id=info.context.request.organization.id)
-        return queryset.filter(**{f"{prefix}id__in": ids}), Q()
+        return _filter_by_port_demands(info, queryset, value, prefix)
 
     @filter_field
     def object_demands(self, info: Info, queryset, value: list[inputs.PortDemandInput], prefix: str):
@@ -59,11 +71,7 @@ class ActionFilter:
         so this keeps only actions a real object can actually be passed to, not merely
         structurally-compatible ones.
         """
-        if len(value) == 0:
-            return queryset, Q()
-
-        ids = managers.get_action_ids_by_port_demands(value, organization_id=info.context.request.organization.id)
-        return queryset.filter(**{f"{prefix}id__in": ids}), Q()
+        return _filter_by_port_demands(info, queryset, value, prefix)
 
     @filter_field
     def protocols(self, info: Info, queryset, value: list[str], prefix: str):

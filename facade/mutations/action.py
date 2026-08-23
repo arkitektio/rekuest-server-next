@@ -1,7 +1,6 @@
 from kante.types import Info
 import strawberry
 from facade import types, models, inputs, scalars
-from rekuest_core.inputs.types import StructureInput, InterfaceInput
 from django.db.models import Count
 import logging
 

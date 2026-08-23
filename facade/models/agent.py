@@ -1,5 +1,3 @@
-import datetime
-from django.utils import timezone
 import uuid
 
 from authentikate.models import App, Client, Organization, Release, User
@@ -7,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.db import models
 from django_choices_field import TextChoicesField
 
-from facade import enums
+from facade import enums, liveness
 
 
 class Lock(models.Model):
@@ -18,7 +16,7 @@ class Lock(models.Model):
         help_text="The agent this lock belongs to",
     )
     key = models.CharField(max_length=2000, help_text="A unique identifier for this lock within the agent")
-    description = models.TextField(help_text="A description for the Lock")
+    description = models.TextField(null=True, blank=True, help_text="A description for the Lock")
     created_at = models.DateTimeField(auto_created=True, auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     hold_by = models.ForeignKey(
@@ -63,6 +61,17 @@ class Agent(models.Model):
         null=True,
         blank=True,
         help_text="The executor process's volatile session id from the last connect. On reconnect, a matching session means the same process survived (reclaim in-flight work); a different session means a fresh process (fail-and-cascade the orphaned work).",
+    )
+    lease_epoch = models.BigIntegerField(
+        default=0,
+        help_text=(
+            "Monotonic fencing token for the executor write-lease. Bumped on every claim (connect) "
+            "and on every revoke (stale sweep). A connection carries the epoch it claimed and renews "
+            "its lease with a compare-and-set on it, so a displaced or revoked connection's heartbeat "
+            "matches no row and the connection terminates itself. Distinct from active_connection_id "
+            "(a socket *name*, unique but not revocable) and active_session_id (the client-supplied "
+            "*process* identity, which must stay equal across a reclaiming reconnect)."
+        ),
     )
     on_instance = models.CharField(
         max_length=1000,
@@ -125,7 +134,7 @@ class Agent(models.Model):
 
     @property
     def is_active(self):
-        return self.connected and self.last_seen > timezone.now() - datetime.timedelta(minutes=5)
+        return liveness.agent_is_live(self.connected, self.last_seen)
 
 
 class MemoryShelve(models.Model):

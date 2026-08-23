@@ -83,8 +83,6 @@ def test_reconnect_same_definition_skips_rebuild(monkeypatch, django_assert_max_
 
     rebuild_calls = []
     monkeypatch.setattr(impl_module, "rebuild_relational_ports", lambda *a, **k: rebuild_calls.append(a))
-    catalog_calls = []
-    monkeypatch.setattr(impl_module, "register_catalog_entities", lambda *a, **k: catalog_calls.append(a))
 
     # Reconnect with the identical definition: same hash, so the whole derived-state block skips.
     with django_assert_max_num_queries(15):
@@ -92,7 +90,6 @@ def test_reconnect_same_definition_skips_rebuild(monkeypatch, django_assert_max_
 
     assert second.action.pk == first.action.pk
     assert not rebuild_calls
-    assert not catalog_calls
     assert set(second.action.arg_ports.values_list("id", flat=True)) == port_ids
 
 
@@ -142,9 +139,11 @@ def test_legacy_action_with_stale_counts_is_healed():
 
 @pytest.mark.django_db
 def test_structure_usages_derived_from_port_rows():
-    """Registration creates the catalog entities; usage lookups are derived from the relational
-    port rows (identifier + parent-chain modifiers), with output/input direction taken from the
-    table the row lives in."""
+    """Usage lookups are derived from the relational port rows (identifier + parent-chain
+    modifiers), with output/input direction taken from the table the row lives in — there is
+    no catalog table."""
+    from types import SimpleNamespace
+
     from facade.types.structure import _port_usages
 
     user, _, org, caller = create_registry_bundle("wp-usages")
@@ -173,23 +172,20 @@ def test_structure_usages_derived_from_port_rows():
         agent,
     )
     action = implementation.action
-
-    # Catalog entities registered (lower-cased keys).
-    assert models.Structure.objects.filter(package__key="mikro", key="mask").exists()
-    assert models.Structure.objects.filter(package__key="mikro", key="image").exists()
+    info = SimpleNamespace(context=SimpleNamespace(request=SimpleNamespace(organization=org)))
 
     # The nested return structure is an OUTPUT usage with the container chain as modifiers.
-    output_usages = _port_usages("@mikro/mask", "STRUCTURE", models.ReturnPort)
+    output_usages = _port_usages(info, "@mikro/mask", "STRUCTURE", models.ReturnPort)
     assert len(output_usages) == 1
     assert output_usages[0].action.pk == action.pk
     assert output_usages[0].modifiers == ["list"]
     assert output_usages[0].port_key == "masks"
     assert output_usages[0].key_path == "masks.mask"
     # ...and NOT an input usage (regression: nested outputs used to land on the input side).
-    assert _port_usages("@mikro/mask", "STRUCTURE", models.ArgPort) == []
+    assert _port_usages(info, "@mikro/mask", "STRUCTURE", models.ArgPort) == []
 
     # The genuine input structure is an input usage; lookup is case-insensitive.
-    input_usages = _port_usages("@MIKRO/IMAGE", "STRUCTURE", models.ArgPort)
+    input_usages = _port_usages(info, "@MIKRO/IMAGE", "STRUCTURE", models.ArgPort)
     assert len(input_usages) == 1
     assert input_usages[0].modifiers == []
     assert input_usages[0].port_key == "image"
@@ -202,7 +198,7 @@ def test_create_implementation_is_atomic(monkeypatch):
     def boom(*args, **kwargs):
         raise RuntimeError("mid-flight failure")
 
-    monkeypatch.setattr(impl_module, "register_catalog_entities", boom)
+    monkeypatch.setattr(impl_module, "infer_protocols", boom)
 
     with pytest.raises(RuntimeError, match="mid-flight failure"):
         _create_implementation(_implementation_input(), agent)

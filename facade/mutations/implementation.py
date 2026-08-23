@@ -2,13 +2,13 @@ import logging
 
 import strawberry
 from django.db import transaction
+from django.db.models import Exists, OuterRef, Q
 from facade import inputs, models, types
 from facade.descriptors import compile_descriptors_to_jsonpath, compile_returndescriptors_to_jsonpath
 from facade.protocol import infer_protocols
-from facade.unique import assert_non_statefullness, infer_action_scope
+from facade.unique import infer_action_scope
 from kante.types import Info
-from rekuest_core.inputs.models import DefinitionInputModel, ImplementationInputModel, PortInputModel
-from rekuest_core.enums import PortKind
+from rekuest_core.inputs.models import DefinitionInputModel, ImplementationInputModel
 from rekuest_core import scalars as rscalars
 from authentikate.vars import get_user, get_client
 from facade.higher_order import validate_dependency_coverage, validate_higher_order_pairing
@@ -16,41 +16,6 @@ from facade.provenance import audience as provenance_audience
 import typing as t
 
 logger = logging.getLogger(__name__)
-
-
-def extract_structure_recursively(structures: list[str], definition: PortInputModel):
-    if definition.identifier and definition.kind == PortKind.STRUCTURE:
-        structures.append(definition.identifier)
-
-    for port in definition.children or []:
-        extract_structure_recursively(structures, port)
-
-
-def extract_interfaces_recursively(interfaces: list[str], definition: PortInputModel):
-    if definition.identifier and definition.kind == PortKind.INTERFACE:
-        interfaces.append(definition.identifier)
-
-    for port in definition.children or []:
-        extract_interfaces_recursively(interfaces, port)
-
-
-def identifier_to_key(identifier: str) -> str:
-    if "/" in identifier:
-        return identifier.split("/")[-1].strip()
-
-    else:
-        raise ValueError(f"Identifier {identifier} does not contain a key part")
-
-
-def identifier_to_package_key(identifier: str) -> str:
-    if "/" in identifier:
-        parts = identifier.split("/")[0]
-        parts = parts.replace("@", "")
-
-        return parts
-
-    else:
-        raise ValueError(f"Identifier {identifier} does not contain a package part")
 
 
 # =========================================================
@@ -102,28 +67,6 @@ def _bulk_create_ports_level_by_level(
         ]
 
 
-def register_catalog_entities(definition: DefinitionInputModel) -> None:
-    """Ensure the Structure/Interface/StructurePackage catalog entities for a definition exist.
-
-    The catalog is the only derived state the ports don't already carry — usage lookups
-    ("which actions consume @mikro/image?") are answered directly from the relational
-    ArgPort/ReturnPort rows via their indexed ``identifier``.
-    """
-    structures: list[str] = []
-    interfaces: list[str] = []
-    for port in list(definition.args or []) + list(definition.returns or []):
-        extract_structure_recursively(structures, port)
-        extract_interfaces_recursively(interfaces, port)
-
-    for identifier in set(structures):
-        package, _ = models.StructurePackage.objects.get_or_create(key=identifier_to_package_key(identifier).lower())
-        models.Structure.objects.get_or_create(key=identifier_to_key(identifier).lower(), package=package)
-
-    for identifier in set(interfaces):
-        package, _ = models.StructurePackage.objects.get_or_create(key=identifier_to_package_key(identifier).lower())
-        models.Interface.objects.get_or_create(key=identifier_to_key(identifier).lower(), package=package)
-
-
 def rebuild_relational_ports(action: models.Action, definition: DefinitionInputModel) -> None:
     """Replace the relational ArgPort/ReturnPort rows for ``action`` from its definition.
 
@@ -141,6 +84,50 @@ def rebuild_relational_ports(action: models.Action, definition: DefinitionInputM
     action.arg_count = len(definition.args or [])
     action.return_count = len(definition.returns or [])
     action.save(update_fields=["arg_count", "return_count"])
+
+
+def _resolve_test_targets(definition: DefinitionInputModel, agent: models.Agent) -> list[models.Action]:
+    """Resolve the definition's ``is_test_for`` targets to Action rows, org-scoped.
+
+    A target is either ``{hash}`` (exact) or ``{app?, key, version?}`` — ``app`` defaults
+    to the registering agent's app and omitting ``version`` matches every version, so a
+    test declared once keeps covering new versions of its target. Targets that match
+    nothing are skipped with a warning: registration order between an app's tests and
+    their targets is not guaranteed, and a missing target must not abort the whole
+    atomic registration.
+    """
+    if not definition.is_test_for:
+        return []
+
+    target_q = Q()
+    for target in definition.is_test_for:
+        if target.hash:
+            target_q |= Q(hash=target.hash)
+        else:
+            q = Q(key=target.key)
+            q &= Q(app__identifier=target.app) if target.app else Q(app=agent.app)
+            if target.version:
+                q &= Q(version=target.version)
+            target_q |= q
+
+    resolved = list(models.Action.objects.filter(target_q, organization=agent.organization).select_related("app"))
+
+    def matches(target: t.Any, candidate: models.Action) -> bool:
+        if target.hash:
+            return candidate.hash == target.hash
+        if candidate.key != target.key:
+            return False
+        if target.app:
+            if candidate.app.identifier != target.app:
+                return False
+        elif candidate.app_id != agent.app_id:
+            return False
+        return target.version is None or candidate.version == target.version
+
+    unmatched = [target for target in definition.is_test_for if not any(matches(target, candidate) for candidate in resolved)]
+    if unmatched:
+        logger.warning(f"Action {definition.key} declares is_test_for targets that are not registered (skipped): {[t_.model_dump(exclude_none=True) for t_ in unmatched]}")
+    return resolved
 
 
 def _sync_dependencies(implementation: models.Implementation, dependencies: t.Any) -> None:
@@ -175,26 +162,56 @@ def _relational_state_is_current(action: models.Action, definition: DefinitionIn
     """
     if action.arg_count != len(definition.args or []) or action.return_count != len(definition.returns or []):
         return False
-    if definition.args and not action.arg_ports.exists():
+
+    need_args = bool(definition.args)
+    need_returns = bool(definition.returns)
+    if not (need_args or need_returns):
+        return True
+
+    # Both existence probes in one statement — this runs per action on every agent
+    # reconnect, so the round trips add up across a large fleet.
+    has_args, has_returns = (
+        models.Action.objects.filter(pk=action.pk)
+        .annotate(
+            has_args=Exists(models.ArgPort.objects.filter(action_id=OuterRef("pk"))),
+            has_returns=Exists(models.ReturnPort.objects.filter(action_id=OuterRef("pk"))),
+        )
+        .values_list("has_args", "has_returns")
+        .first()
+    )
+    if need_args and not has_args:
         return False
-    if definition.returns and not action.return_ports.exists():
+    if need_returns and not has_returns:
         return False
     return True
 
 
 @transaction.atomic
-def _create_implementation(input: ImplementationInputModel, agent: models.Agent) -> models.Implementation:
+def _create_implementation(
+    input: ImplementationInputModel,
+    agent: models.Agent,
+    *,
+    action_map: dict[tuple[str, str], models.Action] | None = None,
+    implementation_map: dict[str, models.Implementation] | None = None,
+) -> models.Implementation:
+    """Register one implementation (and its Action) for ``agent``.
+
+    ``action_map`` (keyed ``(key, version)``, scoped to the agent's app + organization) and
+    ``implementation_map`` (keyed ``interface``, ``select_related("action")``) are optional
+    batch prefetches: ``implement_agent`` passes them so a reconnecting agent with N
+    implementations does two lookups total instead of 2·N. Rows created here are inserted
+    back into the maps so duplicate keys within one batch resolve like sequential lookups
+    would. ``None`` (the default, used by ``create_implementation``) keeps the per-row
+    lookup path.
+    """
     definition = input.definition
 
     hash = definition.unique_hash
     key = definition.key
     version = definition.version
-    app = agent.app or models.Action.objects.get_or_create(identifier=input.definition.app, organization=agent.organization)[0]
+    app = agent.app
 
     scope = infer_action_scope(definition)
-
-    if definition.stateful is False:
-        assert_non_statefullness(definition)
 
     # Qualifier coherence — the only place both the definition's semantic claims and the
     # implementation's effect class are visible together.
@@ -209,13 +226,19 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
 
     definition_changed = True
     try:
-        action = models.Action.objects.get(key=key, version=version, app=app, organization=agent.organization)
+        if action_map is not None:
+            action = action_map.get((key, version))
+            if action is None:
+                raise models.Action.DoesNotExist
+        else:
+            action = models.Action.objects.get(key=key, version=version, app=app, organization=agent.organization)
         if action.hash != hash:
             # Update flow with a changed definition: check the app matches to prevent malicious updates.
             if action.app == agent.app:
                 action.hash = hash
                 action.args = [i.model_dump() for i in definition.args]
                 action.returns = [i.model_dump() for i in definition.returns]
+                action.port_groups = [i.model_dump() for i in definition.port_groups]
                 action.stateful = definition.stateful
                 action.scope = scope
                 action.kind = definition.kind
@@ -247,6 +270,8 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
             returns=[i.model_dump() for i in definition.returns],
             name=definition.name,
         )
+        if action_map is not None:
+            action_map[(key, version)] = action
 
     # Qualifiers are not identity-bearing (deliberately excluded from unique_hash so flipping
     # them doesn't force fleet re-registration) — sync them unconditionally, covering the
@@ -268,18 +293,18 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
         #    rebuild).
         rebuild_relational_ports(action, definition)
 
-        register_catalog_entities(definition)
-        protocols = infer_protocols(definition)
-        action.protocols.add(*protocols)
+        # Derived M2Ms are RECONCILED (.set), not accumulated (.add): protocols feed the
+        # matching engine's protocol demands, so a stale row (e.g. an action that stopped
+        # being a predicate) must stop matching, mirroring how the port rows are rebuilt.
+        action.protocols.set(infer_protocols(definition))
 
-        if definition.is_test_for:
-            for actionhash in definition.is_test_for:
-                action.is_test_for.add(models.Action.objects.get(hash=actionhash))
+        action.is_test_for.set(_resolve_test_targets(definition, agent))
 
-        if definition.collections:
-            for collection_name in definition.collections:
-                c, _ = models.Collection.objects.get_or_create(name=collection_name, defaults=dict(creator=agent.user, organization=agent.organization))
-                action.collections.add(c)
+        collections = []
+        for collection_name in definition.collections or []:
+            c, _ = models.Collection.objects.get_or_create(name=collection_name, defaults=dict(creator=agent.user, organization=agent.organization))
+            collections.append(c)
+        action.collections.set(collections)
 
         logger.info(f"Created {action}")
         action.save()
@@ -292,12 +317,13 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
     else:
         resolved_audience = provenance_audience.derive_from_action(action) or None
 
-    try:
-        implementation = models.Implementation.objects.get(
-            interface=input.interface,
-            agent=agent,
-        )
+    if implementation_map is not None:
+        implementation = implementation_map.get(input.interface)
+    else:
+        # (interface, agent) is unique, so first() is get() without the exception dance.
+        implementation = models.Implementation.objects.filter(interface=input.interface, agent=agent).first()
 
+    if implementation is not None:
         if implementation.action.pk != action.pk:
             if implementation.action.implementations.count() == 1:
                 logger.info("Deleting Action because it has no more implementations")
@@ -310,18 +336,19 @@ def _create_implementation(input: ImplementationInputModel, agent: models.Agent)
         implementation.provenance_audience = resolved_audience
         implementation.effect = getattr(input.effect, "value", input.effect)
         implementation.save()
-    except models.Implementation.DoesNotExist:
+    else:
         implementation = models.Implementation.objects.create(
             interface=input.interface,
             release=agent.release,
             action=action,
             agent=agent,
-            dynamic=input.dynamic,
             params=input.params or {},
             needs_token=input.needs_token,
             provenance_audience=resolved_audience,
             effect=getattr(input.effect, "value", input.effect),
         )
+        if implementation_map is not None:
+            implementation_map[input.interface] = implementation
 
     _sync_dependencies(implementation, input.dependencies)
 

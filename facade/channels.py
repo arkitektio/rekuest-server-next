@@ -11,6 +11,8 @@ task_event_channel = build_channel(TaskEventCreatedEvent)
 
 child_task_channel = build_channel(ChildTaskEvent)
 
+agent_task_channel = build_channel(ChildTaskEvent)
+
 
 new_implementation_channel = build_channel(ImplementationEvent)
 

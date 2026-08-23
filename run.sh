@@ -8,7 +8,10 @@ python manage.py migrate
 echo "=> Ensuring Superusers..."
 python manage.py ensureadmin
 
+echo "=> Reconciling stale agents / orphaned work from before restart..."
+python manage.py reconcile_tasks
+
 
 # Start the first process
 echo "=> Starting Server"
-daphne -b 0.0.0.0 -p 80 --websocket_timeout -1 rekuest.asgi:application 
+daphne -b 0.0.0.0 -p 80 --websocket_timeout -1 rekuest.asgi:application

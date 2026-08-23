@@ -39,8 +39,9 @@ class ImplementationActionFilter:
         if len(value) == 0:
             return queryset, Q()
 
-        ids = managers.get_action_ids_by_port_demands(value, organization_id=info.context.request.organization.id)
-        return queryset.filter(**{f"{prefix}id__in": ids}), Q()
+        # RawSQL subquery: one round trip, no id materialization (see ActionFilter.demands).
+        subquery = managers.get_action_port_demand_subquery(value, organization_id=info.context.request.organization.id)
+        return queryset.filter(**{f"{prefix}id__in": subquery}), Q()
 
     @filter_field
     def kind(self, info: Info, queryset, value: renums.ActionKind, prefix: str):
@@ -54,9 +55,6 @@ class ImplementationActionFilter:
 @strawberry_django.order_type(models.Implementation)
 class ImplementationOrder:
     created_at: auto
-    started_at: auto
-    finished_at: auto
-    status: auto
 
     @strawberry_django.order_field
     def active(self, value: strawberry_django.Ordering, prefix: str) -> list[str]:

@@ -3,12 +3,13 @@ from typing import List, Optional, Tuple
 
 from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
+from django.db import transaction
 from django.utils import timezone
 
-from facade import inputs, models, enums, messages
+from facade import inputs, liveness, models, enums, messages
 from facade.grace import GraceScheduler, grace_seconds, progress_lease_seconds
 from facade.higher_order import project_returns
-from facade.messages import AgentMode
+from facade.ports import LeaseClaim
 
 _TERMINAL_KINDS = (
     enums.TaskEventKind.COMPLETED,
@@ -25,15 +26,18 @@ class ModelPersistBackend:
     The reconcile logic is a set of pure, idempotent DB operations (``reconcile_*``); the
     in-memory :class:`~facade.grace.GraceScheduler` timers are just one *responsive* trigger
     over them (a reconnect or the periodic sweep are interchangeable triggers).
+
+    Writes to an agent's liveness columns follow one rule (see :mod:`facade.liveness`):
+    **transitions** (claim / release / revoke) take a row lock and go through ``save()`` so
+    ``agent_post_save`` fires; **renewal** (the heartbeat, the only hot path) is a lock-free
+    compare-and-set on ``lease_epoch`` whose rowcount is the answer.
     """
 
     def __init__(self) -> None:
         # Responsive reconcile triggers (in-memory; the DB is authoritative). Keyed:
-        # ``_executor_grace`` by agent id (executor death → fail its executed work);
-        # ``_caller_grace`` by caller session id / connection id (caller death → cancel
-        # originated roots); ``_progress_leases`` by task id (silent physical op).
+        # ``_executor_grace`` by agent id (agent death → fail its executed work);
+        # ``_progress_leases`` by task id (silent physical op).
         self._executor_grace = GraceScheduler()
-        self._caller_grace = GraceScheduler()
         self._progress_leases = GraceScheduler()
         # auto_interrupt escalation timers (keyed by task id): a cancel with an
         # auto_interrupt window escalates to an interrupt if not confirmed in time.
@@ -93,7 +97,7 @@ class ModelPersistBackend:
         # Grace window: instead of failing in-flight work immediately, wait — a brief blip
         # that reconnects with the same session reclaims it (on_agent_connected cancels the
         # timer). grace<=0 keeps the legacy immediate, inline behaviour (deterministic).
-        grace = grace_seconds(AgentMode.EXECUTOR)
+        grace = grace_seconds()
         if grace <= 0:
             await self.reconcile_orphaned_executor_work(agent_id)
             return
@@ -101,17 +105,79 @@ class ModelPersistBackend:
         self._executor_grace.schedule(agent_id, grace, lambda: self.reconcile_orphaned_executor_work(agent_id))
 
     async def reconcile_orphaned_executor_work(self, agent_id: int) -> None:
-        """Fail an executor's in-flight work after a confirmed loss. Pure, idempotent DB op.
+        """Fail an agent's in-flight work after a confirmed loss. Pure, idempotent DB op.
 
         The authoritative reconcile shared by all three triggers (grace timer, reconnect with
-        a fresh session, and the periodic sweep). No-op if the agent reconnected in the
-        meantime (``connected`` is back True).
+        a fresh session, and the periodic sweep). No-op if the agent is live again — a
+        reconnect in the meantime means the work is being reclaimed, not orphaned.
+
+        The bail-out asks :func:`liveness.agent_is_live`, not ``agent.connected``. Every other
+        liveness decision goes through that one predicate, and this used to be the exception:
+        a stuck-connected agent whose lease had expired would make this a silent no-op, so its
+        work stayed ``is_done=False`` forever. Today the sweep happens to revoke (flipping
+        ``connected``) *before* calling here, which masks it — but that is sequencing luck, not
+        a guarantee, and it breaks the moment a new trigger calls this directly.
         """
         agent = await models.Agent.objects.aget(id=agent_id)
-        if agent.connected:
+        if liveness.agent_is_live(agent.connected, agent.last_seen):
             return
         in_flight = [a async for a in models.Task.objects.select_related("implementation", "action").filter(agent_id=agent_id, is_done=False)]
         await self._fail_and_cascade_inflight(in_flight)
+
+    def _revoke_lease_sync(self, agent_id: int) -> bool:
+        """Revoke one stuck-connected agent's lease under a row lock. Returns whether we won.
+
+        Re-checks staleness *under the lock*, so this doubles as the claim that makes the sweep
+        multi-worker safe: whichever worker gets the lock first flips ``connected`` and the
+        others then see a row that is no longer stale and back off, instead of every worker
+        racing on to ``reconcile_orphaned_executor_work`` and emitting duplicate terminal
+        events. A reconnect that landed between the scan and the lock also lands here.
+
+        Bumping ``lease_epoch`` is the part a boolean cannot express: it *fences* the wedged
+        connection, so if that worker's event loop later resumes, its heartbeat renewal
+        compare-and-set matches no row and it closes itself instead of resurrecting an agent
+        whose in-flight work has already been failed.
+
+        Uses ``Model.save()`` (NOT ``.aupdate``) so ``agent_post_save`` fires and the GraphQL
+        agent/``active`` subscriptions + dashboards refresh to reality. ``last_seen`` and
+        ``active_connection_id`` are deliberately left untouched: ``last_seen`` is the true
+        last-contact time the orphan cutoff depends on, and clearing ``active_connection_id``
+        could let a still-wedged socket's later disconnect pass the generation guard.
+        """
+        with transaction.atomic():
+            agent = models.Agent.objects.select_for_update().get(id=agent_id)
+            if not liveness.agent_is_stale(agent.connected, agent.last_seen):
+                return False  # healed or reconnected while we waited for the lock
+            agent.connected = False
+            agent.lease_epoch += 1
+            agent.save(update_fields=["connected", "lease_epoch"])
+        return True
+
+    async def reconcile_stale_agents(self) -> int:
+        """Heal websocket agents whose ``connected`` is stuck True past the stale window.
+
+        The disconnect handler only runs on a clean socket close; a crashed/killed worker leaves
+        ``connected=True`` with a stale ``last_seen`` forever, and the in-memory grace timers die
+        with the process. This is the DB-authoritative safety net: revoke the lease
+        (``connected=False`` + epoch bump) and reconcile the orphaned in-flight work.
+
+        Idempotent and multi-worker-safe: the revoke is a lock-guarded claim, so only the worker
+        that actually flips a row goes on to reconcile it. Driven by both the in-process reaper
+        loop and the ``reconcile_tasks`` management command. Returns the number healed.
+        """
+        stale = [
+            a
+            async for a in models.Agent.objects.select_related("organization")
+            .filter(kind=enums.AgentKind.WEBSOCKET.value)
+            .filter(liveness.stale_agent_q(prefix=""))
+        ]
+        healed = 0
+        for agent in stale:
+            if not await database_sync_to_async(self._revoke_lease_sync)(agent.pk):
+                continue  # another worker's sweep (or a reconnect) got there first
+            await self.reconcile_orphaned_executor_work(agent.pk)  # now matches connected=False
+            healed += 1
+        return healed
 
     def _build_redispatch_assign_sync(self, task_id: int) -> "messages.Assign | None":
         """Rebuild the Assign message for an idempotent task's re-dispatch, or None.
@@ -153,6 +219,31 @@ class ModelPersistBackend:
             token=token,
         )
 
+    def _claim_task_transition_sync(self, task_id: int, *, to_kind: str, mark_done: bool = False, skip_if_kind: str | None = None) -> bool:
+        """Take an orphaned task's terminal transition under a row lock. Returns whether we won.
+
+        The sweep is re-entrant *and* runs concurrently in every daphne process, so "is this
+        task still in-flight?" must be answered and acted on atomically. Reading the flag and
+        then writing it — as this path used to — lets two workers both observe an in-flight task
+        and both emit a terminal ``TaskEvent`` for it. Losing the claim (already done, or
+        already in ``skip_if_kind``) means another trigger handled this task; skip it silently.
+
+        ``save()`` rather than ``.aupdate()``: a task transition is observable, and
+        ``task_post_save`` fans it out to the agent/child task feeds.
+        """
+        with transaction.atomic():
+            task = models.Task.objects.select_for_update().get(pk=task_id)
+            if task.is_done or (skip_if_kind is not None and task.latest_event_kind == skip_if_kind):
+                return False
+            task.latest_event_kind = to_kind
+            update_fields = ["latest_event_kind"]
+            if mark_done:
+                task.is_done = True
+                task.finished_at = timezone.now()
+                update_fields += ["is_done", "finished_at"]
+            task.save(update_fields=update_fields)
+        return True
+
     async def _fail_and_cascade_inflight(self, tasks: List[models.Task]) -> None:
         """Mark orphaned in-flight work along the retry axis.
 
@@ -162,6 +253,9 @@ class ModelPersistBackend:
         on reconnect — a same-session reclaim after grace expiry may double-execute, which is
         safe by the idempotent contract. Everything else → DISCONNECTED (fate unknown,
         recoverable but never automatically resolved).
+
+        Every branch claims the transition first and only emits its ``TaskEvent`` if it won, so
+        concurrent sweeps produce exactly one terminal event per task rather than one each.
         """
         from facade.consumers.async_consumer import AgentConsumer  # lazy: avoids import cycle
 
@@ -170,53 +264,88 @@ class ModelPersistBackend:
             implementation = task.implementation
             effect = implementation.effect if implementation is not None else enums.EffectClassChoices.NONE.value
             if effect == enums.EffectClassChoices.PHYSICAL.value:
+                if not await database_sync_to_async(self._claim_task_transition_sync)(task.pk, to_kind=enums.TaskEventKind.CRITICAL, mark_done=True):
+                    continue
                 await models.TaskEvent.objects.acreate(
                     task=task,
                     kind=enums.TaskEventKind.CRITICAL,
                     message="Executor lost while running physical-effect work — terminal, not retried.",
                 )
-                task.is_done = True
-                task.finished_at = timezone.now()
-                task.latest_event_kind = enums.TaskEventKind.CRITICAL
-                await task.asave(update_fields=["latest_event_kind", "is_done", "finished_at"])
                 continue
 
             # The ``!= QUEUED`` guard makes the periodic sweep re-entrant: reconciling an
-            # already-requeued task again must not pile duplicate Assigns into the queue.
+            # already-requeued task again must not pile duplicate Assigns into the queue. The
+            # in-memory read here is only a cheap early-out; the claim below is authoritative.
             if task.action is not None and task.action.idempotent and task.latest_event_kind != enums.TaskEventKind.QUEUED:
+                # Built BEFORE the claim: if there is no re-dispatchable identity we must fall
+                # through to the fate-unknown branch, not leave the task marked QUEUED.
                 assign_message = await database_sync_to_async(self._build_redispatch_assign_sync)(task.pk)
                 if assign_message is not None:
+                    if not await database_sync_to_async(self._claim_task_transition_sync)(
+                        task.pk, to_kind=enums.TaskEventKind.QUEUED, skip_if_kind=enums.TaskEventKind.QUEUED
+                    ):
+                        continue
                     await models.TaskEvent.objects.acreate(
                         task=task,
                         kind=enums.TaskEventKind.QUEUED,
                         message="Executor lost — idempotent action re-queued for redelivery.",
                     )
-                    task.latest_event_kind = enums.TaskEventKind.QUEUED
-                    await task.asave(update_fields=["latest_event_kind"])
                     await sync_to_async(AgentConsumer.broadcast)(task.agent_id, assign_message)
                     continue
                 # No re-dispatchable identity → fall through to fate-unknown.
 
+            if not await database_sync_to_async(self._claim_task_transition_sync)(
+                task.pk, to_kind=enums.TaskEventKind.DISCONNECTED, skip_if_kind=enums.TaskEventKind.DISCONNECTED
+            ):
+                continue
             await models.TaskEvent.objects.acreate(
                 task=task,
                 kind=enums.TaskEventKind.DISCONNECTED,
                 message="Agent disconnected. Fate unknown",
             )
-            task.latest_event_kind = enums.TaskEventKind.DISCONNECTED
-            await task.asave(update_fields=["latest_event_kind"])
 
-    async def on_agent_connected(self, agent_id: int, connection_id: str | None = None, session_id: str | None = None) -> List[models.Task]:
-        agent = await models.Agent.objects.aget(id=agent_id)
-        prior_session = agent.active_session_id
+    def _claim_lease_sync(self, agent_id: int, connection_id: str | None, session_id: str | None, force: bool) -> Tuple[bool, Optional[int], Optional[str], bool]:
+        """Atomically decide the executor singleton and take the lease. Returns
+        ``(claimed, epoch, prior_session, displaced_incumbent)``.
+
+        The gate and the write happen under one ``select_for_update`` so they cannot be split:
+        previously the gate read ``connected``/``last_seen`` off an instance loaded during
+        authentication and the write re-fetched afterwards, so two concurrent registrations on
+        different workers could both observe the same stale incumbent, both pass, and both be
+        handed the in-flight work as ``Init`` inquiries.
+
+        Gate: reject only a *provably live* incumbent (``connected`` AND a fresh heartbeat)
+        when ``force`` is not set. A STALE incumbent — ``connected`` stuck True but the lease
+        expired (crashed worker, lost in-memory timers) — is displaced without ``force``, so a
+        dead connection never wedges the agent behind a ``--force`` reconnect.
+
+        Bumping ``lease_epoch`` is what fences the previous owner: its next heartbeat renewal
+        compare-and-sets against an epoch that no longer exists, matches no row, and it closes.
+        """
+        with transaction.atomic():
+            agent = models.Agent.objects.select_for_update().get(id=agent_id)
+            if liveness.agent_is_live(agent.connected, agent.last_seen) and not force:
+                return False, None, agent.active_session_id, False
+
+            prior_session = agent.active_session_id
+            displaced_incumbent = agent.connected
+
+            agent.lease_epoch += 1
+            agent.connected = True
+            agent.last_seen = timezone.now()
+            agent.active_connection_id = connection_id
+            agent.active_session_id = session_id
+            agent.save(update_fields=["lease_epoch", "connected", "last_seen", "active_connection_id", "active_session_id"])
+
+        return True, agent.lease_epoch, prior_session, displaced_incumbent
+
+    async def on_agent_connected(self, agent_id: int, connection_id: str | None = None, session_id: str | None = None, force: bool = False) -> LeaseClaim:
+        claimed, epoch, prior_session, displaced_incumbent = await database_sync_to_async(self._claim_lease_sync)(agent_id, connection_id, session_id, force)
+        if not claimed:
+            return LeaseClaim(claimed=False)
 
         # We are deciding reclaim-vs-cascade now, so cancel any pending grace timer.
         self._executor_grace.cancel(agent_id)
-
-        agent.connected = True
-        agent.last_seen = timezone.now()
-        agent.active_connection_id = connection_id
-        agent.active_session_id = session_id
-        await agent.asave(update_fields=["connected", "last_seen", "active_connection_id", "active_session_id"])
 
         in_flight = [a async for a in models.Task.objects.select_related("implementation", "action").filter(agent_id=agent_id, is_done=False)]
 
@@ -224,11 +353,26 @@ class ModelPersistBackend:
         # in-flight work is orphaned and must fail-and-cascade rather than be reclaimed.
         if prior_session is not None and session_id is not None and prior_session != session_id:
             await self._fail_and_cascade_inflight(in_flight)
-            return []
+            return LeaseClaim(claimed=True, epoch=epoch, tasks=[], displaced_incumbent=displaced_incumbent)
 
         # Same session (or first connect / no session info) → reclaim: hand the in-flight
         # work back as inquiries so the surviving process can re-sync.
-        return in_flight
+        return LeaseClaim(claimed=True, epoch=epoch, tasks=in_flight, displaced_incumbent=displaced_incumbent)
+
+    async def renew_agent_lease(self, agent_id: int, lease_epoch: int) -> bool:
+        """Renew the executor lease — the hot path, once per heartbeat per agent.
+
+        A lock-free compare-and-set: the rowcount *is* the answer to "am I still the owner?".
+        Returns False when this connection has been displaced by a newer registration or
+        revoked by the stale sweep (either bumps ``lease_epoch``); the caller must then close,
+        because a connection that cannot renew must not keep executing work.
+
+        Deliberately ``.aupdate()`` rather than ``save()``: nothing observable transitions on a
+        renewal, so this must NOT fire ``agent_post_save`` — that would broadcast an
+        ``AgentChange`` to the whole organization every ``AGENT_HEARTBEAT_INTERVAL`` per agent.
+        """
+        rows = await models.Agent.objects.filter(id=agent_id, lease_epoch=lease_epoch).aupdate(last_seen=timezone.now())
+        return rows == 1
 
     async def get_or_create_caller_id(self, agent_id: int) -> str:
         """The durable ``Caller`` id for an agent's identity (user/client/organization).
@@ -249,26 +393,24 @@ class ModelPersistBackend:
         self,
         agent_id: int,
         message: messages.AssignRequest,
-        can_assign_root: bool,
         connection_id: str | None = None,
         session_id: str | None = None,
     ) -> Tuple[models.Task, bool]:
-        """Originate (or resolve) a task requested by a caller over the socket.
+        """Assign *dependent* work requested by an agent over the socket.
 
         Idempotent on ``(caller, reference)`` and durable-before-return: a resend of the same
-        ``reference`` returns the existing task with ``created=False`` rather than
-        creating a duplicate. Raises ``PermissionError`` for a root task when the
-        caller lacks ``can_assign_root``. ``connection_id``/``session_id`` are recorded on a
-        new *root* task so the caller-death cascade can find it. Runs the sync postman
-        backend off the event loop.
+        ``reference`` returns the existing task with ``created=False`` rather than creating a
+        duplicate. Raises ``PermissionError`` for a parentless (root) assign — roots must trace
+        to an accountable human, so they originate solely from the GraphQL ``assign`` mutation
+        (see the human-root invariant in ``facade.provenance``). Runs the sync postman backend
+        off the event loop.
         """
-        return await database_sync_to_async(self._caller_assign_sync)(agent_id, message, can_assign_root, connection_id, session_id)
+        return await database_sync_to_async(self._caller_assign_sync)(agent_id, message, connection_id, session_id)
 
     def _caller_assign_sync(
         self,
         agent_id: int,
         message: messages.AssignRequest,
-        can_assign_root: bool,
         connection_id: str | None = None,
         session_id: str | None = None,
     ) -> Tuple[models.Task, bool]:
@@ -286,9 +428,8 @@ class ModelPersistBackend:
         if existing is not None:
             return existing, False
 
-        is_root = message.parent is None
-        if is_root and not can_assign_root:
-            raise PermissionError("Not authorized to originate a root task (missing can_assign_root).")
+        if message.parent is None:
+            raise PermissionError("An agent may only assign dependent work: 'parent' is required. Root tasks originate from the GraphQL assign mutation, where the initiator is an accountable human.")
 
         ctx = CallerContext.from_agent(agent, roles=principal.roles_for_caller(caller))
         hooks = [inputs.HookInputModel(**h) for h in message.hooks] if message.hooks else None
@@ -309,30 +450,11 @@ class ModelPersistBackend:
             ephemeral=message.ephemeral,
             step=message.step,
         )
-        task = controll_backend.assign(ctx, assign_input)
+        # A dependent task's fate follows its parent, so nothing about this connection needs
+        # recording on the row: if this agent dies, the executor-death cascade covers its work,
+        # and if the parent's tree is cancelled the child goes with it.
+        return controll_backend.assign(ctx, assign_input), True
 
-        # Record origination on a root so the caller-death cascade can find work this live
-        # connection/session owns (a dependent task's fate follows its parent).
-        if is_root and (connection_id is not None or session_id is not None):
-            task.originating_connection_id = connection_id
-            task.originating_session_id = session_id
-            task.save(update_fields=["originating_connection_id", "originating_session_id"])
-
-        return task, True
-
-    async def on_observer_connected(self, agent_id: int, connection_id: str | None = None, mode: str | None = None) -> List[models.Task]:
-        """A non-executor (frontend/caller/observer) connected.
-
-        Non-authoritative: it does NOT flip ``connected`` or claim ``active_connection_id``
-        (which belong to the executor singleton — and the row may be shared, per the
-        shared-Agent-row decision), and it reconciles no in-flight executor work. Caller
-        reclaim of originated roots is handled separately in :meth:`on_caller_connected`.
-        """
-        return []
-
-    # ----------------------------------------------------------------------- #
-    # Caller lifecycle controls (two-phase; the request phase wraps the sync postman backend)
-    # ----------------------------------------------------------------------- #
     def _caller_control_sync(self, agent_id: int, task_id: str, op: str, *, step: bool = False) -> models.Task:
         """Ownership-check then dispatch a control op on the sync postman backend.
 
@@ -432,76 +554,6 @@ class ModelPersistBackend:
     async def on_agent_started(self, agent_id: int, message: messages.Started) -> None:
         # The agent accepted and began executing — record it (mirrored to the caller as StartedEvent).
         await self._on_nonterminal_confirm(message.task, enums.TaskEventKind.STARTED)
-
-    async def on_caller_connected(self, agent_id: int, connection_id: str | None = None, session_id: str | None = None) -> None:
-        """A participant that may originate work connected — reclaim its orphaned roots.
-
-        Called for EVERY mode (any can originate work; executors assign dependents,
-        orchestrators/callers assign roots). Cancels a pending caller-death grace timer for
-        this session (the process survived) and re-points the roots it originated to the new
-        connection so a later disconnect of *this* connection owns them. Sessionless callers
-        cannot be reclaimed (their death is final after grace).
-        """
-        self._caller_grace.cancel(session_id or connection_id)
-        if session_id is not None and connection_id is not None:
-            await models.Task.objects.filter(originating_session_id=session_id, is_done=False).aupdate(originating_connection_id=connection_id)
-
-    async def on_caller_disconnected(self, agent_id: int, connection_id: str | None = None, session_id: str | None = None, mode: str | None = None) -> None:
-        """A participant that may originate work disconnected — cascade-cancel its roots.
-
-        Observers originate nothing, so they are a no-op. Otherwise, after the per-mode grace
-        window (so a quick reconnect with the same session can reclaim via
-        :meth:`on_caller_connected`), every still-running task this connection
-        originated is cancelled down to its executing agents. grace<=0 cancels inline.
-        """
-        if mode == AgentMode.OBSERVER.value:
-            return
-
-        grace = grace_seconds(mode)
-        if grace <= 0:
-            await self.reconcile_caller_roots(connection_id, session_id)
-            return
-
-        key = session_id or connection_id
-        if key is not None:
-            self._caller_grace.schedule(key, grace, lambda: self.reconcile_caller_roots(connection_id, session_id))
-
-    async def reconcile_caller_roots(self, connection_id: Optional[str], session_id: Optional[str] = None) -> None:
-        """Cancel every still-running root a (dead) connection originated. Pure, idempotent DB op.
-
-        Reclaim guard is implicit: ``on_caller_connected`` re-points reclaimed roots to the
-        new connection, so a filter by the OLD ``connection_id`` finds only genuinely-orphaned
-        work. Cancellation is a deliberate stop (a nice ``Cancel`` to each executor), so it
-        applies regardless of effect class — the effect rule governs ambiguous failure, not
-        an intentional cancel.
-        """
-        if connection_id is None:
-            return
-        async for root in models.Task.objects.filter(originating_connection_id=connection_id, is_done=False):
-            await self._cancel_task_tree(root)
-
-    async def _cancel_task_tree(self, root: models.Task) -> None:
-        from facade.consumers.async_consumer import AgentConsumer  # lazy: avoids import cycle
-
-        stack = [root]
-        while stack:
-            task = stack.pop()
-            if task.is_done:
-                continue
-            self._auto_interrupt.cancel(task.pk)
-            # Tell the executing agent to stop (best-effort, off the event loop).
-            await sync_to_async(AgentConsumer.broadcast)(task.agent_id, messages.Cancel(task=str(task.pk)))
-            await models.TaskEvent.objects.acreate(
-                task=task,
-                kind=enums.TaskEventKind.CANCELLED,
-                message="Caller disconnected — task cascade-cancelled.",
-            )
-            task.is_done = True
-            task.finished_at = timezone.now()
-            task.latest_event_kind = enums.TaskEventKind.CANCELLED
-            await task.asave(update_fields=["is_done", "finished_at", "latest_event_kind"])
-            async for child in models.Task.objects.filter(parent_id=task.pk, is_done=False):
-                stack.append(child)
 
     async def on_agent_log(self, agent_id: int, message: messages.Log) -> None:
         logging.info(f"Log Task {message}")

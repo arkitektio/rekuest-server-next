@@ -30,5 +30,4 @@ class TestUIModels:
         dashboard = Dashboard.objects.create(name="Test Dashboard")
 
         assert dashboard.name == "Test Dashboard"
-        assert dashboard.structure is None  # Default null
         assert dashboard.ui_tree is None  # Default null

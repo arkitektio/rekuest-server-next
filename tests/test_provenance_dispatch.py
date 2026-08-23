@@ -46,7 +46,6 @@ def _build_impl(agent_pk, *, needs_token=True):
         interface="prov_fn",
         action=action,
         agent=agent,
-        dynamic=False,
         needs_token=needs_token,
     )
 

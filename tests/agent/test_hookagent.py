@@ -115,11 +115,14 @@ def _signed_request(agent, message):
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 class TestHookIntake:
-    async def test_caller_assign_over_http(self, post_recorder):
+    async def test_sub_assign_over_http(self, post_recorder):
+        # A HookAgent assigns dependent work over HTTP — same rule as the socket: ``parent``
+        # is required, since roots come only from the GraphQL assign mutation.
         agent = await build_webhook_agent("hook-in-ca", secret="sek")
         impl = await build_implementation_for_agent(agent.pk, "hook-in-ca")
+        parent = await build_task("hook-in-ca-parent")
 
-        msg = messages.AssignRequest(reference="hr-1", implementation=str(impl.pk), args={"x": 1})
+        msg = messages.AssignRequest(reference="hr-1", implementation=str(impl.pk), parent=str(parent.pk), args={"x": 1})
         response = await hook_intake(_signed_request(agent, msg), str(agent.pk))
 
         assert response.status_code == 200

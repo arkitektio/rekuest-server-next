@@ -28,7 +28,7 @@ class Task:
     parent: Optional["Task"] = strawberry.field(description="Parent task that triggered this one.")
     action: "Action" = strawberry.field(description="Action assigned.")
     capture: bool = strawberry.field(description="Indicates if the task is being captured for logging or debugging.")
-    implementation: "Implementation" = strawberry.field(description="Implementation assigned to execute.")
+    implementation: Optional["Implementation"] = strawberry.field(description="Implementation assigned to execute. Null until the task is mapped to one.")
     latest_event_kind: enums.TaskEventKind = strawberry.field(description="Type of the latest event.")
     latest_instruct_kind: enums.TaskInstructKind = strawberry.field(description="Last instruction type.")
     caller: Optional["Caller"] = strawberry.field(description="Caller that created this task.")
@@ -62,7 +62,10 @@ class Task:
 
     @classmethod
     def get_queryset(cls, queryset, info, **kwargs):
-        return build_prescoped_queryset(info, queryset, field="implementation__action__organization")
+        # Scope through the non-null ``agent`` FK, not ``implementation__action`` — the latter is
+        # nullable, so its INNER JOIN silently dropped every not-yet-mapped (QUEUED/BOUND) task
+        # and disagreed with the ``agent__organization`` scope ``TaskStats`` uses below.
+        return build_prescoped_queryset(info, queryset, field="agent__organization")
 
 
 TaskStats, TaskStatsResolver = create_stats_type(
@@ -97,7 +100,7 @@ class TaskEvent:
         return self.task.reference
 
 
-@strawberry_django.type(models.TaskInstruct, filters=filters.TaskEventFilter, pagination=True, description="An instruct event for a specific task.")
+@strawberry_django.type(models.TaskInstruct, filters=filters.TaskInstructFilter, pagination=True, description="An instruct event for a specific task.")
 class TaskInstruct:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the instruct event.")
     task: "Task" = strawberry_django.field(description="Task the instruction relates to.")
