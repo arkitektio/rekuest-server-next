@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v2.3.0-rc.1 (2026-08-23)
+
+### Bug Fixes
+
+- Authentikate updates
+  ([`b24c6ce`](https://github.com/arkitektio/rekuest-server-next/commit/b24c6ce12666befaa7fbef08072e5ce8190606b9))
+
+### Features
+
+- Add probe
+  ([`ffddaf0`](https://github.com/arkitektio/rekuest-server-next/commit/ffddaf056e88e533c6591ea211f144a5a6c5e8c9))
+
+- Authentikate 4
+  ([`03a808c`](https://github.com/arkitektio/rekuest-server-next/commit/03a808c641f95c65c931643057174c878c10529c))
+
+
 ## v2.2.0 (2026-08-19)
 
 ### Bug Fixes
