@@ -1966,7 +1966,7 @@ wheels = [
 
 [[package]]
 name = "rekuest-server"
-version = "2.1.2"
+version = "2.2.0"
 source = { virtual = "." }
 dependencies = [
     { name = "aioredis" },
