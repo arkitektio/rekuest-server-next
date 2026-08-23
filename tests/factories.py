@@ -266,8 +266,12 @@ def _build_task_event(task_pk, kind=enums.TaskEventChoices.COMPLETED, message=No
     )
 
 
-def _build_implementation_for_agent(agent_pk, prefix, needs_token=True):
-    """An Action + Implementation owned by ``agent`` (connectable assign target)."""
+def _build_implementation_for_agent(agent_pk, prefix, needs_token=True, allow_probe=True):
+    """An Action + Implementation owned by ``agent`` (connectable assign target).
+
+    ``allow_probe`` defaults True so the call tests can target it; the flag only
+    gates the ``call`` mutation and is invisible to the task paths.
+    """
     agent = Agent.objects.select_related("app", "release", "organization").get(pk=agent_pk)
     action = Action.objects.create(
         app=agent.app,
@@ -277,6 +281,7 @@ def _build_implementation_for_agent(agent_pk, prefix, needs_token=True):
         description=f"{prefix} description",
         hash=f"{prefix}-action-hash",
         organization=agent.organization,
+        allow_probe=allow_probe,
     )
     return Implementation.objects.create(
         release=agent.release,

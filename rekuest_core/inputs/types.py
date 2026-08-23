@@ -419,6 +419,10 @@ class DefinitionInput:
         default=False,
         description="Whether the action is idempotent: safe to run multiple times with the same args without changing the outcome — on ambiguous executor loss it may be freely re-dispatched.",
     )
+    allow_probe: bool = strawberry.field(
+        default=False,
+        description="Whether the action may be invoked as a probe: zero persistence, redis-held state, no history/replay/recovery. Only actions declaring this are callable via the call mutation.",
+    )
     port_groups: list[PortGroupInput] = strawberry.field(
         default_factory=list,
         description="The port groups of the definition. This is used to group ports together in the UI",
@@ -520,15 +524,15 @@ class DynamicValueInput:
     path: Optional[str] = None
 
 
-@pydantic.input(models.AgentCallInputModel, description="Defines a callback that routes user interactions directly to an Arkitekt Agent via Rekuest.")
-class AgentCallInput:
+@pydantic.input(models.AgentProbeInputModel, description="Defines a callback that routes user interactions directly to an Arkitekt Agent via Rekuest.")
+class AgentProbeInput:
     dependency: str
     operation: str
     arguments: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = None
 
 
-@pydantic.input(models.UtilCallInputModel, description="Defines a utility call that can be invoked within the system.")
-class UtilCallInput:
+@pydantic.input(models.UtilProbeInputModel, description="Defines a utility call that can be invoked within the system.")
+class UtilProbeInput:
     operation: str
     arguments: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = None
 
@@ -539,8 +543,8 @@ class ActionArgumentInput:
     value_literal: Optional[scalars.JSONSerializable] = None
     value_path: Optional[str] = None
 
-    agent_call: Optional[AgentCallInput] = None
-    util_call: Optional[UtilCallInput] = None
+    agent_call: Optional[AgentProbeInput] = None
+    util_call: Optional[UtilProbeInput] = None
     value_list: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = None
     value_dict: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = None
 
@@ -552,8 +556,8 @@ class ComponentPropInput:
     # Primitives mapping to standard properties, state paths, or actions
     static_value: Optional[scalars.JSONSerializable] = None
     dynamic_value: Optional[DynamicValueInput] = None
-    agent_call: Optional[AgentCallInput] = None
-    util_call: Optional[UtilCallInput] = None
+    agent_call: Optional[AgentProbeInput] = None
+    util_call: Optional[UtilProbeInput] = None
     declares_value: Optional[str] = None
 
 

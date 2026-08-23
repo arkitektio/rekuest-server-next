@@ -15,7 +15,11 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+from channels.db import database_sync_to_async
+
 from facade import messages
+from facade.probes.ids import is_probe_id
+from facade.probes.persist import probe_event_backend
 from facade.ports import PersistBackend
 
 logger = logging.getLogger(__name__)
@@ -57,11 +61,26 @@ async def route_from_agent_message(
     Raises :class:`UnknownAgentMessage` for messages it does not handle (e.g. a second
     Register) so the transport can close the socket / return a 4xx.
     """
+    # Probes share the agent wire protocol: agents report on a probe exactly as on
+    # a task, distinguished only by the id prefix — those reports go to the redis-backed
+    # probe handlers and must never reach the DB backend (integer PK lookups would raise).
+    task_ref = getattr(message, "task", None)
+    if task_ref is not None and is_probe_id(task_ref):
+        return await _route_probe_message(agent_id, message)
+
     match message:
         case messages.AssignRequest():
             # An agent assigning dependent work. A bad request (including a parentless root
             # assign) NACKs with an error result rather than propagating — it must never tear
             # down the transport.
+            if is_probe_id(message.parent or ""):
+                return messages.AssignResponse(
+                    request=message.id,
+                    reference=message.reference,
+                    task=None,
+                    created=False,
+                    error="A probe cannot parent dependent work — assign a task instead.",
+                )
             try:
                 task, created = await backend.on_caller_assign(
                     agent_id,
@@ -73,6 +92,19 @@ async def route_from_agent_message(
                 logger.error("AssignRequest failed", exc_info=True)
                 return messages.AssignResponse(request=message.id, reference=message.reference, task=None, created=False, error=str(e))
             return messages.AssignResponse(request=message.id, reference=message.reference, task=str(task.pk), created=created)
+
+        case messages.ProbeRequest():
+            # An agent firing a probe under its own identity. Refusals (allow_probe not
+            # declared, inflight cap, unknown target) NACK rather than propagate — they
+            # must never tear down the transport.
+            from facade.probes.backend import probe_backend  # lazy: probes.backend reaches facade.backend
+
+            try:
+                state = await database_sync_to_async(probe_backend.probe_for_agent)(agent_id, message)
+            except Exception as e:
+                logger.error("ProbeRequest failed", exc_info=True)
+                return messages.ProbeResponse(request=message.id, probe=None, error=str(e))
+            return messages.ProbeResponse(request=message.id, probe=state["id"])
 
         # Caller lifecycle-control requests (two-phase; the outcome streams back as …Event mirrors).
         case messages.CancelRequest():
@@ -119,6 +151,10 @@ async def route_from_agent_message(
             await backend.on_agent_critical(agent_id, message)
             return _ack(message)
         case messages.StatePatch():
+            # ``Patch.task`` is a real FK — a probe id cannot be recorded there. Keep the
+            # patch (state truth matters) but drop the provenance link.
+            if is_probe_id(message.task_id or ""):
+                message = message.model_copy(update={"task_id": None})
             await backend.on_agent_state_patch(agent_id, message)
             return None
         case messages.StateSnapshot():
@@ -135,6 +171,63 @@ async def route_from_agent_message(
             return None
         case messages.Unlock():
             await backend.on_agent_unlock(agent_id, message)
+            return None
+        case _:
+            raise UnknownAgentMessage(type(message).__name__)
+
+
+async def _route_probe_message(agent_id: int, message: messages.FromAgentMessage) -> Optional[messages.ToAgentMessage]:
+    """Dispatch a probe-id-carrying FromAgent message to the redis probe handlers.
+
+    Mirrors the task dispatch: lifecycle confirmations and terminals are acked (agents
+    retry terminal reports until acked; the probe store dedups the resends), the streaming
+    events are fire-and-forget. What a probe cannot do is refused without tearing down the
+    transport: agent-side control of a probe NACKs, a Lock held by a probe is ignored
+    (probes lose distributed locking by design — there is no row to record the holder).
+    """
+    match message:
+        case messages.Started():
+            await probe_event_backend.on_agent_started(agent_id, message)
+            return _ack(message)
+        case messages.Paused():
+            await probe_event_backend.on_agent_paused(agent_id, message)
+            return _ack(message)
+        case messages.Resumed():
+            await probe_event_backend.on_agent_resumed(agent_id, message)
+            return _ack(message)
+        case messages.Cancelled():
+            await probe_event_backend.on_agent_cancelled(agent_id, message)
+            return _ack(message)
+        case messages.Interrupted():
+            await probe_event_backend.on_agent_interrupted(agent_id, message)
+            return _ack(message)
+        case messages.Completed():
+            await probe_event_backend.on_agent_done(agent_id, message)
+            return _ack(message)
+        case messages.Failed():
+            await probe_event_backend.on_agent_error(agent_id, message)
+            return _ack(message)
+        case messages.Critical():
+            await probe_event_backend.on_agent_critical(agent_id, message)
+            return _ack(message)
+        case messages.Yield():
+            await probe_event_backend.on_agent_yield(agent_id, message)
+            return None
+        case messages.Log():
+            await probe_event_backend.on_agent_log(agent_id, message)
+            return None
+        case messages.Progress():
+            await probe_event_backend.on_agent_progress(agent_id, message)
+            return None
+        case messages.CancelRequest() | messages.InterruptRequest() | messages.PauseRequest() | messages.ResumeRequest():
+            return messages.ControlResponse(
+                request=message.id,
+                task=message.task,
+                accepted=False,
+                error="Probes are controlled by their caller via GraphQL, not from an agent connection.",
+            )
+        case messages.Lock():
+            logger.warning("Lock %s requested by probe %s — ignored (probes cannot hold locks)", message.key, message.task)
             return None
         case _:
             raise UnknownAgentMessage(type(message).__name__)

@@ -59,6 +59,17 @@ REKUEST_GRACE = {
     "PROGRESS_LEASE": conf.rekuest.progress_lease,
 }
 
+# Task retention: terminal root task trees older than this are deleted by the retention
+# sweep (reaper loop + reconcile_tasks command). 0 disables — history then grows forever.
+TASK_RETENTION_SECONDS = conf.rekuest.task_retention
+
+# Probes (facade.probes): redis-held, zero-DB-row invocations. TTL is the garbage
+# collector — a live probe's state expires after PROBE_TTL_SECONDS without a write, and a
+# terminal probe lingers PROBE_LINGER_SECONDS for late subscribers.
+PROBE_TTL_SECONDS = conf.rekuest.probe_ttl
+PROBE_LINGER_SECONDS = conf.rekuest.probe_linger
+PROBE_MAX_INFLIGHT_PER_CALLER = conf.rekuest.probe_max_inflight
+
 # Application definition
 USE_X_FORWARDED_HOST = conf.django.use_x_forwarded_host
 

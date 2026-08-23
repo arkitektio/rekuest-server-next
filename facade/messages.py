@@ -62,6 +62,7 @@ class ToAgentMessageType(str, Enum):
     PROTOCOL_ERROR = "PROTOCOL_ERROR"
     EVENT_ACK = "EVENT_ACK"
     ASSIGN_RESPONSE = "ASSIGN_RESPONSE"
+    PROBE_RESPONSE = "PROBE_RESPONSE"
     # Caller-bound event-stream mirrors — one per TaskEventKind — streamed back to the
     # participant that originated the task (see ``ExecutionEvent`` and subclasses).
     BOUND_EVENT = "BOUND_EVENT"
@@ -110,6 +111,7 @@ class FromAgentMessageType(str, Enum):
     STATE_SNAPSHOT = "STATE_SNAPSHOT"
     SESSION_INIT = "SESSION_INIT"
     ASSIGN_REQUEST = "ASSIGN_REQUEST"
+    PROBE_REQUEST = "PROBE_REQUEST"
     # Caller-issued lifecycle control requests over the socket (mirroring ASSIGN_REQUEST).
     CANCEL_REQUEST = "CANCEL_REQUEST"
     INTERRUPT_REQUEST = "INTERRUPT_REQUEST"
@@ -166,6 +168,10 @@ class Assign(Message):
     )
     """ The parent s"""
     resolution: Optional[str] = Field(default=None, description="The resolution id this task has dependencies")
+    probe: bool = Field(
+        default=False,
+        description="Whether this is a probe (p-… id): an ephemeral invocation with no server-side history, no replay/recovery; sub-assignment and locks are unavailable. Agents may adapt (e.g. skip audit side effects).",
+    )
     capture: Optional[bool] = Field(default=None, description="Whether to run in debug mode, false by default")
     reference: Optional[str] = Field(default=None, description="A reference that the assinger provided")
     args: Dict[str, ShallowJSONSerializable] = Field(description="The arguments that was sendend")
@@ -571,7 +577,6 @@ class AssignRequest(Message):
     resolution: Optional[str] = Field(default=None, description="The resolution ID for an implementation with dependencies.")
     hooks: Optional[List[Dict[str, Any]]] = Field(default=None, description="Lifecycle hooks for the task.")
     capture: Optional[bool] = Field(default=None, description="Whether to run in debug capture mode.")
-    ephemeral: Optional[bool] = Field(default=None, description="Whether the task is ephemeral.")
     step: Optional[bool] = Field(default=None, description="Whether to step to breakpoints.")
 
 
@@ -590,6 +595,37 @@ class AssignResponse(Message):
     task: Optional[str] = Field(default=None, description="The durable task id, or None when error is set.")
     created: bool = Field(default=True, description="False when an existing task was returned for a duplicate reference.")
     error: Optional[str] = Field(default=None, description="A human-readable error if the assign was rejected (e.g. a parentless root assign).")
+
+
+class ProbeRequest(Message):
+    """An agent's request to fire a probe over the socket.
+
+    The socket twin of the GraphQL ``probe`` mutation: an ephemeral, zero-persistence
+    invocation under the requesting agent's own identity. Unlike ``AssignRequest`` no
+    ``parent`` exists — probes are always provenance roots and cannot join a task tree.
+    Best-effort: there is no durable row to dedupe resends against, so a resend after a
+    lost ``ProbeResponse`` fires a NEW probe (probes are cheap and TTL-bounded).
+    """
+
+    type: Literal[FromAgentMessageType.PROBE_REQUEST] = FromAgentMessageType.PROBE_REQUEST
+    reference: Optional[str] = Field(default=None, description="An optional requester-side reference echoed to the executor.")
+    args: Dict[str, ShallowJSONSerializable] = Field(default_factory=dict, description="The args of the probe (ports → values).")
+    action: Optional[str] = Field(default=None, description="The action ID to probe.")
+    action_hash: Optional[str] = Field(default=None, description="The action hash to probe.")
+    implementation: Optional[str] = Field(default=None, description="A direct implementation ID to probe.")
+
+
+class ProbeResponse(Message):
+    """The backend's answer to a ``ProbeRequest``: the probe id, or a refusal.
+
+    Events of the probe then stream to the requester as ``…Event`` mirrors whose
+    ``task`` is the probe id (``p-…``) and whose ``seq`` is the per-probe counter.
+    """
+
+    type: Literal[ToAgentMessageType.PROBE_RESPONSE] = ToAgentMessageType.PROBE_RESPONSE
+    request: str = Field(description="The id of the ProbeRequest this answers.")
+    probe: Optional[str] = Field(default=None, description="The probe id (p-…), or None when error is set.")
+    error: Optional[str] = Field(default=None, description="A human-readable error if the probe was refused (allow_probe not declared, cap exceeded, …).")
 
 
 class ControlRequest(Message):
@@ -846,6 +882,7 @@ ToAgentMessage = Union[
     Kick,
     EventAck,
     AssignResponse,
+    ProbeResponse,
     ControlResponse,
     BoundEvent,
     QueuedEvent,
@@ -867,4 +904,4 @@ ToAgentMessage = Union[
     FailedEvent,
     CriticalEvent,
 ]
-FromAgentMessage = Union[Critical, Log, Progress, Started, Completed, Failed, Yield, Register, HeartbeatEvent, Resumed, Paused, Cancelled, Interrupted, StatePatch, StateSnapshot, Lock, Unlock, SessionInit, AssignRequest, CancelRequest, InterruptRequest, PauseRequest, ResumeRequest]
+FromAgentMessage = Union[Critical, Log, Progress, Started, Completed, Failed, Yield, Register, HeartbeatEvent, Resumed, Paused, Cancelled, Interrupted, StatePatch, StateSnapshot, Lock, Unlock, SessionInit, AssignRequest, ProbeRequest, CancelRequest, InterruptRequest, PauseRequest, ResumeRequest]

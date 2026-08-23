@@ -9,6 +9,7 @@ class LogLevelChoices(TextChoices):
     INFO = "INFO", "INFO Level"
     ERROR = "ERROR", "ERROR Level"
     WARN = "WARN", "WARN Level"
+    CRITICAL = "CRITICAL", "CRITICAL Level"
 
 
 @strawberry.enum

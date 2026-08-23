@@ -18,6 +18,7 @@ from . import (
     auth,
     base,
     blok,
+    probe,
     dashboard,
     demand,
     dependency,
@@ -39,6 +40,7 @@ from .task import (
     TaskStats,
     TaskStatsResolver,
 )
+from .probe import Probe, ProbeEvent, ProbeStats
 from .auth import App, Caller, Client, Device, Organization, Release, User
 from .base import build_prescoped_queryset, build_prescoper
 from .blok import Blok, BlokAgentMapping, BlokDependency, MaterializedBlok
@@ -116,6 +118,9 @@ __all__ = [
     "MemoryShelve",
     "MemoryDrawer",
     "Task",
+    "Probe",
+    "ProbeEvent",
+    "ProbeStats",
     "TaskStats",
     "TaskStatsResolver",
     "TaskEvent",
@@ -155,6 +160,7 @@ _SUBMODULES = (
     task,
     auth,
     blok,
+    probe,
     dashboard,
     demand,
     dependency,

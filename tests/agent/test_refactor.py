@@ -26,7 +26,7 @@ def test_persist_backend_satisfies_port():
 
 def test_deliver_to_agent_routes_by_kind(monkeypatch):
     pushed, posted = [], []
-    monkeypatch.setattr(transport.RedisAgentQueue, "from_settings", classmethod(lambda cls: type("Q", (), {"push": lambda self, a, b: pushed.append((a, b))})()))
+    monkeypatch.setattr(transport.RedisAgentQueue, "from_settings", classmethod(lambda cls: type("Q", (), {"push": lambda self, a, b, priority=False: pushed.append((a, b))})()))
     monkeypatch.setattr(transport.hooks, "deliver_to_hook", lambda agent, body: posted.append((agent, body)))
 
     ws = type("A", (), {"pk": 7, "kind": enums.AgentKind.WEBSOCKET.value})()

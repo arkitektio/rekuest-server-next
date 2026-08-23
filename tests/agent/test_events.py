@@ -20,12 +20,13 @@ class TestAgentEvents:
         task = await build_task("log")
         session = await open_agent(agent_ws, "log-agent")
 
-        await session.send(messages.Log(task=str(task.pk), message="hello", level="INFO"))
+        await session.send(messages.Log(task=str(task.pk), message="hello", level="ERROR"))
 
         await session.disconnect()  # flush the event through before asserting
         events = [e async for e in TaskEvent.objects.filter(task_id=task.pk, kind=enums.TaskEventKind.LOG)]
         assert len(events) == 1
         assert events[0].message == "hello"
+        assert str(events[0].level) == "ERROR"  # the agent-sent level is persisted, not dropped
 
     async def test_progress_event_persists(self, agent_ws):
         task = await build_task("progress")
