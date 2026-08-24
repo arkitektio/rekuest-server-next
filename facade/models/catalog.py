@@ -52,6 +52,12 @@ class Protocol(models.Model):
 
     """
 
+    organization = models.ForeignKey(
+        "authentikate.Organization",
+        on_delete=models.CASCADE,
+        related_name="protocols",
+        help_text="The organization this Protocol belongs to. Access is scoped to it.",
+    )
     name = models.CharField(max_length=1000, unique=True, help_text="The name of this Protocol")
     description = models.TextField(help_text="A description for the Protocol")
 
@@ -66,6 +72,12 @@ class UICatalog(models.Model):
 
     """
 
+    organization = models.ForeignKey(
+        "authentikate.Organization",
+        on_delete=models.CASCADE,
+        related_name="ui_catalogs",
+        help_text="The organization this UICatalog belongs to. Access is scoped to it.",
+    )
     name = models.CharField(max_length=1000)
     schema = models.JSONField(default=dict)
 

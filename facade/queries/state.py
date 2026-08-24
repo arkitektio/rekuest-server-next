@@ -18,26 +18,39 @@ from facade.logic import get_latest_state
 
 
 def _get_boundary_aggregates(queryset: QuerySet) -> Optional[Dict[str, Any]]:
-    """Helper to extract common start/end aggregations for boundary calculations."""
+    """Helper to extract common start/end aggregations for boundary calculations.
+
+    ``global_rev`` is the revision *after* a patch applies, so the range a patch set spans runs
+    from ``min(global_rev) - 1`` (what the first patch applied to) to ``max(global_rev)``.
+    """
     agg = queryset.aggregate(
-        start_global_revision=Min("global_current_revision"),
-        end_global_revision=Max("global_future_revision"),
+        first_rev=Min("global_rev"),
+        last_rev=Max("global_rev"),
         start_time=Min("timestamp"),
         end_time=Max("timestamp"),
     )
-    if agg["start_global_revision"] is None:
+    if agg["first_rev"] is None:
         return None
-    return agg
+    return {
+        "start_global_revision": agg["first_rev"] - 1,
+        "end_global_revision": agg["last_rev"],
+        "start_time": agg["start_time"],
+        "end_time": agg["end_time"],
+    }
 
 
-def _get_state_ids(session_id: str | None) -> List[str]:
-    """Get distinct state_ids from both Snapshots and Patches."""
-    snapshot_qs = models.Snapshot.objects.all()
-    patch_qs = models.Patch.objects.all()
+def _get_state_ids(session_id: str | None, organization) -> List[str]:
+    """Get distinct state_ids from both Snapshots and Patches, within one organization.
+
+    Unscoped, and with no ``session_id``, this enumerated every Snapshot and Patch in the
+    deployment.
+    """
+    snapshot_qs = models.Snapshot.objects.filter(agent__organization=organization)
+    patch_qs = models.Patch.objects.filter(agent__organization=organization)
 
     if session_id:
-        snapshot_qs = snapshot_qs.filter(session_id=session_id)
-        patch_qs = patch_qs.filter(session_id=session_id)
+        snapshot_qs = snapshot_qs.filter(session__session_id=session_id)
+        patch_qs = patch_qs.filter(session__session_id=session_id)
 
     snapshot_ids = set(snapshot_qs.values_list("state_id", flat=True))
     patch_ids = set(patch_qs.values_list("state_id", flat=True))
@@ -48,30 +61,26 @@ def _get_state_at_revision(
     target_revision: int,
     state_id: str,
     session_id: str | None,
-    use_global_revision: bool,
 ) -> Optional[types.Snapshot]:
     """Calculates the state of a specific document at a given revision by applying JSON patches."""
-    snapshot_rev_field = "global_revision" if use_global_revision else "revision"
-    patch_current_field = "global_current_revision" if use_global_revision else "current_revision"
-    patch_future_field = "global_future_revision" if use_global_revision else "future_revision"
-
     # 1. Fetch the closest anchor snapshot prior to or at the target revision
     snapshot_qs = models.Snapshot.objects.filter(state_id=state_id)
     if session_id:
-        snapshot_qs = snapshot_qs.filter(session_id=session_id)
+        snapshot_qs = snapshot_qs.filter(session__session_id=session_id)
 
-    anchor_snapshot = snapshot_qs.filter(**{f"{snapshot_rev_field}__lte": target_revision}).order_by(f"-{snapshot_rev_field}").first()
+    anchor_snapshot = snapshot_qs.filter(global_rev__lte=target_revision).order_by("-global_rev").first()
 
     if not anchor_snapshot:
         return None
 
     # 2. Fetch all patches between the anchor snapshot and the target revision
-    patch_start_rev = getattr(anchor_snapshot, snapshot_rev_field) or 0
+    patch_start_rev = anchor_snapshot.global_rev or 0
     patch_qs = models.Patch.objects.filter(state_id=state_id)
     if session_id:
-        patch_qs = patch_qs.filter(session_id=session_id)
+        patch_qs = patch_qs.filter(session__session_id=session_id)
 
-    patch_qs = patch_qs.filter(**{f"{patch_current_field}__gte": patch_start_rev, f"{patch_future_field}__lte": target_revision}).order_by(patch_current_field)
+    # Patches strictly after the anchor, up to and including the target revision.
+    patch_qs = patch_qs.filter(global_rev__gt=patch_start_rev, global_rev__lte=target_revision).order_by("global_rev")
 
     # 3. Batch apply JSON patches
     state_data = anchor_snapshot.value
@@ -88,7 +97,14 @@ def _get_state_at_revision(
 
     if patch_docs:
         state_data = jsonpatch.apply_patch(state_data, patch_docs, in_place=False)
-        last_snapshot = types.Snapshot(value=state_data, timestamp=last_patch.timestamp, revision=last_patch.future_revision, global_revision=last_patch.global_future_revision, session_id=last_patch.session_id, state=last_patch.state)
+        last_snapshot = models.Snapshot(
+            value=state_data,
+            timestamp=last_patch.timestamp,
+            global_rev=last_patch.global_rev,
+            session=last_patch.session,
+            state=last_patch.state,
+            agent=last_patch.agent,
+        )
 
     return last_snapshot
 
@@ -122,7 +138,7 @@ def task_boundaries(
     state_id: strawberry.ID | None = None,
 ) -> Optional[types.TaskBoundary]:
     """Retrieve min/max revisions and times for a task correlation ID."""
-    queryset = models.Patch.objects.filter(task__reference=correlation_id)
+    queryset = models.Patch.objects.filter(task__reference=correlation_id, agent__organization=info.context.request.organization)
     if state_id:
         queryset = queryset.filter(state_id=state_id)
 
@@ -139,7 +155,7 @@ def session_boundaries(
     state_id: strawberry.ID | None = None,
 ) -> Optional[types.SessionBoundary]:
     """Retrieve min/max revisions and times for a specific session."""
-    queryset = models.Patch.objects.filter(session_id=session_id)
+    queryset = models.Patch.objects.filter(session__session_id=session_id, agent__organization=info.context.request.organization)
     if state_id:
         queryset = queryset.filter(state_id=state_id)
 
@@ -156,28 +172,11 @@ def state_at_global_rev(
     state_id: strawberry.ID | None = None,
     session_id: str | None = None,
 ) -> List[types.Snapshot]:
-    state_ids = [str(state_id)] if state_id else _get_state_ids(session_id)
+    state_ids = [str(state_id)] if state_id else _get_state_ids(session_id, info.context.request.organization)
 
     results = []
     for sid in state_ids:
-        res = _get_state_at_revision(global_revision, sid, session_id, use_global_revision=True)
-        if res:
-            results.append(res)
-
-    return results
-
-
-def state_at_local_rev(
-    info: Info,
-    revision: int,
-    state_id: strawberry.ID | None = None,
-    session_id: str | None = None,
-) -> List[types.Snapshot]:
-    state_ids = [str(state_id)] if state_id else _get_state_ids(session_id)
-
-    results = []
-    for sid in state_ids:
-        res = _get_state_at_revision(revision, sid, session_id, use_global_revision=False)
+        res = _get_state_at_revision(global_revision, sid, session_id)
         if res:
             results.append(res)
 
@@ -191,13 +190,14 @@ def forward_events_after_rev(
     session_id: str | None = None,
     count: int = 100,
 ) -> List[types.Patch]:
-    queryset = models.Patch.objects.filter(global_current_revision__gte=global_revision)
+    # current_revision >= X  <=>  global_rev - 1 >= X  <=>  global_rev > X
+    queryset = models.Patch.objects.filter(agent__organization=info.context.request.organization, global_rev__gt=global_revision)
     if state_id:
         queryset = queryset.filter(state_id=state_id)
     if session_id:
-        queryset = queryset.filter(session_id=session_id)
+        queryset = queryset.filter(session__session_id=session_id)
 
-    return list(queryset.order_by("global_current_revision", "state_id", "current_revision")[:count])
+    return list(queryset.order_by("global_rev", "state_id")[:count])
 
 
 def patch_events_between_global_revs(
@@ -210,13 +210,17 @@ def patch_events_between_global_revs(
     if to_global_revision < from_global_revision:
         return []
 
-    queryset = models.Patch.objects.filter(global_current_revision__gte=from_global_revision, global_future_revision__lte=to_global_revision)
+    queryset = models.Patch.objects.filter(
+        agent__organization=info.context.request.organization,
+        global_rev__gt=from_global_revision,
+        global_rev__lte=to_global_revision,
+    )
     if state_ids:
         queryset = queryset.filter(state_id__in=state_ids)
     if session_id:
-        queryset = queryset.filter(session_id=session_id)
+        queryset = queryset.filter(session__session_id=session_id)
 
-    return list(queryset.order_by("global_current_revision", "state_id", "current_revision"))
+    return list(queryset.order_by("global_rev", "state_id"))
 
 
 def snapshots_around_rev(
@@ -227,19 +231,19 @@ def snapshots_around_rev(
     before: int = 1,
     after: int = 1,
 ) -> List[types.Snapshot]:
-    target_state_ids = [str(state_id)] if state_id else _get_state_ids(session_id)
+    target_state_ids = [str(state_id)] if state_id else _get_state_ids(session_id, info.context.request.organization)
     collected: List[types.Snapshot] = []
 
     for sid in target_state_ids:
-        qs_before = models.Snapshot.objects.filter(state_id=sid, revision__lte=revision)
-        qs_after = models.Snapshot.objects.filter(state_id=sid, revision__gt=revision)
+        qs_before = models.Snapshot.objects.filter(state_id=sid, global_rev__lte=revision)
+        qs_after = models.Snapshot.objects.filter(state_id=sid, global_rev__gt=revision)
 
         if session_id:
-            qs_before = qs_before.filter(session_id=session_id)
-            qs_after = qs_after.filter(session_id=session_id)
+            qs_before = qs_before.filter(session__session_id=session_id)
+            qs_after = qs_after.filter(session__session_id=session_id)
 
-        before_list = list(qs_before.order_by("-revision")[:before][::-1])  # Reverse to chronological
-        after_list = list(qs_after.order_by("revision")[:after])
+        before_list = list(qs_before.order_by("-global_rev")[:before][::-1])  # Reverse to chronological
+        after_list = list(qs_after.order_by("global_rev")[:after])
 
         collected.extend(before_list + after_list)
 

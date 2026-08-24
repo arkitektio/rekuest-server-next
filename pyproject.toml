@@ -73,11 +73,14 @@ include = [
     "facade/transport.py",
     "facade/message_router.py",
     "facade/grace.py",
-    "facade/capabilities.py",
     "facade/caller_context.py",
     "facade/caller_events.py",
     "facade/hooks.py",
     "facade/consumers/agent_protocol.py",
+    "facade/probes/backend.py",
+    "facade/probes/store.py",
+    "facade/probes/persist.py",
+    "facade/probes/ids.py",
 ]
 exclude = ["**/migrations", "**/__pycache__", ".venv", "tests"]
 # Django models / pydantic models defeat structural inference without a plugin.

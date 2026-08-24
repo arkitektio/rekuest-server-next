@@ -14,7 +14,7 @@ class Task(models.Model):
     acted_on = ArrayField(base_field=models.CharField(max_length=1000), help_text="Which structures were acted on in this task", default=list)
     implementation = models.ForeignKey(
         "Implementation",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         help_text="Which implementation is the task currently mapped (can be reassigned)?",
         related_name="tasks",
         blank=True,

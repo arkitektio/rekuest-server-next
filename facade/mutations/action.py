@@ -8,19 +8,23 @@ logger = logging.getLogger(__name__)
 
 
 def cleanup_actions(info: Info, action_ids: list[strawberry.ID] | None = None) -> int:
-    # TODO: Check that user has permission to delete actions
+    """Delete the caller's organization's Actions that no implementation references.
 
+    Always organization-scoped. The no-argument form used to fall through to the bare manager,
+    which deleted every unreferenced Action in *every* organization — and, because
+    ``Task.action`` cascades, their task history with them.
+    """
+    organization = info.context.request.organization
+
+    actions_to_check = models.Action.objects.filter(organization=organization)
     if action_ids:
-        # Delete specific actions by IDs
-        actions_to_check = models.Action.objects.filter(id__in=action_ids, organization=info.context.request.organization)
-    else:
-        actions_to_check = models.Action.objects
+        actions_to_check = actions_to_check.filter(id__in=action_ids)
 
-    runreferenced_actions = actions_to_check.annotate(num_implementations=Count("implementations")).filter(num_implementations=0)
+    unreferenced_actions = actions_to_check.annotate(num_implementations=Count("implementations")).filter(num_implementations=0)
 
     # Delete them in bulk (efficiently)
-    deleted_count, _ = runreferenced_actions.delete()
+    deleted_count, _ = unreferenced_actions.delete()
 
-    logger.info(f"Successfully deleted {deleted_count} unreferenced actions.")
+    logger.info(f"Deleted {deleted_count} unreferenced actions for organization {organization.slug}.")
 
     return deleted_count

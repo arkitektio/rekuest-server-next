@@ -177,6 +177,20 @@ def acted_on_from_args(args: dict, action: models.Action) -> list[str]:
     return acted_on
 
 
+
+def _agent_in_org(info: Info, agent_id) -> "models.Agent":
+    """Resolve an agent inside the requesting organization, or refuse.
+
+    ``bounce``/``block``/``unblock``/``kick`` are destructive to a running deployment, so the
+    target must belong to the caller — otherwise any authenticated user could permanently block
+    another organization's production agent by naming its id.
+    """
+    try:
+        return models.Agent.objects.get(id=agent_id, organization=info.context.request.organization)
+    except models.Agent.DoesNotExist:
+        raise PermissionError(f"No agent {agent_id} in your organization.")
+
+
 class RedisControllBackend:
     """The postman backend: resolves + persists tasks, then notifies via transport."""
 
@@ -203,6 +217,10 @@ class RedisControllBackend:
         already terminal.
         """
         task = models.Task.objects.select_related("agent").get(id=task_id)
+        # A caller may only control tasks in its own organization. ``caller`` is None only on
+        # internal (non-GraphQL) paths, which are already trusted.
+        if caller is not None and task.agent.organization_id != caller.organization_id:
+            raise PermissionError(f"Task {task_id} is not in your organization.")
         if task.is_done:
             raise ValueError("Task is already terminal")
 
@@ -512,7 +530,7 @@ class RedisControllBackend:
         )
 
     def bounce(self, info: Info, input: inputs.BounceInputModel) -> models.Agent:
-        agent = models.Agent.objects.get(id=input.agent)
+        agent = _agent_in_org(info, input.agent)
 
         AgentConsumer.broadcast(
             agent,
@@ -523,7 +541,7 @@ class RedisControllBackend:
         return agent
 
     def block(self, info: Info, input: inputs.BlockInputModel) -> models.Agent:
-        agent = models.Agent.objects.get(id=input.agent)
+        agent = _agent_in_org(info, input.agent)
         agent.blocked = True
         agent.save()
 
@@ -537,14 +555,14 @@ class RedisControllBackend:
         return agent
 
     def unblock(self, info: Info, input: inputs.UnblockInputModel) -> models.Agent:
-        agent = models.Agent.objects.get(id=input.agent)
+        agent = _agent_in_org(info, input.agent)
         agent.blocked = False
         agent.save()
 
         return agent
 
     def kick(self, info: Info, input: inputs.KickInputModel) -> models.Agent:
-        agent = models.Agent.objects.get(id=input.agent)
+        agent = _agent_in_org(info, input.agent)
 
         AgentConsumer.broadcast(
             agent,

@@ -147,6 +147,12 @@ class MemoryShelve(models.Model):
 
     """
 
+    organization = models.ForeignKey(
+        "authentikate.Organization",
+        on_delete=models.CASCADE,
+        related_name="memory_shelves",
+        help_text="The organization this MemoryShelve belongs to. Access is scoped to it.",
+    )
     agent = models.OneToOneField(
         Agent,
         on_delete=models.CASCADE,

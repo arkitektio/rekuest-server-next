@@ -17,6 +17,12 @@ class StateDefinition(models.Model):
 
     """
 
+    organization = models.ForeignKey(
+        "authentikate.Organization",
+        on_delete=models.CASCADE,
+        related_name="state_definitions",
+        help_text="The organization this StateDefinition belongs to. Access is scoped to it.",
+    )
     name = models.CharField(max_length=2000)
     hash = models.CharField(max_length=2000, unique=True)
     ports = models.JSONField(default=dict)

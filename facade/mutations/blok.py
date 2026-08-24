@@ -7,10 +7,15 @@ import strawberry
 def create_blok(info: Info, input: inputs.CreateBlokInput) -> types.Blok:
     model = input.to_pydantic()
 
-    catalog = models.UICatalog.objects.get_or_create(name=model.catalog)[0] if model.catalog else models.UICatalog.objects.get_or_create(name="default")[0]
+    organization = info.context.request.organization
+    catalog_name = model.catalog or "default"
+    catalog = models.UICatalog.objects.get_or_create(name=catalog_name, organization=organization)[0]
 
+    # ``organization`` is part of the lookup, not the defaults: keyed on name alone this was a
+    # global upsert, so any user could overwrite another organization's blok by name.
     x, _ = models.Blok.objects.update_or_create(
         name=model.name,
+        organization=organization,
         defaults=dict(
             components=[x.model_dump() for x in model.components] if model.components else [],
             description=model.description,
@@ -62,7 +67,7 @@ def update_blok(info: Info, input: inputs.UpdateBlokInput) -> types.Blok:
     if input.demo_state is not None:
         blok.demo_state = input.demo_state
     if input.catalog is not None:
-        catalog = models.UICatalog.objects.get_or_create(name=input.catalog)[0]
+        catalog = models.UICatalog.objects.get_or_create(name=input.catalog, organization=info.context.request.organization)[0]
         blok.catalog = catalog
 
     blok.save()

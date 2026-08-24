@@ -9,6 +9,7 @@ import strawberry_django
 from datalayer import types as dtypes
 
 from facade import filters, models, scalars
+from facade.types.base import build_prescoped_queryset
 
 
 @strawberry_django.type(
@@ -28,6 +29,10 @@ class ThreeDModel:
     created_at: datetime.datetime
     updated_at: datetime.datetime
 
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="organization")
+
 
 @strawberry_django.type(
     models.Space,
@@ -44,6 +49,10 @@ class Space:
     created_at: datetime.datetime
     updated_at: datetime.datetime
     placements: list["Placement"]
+
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="organization")
 
 
 @strawberry_django.type(
@@ -65,3 +74,9 @@ class Placement:
     @strawberry_django.field(description="Get the agent associated with this placement.")
     def name(self) -> str:
         return self.agent.name
+
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="space__organization")
+
+

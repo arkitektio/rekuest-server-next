@@ -8,7 +8,7 @@ from facade.probes.backend import probe_backend
 from facade.probes.store import get_probe_store
 
 from tests.agent.helpers import open_agent
-from tests.factories import build_implementation_for_agent
+from tests.factories import build_implementation_for_agent, seed_agent
 
 
 class _Info:
@@ -71,6 +71,10 @@ class TestProbePauseResume:
         state = await sync_to_async(probe_backend.probe)(_Info(authenticated_context), inputs.ProbeInputModel(implementation=str(impl.pk), args={}))
         await session.receive(messages.Assign)
 
-        foreign = CallerContext.from_agent(session.agent)
+        # A genuinely different identity (token "test2"), not merely a different fixture. This
+        # used to rely on ``authenticated_context`` and ``seed_agent`` disagreeing about the
+        # organization, which was a fixture bug rather than a foreign caller.
+        other_agent = await seed_agent("probe-foreign", token="test2")
+        foreign = await sync_to_async(CallerContext.from_agent)(other_agent)
         with pytest.raises(PermissionError):
             await sync_to_async(probe_backend.pause)(foreign, state["id"])

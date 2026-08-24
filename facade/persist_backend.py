@@ -542,12 +542,28 @@ class ModelPersistBackend:
     # ----------------------------------------------------------------------- #
     # Lifecycle confirmation handlers (the second phase)
     # ----------------------------------------------------------------------- #
+    async def _agent_task(self, agent_id: int, task_id: str) -> models.Task | None:
+        """Fetch a task, asserting it belongs to the reporting agent.
+
+        The agent's *socket* is authenticated, but the task id inside the frame is not — it is
+        whatever the agent put there. Without the ``agent_id`` predicate any authenticated agent
+        could terminate, fail, or inject results into any task in any organization simply by
+        naming its id. ``Task.agent`` is non-nullable and set at dispatch, so this is total.
+
+        Returns ``None`` when the task is unknown *or* not this agent's, which callers treat the
+        same way: drop the frame rather than tear down the transport.
+        """
+        try:
+            return await models.Task.objects.aget(id=task_id, agent_id=agent_id)
+        except models.Task.DoesNotExist:
+            logging.warning(f"Agent {agent_id} reported on task {task_id}, which is not assigned to it. Dropping.")
+            return None
+
     async def on_agent_interrupted(self, agent_id: int, message: messages.Interrupted) -> None:
         self._progress_leases.cancel(message.task)
         self._auto_interrupt.cancel(message.task)
-        try:
-            x = await models.Task.objects.aget(id=message.task)
-        except models.Task.DoesNotExist:
+        x = await self._agent_task(agent_id, message.task)
+        if x is None:
             return
         if x.is_done:
             return
@@ -558,14 +574,15 @@ class ModelPersistBackend:
         await x.asave(update_fields=["is_done", "finished_at", "latest_event_kind"])
         await self._unfold_to_higher_order(message.task, enums.TaskEventKind.INTERRUPTED, task=x)
 
-    async def _on_nonterminal_confirm(self, task_id: str, kind, *, cancel_lease: bool = False) -> None:
+    async def _on_nonterminal_confirm(self, agent_id: int, task_id: str, kind, *, cancel_lease: bool = False) -> None:
         """Persist a non-terminal lifecycle confirmation (paused/resumed)."""
         if cancel_lease:
             self._progress_leases.cancel(task_id)
-        try:
-            x = await models.Task.objects.aget(id=task_id)
-        except models.Task.DoesNotExist:
-            return  # a confirmation for an unknown task must not tear down the transport
+        # A confirmation for an unknown task — or another agent's task — must not tear down the
+        # transport; it is dropped.
+        x = await self._agent_task(agent_id, task_id)
+        if x is None:
+            return
         if x.is_done:
             return
         await models.TaskEvent.objects.acreate(task=x, kind=kind)
@@ -574,18 +591,20 @@ class ModelPersistBackend:
 
     async def on_agent_paused(self, agent_id: int, message: messages.Paused) -> None:
         # A suspended op stops reporting progress — don't let the silent-physical-op lease reap it.
-        await self._on_nonterminal_confirm(message.task, enums.TaskEventKind.PAUSED, cancel_lease=True)
+        await self._on_nonterminal_confirm(agent_id, message.task, enums.TaskEventKind.PAUSED, cancel_lease=True)
 
     async def on_agent_resumed(self, agent_id: int, message: messages.Resumed) -> None:
-        await self._on_nonterminal_confirm(message.task, enums.TaskEventKind.RESUMED)
+        await self._on_nonterminal_confirm(agent_id, message.task, enums.TaskEventKind.RESUMED)
 
     async def on_agent_started(self, agent_id: int, message: messages.Started) -> None:
         # The agent accepted and began executing — record it (mirrored to the caller as StartedEvent).
-        await self._on_nonterminal_confirm(message.task, enums.TaskEventKind.STARTED)
+        await self._on_nonterminal_confirm(agent_id, message.task, enums.TaskEventKind.STARTED)
 
     async def on_agent_log(self, agent_id: int, message: messages.Log) -> None:
         logging.info(f"Log Task {message}")
 
+        if await self._agent_task(agent_id, message.task) is None:
+            return
         await models.TaskEvent.objects.acreate(
             task_id=message.task,
             kind=enums.TaskEventKind.LOG,
@@ -596,6 +615,8 @@ class ModelPersistBackend:
     async def on_agent_yield(self, agent_id: int, message: messages.Yield) -> None:
         logging.info(f"Yield Task {message}")
 
+        if await self._agent_task(agent_id, message.task) is None:
+            return
         await models.TaskEvent.objects.acreate(
             task_id=message.task,
             kind=enums.TaskEventKind.YIELD,
@@ -608,7 +629,9 @@ class ModelPersistBackend:
 
         self._progress_leases.cancel(message.task)
         self._auto_interrupt.cancel(message.task)
-        x = await models.Task.objects.aget(id=message.task)
+        x = await self._agent_task(agent_id, message.task)
+        if x is None:
+            return
         if x.is_done:
             return  # dedup: a resent terminal report (the agent retries until EventAck)
 
@@ -625,7 +648,9 @@ class ModelPersistBackend:
 
         self._progress_leases.cancel(message.task)
         self._auto_interrupt.cancel(message.task)
-        x = await models.Task.objects.aget(id=message.task)
+        x = await self._agent_task(agent_id, message.task)
+        if x is None:
+            return
         if x.is_done:
             return  # dedup: a resent terminal report (the agent retries until EventAck)
 
@@ -642,7 +667,9 @@ class ModelPersistBackend:
 
         self._progress_leases.cancel(message.task)
         self._auto_interrupt.cancel(message.task)
-        x = await models.Task.objects.aget(id=message.task)
+        x = await self._agent_task(agent_id, message.task)
+        if x is None:
+            return
         if x.is_done:
             return  # dedup: a resent terminal report (the agent retries until EventAck)
 
@@ -659,7 +686,9 @@ class ModelPersistBackend:
 
         self._progress_leases.cancel(message.task)
         self._auto_interrupt.cancel(message.task)
-        x = await models.Task.objects.aget(id=message.task)
+        x = await self._agent_task(agent_id, message.task)
+        if x is None:
+            return
         if x.is_done:
             return  # dedup: a resent terminal report (the agent retries until EventAck)
 
@@ -674,6 +703,8 @@ class ModelPersistBackend:
     async def on_agent_progress(self, agent_id: int, message: messages.Progress) -> None:
         logging.info(f"Progress Task {message}")
 
+        if await self._agent_task(agent_id, message.task) is None:
+            return
         await models.TaskEvent.objects.acreate(
             task_id=message.task,
             kind=enums.TaskEventKind.PROGRESS,

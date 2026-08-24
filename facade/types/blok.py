@@ -11,6 +11,7 @@ from rekuest_core.objects import types as rtypes
 
 from facade import filters, models, scalars
 from facade.types.demand import ActionDependencyModel, StateDependencyModel
+from facade.types.base import build_prescoped_queryset
 
 
 @strawberry_django.type(models.Blok)
@@ -38,6 +39,10 @@ class Blok:
     @strawberry_django.field(description="List of action demands specified in this blok.")
     def demo_state(self) -> scalars.Props:
         return self.demo_state
+
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="organization")
 
 
 @strawberry_django.type(models.BlokDependency, filters=filters.BlokDependencyFilter, pagination=True, description="Represents a dependency between implementations and actions.")
@@ -100,6 +105,10 @@ class MaterializedBlok:
     placements: list["Placement"] = strawberry_django.field(
         description="Placements of this materialized blok.",
     )
+
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="blok__organization")
 
 
 @strawberry_django.type(models.BlokAgentMapping)

@@ -9,6 +9,12 @@ import redis as sync_redis
 from moto import mock_aws
 
 from authentikate.models import Client, Organization, User, Membership
+from authentikate.expand import (
+    aexpand_client_from_token,
+    aexpand_organization_from_token,
+    aexpand_user_from_token,
+)
+from authentikate.utils import authenticate_token_or_none
 from django.conf import settings
 from kante.context import HttpContext, UniversalRequest
 from strawberry.http.temporal_response import TemporalResponse
@@ -85,9 +91,19 @@ def django_db_modify_db_settings(backend_stack):
 
 @pytest.fixture(scope="function")
 def authenticated_context(db, backend_stack):
-    user, _ = User.objects.get_or_create(username="fart", password="123456789", sub="1")
-    client, _ = Client.objects.get_or_create(client_id="oinsoins")
-    org, _ = Organization.objects.get_or_create(slug="test-organization")
+    # Derive the identity from the same static token the agent sockets use, so a caller built
+    # here and an agent from ``seed_agent`` land in the SAME organization. This used to
+    # hardcode ``slug="test-organization"`` while ``seed_agent`` resolved the token's own org,
+    # which silently put caller and agent in different tenants — invisible until the resolvers
+    # started enforcing organization scoping.
+    from asgiref.sync import async_to_sync
+
+    from tests.factories import TEST_TOKEN
+
+    decoded = async_to_sync(authenticate_token_or_none)(TEST_TOKEN)
+    user = async_to_sync(aexpand_user_from_token)(decoded)
+    client = async_to_sync(aexpand_client_from_token)(decoded)
+    org = async_to_sync(aexpand_organization_from_token)(decoded)
     membership, _ = Membership.objects.get_or_create(
         user=user,
         organization=org,

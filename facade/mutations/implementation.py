@@ -297,7 +297,7 @@ def _create_implementation(
         # Derived M2Ms are RECONCILED (.set), not accumulated (.add): protocols feed the
         # matching engine's protocol demands, so a stale row (e.g. an action that stopped
         # being a predicate) must stop matching, mirroring how the port rows are rebuilt.
-        action.protocols.set(infer_protocols(definition))
+        action.protocols.set(infer_protocols(definition, action.organization))
 
         action.is_test_for.set(_resolve_test_targets(definition, agent))
 

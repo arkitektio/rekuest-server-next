@@ -22,6 +22,10 @@ class HardwareRecord:
     created_at: datetime.datetime = strawberry_django.field(description="Timestamp when this record was created.")
     agent: "Agent" = strawberry_django.field(description="The agent to which this hardware belongs.")
 
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="agent__organization")
+
 
 @strawberry_django.type(models.Agent, filters=filters.AgentFilter, ordering=filters.AgentOrder, pagination=True, description="Represents a compute agent that can execute implementations.")
 class Agent:
@@ -69,6 +73,7 @@ class Agent:
     def pinned(self, info: Info) -> bool:
         user = info.context.request.user
         return self.pinned_by.filter(id=user.id).exists()
+
 
     @classmethod
     def get_queryset(cls, queryset, info, **kwargs):

@@ -3,7 +3,7 @@ from facade.models import Protocol
 from rekuest_core.enums import PortKind
 
 
-def is_predicate(definition: DefinitionInputModel) -> Protocol | None:
+def is_predicate(definition: DefinitionInputModel, organization) -> Protocol | None:
     """Check if the definition is a predicate."""
     if not definition.returns:
         return None
@@ -12,5 +12,5 @@ def is_predicate(definition: DefinitionInputModel) -> Protocol | None:
         return None
 
     if definition.returns[0].kind == PortKind.BOOL:
-        x, _ = Protocol.objects.update_or_create(name="predicate", defaults=dict(description="Is this a predicate?"))
+        x, _ = Protocol.objects.update_or_create(name="predicate", organization=organization, defaults=dict(description="Is this a predicate?"))
         return x

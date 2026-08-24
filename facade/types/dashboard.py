@@ -6,6 +6,7 @@ import strawberry
 import strawberry_django
 
 from facade import filters, models
+from facade.types.base import build_prescoped_queryset
 
 
 @strawberry_django.type(models.Dashboard)
@@ -13,6 +14,10 @@ class Dashboard:
     id: strawberry.ID
     name: str | None
     placements: list["DashboardPlacement"]
+
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="organization")
 
 
 @strawberry_django.type(models.UICatalog)

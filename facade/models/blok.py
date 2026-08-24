@@ -6,11 +6,23 @@ from facade import enums
 
 
 class Dashboard(models.Model):
+    organization = models.ForeignKey(
+        "authentikate.Organization",
+        on_delete=models.CASCADE,
+        related_name="dashboards",
+        help_text="The organization this Dashboard belongs to. Access is scoped to it.",
+    )
     name = models.CharField(max_length=2000)
     ui_tree = models.JSONField(null=True, blank=True)
 
 
 class Blok(models.Model):
+    organization = models.ForeignKey(
+        "authentikate.Organization",
+        on_delete=models.CASCADE,
+        related_name="bloks",
+        help_text="The organization this Blok belongs to. Access is scoped to it.",
+    )
     name = models.CharField(max_length=1000)
     description = models.TextField(null=True, blank=True)
     creator = models.ForeignKey(

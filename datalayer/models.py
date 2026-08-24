@@ -32,6 +32,23 @@ class DatalayerStore(PolymorphicModel):
 
     objects: models.Manager["DatalayerStore"]  # type: ignore[assignment]
 
+    # Ownership. Without these there is nothing to authorize against, so any authenticated user
+    # could trade any store id for S3 read credentials.
+    organization = models.ForeignKey(
+        "authentikate.Organization",
+        on_delete=models.CASCADE,
+        related_name="datalayer_stores",
+        help_text="The organization this store owns. Access is scoped to it.",
+    )
+    creator = models.ForeignKey(
+        "authentikate.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="datalayer_stores",
+        help_text="The user that created this store.",
+    )
+
     path = models.CharField(max_length=1000, null=True, blank=True, help_text="The object-store URI of the file", unique=True)
     key = models.CharField(max_length=1000, help_text="The object key/path within the datalayer bucket.")
     bucket = models.CharField(max_length=1000, help_text="The datalayer bucket/service this store belongs to.")

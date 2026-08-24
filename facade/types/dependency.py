@@ -10,6 +10,7 @@ import strawberry_django
 
 from facade import filters, loaders, models
 from facade.types.demand import ActionDependencyModel, StateDependencyModel
+from facade.types.base import build_prescoped_queryset
 
 
 @strawberry_django.type(models.Dependency, filters=filters.DependencyFilter, pagination=True, description="Represents a dependency between implementations and actions.")
@@ -54,6 +55,10 @@ class Dependency:
     def state_dependencies(self) -> list["StateDependency"]:
         return [StateDependencyModel(**d.model_dump()) for d in self.get_state_dependencies()]
 
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="implementation__action__organization")
+
 
 @strawberry_django.type(models.ResolvedDependency, filters=filters.ResolvedDependencyFilter, pagination=True, description="Represents a dependency that has been resolved to a specific implementation.")
 class ResolvedDependency:
@@ -74,6 +79,10 @@ class Resolution:
     resolved_at: datetime.datetime = strawberry_django.field(description="Timestamp when the resolution was created.")
     creator: User = strawberry_django.field(description="User who created the resolution.")
     organization: Organization = strawberry_django.field(description="Organization that owns this resolution.")
+
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="organization")
 
 
 @strawberry.type

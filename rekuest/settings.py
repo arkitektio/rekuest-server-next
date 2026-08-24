@@ -25,9 +25,12 @@ conf = Settings()
 SECRET_KEY = conf.django.secret_key  # TODO: Change this in production
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Config-driven and defaulting to False. This is load-bearing beyond leaking tracebacks:
+# authentikate only refuses static tokens when DEBUG is False (see its settings.py), so a
+# hardcoded DEBUG=True silently disables that guard.
+DEBUG = conf.django.debug
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = conf.django.hosts
 
 AGENT_HEARTBEAT_INTERVAL = 10
 AGENT_HEARTBEAT_RESPONSE_TIMEOUT = 5
@@ -148,6 +151,9 @@ STRAWBERRY_DJANGO = {
 
 
 CSRF_TRUSTED_ORIGINS = conf.django.csrf_trusted_origins
+# Consumed by kante's ``dynamicpath``/``re_dynamicpath`` (see rekuest/urls.py), which prefixes
+# each URL pattern itself. Deliberately NOT Django's FORCE_SCRIPT_NAME — setting both would
+# prefix twice.
 MY_SCRIPT_NAME = conf.django.force_script_name
 
 

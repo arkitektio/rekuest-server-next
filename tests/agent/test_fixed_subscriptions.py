@@ -19,7 +19,7 @@ WARMUP = 1.0
 
 NEW_ACTIONS = """
     subscription {
-        newActions(cage: "1") { id name }
+        newActions { id name }
     }
 """
 

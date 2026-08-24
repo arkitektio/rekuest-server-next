@@ -20,6 +20,14 @@ from tests.factories import create_agent_for_registry, create_registry_bundle
 from tests.models.test_action_matching import action_demand, make_action, pm
 
 
+def _org(slug="test-org-scope"):
+    """Protocol / StateDefinition / Blok / Dashboard are organization-scoped; any org will do here."""
+    from authentikate.models import Organization
+
+    return Organization.objects.get_or_create(slug=slug)[0]
+
+
+
 def pd(matches=None, kind="args", force_length=None, force_non_nullable_length=None, force_structure_length=None):
     """A PortDemandInput-shaped object (attribute access is all the manager needs)."""
     return SimpleNamespace(kind=kind, matches=matches, force_length=force_length, force_non_nullable_length=force_non_nullable_length, force_structure_length=force_structure_length)
@@ -125,7 +133,7 @@ def test_action_demands_single_demand_matches_legacy_shape(catalog):
 def test_action_demand_protocols_are_matched(catalog):
     # a1 implements "predicate"; a2/a3 don't. Protocols on a demand AND with the port matches
     # (previously the field was accepted on dependency inputs but silently ignored).
-    predicate = models.Protocol.objects.create(name="predicate", description="single bool return")
+    predicate = models.Protocol.objects.create(name="predicate", description="single bool return", organization=_org())
     catalog.a1.protocols.add(predicate)
 
     ids = managers.get_action_ids_by_action_demands([action_demand(arg_matches=ARGS_XA, protocols=["predicate"])])[0]

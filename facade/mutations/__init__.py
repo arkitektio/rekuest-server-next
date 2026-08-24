@@ -9,7 +9,6 @@ from .shortcut import create_shortcut, delete_shortcut
 from .toolbox import create_toolbox, delete_toolbox
 from .blok import create_blok, delete_blok, update_blok
 from .materialized_blok import materialize_blok, delete_materialized_blok, update_materialized_blok
-from .lifeline import reinit
 from .action import cleanup_actions
 from .resolution import auto_resolve, create_resolution, update_resolution, delete_resolution
 from .space import create_space, create_placement, update_space, delete_space, update_placement, delete_placement
@@ -37,7 +36,6 @@ __all__ = [
     "update_resolution",
     "delete_resolution",
     "cleanup_actions",
-    "reinit",
     "materialize_blok",
     "unblock",
     "delete_implementation",
