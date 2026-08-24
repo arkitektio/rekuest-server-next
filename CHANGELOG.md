@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## v2.3.0-rc.2 (2026-08-24)
+
+### Features
+
+- Fix state updates and tenancy
+  ([`60f4c13`](https://github.com/arkitektio/rekuest-server-next/commit/60f4c13462ebe7027d3ea7898bb1a17740bdbf54))
+
+- Remove of vestigal parts
+  ([`80e7829`](https://github.com/arkitektio/rekuest-server-next/commit/80e7829ebda32e91639bc2b6fe773b931cb31602))
+
+
 ## v2.3.0-rc.1 (2026-08-23)
 
 ### Bug Fixes
