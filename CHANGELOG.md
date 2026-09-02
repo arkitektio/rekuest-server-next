@@ -1,6 +1,64 @@
 # CHANGELOG
 
 
+## v3.0.0-rc.1 (2026-09-02)
+
+### Features
+
+- Blok UtilCall as the primitive for effects, validators and widgets; blok write-path fixes; UI
+  catalog registry
+  ([`1d1ea4e`](https://github.com/arkitektio/rekuest-server-next/commit/1d1ea4e54d19fb8212065a50e33ad51092e2aec2))
+
+rekuest_core (vendored, kept in sync with fluss and kabinet): - Effect/Validator: `function:
+  ValidatorFunction` -> `call: UtilCall!` (typed blok call, no scalar); inputs take `call:
+  UtilCallInput!`. `UtilProbeInput` renamed to `UtilCallInput`. - Purity rules on every port call:
+  no nested agent calls, value_path roots limited to `dependencies` + `value` (+ `state` / `args`
+  where documented). - Dependency grammar defined once (`foo..bar` port paths); `check_dependencies`
+  now walks returns, nested children and port-group effects; `value` is a reserved port key. -
+  ActionArgument: exactly one binding; keyed call arguments and value_dict entries. - Blok manifest
+  coherence: unique node ids, agent_call dependencies declared, value_path / dynamic_value roots
+  resolve against demo_state, declared values or dependency keys. - Catalog vocabulary:
+  CatalogComponent/CatalogOperation (+ inputs), CatalogValueKind; `DefinitionInput.catalog` opts a
+  definition into operation-name validation. - Escape hatches removed: arrow-function
+  `sub_path`/`state_path`/`Optimistic.path` become a static pointer + optional pure call; custom
+  assign/return widgets are catalog components (`component` + `props`) instead of `hook`/`ward`;
+  CustomEffect is just its call; kind-aware validation of AssignWidgetInput/ReturnWidgetInput;
+  `WindowFunction` enum; `ReturnWidgetKind.PROXY`, `state_choices`, dead return-widget fields
+  dropped. - Cleanup: duplicate StateChoiceAssignWidgetModel and BlokImplementationInputModel stub
+  removed; DynamicValueInput gains `literal`; SearchQuery description fixed.
+
+facade: - updateBlok is pydantic-backed and can actually run; MaterializeBlokInput gains
+  name/description. - Blok and materialized-blok mutations are organization-scoped (they were not).
+  - materializeBlok validates all agent mappings before writing, passes the mapping `key` (two
+  dependencies used to violate the unique constraint), honours `optional`, checks app/version
+  filters, creates one materialization per call, places on the dashboard last, all inside a
+  transaction. `optional` and the other dependency fields are now persisted. - Unique constraints:
+  Blok(organization, name), BlokDependency(blok, key), UICatalog(organization, name); Blok.catalog
+  required. Migration 0002 dedupes and backfills. - UI catalog registry: `registerUiCatalog`,
+  `uiCatalogs`, `uiCatalog(id)`; UICatalog stores components/operations (dead `schema` field
+  removed); bloks and opted-in definitions are validated against a registered catalog.
+  `Blok.uiComponents`, `UISchema`, facade `SearchQuery` and the phantom
+  `BlokDependency.implementation` field are gone. - Test harness: a second tenant is a second static
+  token (`test-other` in `other_org`); `_context_for` contexts that sent `Bearer test` collapsed
+  into the token's org, which made every cross-tenant assertion vacuous.
+
+BREAKING CHANGE: `ValidatorFunction` scalar removed; `Effect.function`/`Validator.function` are
+  `call: UtilCall!`; `UtilProbeInput` is `UtilCallInput`; `hook`/`ward`, `subPath`, `stateChoices`,
+  `uiComponents`, `UISchema`, `ReturnWidgetKind.PROXY` removed; `Window.windowFunction` is an enum;
+  stored actions with old widgets/effects must re-register.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_019je4cqXZZqsfXcF5AySTtY
+
+### Breaking Changes
+
+- `validatorfunction` scalar removed; `Effect.function`/`Validator.function` are `call: UtilCall!`;
+  `UtilProbeInput` is `UtilCallInput`; `hook`/`ward`, `subPath`, `stateChoices`, `uiComponents`,
+  `UISchema`, `ReturnWidgetKind.PROXY` removed; `Window.windowFunction` is an enum; stored actions
+  with old widgets/effects must re-register.
+
+
 ## v2.3.0-rc.2 (2026-08-24)
 
 ### Features
