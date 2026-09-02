@@ -1,5 +1,6 @@
+import dataclasses
 import datetime
-from typing import Annotated, List, Optional
+from typing import Annotated, Any, List, Optional
 import strawberry
 import strawberry_django
 from pydantic import BaseModel
@@ -45,9 +46,9 @@ class SliderAssignWidget(AssignWidget):
     step: float | None
 
 
-@pydantic.type(models.ChoiceAssignWidgetModel)
+@pydantic.type(models.ChoiceAssignWidgetModel, description="A dropdown over the port's own `choices`.")
 class ChoiceAssignWidget(AssignWidget):
-    choices: strawberry.auto
+    placeholder: str | None = None
 
 
 @pydantic.type(models.CustomAssignWidgetModel, description="A catalog component rendered as the port's widget.")
@@ -76,8 +77,8 @@ class StateChoiceAssignWidget(AssignWidget):
 
 @pydantic.type(models.StringWidgetModel)
 class StringAssignWidget(AssignWidget):
-    placeholder: str
-    as_paragraph: bool
+    placeholder: str | None = None
+    as_paragraph: bool | None = None
 
 
 @pydantic.interface(models.ReturnWidgetModel)
@@ -91,9 +92,18 @@ class CustomReturnWidget(ReturnWidget):
     props: Optional[List[Annotated["ComponentProp", strawberry.lazy(__name__)]]] = strawberry.field(default=None, description="Props of the component; value_paths may only reference `value`.")
 
 
-@pydantic.type(models.ChoiceReturnWidgetModel)
+@pydantic.type(models.ChoiceReturnWidgetModel, description="Displays the label of the port's own `choices` for a returned value.")
 class ChoiceReturnWidget(ReturnWidget):
-    choices: strawberry.auto
+    kind: enums.ReturnWidgetKind
+
+
+def _call_as_json(call: Any) -> Any:
+    """A call tree as plain JSON, whether strawberry hands us the pydantic model or its dataclass twin."""
+    if hasattr(call, "model_dump"):
+        return call.model_dump(mode="json", exclude_none=True)
+    if dataclasses.is_dataclass(call):
+        return {k: v for k, v in dataclasses.asdict(call).items() if v is not None}
+    return call
 
 
 @pydantic.interface(models.EffectModel)
@@ -103,6 +113,12 @@ class Effect:
         description="The pure blok UtilCall evaluated client-side against the catalog. It must return a boolean: for effects whether the effect applies, for validators whether the value is valid. Argument value_paths may only reference names listed in `dependencies`, plus `value` for the port's own value."
     )
     dependencies: list[str]
+
+    source: Optional[str] = strawberry.field(default=None, description="The authoring expression the call was compiled from, if the client provided one. Informational: never parsed or validated by the server.")
+
+    @strawberry_django.field(description="The full call tree as raw JSON, so deep trees are not truncated by fragment depth.")
+    def call_json(self) -> scalars.JSONSerializable:
+        return _call_as_json(self.call)
 
 
 @pydantic.type(models.MessageEffectModel)
@@ -169,6 +185,12 @@ class Validator:
     dependencies: list[str] | None
     label: str | None
     error_message: str | None = None
+
+    source: Optional[str] = strawberry.field(default=None, description="The authoring expression the call was compiled from, if the client provided one. Informational: never parsed or validated by the server.")
+
+    @strawberry_django.field(description="The full call tree as raw JSON, so deep trees are not truncated by fragment depth.")
+    def call_json(self) -> scalars.JSONSerializable:
+        return _call_as_json(self.call)
 
 
 @pydantic.type(models.RequiresModel)
@@ -270,6 +292,7 @@ class SearchAssignWidget(AssignWidget):
     ward: str
     filters: list[ArgPort] | None = None
     dependencies: list[str] | None = None
+    placeholder: str | None = None
 
 
 # TODO: Should be saved and made accessible
@@ -389,3 +412,19 @@ class CatalogOperation:
     description: Optional[str] = strawberry.field(default=None, description="Human-readable description of the operation.")
     arguments: List[CatalogArgument] = strawberry.field(description="The arguments the operation accepts.")
     returns: enums.CatalogValueKind = strawberry.field(description="The kind of value the operation returns.")
+
+
+@pydantic.type(models.DiagnosticModel, description="A non-fatal registration finding, e.g. a validator call naming an operation neither the base catalog nor the named catalog provides.")
+class Diagnostic:
+    level: enums.DiagnosticLevel = strawberry.field(description="Severity; only WARNING is ever stored.")
+    code: str = strawberry.field(description="Machine-readable code, e.g. unknown_operation, unknown_catalog.")
+    message: str = strawberry.field(description="Human-readable explanation.")
+    path: Optional[str] = strawberry.field(default=None, description="Where the finding applies (owner label).")
+
+
+@pydantic.type(models.WidgetDefaultModel, description="A catalog's default widget for ports matching a kind and/or structure identifier. A UI applies it when a port has no explicit widget; an identifier match beats a kind match.")
+class WidgetDefault:
+    kind: Optional[enums.PortKind] = strawberry.field(default=None, description="Port kind the default applies to (with `identifier`: both must match).")
+    identifier: Optional[str] = strawberry.field(default=None, description="Structure identifier the default applies to, e.g. '@mikro/image'.")
+    widget: Optional[AssignWidget] = strawberry.field(default=None, description="The assign widget to render for matching argument ports.")
+    return_widget: Optional[ReturnWidget] = strawberry.field(default=None, description="The return widget to render for matching return ports.")

@@ -40,6 +40,7 @@ class Blok(models.Model):
     components = models.JSONField(help_text="The UI schema for this Blok", default=list)
     uri = models.CharField(max_length=1000, help_text="The URI for this Blok (e.g. if it should be rendered as an iframe)", null=True, blank=True)
     demo_state = models.JSONField(help_text="The initial state for this Blok (to display in the ui a fake version)", default=dict)
+    diagnostics = models.JSONField(default=list, help_text="Non-fatal registration findings (rekuest_core Diagnostic), e.g. manifest util calls naming operations that neither the base catalog nor this blok's catalog provides. Replaced on every write.")
 
     class Meta:
         # Every write path upserts on (organization, name); the constraint makes that upsert safe.

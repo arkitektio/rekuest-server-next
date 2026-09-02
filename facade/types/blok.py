@@ -36,6 +36,10 @@ class Blok:
     def demo_state(self) -> scalars.Props:
         return self.demo_state
 
+    @strawberry_django.field(description="Non-fatal registration findings, e.g. manifest util calls naming operations that neither the base catalog nor this blok's catalog provides.")
+    def diagnostics(self) -> list[rtypes.Diagnostic]:
+        return [rmodels.DiagnosticModel(**i) for i in self.diagnostics]
+
     @classmethod
     def get_queryset(cls, queryset, info, **kwargs):
         return build_prescoped_queryset(info, queryset, field="organization")

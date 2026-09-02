@@ -33,10 +33,18 @@ CATALOG = {
         {"name": "Box"},
     ],
     "operations": [
-        {"name": "gt", "arguments": [{"key": "a", "kind": "FLOAT"}, {"key": "b", "kind": "FLOAT"}], "returns": "BOOL"},
+        {"name": "clamp", "arguments": [{"key": "a", "kind": "FLOAT"}, {"key": "b", "kind": "FLOAT"}], "returns": "FLOAT"},
         {"name": "fmt", "arguments": [{"key": "v", "kind": "ANY"}], "returns": "STRING"},
     ],
 }
+
+BASE_CATALOG = "query { baseCatalog { name version operations { name returns arguments { key kind required } } } }"
+
+
+async def _blok_diagnostics(name: str = "catalogued") -> list[dict]:
+    from facade.models import Blok
+
+    return await sync_to_async(lambda: Blok.objects.get(name=name).diagnostics)()
 
 
 async def _register(context: HttpContext, catalog: dict = CATALOG) -> dict:
@@ -62,7 +70,7 @@ class TestUiCatalog:
         assert first["isRegistered"] is True
         assert {c["name"] for c in first["components"]} == {"Slider", "Box"}
         assert first["components"][0]["props"][0] == {"key": "value", "kind": "FLOAT", "required": True}
-        assert first["operations"][0]["returns"] == "BOOL"
+        assert first["operations"][0]["returns"] == "FLOAT"
 
         second = await _register(authenticated_context, {**CATALOG, "components": [{"name": "Text"}], "operations": []})
         assert second["id"] == first["id"]
@@ -103,9 +111,10 @@ class TestUiCatalog:
 
         unknown_operation = await _create_blok(
             authenticated_context,
-            [{"id": "root", "component": "Slider", "props": [{"key": "value", "utilCall": {"operation": "clamp", "arguments": [{"key": "v", "valuePath": "/exposure"}]}}]}],
+            [{"id": "root", "component": "Slider", "props": [{"key": "value", "utilCall": {"operation": "fizz", "arguments": [{"key": "v", "valuePath": "/exposure"}]}}]}],
         )
-        assert unknown_operation.errors and "operation 'clamp' is not registered" in unknown_operation.errors[0].message
+        assert not unknown_operation.errors, unknown_operation.errors
+        assert [d["code"] for d in await _blok_diagnostics()] == ["unknown_operation"]
 
         wrong_arguments = await _create_blok(
             authenticated_context,
@@ -133,8 +142,102 @@ class TestUiCatalog:
             ],
         )
         assert not accepted.errors, accepted.errors
+        assert await _blok_diagnostics() == []
 
-    async def test_unregistered_catalog_validates_nothing(self, authenticated_context: HttpContext) -> None:
-        """A catalog that only exists because a blok named it does not reject anything."""
+    async def test_unregistered_catalog_still_validates_base(self, authenticated_context: HttpContext) -> None:
+        """A catalog that only exists because a blok named it checks no components, but base operations still apply."""
         result = await _create_blok(authenticated_context, [{"id": "root", "component": "Whatever", "props": [{"key": "x", "utilCall": {"operation": "anything"}}]}], catalog="fresh")
         assert not result.errors, result.errors
+        assert [d["code"] for d in await _blok_diagnostics()] == ["unknown_operation"]
+
+        wrong_keys = await _create_blok(authenticated_context, [{"id": "root", "component": "Whatever", "props": [{"key": "x", "utilCall": {"operation": "gt", "arguments": [{"key": "left", "valueLiteral": 1}]}}]}], catalog="fresh")
+        assert wrong_keys.errors and "does not accept arguments ['left']" in wrong_keys.errors[0].message
+
+    async def test_registering_a_base_name_is_rejected(self, authenticated_context: HttpContext) -> None:
+        """A UI catalog cannot redefine a base operation."""
+        result = await schema.execute(
+            REGISTER_UI_CATALOG,
+            context_value=authenticated_context,
+            variable_values={"input": {**CATALOG, "operations": [{"name": "gt", "arguments": [], "returns": "BOOL"}]}},
+        )
+        assert result.errors and "cannot redefine base operations ['gt']" in result.errors[0].message
+        assert await sync_to_async(UICatalog.objects.filter(name="electron").count)() == 0
+
+    async def test_base_catalog_query(self, authenticated_context: HttpContext) -> None:
+        """The base catalog is queryable and identical for every organization."""
+        result = await schema.execute(BASE_CATALOG, context_value=authenticated_context)
+        assert not result.errors, result.errors
+        base = result.data["baseCatalog"]
+        assert base["name"] == "base" and base["version"] == 1
+        gt = next(op for op in base["operations"] if op["name"] == "gt")
+        assert gt["returns"] == "BOOL"
+        assert [a["key"] for a in gt["arguments"]] == ["a", "b"]
+        len_between = next(op for op in base["operations"] if op["name"] == "len_between")
+        assert [(a["key"], a["required"]) for a in len_between["arguments"]] == [("value", True), ("min", True), ("max", False)]
+
+        other, _, _, _ = await sync_to_async(tenant_context)(OTHER_TOKEN)
+        theirs = await schema.execute(BASE_CATALOG, context_value=other)
+        assert theirs.data == result.data
+
+
+REGISTER_WITH_DEFAULTS = """
+    mutation RegisterUiCatalog($input: RegisterUiCatalogInput!) {
+        registerUiCatalog(input: $input) {
+            id
+            widgetDefaults {
+                kind
+                identifier
+                widget { kind ... on CustomAssignWidget { component props { key dynamicValue { path } } } ... on SliderAssignWidget { min max } }
+                returnWidget { kind ... on CustomReturnWidget { component } }
+            }
+        }
+    }
+"""
+
+DEFAULTS = [
+    {"identifier": "@mikro/image", "widget": {"kind": "CUSTOM", "component": "Slider", "props": [{"key": "value", "dynamicValue": {"path": "/value"}}]}, "returnWidget": {"kind": "CUSTOM", "component": "Box"}},
+    {"kind": "FLOAT", "widget": {"kind": "SLIDER", "min": 0, "max": 1}},
+]
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+class TestWidgetDefaults:
+    async def test_register_and_query_widget_defaults(self, authenticated_context: HttpContext) -> None:
+        """Defaults are stored typed and come back as the widget union."""
+        result = await schema.execute(REGISTER_WITH_DEFAULTS, context_value=authenticated_context, variable_values={"input": {**CATALOG, "widgetDefaults": DEFAULTS}})
+        assert not result.errors, result.errors
+
+        by_image, by_float = result.data["registerUiCatalog"]["widgetDefaults"]
+        assert by_image["identifier"] == "@mikro/image" and by_image["kind"] is None
+        assert by_image["widget"] == {"kind": "CUSTOM", "component": "Slider", "props": [{"key": "value", "dynamicValue": {"path": "/value"}}]}
+        assert by_image["returnWidget"] == {"kind": "CUSTOM", "component": "Box"}
+        assert by_float["kind"] == "FLOAT" and by_float["widget"] == {"kind": "SLIDER", "min": 0, "max": 1}
+
+        stored = await sync_to_async(lambda: UICatalog.objects.get(name="electron").widget_defaults)()
+        assert [d["identifier"] for d in stored] == ["@mikro/image", None]
+
+    async def test_default_naming_an_unregistered_component_is_rejected(self, authenticated_context: HttpContext) -> None:
+        """A UI cannot announce a default it cannot render; nothing is written."""
+        bad = [{"identifier": "@mikro/image", "widget": {"kind": "CUSTOM", "component": "Knob"}}]
+        result = await schema.execute(REGISTER_WITH_DEFAULTS, context_value=authenticated_context, variable_values={"input": {**CATALOG, "widgetDefaults": bad}})
+        assert result.errors and "component 'Knob' is not registered" in result.errors[0].message
+        assert await sync_to_async(UICatalog.objects.filter(name="electron").count)() == 0
+
+    async def test_default_with_unknown_operation_is_rejected(self, authenticated_context: HttpContext) -> None:
+        """Unknown operations are warnings on definitions but errors on a catalog's own defaults."""
+        bad = [{"kind": "FLOAT", "widget": {"kind": "CUSTOM", "component": "Slider", "props": [{"key": "value", "staticValue": 1}, {"key": "onChange", "utilCall": {"operation": "fizz"}}]}}]
+        result = await schema.execute(REGISTER_WITH_DEFAULTS, context_value=authenticated_context, variable_values={"input": {**CATALOG, "widgetDefaults": bad}})
+        assert result.errors and "operation 'fizz' is not provided" in result.errors[0].message
+
+    async def test_duplicate_selectors_are_rejected(self, authenticated_context: HttpContext) -> None:
+        """Duplicate selectors are rejected."""
+        dup = [{"kind": "FLOAT", "widget": {"kind": "SLIDER"}}, {"kind": "FLOAT", "widget": {"kind": "STRING"}}]
+        result = await schema.execute(REGISTER_WITH_DEFAULTS, context_value=authenticated_context, variable_values={"input": {**CATALOG, "widgetDefaults": dup}})
+        assert result.errors and "duplicate selector" in result.errors[0].message
+
+    async def test_merged_widget_input_rejects_fields_of_another_kind(self, authenticated_context: HttpContext) -> None:
+        """The merged AssignWidgetInput dispatches on kind and names a contradicting field instead of dropping it."""
+        bad = [{"kind": "FLOAT", "widget": {"kind": "SLIDER", "component": "Box"}}]
+        result = await schema.execute(REGISTER_WITH_DEFAULTS, context_value=authenticated_context, variable_values={"input": {**CATALOG, "widgetDefaults": bad}})
+        assert result.errors and "A SLIDER assign widget does not read `component`" in result.errors[0].message

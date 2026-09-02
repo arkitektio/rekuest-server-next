@@ -14,7 +14,7 @@ from authentikate.vars import get_user, get_client
 from facade.higher_order import validate_dependency_coverage, validate_higher_order_pairing
 from facade.provenance import audience as provenance_audience
 import typing as t
-from facade.catalog_validation import catalog_for_definition, iter_definition_calls, validate_calls_against_catalog
+from facade.catalog_validation import catalogs_for_definition, dump_diagnostics, iter_definition_calls, iter_definition_widgets, validate_calls_against_catalogs, validate_widgets_against_catalogs
 
 logger = logging.getLogger(__name__)
 
@@ -225,11 +225,18 @@ def _create_implementation(
     # only ever check `idempotent` for the retry axis and `pure` for replayability.
     desired_idempotent = definition.idempotent or definition.pure
 
-    # Effect/validator calls are evaluated client-side against a UI catalog; a definition that
-    # names its catalog has every operation it uses checked against what that catalog registered.
-    catalog = catalog_for_definition(definition, agent)
-    if catalog is not None:
-        validate_calls_against_catalog(catalog, iter_definition_calls(definition), f"Definition {definition.key}")
+    # Effect/validator calls are evaluated client-side against the base catalog plus the UI catalog
+    # the definition names. Argument mismatches on known operations abort registration; operations
+    # neither catalog provides are stored as warnings so UI apps can roll out new ones independently.
+    catalogs, diagnostics = catalogs_for_definition(definition, agent)
+    diagnostics = [
+        *validate_calls_against_catalogs(catalogs, iter_definition_calls(definition, input.optimistics), f"Definition {definition.key}"),
+        *validate_widgets_against_catalogs(catalogs, iter_definition_widgets(definition)),
+        *diagnostics,
+    ]
+    for diagnostic in diagnostics:
+        logger.warning(diagnostic.message)
+    stored_diagnostics = dump_diagnostics(diagnostics)
 
     definition_changed = True
     try:
@@ -343,6 +350,7 @@ def _create_implementation(
         implementation.needs_token = input.needs_token
         implementation.provenance_audience = resolved_audience
         implementation.effect = getattr(input.effect, "value", input.effect)
+        implementation.diagnostics = stored_diagnostics
         implementation.save()
     else:
         implementation = models.Implementation.objects.create(
@@ -354,6 +362,7 @@ def _create_implementation(
             needs_token=input.needs_token,
             provenance_audience=resolved_audience,
             effect=getattr(input.effect, "value", input.effect),
+            diagnostics=stored_diagnostics,
         )
         if implementation_map is not None:
             implementation_map[input.interface] = implementation

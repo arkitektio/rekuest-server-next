@@ -157,3 +157,11 @@ def test_port_named_value_is_allowed_and_shadowed_in_calls() -> None:
     own = imodels.ValidatorInputModel(call=_call({"key": "a", "value_path": "/value"}), dependencies=[])
     definition = _definition(args=[_port("value"), _port("n", validators=[own])])
     assert definition.args[1].validators[0].dependencies == []
+
+
+def test_source_rides_along_without_being_interpreted() -> None:
+    """``source`` is stored and read back verbatim; the server never parses it."""
+    validator = imodels.ValidatorInputModel(call=_call({"key": "a", "value_path": "/value"}), source="value > 3  # anything goes")
+    assert omodels.ValidatorModel(**validator.model_dump()).source == "value > 3  # anything goes"
+    effect = imodels.EffectInputModel(kind="HIDE", call=_call({"key": "a", "value_path": "/value"}), dependencies=[])
+    assert omodels.EffectModel(**effect.model_dump()).source is None

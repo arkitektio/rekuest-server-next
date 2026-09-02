@@ -27,8 +27,10 @@ class SliderAssignWidgetModel(AssignWidgetModel):
 
 
 class ChoiceAssignWidgetModel(AssignWidgetModel):
+    """A dropdown over the port's own `choices`."""
+
     kind: Literal["CHOICE"]
-    choices: list[ChoiceModel] | None
+    placeholder: str | None = None
 
 
 class CustomAssignWidgetModel(AssignWidgetModel):
@@ -45,8 +47,9 @@ class SearchAssignWidgetModel(AssignWidgetModel):
     kind: Literal["SEARCH"]
     query: str  # TODO: Validators
     ward: str
-    filters: list["PortModel"] | None = None
+    filters: list["ArgPortModel"] | None = None
     dependencies: list[str] | None = None
+    placeholder: str | None = None
 
 
 class StateAccessorModel(BaseModel):
@@ -103,8 +106,9 @@ class CustomReturnWidgetModel(ReturnWidgetModel):
 
 
 class ChoiceReturnWidgetModel(ReturnWidgetModel):
+    """Displays the label of the port's own `choices` for a returned value."""
+
     kind: Literal["CHOICE"]
-    choices: list[ChoiceModel] | None
 
 
 ReturnWidgetModelUnion = Union[CustomReturnWidgetModel, ChoiceReturnWidgetModel]
@@ -114,6 +118,7 @@ class EffectModel(BaseModel):
     kind: str
     call: "UtilCallModel"
     dependencies: list[str]
+    source: str | None = None
 
 
 class MessageEffectModel(EffectModel):
@@ -146,6 +151,7 @@ class ValidatorModel(BaseModel):
     dependencies: list[str] | None = []
     label: str | None = None
     error_message: str | None = None
+    source: str | None = None
 
 
 class PortMatchModel(BaseModel):
@@ -320,6 +326,15 @@ class ComponentNodeModel(BaseModel):
     children: Optional[List["ComponentNodeModel"]] = None
 
 
+class WidgetDefaultModel(BaseModel):
+    """A catalog's default widget for ports matching a kind and/or structure identifier."""
+
+    kind: str | None = None
+    identifier: str | None = None
+    widget: Optional[AssignWidgetModelUnion] = None
+    return_widget: Optional[ReturnWidgetModelUnion] = None
+
+
 SearchAssignWidgetModel.model_rebuild()
 CustomAssignWidgetModel.model_rebuild()
 CustomReturnWidgetModel.model_rebuild()
@@ -357,3 +372,12 @@ class CatalogOperationModel(BaseModel):
     description: str | None = None
     arguments: list[CatalogArgumentModel] = []
     returns: enums.CatalogValueKind
+
+
+class DiagnosticModel(BaseModel):
+    """A non-fatal registration finding, stored on the registered row."""
+
+    level: enums.DiagnosticLevel = enums.DiagnosticLevel.WARNING
+    code: str
+    message: str
+    path: str | None = None

@@ -1,7 +1,8 @@
 from authentikate.models import Client, Organization
-from rekuest_core.inputs.models import CatalogComponentInputModel, CatalogOperationInputModel
 from django.contrib.auth import get_user_model
 from django.db import models
+
+from rekuest_core.inputs.models import CatalogComponentInputModel, CatalogOperationInputModel, WidgetDefaultInputModel
 
 
 class Collection(models.Model):
@@ -89,6 +90,10 @@ class UICatalog(models.Model):
         default=list,
         help_text="Registered operation specs (rekuest_core CatalogOperation): the names a UtilCall.operation may use, their arguments and return kind.",
     )
+    widget_defaults = models.JSONField(
+        default=list,
+        help_text="Default widgets per port kind and/or structure identifier (rekuest_core WidgetDefault), applied by the UI to ports that declare no widget.",
+    )
     registered_by = models.ForeignKey(
         Client,
         null=True,
@@ -111,6 +116,9 @@ class UICatalog(models.Model):
 
     def get_operations(self) -> list[CatalogOperationInputModel]:
         return [CatalogOperationInputModel(**operation) for operation in self.operations]
+
+    def get_widget_defaults(self) -> list[WidgetDefaultInputModel]:
+        return [WidgetDefaultInputModel(**default) for default in self.widget_defaults]
 
 
 class Toolbox(models.Model):

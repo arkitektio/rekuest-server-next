@@ -1,8 +1,8 @@
 import hashlib
 import json
-from typing import Any, ClassVar, Iterator, List, Optional
+from typing import Annotated, Any, ClassVar, Iterator, List, Literal, Optional, Union
 from rekuest_core import enums, units
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing_extensions import Self
 
 
@@ -108,6 +108,8 @@ class EffectInputModel(BaseModel):
     message: str | None = Field(default=None, description="The message to display when the effect is applied (if it is a message effect)")
     kind: enums.EffectKind = Field(description="The kind of the effect. Can be either message, hide or custom")
     fade: bool = Field(default=True, description="Whether to fade out the port when the effect is applied (if it is a hide effect)")
+    source: str | None = Field(default=None, description="The authoring expression the call was compiled from (informational; never parsed or validated by the server).")
+
     @model_validator(mode="after")
     def check_call_is_pure(self) -> Self:
         """Reject impure calls and value_paths outside the declared dependencies."""
@@ -132,6 +134,7 @@ class ValidatorInputModel(BaseModel):
     )
     label: str | None = Field(default=None, description="An optional human-readable label for the validator.")
     error_message: str | None = Field(default=None, description="The error message to display when the validation fails")
+    source: str | None = Field(default=None, description="The authoring expression the call was compiled from (informational; never parsed or validated by the server).")
 
     @model_validator(mode="after")
     def check_call_is_pure(self) -> Self:
@@ -153,11 +156,6 @@ class StateAccessorInputModel(BaseModel):
         return self
 
 
-def _is_set(value: Any) -> bool:
-    """None and empty lists count as unset (strawberry inputs default list fields to [])."""
-    return value is not None and value != []
-
-
 def _check_widget_props(props: Optional[List["ComponentPropInputModel"]], dependencies: list[str] | None, owner: str) -> None:
     """Custom widget props: no agent calls; value_paths only reference `value` and `dependencies`."""
     allowed = set(dependencies or []) | {"value"}
@@ -173,101 +171,244 @@ def _check_widget_props(props: Optional[List["ComponentPropInputModel"]], depend
             _check_pure_call(prop.util_call, dependencies, prop_owner)
 
 
-# Per kind: (required fields, optional fields). `kind` and `follow_value` are always allowed;
-# everything else is forbidden for that kind.
-_ASSIGN_WIDGET_FIELDS: dict[enums.AssignWidgetKind, tuple[set[str], set[str]]] = {
-    enums.AssignWidgetKind.SEARCH: ({"query", "ward"}, {"filters", "dependencies", "placeholder"}),
-    enums.AssignWidgetKind.CHOICE: ({"choices"}, {"placeholder"}),
-    enums.AssignWidgetKind.SLIDER: (set(), {"min", "max", "step"}),
-    enums.AssignWidgetKind.STRING: (set(), {"placeholder", "as_paragraph"}),
-    enums.AssignWidgetKind.CUSTOM: ({"component"}, {"props", "dependencies", "fallback"}),
-    enums.AssignWidgetKind.STATE_CHOICE: (set(), {"state_path", "state_call", "dependency", "state_accessors", "dependencies"}),
-    enums.AssignWidgetKind.PROXY: ({"target_port", "target_action"}, {"target_dependency"}),
-}
-_ASSIGN_WIDGET_ALWAYS = {"kind", "follow_value"}
+def _as_plain(value: Any) -> Any:
+    """A discriminated-union field accepts dicts (matched on `kind`) or its own member instances.
+
+    Strawberry hands us member model instances (via the merged input's ``to_pydantic``), config
+    files hand us dicts. Dumping instances keeps both paths identical and makes a foreign model
+    instance a clean validation error instead of a type mismatch.
+    """
+    if isinstance(value, BaseModel):
+        return value.model_dump(exclude_none=True)
+    if isinstance(value, (list, tuple)):
+        return [_as_plain(item) for item in value]
+    return value
 
 
-class AssignWidgetInputModel(BaseModel):
-    kind: enums.AssignWidgetKind = Field(description="The kind of the assign widget. Decides which of the other fields are required, optional or forbidden.")
-    query: str | None = Field(default=None, description="SEARCH: the GraphQL query the ward executes to populate the choices.")
-    choices: list[ChoiceInputModel] | None = Field(default=None, description="CHOICE: the choices to display.")
-    follow_value: str | None = Field(default=None, description="The key of another port whose value this widget should follow and mirror.")
-    min: float | None = Field(default=None, description="SLIDER: the minimum value.")
-    max: float | None = Field(default=None, description="SLIDER: the maximum value.")
-    step: float | None = Field(default=None, description="SLIDER: the step.")
-    placeholder: str | None = Field(default=None, description="SEARCH, CHOICE, STRING: the placeholder text.")
-    as_paragraph: bool | None = Field(default=None, description="STRING: render as a paragraph.")
-    ward: str | None = Field(default=None, description="SEARCH: the ward (service) that executes the query.")
-    component: str | None = Field(default=None, description="CUSTOM: the catalog component to render. The port value is in scope as the reserved root `value`.")
-    props: Optional[List["ComponentPropInputModel"]] = Field(default=None, description="CUSTOM: props of the component. value_paths may only reference `value` and `dependencies`; agent calls are not allowed.")
-    fallback: Optional["AssignWidgetInputModel"] = Field(default=None, description="CUSTOM: widget to render when the UI has no such component in its catalog.")
-    filters: list["ArgPortInputModel"] | None = Field(default=None, description="SEARCH: filter ports whose values are passed to the query.")
-    dependencies: list[str] | None = Field(
-        default_factory=list,
-        description="SEARCH, CUSTOM, STATE_CHOICE: the other ports (port paths, `..` traverses children) whose values the query, props or calls may reference.",
-    )
-    dependency: str | None = Field(default=None, description="STATE_CHOICE: the agent dependency whose state provides the choices; omitted: the own state.")
-    target_dependency: str | None = Field(default=None, description="PROXY: the dependency to target.")
-    target_action: str | None = Field(default=None, description="PROXY: the action to target.")
-    target_port: str | None = Field(default=None, description="PROXY: the port to target.")
-    state_path: str | None = Field(default=None, description="STATE_CHOICE: static JSON pointer into the state value that provides the choices. Mutually exclusive with `state_call`.")
-    state_call: Optional["UtilCallInputModel"] = Field(default=None, description="STATE_CHOICE: pure UtilCall returning that pointer dynamically; may reference `state`, `value` and `dependencies`. Mutually exclusive with `state_path`.")
-    state_accessors: list[StateAccessorInputModel] | None = Field(
-        default=None,
-        description="STATE_CHOICE: how to read label/description/logo/value out of each state entry; each accessor is a static pointer or a pure call.",
-    )
+# ----------------------------------------------------------------------------
+# Assign widgets: one model per kind, discriminated by ``kind``. ``extra="forbid"`` is what makes
+# a field of another kind an error instead of a silent drop (kante's merged input relies on it).
+# ----------------------------------------------------------------------------
+class _AssignWidgetBase(BaseModel):
+    follow_value: str | None = Field(default=None, description="Port path of another port whose value this widget follows and mirrors.")
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class SliderAssignWidgetInputModel(_AssignWidgetBase):
+    kind: Literal["SLIDER"] = Field(description="Which member of AssignWidgetInput this is.")
+    min: float | None = Field(default=None, description="The minimum value.")
+    max: float | None = Field(default=None, description="The maximum value.")
+    step: float | None = Field(default=None, description="The step between selectable values; must be positive.")
 
     @model_validator(mode="after")
-    def check_kind_fields(self) -> Self:
-        """Only the fields of this kind are set, required ones are present, and calls are pure."""
-        required, optional = _ASSIGN_WIDGET_FIELDS[self.kind]
-        present = {name for name in type(self).model_fields if name not in _ASSIGN_WIDGET_ALWAYS and _is_set(getattr(self, name))}
-        missing = sorted(required - present)
-        if missing:
-            raise ValueError(f"{self.kind.value} widget requires {missing}")
-        extra = sorted(present - required - optional)
-        if extra:
-            raise ValueError(f"{self.kind.value} widget must not set {extra}")
-
-        if self.kind == enums.AssignWidgetKind.CUSTOM:
-            _check_widget_props(self.props, self.dependencies, "CustomAssignWidget")
-        if self.kind == enums.AssignWidgetKind.STATE_CHOICE:
-            if (self.state_path is None) == (self.state_call is None):
-                raise ValueError("STATE_CHOICE widget needs exactly one of state_path or state_call")
-            if self.state_call is not None:
-                _check_pure_call(self.state_call, self.dependencies, "StateChoice state_call", extra_roots=("state",))
-            for index, accessor in enumerate(self.state_accessors or []):
-                if accessor.call is not None:
-                    _check_pure_call(accessor.call, self.dependencies, f"StateAccessor {index}", extra_roots=("state",))
+    def check_range(self) -> Self:
+        """A slider's range must be non-empty and its step positive."""
+        if self.min is not None and self.max is not None and self.min >= self.max:
+            raise ValueError(f"SLIDER widget: min ({self.min}) must be smaller than max ({self.max})")
+        if self.step is not None and self.step <= 0:
+            raise ValueError(f"SLIDER widget: step must be positive, got {self.step}")
         return self
 
 
-_RETURN_WIDGET_FIELDS: dict[enums.ReturnWidgetKind, tuple[set[str], set[str]]] = {
-    enums.ReturnWidgetKind.CHOICE: ({"choices"}, set()),
-    enums.ReturnWidgetKind.CUSTOM: ({"component"}, {"props"}),
+class ChoiceAssignWidgetInputModel(_AssignWidgetBase):
+    kind: Literal["CHOICE"] = Field(description="Which member of AssignWidgetInput this is.")
+    placeholder: str | None = Field(default=None, description="The placeholder text shown before a choice is made. The choices themselves are the port's `choices`.")
+
+
+class StringAssignWidgetInputModel(_AssignWidgetBase):
+    kind: Literal["STRING"] = Field(description="Which member of AssignWidgetInput this is.")
+    placeholder: str | None = Field(default=None, description="The placeholder text.")
+    as_paragraph: bool | None = Field(default=None, description="Render as a multi-line paragraph.")
+
+
+SEARCH_QUERY_VARIABLES = ("search", "values")
+
+
+class SearchAssignWidgetInputModel(_AssignWidgetBase):
+    kind: Literal["SEARCH"] = Field(description="Which member of AssignWidgetInput this is.")
+    query: str = Field(description="The GraphQL query the ward executes to populate the choices. Must be a single `query` operation declaring `$search: String` and `$values: [ID!]`, plus one variable per filter port key.")
+    ward: str = Field(min_length=1, description="The ward (service) that executes the query.")
+    filters: list["ArgPortInputModel"] | None = Field(default=None, description="Filter ports whose values are passed to the query as variables named by their keys.")
+    dependencies: list[str] | None = Field(default_factory=list, description="The other ports (port paths, `..` traverses children) whose values the query may reference.")
+    placeholder: str | None = Field(default=None, description="The placeholder text.")
+
+    @model_validator(mode="after")
+    def check_query(self) -> Self:
+        """The query parses, is one `query` operation, and declares the variables the widget will pass."""
+        from graphql import OperationType, parse
+        from graphql.error import GraphQLSyntaxError
+
+        try:
+            document = parse(self.query)
+        except GraphQLSyntaxError as error:
+            raise ValueError(f"SEARCH widget query does not parse: {error.message}") from error
+
+        operations = [definition for definition in document.definitions if getattr(definition, "operation", None) is not None]
+        if len(operations) != 1 or operations[0].operation != OperationType.QUERY:
+            raise ValueError("SEARCH widget query must contain exactly one `query` operation")
+        declared = {variable.variable.name.value for variable in operations[0].variable_definitions or []}
+        missing = sorted(set(SEARCH_QUERY_VARIABLES) - declared)
+        if missing:
+            raise ValueError(f"SEARCH widget query must declare the variables {['$' + name for name in missing]}")
+
+        keys = [port.key for port in self.filters or []]
+        duplicates = sorted({key for key in keys if keys.count(key) > 1})
+        if duplicates:
+            raise ValueError(f"SEARCH widget filters have duplicate keys {duplicates}")
+        if "value" in keys:
+            raise ValueError("SEARCH widget filters may not use the reserved key 'value'")
+        undeclared = sorted(set(keys) - declared)
+        if undeclared:
+            raise ValueError(f"SEARCH widget query must declare a variable for each filter port: missing {['$' + key for key in undeclared]}")
+        return self
+
+
+class CustomAssignWidgetInputModel(_AssignWidgetBase):
+    kind: Literal["CUSTOM"] = Field(description="Which member of AssignWidgetInput this is.")
+    component: str = Field(min_length=1, description="The catalog component to render. The port value is in scope as the reserved root `value`.")
+    props: Optional[List["ComponentPropInputModel"]] = Field(default=None, description="Props of the component. value_paths may only reference `value` and `dependencies`; agent calls are not allowed.")
+    dependencies: list[str] | None = Field(default_factory=list, description="The other ports (port paths, `..` traverses children) whose values the props may reference.")
+    fallback: Optional["AssignWidgetInputModel"] = Field(default=None, description="Widget to render when the UI has no such component in its catalog.")
+
+    @field_validator("fallback", mode="before")
+    @classmethod
+    def _plain_fallback(cls, value: Any) -> Any:
+        return _as_plain(value)
+
+    @model_validator(mode="after")
+    def check_props(self) -> Self:
+        """Props are pure and only reference declared ports."""
+        _check_widget_props(self.props, self.dependencies, "CustomAssignWidget")
+        return self
+
+
+class StateChoiceAssignWidgetInputModel(_AssignWidgetBase):
+    kind: Literal["STATE_CHOICE"] = Field(description="Which member of AssignWidgetInput this is.")
+    dependency: str | None = Field(default=None, description="The agent dependency (by key) whose state provides the choices; omitted: the implementing agent's own state.")
+    state_path: str | None = Field(default=None, description="Static JSON pointer into the state value that provides the choices. Mutually exclusive with `state_call`.")
+    state_call: Optional["UtilCallInputModel"] = Field(default=None, description="Pure UtilCall returning that pointer dynamically; may reference `state`, `value` and `dependencies`. Mutually exclusive with `state_path`.")
+    state_accessors: list[StateAccessorInputModel] | None = Field(default=None, description="How to read label/description/logo/value out of each state entry; each accessor is a static pointer or a pure call.")
+    dependencies: list[str] | None = Field(default_factory=list, description="The other ports (port paths, `..` traverses children) whose values the calls may reference.")
+
+    @model_validator(mode="after")
+    def check_pointer(self) -> Self:
+        """Exactly one pointer source, and every call is pure."""
+        if (self.state_path is None) == (self.state_call is None):
+            raise ValueError("STATE_CHOICE widget needs exactly one of state_path or state_call")
+        if self.state_call is not None:
+            _check_pure_call(self.state_call, self.dependencies, "StateChoice state_call", extra_roots=("state",))
+        for index, accessor in enumerate(self.state_accessors or []):
+            if accessor.call is not None:
+                _check_pure_call(accessor.call, self.dependencies, f"StateAccessor {index}", extra_roots=("state",))
+        return self
+
+
+class ProxyAssignWidgetInputModel(_AssignWidgetBase):
+    kind: Literal["PROXY"] = Field(description="Which member of AssignWidgetInput this is.")
+    target_port: str = Field(min_length=1, description="The port key on the targeted action.")
+    target_action: str = Field(min_length=1, description="The action to target: an action-dependency key of `target_dependency` when that is set.")
+    target_dependency: str | None = Field(default=None, description="The agent dependency (by key) that provides the targeted action; omitted: the implementing agent itself.")
+
+
+AssignWidgetInputModel = Annotated[
+    Union[
+        SliderAssignWidgetInputModel,
+        ChoiceAssignWidgetInputModel,
+        StringAssignWidgetInputModel,
+        SearchAssignWidgetInputModel,
+        CustomAssignWidgetInputModel,
+        StateChoiceAssignWidgetInputModel,
+        ProxyAssignWidgetInputModel,
+    ],
+    Field(discriminator="kind"),
+]
+"""An assign widget of any kind, discriminated by ``kind``."""
+
+ASSIGN_WIDGET_INPUT_MODELS: dict[str, type[_AssignWidgetBase]] = {
+    "SLIDER": SliderAssignWidgetInputModel,
+    "CHOICE": ChoiceAssignWidgetInputModel,
+    "STRING": StringAssignWidgetInputModel,
+    "SEARCH": SearchAssignWidgetInputModel,
+    "CUSTOM": CustomAssignWidgetInputModel,
+    "STATE_CHOICE": StateChoiceAssignWidgetInputModel,
+    "PROXY": ProxyAssignWidgetInputModel,
 }
 
 
-class ReturnWidgetInputModel(BaseModel):
-    kind: enums.ReturnWidgetKind = Field(description="The kind of the return widget. Decides which of the other fields are required, optional or forbidden.")
-    choices: list[ChoiceInputModel] | None = Field(default=None, description="CHOICE: the choices to display.")
-    component: str | None = Field(default=None, description="CUSTOM: the catalog component to render. The returned value is in scope as the reserved root `value`.")
-    props: Optional[List["ComponentPropInputModel"]] = Field(default=None, description="CUSTOM: props of the component; value_paths may only reference `value`, agent calls are not allowed.")
+# ----------------------------------------------------------------------------
+# Return widgets
+# ----------------------------------------------------------------------------
+class _ReturnWidgetBase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class ChoiceReturnWidgetInputModel(_ReturnWidgetBase):
+    kind: Literal["CHOICE"] = Field(description="Which member of ReturnWidgetInput this is. Displays the port's `choices`.")
+
+
+class CustomReturnWidgetInputModel(_ReturnWidgetBase):
+    kind: Literal["CUSTOM"] = Field(description="Which member of ReturnWidgetInput this is.")
+    component: str = Field(min_length=1, description="The catalog component to render. The returned value is in scope as the reserved root `value`.")
+    props: Optional[List["ComponentPropInputModel"]] = Field(default=None, description="Props of the component; value_paths may only reference `value`, agent calls are not allowed.")
 
     @model_validator(mode="after")
-    def check_kind_fields(self) -> Self:
-        """Only the fields of this kind are set, required ones are present, and calls are pure."""
-        required, optional = _RETURN_WIDGET_FIELDS[self.kind]
-        present = {name for name in type(self).model_fields if name != "kind" and _is_set(getattr(self, name))}
-        missing = sorted(required - present)
-        if missing:
-            raise ValueError(f"{self.kind.value} return widget requires {missing}")
-        extra = sorted(present - required - optional)
-        if extra:
-            raise ValueError(f"{self.kind.value} return widget must not set {extra}")
-        if self.kind == enums.ReturnWidgetKind.CUSTOM:
-            _check_widget_props(self.props, None, "CustomReturnWidget")
+    def check_props(self) -> Self:
+        """Props are pure and only reference the returned value."""
+        _check_widget_props(self.props, None, "CustomReturnWidget")
         return self
+
+
+ReturnWidgetInputModel = Annotated[
+    Union[ChoiceReturnWidgetInputModel, CustomReturnWidgetInputModel],
+    Field(discriminator="kind"),
+]
+"""A return widget of any kind, discriminated by ``kind``."""
+
+RETURN_WIDGET_INPUT_MODELS: dict[str, type[_ReturnWidgetBase]] = {
+    "CHOICE": ChoiceReturnWidgetInputModel,
+    "CUSTOM": CustomReturnWidgetInputModel,
+}
+
+
+def iter_widget_chain(widget: Any) -> Iterator[Any]:
+    """A widget followed by its fallback chain."""
+    while widget is not None:
+        yield widget
+        widget = getattr(widget, "fallback", None)
+
+
+# Which port kinds each assign widget kind can edit. Absent kinds fit any port.
+_WIDGET_PORT_KINDS: dict[str, set[enums.PortKind]] = {
+    "SLIDER": {enums.PortKind.INT, enums.PortKind.FLOAT, enums.PortKind.QUANTITY},
+    "STRING": {enums.PortKind.STRING},
+    "SEARCH": {enums.PortKind.STRUCTURE, enums.PortKind.MEMORY_STRUCTURE, enums.PortKind.LIST},
+}
+
+
+def _check_widget_fits_port(widget: Any, port: "PortInputModel") -> None:
+    """A widget only makes sense on ports whose kind it can edit; choices and defaults must agree."""
+    fits = _WIDGET_PORT_KINDS.get(widget.kind)
+    if fits is not None and port.kind not in fits:
+        raise ValueError(f"Port {port.key!r} of kind {port.kind.value} cannot use a {widget.kind} widget (fits {sorted(kind.value for kind in fits)})")
+    if widget.kind == "SEARCH" and port.kind == enums.PortKind.LIST:
+        child = (port.children or [None])[0]
+        if child is None or child.kind not in (enums.PortKind.STRUCTURE, enums.PortKind.MEMORY_STRUCTURE):
+            raise ValueError(f"Port {port.key!r}: a SEARCH widget on a LIST port needs a STRUCTURE child")
+    if widget.kind == "CHOICE" and not port.choices:
+        raise ValueError(f"Port {port.key!r}: a CHOICE widget needs the port to declare `choices`")
+    if widget.kind == "SLIDER" and isinstance(port.default, (int, float)) and not isinstance(port.default, bool):
+        below = widget.min is not None and port.default < widget.min
+        above = widget.max is not None and port.default > widget.max
+        if below or above:
+            raise ValueError(f"Port {port.key!r}: default {port.default} lies outside the SLIDER range [{widget.min}, {widget.max}]")
+
+
+def _check_default_in_choices(port: "PortInputModel") -> None:
+    if port.choices and port.default is not None:
+        values = {choice.value for choice in port.choices}
+        if port.default not in values and str(port.default) not in values:
+            raise ValueError(f"Port {port.key!r}: default {port.default!r} is not one of its choices {sorted(values)}")
 
 
 class RequiresInputModel(BaseModel):
@@ -341,15 +482,41 @@ class PortInputModel(BaseModel):
 
 class ArgPortInputModel(PortInputModel):
     default: Any | None = Field(default=None, description="The default value for the port.")
-    widget: Optional["AssignWidgetInputModel"] = Field(default=None, description="The assign widget to use for this port.")
+    widget: Optional["AssignWidgetInputModel"] = Field(default=None, description="The assign widget to use for this port, discriminated by `kind`.")
     requires: list[RequiresInputModel] | None = Field(default=None, description="The descriptors for the port. Descriptors are key-value pairs that can be used to add additional metadata to a port. When using rekuest's action search, you can filter actions based on their port descriptors")
     children: Optional[list["ArgPortInputModel"]] = Field(default=None, description="The child ports (used for list, dict, union and model ports).")
 
+    @field_validator("widget", mode="before")
+    @classmethod
+    def _plain_widget(cls, value: Any) -> Any:
+        return _as_plain(value)
+
+    @model_validator(mode="after")
+    def check_widget_and_choices(self) -> Self:
+        """The widget (and its fallbacks) fit the port's kind; a default is one of the choices."""
+        _check_default_in_choices(self)
+        for widget in iter_widget_chain(self.widget):
+            _check_widget_fits_port(widget, self)
+        return self
+
 
 class ReturnPortInputModel(PortInputModel):
-    widget: Optional["ReturnWidgetInputModel"] = Field(default=None, description="The return widget to use for this port.")
+    widget: Optional["ReturnWidgetInputModel"] = Field(default=None, description="The return widget to use for this port, discriminated by `kind`.")
     provides: list[ProvidesInputModel] | None = Field(default=None, description="The provisions for the port. Provisions are key-value pairs that can be used to add additional metadata to a port. When using rekuest's action search, you can filter actions based on their port provisions")
     children: Optional[list["ReturnPortInputModel"]] = Field(default=None, description="The child ports (used for list, dict, union and model ports).")
+
+    @field_validator("widget", mode="before")
+    @classmethod
+    def _plain_widget(cls, value: Any) -> Any:
+        return _as_plain(value)
+
+    @model_validator(mode="after")
+    def check_widget_and_choices(self) -> Self:
+        """A CHOICE return widget displays the port's choices, so the port must declare them."""
+        _check_default_in_choices(self)
+        if self.widget is not None and self.widget.kind == "CHOICE" and not self.choices:
+            raise ValueError(f"Port {self.key!r}: a CHOICE return widget needs the port to declare `choices`")
+        return self
 
 
 class PortGroupInputModel(BaseModel):
@@ -502,14 +669,14 @@ class DefinitionInputModel(BaseModel):
     is_test_for: list[TestTargetInputModel] = Field(default_factory=list, description="The actions this definition is a test for, each identified by hash or by (app, key, version).")
     is_dev: bool = Field(default=False, description="Whether the definition is a dev definition or not. If the definition is a dev definition, it can be used to create a dev action. If the definition is not a dev definition, it cannot be used to create a dev action")
 
-    catalog: str | None = Field(
-        default=None,
-        description="Name of the UI catalog (in the registering agent's organization) whose operations the effect and validator calls of this definition are checked against at registration. Unknown or unregistered catalog: no check.",
+    catalogs: list[str] | None = Field(
+        default_factory=list,
+        description="Names of the UI catalogs (in the registering agent's organization) that extend the base catalog for this definition's effect and validator calls. The base catalog (`base@1`) is always applied and may be named explicitly; naming another base version or a catalog that does not exist yields an unknown_catalog warning. Two catalogs defining the same operation differently is a registration error. An operation no catalog provides is stored as a warning on the implementation.",
     )
 
     @model_validator(mode="after")
     def check_dependencies(self) -> Self:
-        """Every dependency of every validator/effect (args, returns, nested children, port groups) is a resolvable port path."""
+        """Every dependency of every validator, effect and widget (args, returns, nested children, port groups) is a resolvable port path."""
         roots: list[PortInputModel] = [*self.args, *self.returns]
 
         def check(dependencies: list[str] | None, owner: str) -> None:
@@ -524,6 +691,12 @@ class DefinitionInputModel(BaseModel):
                     check(validator.dependencies, f"Validator {validator.label or validator.call.operation} in port {path}")
                 for effect in port.effects or []:
                     check(effect.dependencies, f"Effect {effect.kind.value} ({effect.call.operation}) in port {path}")
+                for depth, widget in enumerate(iter_widget_chain(getattr(port, "widget", None))):
+                    owner = f"Widget {widget.kind} in port {path}" + (f" (fallback {depth})" if depth else "")
+                    check(getattr(widget, "dependencies", None), owner)
+                    follow = getattr(widget, "follow_value", None)
+                    if follow is not None and not _resolve_port_path(follow, roots):
+                        raise ValueError(f"{owner} follows an unknown port: {follow}")
                 walk(port.children or [], f"{path}{PORT_PATH_SEPARATOR}")
 
         walk(self.args)
@@ -595,6 +768,29 @@ class ImplementationInputModel(BaseModel):
     effect: enums.EffectClass = Field(
         default=enums.EffectClass.NONE, description="The effect class of this implementation. NONE work is freely retryable/reclaimable; PHYSICAL work touches the real world and an ambiguous failure is terminal (never retried). Declared by the implementation here — never by the caller."
     )
+
+    @model_validator(mode="after")
+    def check_widget_targets(self) -> Self:
+        """PROXY and STATE_CHOICE widgets may only name agent dependencies this implementation declares."""
+        dependencies = {dependency.key: dependency for dependency in self.dependencies}
+
+        def walk(ports: list[ArgPortInputModel], prefix: str = "") -> None:
+            for port in ports:
+                path = f"{prefix}{port.key}"
+                for widget in iter_widget_chain(port.widget):
+                    if widget.kind == "STATE_CHOICE" and widget.dependency is not None and widget.dependency not in dependencies:
+                        raise ValueError(f"Widget STATE_CHOICE in port {path} names undeclared agent dependency {widget.dependency!r}")
+                    if widget.kind == "PROXY" and widget.target_dependency is not None:
+                        dependency = dependencies.get(widget.target_dependency)
+                        if dependency is None:
+                            raise ValueError(f"Widget PROXY in port {path} names undeclared agent dependency {widget.target_dependency!r}")
+                        actions = {action.key for action in dependency.action_dependencies or []}
+                        if actions and widget.target_action not in actions:
+                            raise ValueError(f"Widget PROXY in port {path} targets action {widget.target_action!r}, which dependency {widget.target_dependency!r} does not declare (it declares {sorted(actions)})")
+                walk(port.children or [], f"{path}{PORT_PATH_SEPARATOR}")
+
+        walk(self.definition.args)
+        return self
 
 
 class StateDefinitionInputModel(BaseModel):
@@ -827,8 +1023,40 @@ class BlokImplementationInputModel(BaseModel):
         return self
 
 
-AssignWidgetInputModel.model_rebuild()
-ReturnWidgetInputModel.model_rebuild()
+class WidgetDefaultInputModel(BaseModel):
+    """A catalog's default widget for ports matching a kind and/or structure identifier."""
+
+    kind: enums.PortKind | None = Field(default=None, description="Port kind the default applies to. With `identifier`, both must match.")
+    identifier: str | None = Field(default=None, description="Structure identifier the default applies to, e.g. '@mikro/image'.")
+    widget: Optional["AssignWidgetInputModel"] = Field(default=None, description="The assign widget to render for matching argument ports that declare no widget of their own.")
+    return_widget: Optional["ReturnWidgetInputModel"] = Field(default=None, description="The return widget to render for matching return ports that declare no widget of their own.")
+
+    @field_validator("widget", "return_widget", mode="before")
+    @classmethod
+    def _plain_widgets(cls, value: Any) -> Any:
+        return _as_plain(value)
+
+    @model_validator(mode="after")
+    def check_selector_and_widget(self) -> Self:
+        """A default needs something to match on and something to render."""
+        if self.kind is None and self.identifier is None:
+            raise ValueError("WidgetDefault needs a kind and/or an identifier to match ports on")
+        if self.widget is None and self.return_widget is None:
+            raise ValueError("WidgetDefault needs a widget and/or a return_widget")
+        return self
+
+    @property
+    def selector(self) -> tuple[str | None, str | None]:
+        return (self.kind.value if self.kind is not None else None, self.identifier)
+
+
+SearchAssignWidgetInputModel.model_rebuild()
+CustomAssignWidgetInputModel.model_rebuild()
+StateChoiceAssignWidgetInputModel.model_rebuild()
+CustomReturnWidgetInputModel.model_rebuild()
+ArgPortInputModel.model_rebuild()
+ReturnPortInputModel.model_rebuild()
+WidgetDefaultInputModel.model_rebuild()
 StateAccessorInputModel.model_rebuild()
 OptimisticInputModel.model_rebuild()
 

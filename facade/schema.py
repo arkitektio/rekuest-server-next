@@ -2,7 +2,8 @@ import strawberry
 import strawberry_django
 from facade import models, mutations, queries, subscriptions, types
 from kante.types import Info
-from rekuest_core.constants import interface_types
+from rekuest_core.constants import interface_types, input_union_types
+from kante.unions import unionElementOf
 from strawberry_django.optimizer import DjangoOptimizerExtension
 from authentikate.strawberry import AuthentikateExtension, AuthExtension, AuthSubscribeExtension
 from typing import cast
@@ -58,6 +59,7 @@ class Query:
     resolutions: list[types.Resolution] = field(description="All resolutions.")
     materialized_bloks: list[types.MaterializedBlok] = field(description="List of UI Blok.")
     ui_catalogs: list[types.UICatalog] = field(description="UI catalogs registered in the caller's organization: the components and operations UI apps can render and evaluate.")
+    base_catalog = field(resolver=types.dashboard.base_catalog, description="The built-in base catalog every definition and blok is validated against before any registered UI catalog (virtual: shipped with the server, not registered).")
     state_definitions: list[types.StateDefinition] = field(description="Available state schemas.")
     memory_shelves: list[types.MemoryShelve] = field(description="All memory shelves.")
     memory_drawers: list[types.MemoryDrawer] = field(description="All memory drawers.")
@@ -277,7 +279,8 @@ schema = kante.Schema(
         DjangoOptimizerExtension,
         AuthentikateExtension,
     ],
-    types=interface_types,
+    schema_directives=[unionElementOf],
+    types=interface_types + input_union_types,
     config=StrawberryConfig(
         scalar_map={
             **dscalar_map,

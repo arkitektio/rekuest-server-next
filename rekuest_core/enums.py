@@ -119,6 +119,11 @@ class CatalogValueKind(str, Enum):
     CALLBACK = "CALLBACK"
 
 
+@strawberry.enum(description="Severity of a registration finding. Errors are never stored (they abort registration), so only WARNING exists.")
+class DiagnosticLevel(str, Enum):
+    WARNING = "WARNING"
+
+
 @strawberry.enum(description="Aggregation computed over a tracked value within a window.")
 class WindowFunction(str, Enum):
     MEAN = "MEAN"

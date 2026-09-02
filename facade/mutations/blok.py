@@ -11,7 +11,7 @@ from django.db import transaction
 from kante.types import Info
 
 from facade import inputs, models, types
-from facade.catalog_validation import validate_manifest_against_catalog
+from facade.catalog_validation import dump_diagnostics, validate_manifest_against_catalog
 from facade.types.base import scoped_get
 from rekuest_core.inputs import models as rimodels
 
@@ -65,7 +65,7 @@ def create_blok(info: Info, input: inputs.CreateBlokInput) -> types.Blok:
     model = input.to_pydantic()
     organization = info.context.request.organization
     catalog = _catalog_for(info, model.catalog)
-    validate_manifest_against_catalog(catalog, model.components)
+    diagnostics = validate_manifest_against_catalog(catalog, model.components)
 
     # ``organization`` is part of the lookup, not the defaults: keyed on name alone this was a
     # global upsert, so any user could overwrite another organization's blok by name.
@@ -78,6 +78,7 @@ def create_blok(info: Info, input: inputs.CreateBlokInput) -> types.Blok:
             creator=info.context.request.user,
             catalog=catalog,
             demo_state=model.demo_state or {},
+            diagnostics=dump_diagnostics(diagnostics),
         ),
     )
 
@@ -116,7 +117,7 @@ def update_blok(info: Info, input: inputs.UpdateBlokInput) -> types.Blok:
     dependency_keys = {dep.key for dep in model.dependencies} if model.dependencies is not None else set(blok.dependencies.values_list("key", flat=True))
     components = [rimodels.ComponentNodeInputModel(**c) for c in blok.components]
     rimodels.check_blok_manifest(components, dependency_keys, set(blok.demo_state or {}))
-    validate_manifest_against_catalog(blok.catalog, components)
+    blok.diagnostics = dump_diagnostics(validate_manifest_against_catalog(blok.catalog, components))
 
     blok.save()
 

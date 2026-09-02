@@ -183,6 +183,7 @@ class Implementation(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     tracks = models.JSONField(default=list, help_text="A log of all the tasks that have been provisioned with this implementation, as well as their status and results")
+    diagnostics = models.JSONField(default=list, help_text="Non-fatal registration findings (rekuest_core Diagnostic), e.g. validator/effect calls naming operations that neither the base catalog nor the definition's catalog provides. Replaced on every registration.")
     manipulates = models.ManyToManyField("State", help_text="Which states does this implementation manipulate?", related_name="manipulated_by")
     needs_token = models.BooleanField(
         default=True,

@@ -11,7 +11,7 @@ import logging
 from facade import types, models, inputs, unique
 from pydantic import BaseModel, Field
 import kante
-from facade.catalog_validation import validate_manifest_against_catalog
+from facade.catalog_validation import dump_diagnostics, validate_manifest_against_catalog
 from facade.mutations.blok import _sync_dependencies
 
 logger = logging.getLogger(__name__)
@@ -221,7 +221,7 @@ def implement_agent(info: Info, input: ImplementAgentInput) -> types.Agent:
 
     for blok in input.bloks or []:
         catalog = models.UICatalog.objects.get_or_create(name=blok.catalog or "default", organization=agent.organization)[0]
-        validate_manifest_against_catalog(catalog, blok.components)
+        blok_diagnostics = validate_manifest_against_catalog(catalog, blok.components)
 
         x, _ = models.Blok.objects.update_or_create(
             name=blok.key,
@@ -232,6 +232,7 @@ def implement_agent(info: Info, input: ImplementAgentInput) -> types.Agent:
                 creator=info.context.request.user,
                 catalog=catalog,
                 demo_state=blok.demo_state or {},
+                diagnostics=dump_diagnostics(blok_diagnostics),
             ),
         )
 
