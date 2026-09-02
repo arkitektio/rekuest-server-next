@@ -520,8 +520,6 @@ class DefinitionInputModel(BaseModel):
         def walk(ports: list[PortInputModel], prefix: str = "") -> None:
             for port in ports:
                 path = f"{prefix}{port.key}"
-                if port.key == "value":
-                    raise ValueError("'value' is a reserved port key (it names the port's own value in calls)")
                 for validator in port.validators or []:
                     check(validator.dependencies, f"Validator {validator.label or validator.call.operation} in port {path}")
                 for effect in port.effects or []:

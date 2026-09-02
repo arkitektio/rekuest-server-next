@@ -150,7 +150,10 @@ def test_dependency_inside_child_port_is_checked() -> None:
         _definition(args=[_port("foo", kind="MODEL", children=[_port("bar", validators=[validator])])])
 
 
-def test_port_keyed_value_is_rejected() -> None:
-    """'value' is reserved for the port's own value inside calls."""
-    with pytest.raises(ValidationError, match="reserved port key"):
-        _definition(args=[_port("value")])
+def test_port_named_value_is_allowed_and_shadowed_in_calls() -> None:
+    """A port may be called 'value'; inside a call the root 'value' is always the port's own value."""
+    _definition(args=[_port("value")])
+
+    own = imodels.ValidatorInputModel(call=_call({"key": "a", "value_path": "/value"}), dependencies=[])
+    definition = _definition(args=[_port("value"), _port("n", validators=[own])])
+    assert definition.args[1].validators[0].dependencies == []
