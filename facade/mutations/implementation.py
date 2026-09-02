@@ -14,6 +14,7 @@ from authentikate.vars import get_user, get_client
 from facade.higher_order import validate_dependency_coverage, validate_higher_order_pairing
 from facade.provenance import audience as provenance_audience
 import typing as t
+from facade.catalog_validation import catalog_for_definition, iter_definition_calls, validate_calls_against_catalog
 
 logger = logging.getLogger(__name__)
 
@@ -223,6 +224,12 @@ def _create_implementation(
     # A pure function is definitionally idempotent — upgrade rather than reject, so consumers
     # only ever check `idempotent` for the retry axis and `pure` for replayability.
     desired_idempotent = definition.idempotent or definition.pure
+
+    # Effect/validator calls are evaluated client-side against a UI catalog; a definition that
+    # names its catalog has every operation it uses checked against what that catalog registered.
+    catalog = catalog_for_definition(definition, agent)
+    if catalog is not None:
+        validate_calls_against_catalog(catalog, iter_definition_calls(definition), f"Definition {definition.key}")
 
     definition_changed = True
     try:

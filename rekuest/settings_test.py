@@ -19,6 +19,10 @@ AUTHENTIKATE = {
         # A second distinct identity (same default ``static_org``) for cross-agent tests —
         # agent 1 (token "test") assigns to agent 2 (token "test2").
         "test2": {"sub": "2", "client_id": "oinsoins2", "app": "test-app"},
+        # A third identity in a *different* organization for cross-tenant tests. The auth
+        # extension always derives the request's organization from the bearer token, so a
+        # second tenant can only be expressed as a second token.
+        "test-other": {"sub": "3", "client_id": "oinsoins3", "app": "test-app", "org": "other_org"},
     },
 }
 

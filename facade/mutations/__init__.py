@@ -8,6 +8,7 @@ from .dashboard import create_dashboard, delete_dashboard, update_dashboard
 from .shortcut import create_shortcut, delete_shortcut
 from .toolbox import create_toolbox, delete_toolbox
 from .blok import create_blok, delete_blok, update_blok
+from .catalog import register_ui_catalog
 from .materialized_blok import materialize_blok, delete_materialized_blok, update_materialized_blok
 from .action import cleanup_actions
 from .resolution import auto_resolve, create_resolution, update_resolution, delete_resolution
@@ -41,6 +42,7 @@ __all__ = [
     "delete_implementation",
     "create_dashboard",
     "create_blok",
+    "register_ui_catalog",
     "create_space",
     "create_placement",
     "update_space",

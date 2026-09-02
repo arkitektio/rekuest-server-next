@@ -33,3 +33,14 @@ def test_no_phantom_column_ordering_keys():
             if input_name == "TaskOrder" and phantom == "finishedAt":
                 continue  # Task really does have finished_at
             assert phantom not in block.group(0), f"{input_name}.{phantom} names a nonexistent column"
+
+
+def test_blok_dependency_has_no_phantom_implementation_field():
+    """`BlokDependency.implementation` was declared on the GraphQL type but never existed on the model."""
+    from facade.schema import schema
+
+    sdl = str(schema)
+    block = sdl[sdl.index("type BlokDependency") :]
+    block = block[: block.index("}")]
+    assert "implementation:" not in block
+    assert "blok: Blok!" in block

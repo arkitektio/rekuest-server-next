@@ -11,6 +11,8 @@ import logging
 from facade import types, models, inputs, unique
 from pydantic import BaseModel, Field
 import kante
+from facade.catalog_validation import validate_manifest_against_catalog
+from facade.mutations.blok import _sync_dependencies
 
 logger = logging.getLogger(__name__)
 
@@ -219,6 +221,7 @@ def implement_agent(info: Info, input: ImplementAgentInput) -> types.Agent:
 
     for blok in input.bloks or []:
         catalog = models.UICatalog.objects.get_or_create(name=blok.catalog or "default", organization=agent.organization)[0]
+        validate_manifest_against_catalog(catalog, blok.components)
 
         x, _ = models.Blok.objects.update_or_create(
             name=blok.key,
@@ -228,36 +231,23 @@ def implement_agent(info: Info, input: ImplementAgentInput) -> types.Agent:
                 description=blok.description,
                 creator=info.context.request.user,
                 catalog=catalog,
-                demo_state=blok.demo_state,
+                demo_state=blok.demo_state or {},
             ),
         )
 
-        new_deps = []
-
+        # One auto-materialization per agent-declared blok, every dependency bound to the
+        # declaring agent itself.
         mblok, _ = models.MaterializedBlok.objects.update_or_create(
             blok=x,
+            defaults=dict(name=x.name, description=x.description or ""),
         )
 
-        if blok.dependencies:
-            for i in blok.dependencies:
-                dep, _ = models.BlokDependency.objects.update_or_create(
-                    blok=x,
-                    key=i.key,
-                    defaults=dict(
-                        action_demands=[x.model_dump() for x in i.action_dependencies] if i.action_dependencies else [],
-                        state_demands=[x.model_dump() for x in i.state_dependencies] if i.state_dependencies else [],
-                        app_filter=i.app,
-                        version_filter=i.version,
-                    ),
-                )
-                new_deps.append(dep)
-
-                models.BlokAgentMapping.objects.update_or_create(
-                    materialized_blok=mblok,
-                    key=i.key,
-                    dependency=dep,
-                    defaults=dict(agent=agent),
-                )
+        for dep in _sync_dependencies(x, blok.dependencies, replace=True):
+            models.BlokAgentMapping.objects.update_or_create(
+                materialized_blok=mblok,
+                key=dep.key,
+                defaults=dict(dependency=dep, agent=agent),
+            )
 
     return agent
 

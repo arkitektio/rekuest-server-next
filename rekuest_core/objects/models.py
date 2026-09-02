@@ -32,9 +32,13 @@ class ChoiceAssignWidgetModel(AssignWidgetModel):
 
 
 class CustomAssignWidgetModel(AssignWidgetModel):
+    """A catalog component rendered as the port's widget. The port value is in scope as the reserved root `value`."""
+
     kind: Literal["CUSTOM"]
-    hook: str
-    ward: str
+    component: str
+    props: Optional[List["ComponentPropModel"]] = None
+    dependencies: list[str] | None = None
+    fallback: Optional["AssignWidgetModelUnion"] = None
 
 
 class SearchAssignWidgetModel(AssignWidgetModel):
@@ -47,21 +51,19 @@ class SearchAssignWidgetModel(AssignWidgetModel):
 
 class StateAccessorModel(BaseModel):
     option_key: enums.OptionKey
-    sub_path: str | None = None
+    path: str | None = None
+    call: Optional["UtilCallModel"] = None
 
 
+# `StateChoiceAssignWidgetModel` used to be declared twice here, byte for byte. The
+# second definition shadowed the first, so only one was ever reachable.
 class StateChoiceAssignWidgetModel(AssignWidgetModel):
     kind: Literal["STATE_CHOICE"]
-    state_path: str
+    state_path: str | None = None
+    state_call: Optional["UtilCallModel"] = None
     dependency: str | None = None
     state_accessors: list[StateAccessorModel] | None = None
-
-
-class StateChoiceAssignWidgetModel(AssignWidgetModel):
-    kind: Literal["STATE_CHOICE"]
-    state_path: str
-    dependency: str | None = None
-    state_accessors: list[StateAccessorModel] | None = None
+    dependencies: list[str] | None = None
 
 
 class ProxyWidgetModel(AssignWidgetModel):
@@ -93,8 +95,11 @@ class ReturnWidgetModel(BaseModel):
 
 
 class CustomReturnWidgetModel(ReturnWidgetModel):
-    hook: str
-    ward: str
+    """A catalog component rendered for a returned value. The value is in scope as the reserved root `value`."""
+
+    kind: Literal["CUSTOM"]
+    component: str
+    props: Optional[List["ComponentPropModel"]] = None
 
 
 class ChoiceReturnWidgetModel(ReturnWidgetModel):
@@ -107,7 +112,7 @@ ReturnWidgetModelUnion = Union[CustomReturnWidgetModel, ChoiceReturnWidgetModel]
 
 class EffectModel(BaseModel):
     kind: str
-    function: str
+    call: "UtilCallModel"
     dependencies: list[str]
 
 
@@ -123,8 +128,6 @@ class HideEffectModel(EffectModel):
 
 class CustomEffectModel(EffectModel):
     kind: Literal["CUSTOM"]
-    hook: str
-    ward: str
 
 
 EffectModelUnion = Union[MessageEffectModel, HideEffectModel, CustomEffectModel]
@@ -139,7 +142,7 @@ class PortGroupModel(BaseModel):
 
 
 class ValidatorModel(BaseModel):
-    function: str
+    call: "UtilCallModel"
     dependencies: list[str] | None = []
     label: str | None = None
     error_message: str | None = None
@@ -169,7 +172,8 @@ class ProvidesModel(BaseModel):
 
 class OptimisticModel(BaseModel):
     state: str
-    path: str
+    path: str | None = None
+    path_call: Optional["UtilCallModel"] = None
     accessor: str | None = None
 
 
@@ -203,7 +207,7 @@ class ReturnPortModel(PortModel):
 
 
 class WindowModel(BaseModel):
-    window_function: str
+    window_function: enums.WindowFunction
     label: str | None = None
 
 
@@ -317,3 +321,39 @@ class ComponentNodeModel(BaseModel):
 
 
 SearchAssignWidgetModel.model_rebuild()
+CustomAssignWidgetModel.model_rebuild()
+CustomReturnWidgetModel.model_rebuild()
+StateAccessorModel.model_rebuild()
+StateChoiceAssignWidgetModel.model_rebuild()
+OptimisticModel.model_rebuild()
+
+
+# ============================================================================
+# UI catalog registry
+# ============================================================================
+class CatalogPropModel(BaseModel):
+    key: str
+    kind: enums.CatalogValueKind
+    required: bool = False
+    description: str | None = None
+
+
+class CatalogComponentModel(BaseModel):
+    name: str
+    description: str | None = None
+    props: list[CatalogPropModel] = []
+    accepts_children: bool = True
+
+
+class CatalogArgumentModel(BaseModel):
+    key: str
+    kind: enums.CatalogValueKind
+    required: bool = True
+    description: str | None = None
+
+
+class CatalogOperationModel(BaseModel):
+    name: str
+    description: str | None = None
+    arguments: list[CatalogArgumentModel] = []
+    returns: enums.CatalogValueKind

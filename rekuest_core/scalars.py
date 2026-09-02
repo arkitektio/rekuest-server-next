@@ -8,7 +8,6 @@ Arg = NewType("Arg", object)
 SearchQuery = NewType("SearchQuery", str)
 InstanceID = NewType("InstanceID", str)
 ActionHash = NewType("ActionHash", str)
-ValidatorFunction = NewType("ValidatorFunction", object)
 
 
 scalar_map = {
@@ -38,7 +37,7 @@ scalar_map = {
     ),
     SearchQuery: strawberry.scalar(
         name="SearchQuery",
-        description="The `ArrayLike` scalar type represents a reference to a store previously created by the user n a datalayer",
+        description="The `SearchQuery` scalar is a GraphQL query string a search widget executes against its ward to populate its choices",
         serialize=lambda v: v,
         parse_value=lambda v: v,
     ),
@@ -51,15 +50,6 @@ scalar_map = {
     ActionHash: strawberry.scalar(
         name="ActionHash",
         description="The `ArrayLike` scalar type represents a reference to a store previously created by the user n a datalayer",
-        serialize=lambda v: v,
-        parse_value=lambda v: v,
-    ),
-    ValidatorFunction: strawberry.scalar(
-        name="ValidatorFunction",
-        description="""
-    The `Validator` scalar represents a javascript function that should execute on the client side (inside a shadow realm)
-      to validate a value (or a set of values) before it is sent to the server.  The function has two parameters (value, otherValues) and should return a string if the value is invalid and undefined if the value is valid.
-        The otherValues parameter is an object with the other values in the form {fieldName: value}.""",
         serialize=lambda v: v,
         parse_value=lambda v: v,
     ),

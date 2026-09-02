@@ -17,22 +17,21 @@ from rekuest_core import enums, scalars
 @pydantic.input(
     models.EffectInputModel,
     description="""
-                 An effect is a way to modify a port based on a condition. For example,
-    you could have an effect that sets a port to null if another port is null.
+    An effect is a way to modify a port based on a condition. For example,
+    you could have an effect that hides the port if another port meets a condition,
+    e.g. when the user selects a certain option in a dropdown, another port is hidden.
 
-    Or, you could have an effect that hides the port if another port meets a condition.
-    E.g when the user selects a certain option in a dropdown, another port is hidden.
-
-
+    The condition is a pure blok UtilCall (`call`) evaluated client-side against the
+    catalog; it must return a boolean deciding whether the effect applies. `dependencies`
+    is the authoritative list of other ports the call may reference (plus `value` for the
+    port's own value).
     """,
 )
 class EffectInput:
     kind: enums.EffectKind
     dependencies: list[str] | None = strawberry.field(default_factory=list)
-    function: scalars.ValidatorFunction
+    call: Annotated["UtilCallInput", strawberry.lazy(__name__)]
     message: str | None = None
-    hook: str | None = None
-    ward: str | None = None
     fade: bool | None = True
 
 
@@ -58,7 +57,8 @@ class ChoiceInput:
 @pydantic.input(models.StateAccessorInputModel)
 class StateAccessorInput:
     option_key: enums.OptionKey
-    sub_path: str | None = None
+    path: str | None = None
+    call: Optional[Annotated["UtilCallInput", strawberry.lazy(__name__)]] = None
 
 
 @pydantic.input(models.AssignWidgetInputModel)
@@ -79,20 +79,21 @@ class AssignWidgetInput:
     kind: enums.AssignWidgetKind
     query: scalars.SearchQuery | None = None
     choices: list[ChoiceInput] | None = None
-    state_choices: str | None = None
     follow_value: str | None = None
     min: float | None = None
     max: float | None = None
     step: float | None = None
     placeholder: str | None = None
     as_paragraph: bool | None = None
-    hook: str | None = None
     ward: str | None = None
+    component: str | None = None
+    props: Optional[List[Annotated["ComponentPropInput", strawberry.lazy(__name__)]]] = None
     fallback: Optional[Annotated["AssignWidgetInput", strawberry.lazy(__name__)]] = None
     filters: Optional[List[Annotated["ArgPortInput", strawberry.lazy(__name__)]]] = strawberry.field(default_factory=list)
     dependencies: list[str] | None = strawberry.field(default_factory=list)
     dependency: str | None = None
     state_path: str | None = None
+    state_call: Optional[Annotated["UtilCallInput", strawberry.lazy(__name__)]] = None
     target_dependency: str | None = None
     target_action: str | None = None
     target_port: str | None = None
@@ -117,27 +118,22 @@ class AssignWidgetInput:
 )
 class ReturnWidgetInput:
     kind: enums.ReturnWidgetKind
-    query: scalars.SearchQuery | None = None
     choices: list[ChoiceInput] | None = None
-    min: int | None = None
-    max: int | None = None
-    step: int | None = None
-    placeholder: str | None = None
-    hook: str | None = None
-    ward: str | None = None
+    component: str | None = None
+    props: Optional[List[Annotated["ComponentPropInput", strawberry.lazy(__name__)]]] = None
 
 
 @pydantic.input(
     models.ValidatorInputModel,
     description="""
-A validating function for a port. Can specify a function that will run when validating values of the port.
-If outside dependencies are needed they need to be specified in the dependencies field. With the .. syntax
-when transversing the tree of ports.
-
+A validator for a port. `call` is a pure blok UtilCall evaluated client-side against the
+catalog; it must return a boolean meaning 'valid'. Other ports the call references must be
+listed in `dependencies` (the authoritative subscription list); `value` refers to the port's
+own value. Use the .. syntax when traversing the tree of ports.
 """,
 )
 class ValidatorInput:
-    function: scalars.ValidatorFunction
+    call: Annotated["UtilCallInput", strawberry.lazy(__name__)]
     dependencies: list[str] | None = strawberry.field(default_factory=list)
     label: str | None = None
     error_message: str | None = None
@@ -151,7 +147,8 @@ class ValidatorInput:
 )
 class OptimisticInput:
     state: str
-    path: str
+    path: str | None = None
+    path_call: Optional[Annotated["UtilCallInput", strawberry.lazy(__name__)]] = None
     accessor: str | None = None
 
 
@@ -423,6 +420,10 @@ class DefinitionInput:
         default=False,
         description="Whether the action may be invoked as a probe: zero persistence, redis-held state, no history/replay/recovery. Only actions declaring this are callable via the call mutation.",
     )
+    catalog: str | None = strawberry.field(
+        default=None,
+        description="Name of the UI catalog whose operations the effect and validator calls of this definition are checked against at registration. Unknown or unregistered catalog: no check.",
+    )
     port_groups: list[PortGroupInput] = strawberry.field(
         default_factory=list,
         description="The port groups of the definition. This is used to group ports together in the UI",
@@ -448,7 +449,7 @@ class DefinitionInput:
 
 @pydantic.input(models.WindowInputModel, description="""A window that is calculated""")
 class WindowInput:
-    window_function: str
+    window_function: enums.WindowFunction
     label: str | None = None
 
 
@@ -521,6 +522,7 @@ class LockImplementationInput:
 
 @pydantic.input(models.DynamicValueInputModel, description="A bound state pointer referencing a variable inside a Blok state instance.")
 class DynamicValueInput:
+    literal: Optional[str] = None
     path: Optional[str] = None
 
 
@@ -531,8 +533,8 @@ class AgentProbeInput:
     arguments: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = None
 
 
-@pydantic.input(models.UtilProbeInputModel, description="Defines a utility call that can be invoked within the system.")
-class UtilProbeInput:
+@pydantic.input(models.UtilCallInputModel, description="Defines a utility call that can be invoked within the system.")
+class UtilCallInput:
     operation: str
     arguments: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = None
 
@@ -544,7 +546,7 @@ class ActionArgumentInput:
     value_path: Optional[str] = None
 
     agent_call: Optional[AgentProbeInput] = None
-    util_call: Optional[UtilProbeInput] = None
+    util_call: Optional[UtilCallInput] = None
     value_list: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = None
     value_dict: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = None
 
@@ -557,7 +559,7 @@ class ComponentPropInput:
     static_value: Optional[scalars.JSONSerializable] = None
     dynamic_value: Optional[DynamicValueInput] = None
     agent_call: Optional[AgentProbeInput] = None
-    util_call: Optional[UtilProbeInput] = None
+    util_call: Optional[UtilCallInput] = None
     declares_value: Optional[str] = None
 
 
@@ -580,3 +582,35 @@ class BlokImplementationInput:
     catalog: Optional[str] = None
     demo_state: Optional[scalars.JSONSerializable] = None
     description: Optional[str] = None
+
+
+@pydantic.input(models.CatalogPropInputModel, description="A prop a catalog component accepts.")
+class CatalogPropInput:
+    key: str
+    kind: enums.CatalogValueKind
+    required: bool = False
+    description: Optional[str] = None
+
+
+@pydantic.input(models.CatalogComponentInputModel, description="A component a UI catalog can render.")
+class CatalogComponentInput:
+    name: str
+    description: Optional[str] = None
+    props: List[CatalogPropInput] = strawberry.field(default_factory=list)
+    accepts_children: bool = True
+
+
+@pydantic.input(models.CatalogArgumentInputModel, description="An argument a catalog operation accepts.")
+class CatalogArgumentInput:
+    key: str
+    kind: enums.CatalogValueKind
+    required: bool = True
+    description: Optional[str] = None
+
+
+@pydantic.input(models.CatalogOperationInputModel, description="A pure operation a UI catalog can evaluate for UtilCalls.")
+class CatalogOperationInput:
+    name: str
+    description: Optional[str] = None
+    arguments: List[CatalogArgumentInput] = strawberry.field(default_factory=list)
+    returns: enums.CatalogValueKind

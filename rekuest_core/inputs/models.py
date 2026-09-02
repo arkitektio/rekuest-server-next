@@ -1,6 +1,6 @@
 import hashlib
 import json
-from typing import Any, List, Optional
+from typing import Any, ClassVar, Iterator, List, Optional
 from rekuest_core import enums, units
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
@@ -13,23 +13,106 @@ class BindsInputModel(BaseModel):
     minimum_instances: int = Field(default=1, description="The minimum number of instances that must fulfill this bind for it to be viable.")
 
 
-class EffectDependencyInputModel(BaseModel):
-    key: str = Field(description="The key of the port this effect dependency refers to.")
-    condition: str = Field(description="The condition operator to evaluate against the referenced port's value.")
-    value: str = Field(description="The value to compare the referenced port's value against.")
+# Path grammar shared by port dependencies and call arguments
+# ----------------------------------------------------------------------------
+# * A **port path** is a ``..``-separated sequence of port keys walking ``children``:
+#   ``foo``, ``foo..bar``, ``foo..bar..baz``.
+# * A ``dependencies`` entry is a port path.
+# * A **value_path** is ``[/]<root>[/<json-pointer-into-the-value>...]``. Its first ``/``
+#   segment (the root) is compared verbatim against the allowed roots -- ``dependencies``
+#   plus ``value`` for ports, demo-state keys / declared values / dependency keys for bloks.
+#   Everything after the first ``/`` is a JSON pointer into that value and is not validated
+#   server-side.
+# * ``value`` is reserved for the port's own value; a port may not be keyed ``value``.
+PORT_PATH_SEPARATOR = ".."
+
+
+def _value_path_root(value_path: str) -> str:
+    """First '/' segment of a value_path ('/other/x' -> 'other', 'foo..bar/x' -> 'foo..bar', 'value' -> 'value')."""
+    return value_path.lstrip("/").split("/", 1)[0]
+
+
+def _resolve_port_path(path: str, ports: list["PortInputModel"]) -> bool:
+    """True if a port path ('a..b..c') resolves through ``children`` from the given root ports."""
+    candidates: list[PortInputModel] = ports
+    for segment in path.split(PORT_PATH_SEPARATOR):
+        match = next((port for port in candidates if port.key == segment), None)
+        if match is None:
+            return False
+        candidates = match.children or []
+    return True
+
+
+def _check_keyed(arguments: Optional[List["ActionArgumentInputModel"]], owner: str) -> None:
+    """Map-shaped argument lists (call arguments, value_dict) need unique, non-empty keys."""
+    seen: set[str] = set()
+    for argument in arguments or []:
+        if not argument.key:
+            raise ValueError(f"{owner}: every entry must carry a key")
+        if argument.key in seen:
+            raise ValueError(f"{owner}: duplicate key {argument.key!r}")
+        seen.add(argument.key)
+
+
+def iter_util_calls(arguments: Optional[List["ActionArgumentInputModel"]]) -> Iterator["UtilCallInputModel"]:
+    """Every UtilCall nested anywhere inside an argument tree (depth first)."""
+    for argument in arguments or []:
+        if argument.util_call is not None:
+            yield argument.util_call
+            yield from iter_util_calls(argument.util_call.arguments)
+        if argument.agent_call is not None:
+            yield from iter_util_calls(argument.agent_call.arguments)
+        yield from iter_util_calls(argument.value_list)
+        yield from iter_util_calls(argument.value_dict)
+
+
+def iter_component_nodes(components: Optional[List["ComponentNodeInputModel"]]) -> Iterator["ComponentNodeInputModel"]:
+    """Every node of a component tree (pre-order)."""
+    for node in components or []:
+        yield node
+        yield from iter_component_nodes(node.children)
+
+
+def _check_pure_call(call: "UtilCallInputModel", dependencies: list[str] | None, owner: str, *, extra_roots: tuple[str, ...] = ()) -> None:
+    """Enforce that a port call is pure and only references declared dependencies.
+
+    A port call (effect, validator, widget or optimistic pointer) is evaluated client-side against
+    the blok catalog. It must not trigger agent interactions, and every ``value_path`` in its
+    argument tree must resolve to a name in ``dependencies``, to ``value`` (the port's own value)
+    or to one of ``extra_roots`` (e.g. ``state`` for state widgets, ``args`` for optimistics).
+    """
+    allowed = set(dependencies or []) | {"value"} | set(extra_roots)
+
+    def walk(arguments: Optional[List["ActionArgumentInputModel"]]) -> None:
+        for argument in arguments or []:
+            if argument.agent_call is not None:
+                raise ValueError(f"{owner} must be pure: nested agent calls are not allowed")
+            if argument.value_path is not None:
+                root = _value_path_root(argument.value_path)
+                if root not in allowed:
+                    raise ValueError(f"{owner} references '{root}' via value_path but it is not in dependencies")
+            if argument.util_call is not None:
+                walk(argument.util_call.arguments)
+            walk(argument.value_list)
+            walk(argument.value_dict)
+
+    walk(call.arguments)
 
 
 class EffectInputModel(BaseModel):
-    function: str = Field(description="The function to run to determine if the effect should be applied")
+    call: "UtilCallInputModel" = Field(description="The pure blok UtilCall, evaluated client-side against the catalog, that decides whether the effect applies. It must return a boolean. Argument value_paths may only reference names listed in `dependencies`, plus `value` for the port's own value.")
     dependencies: list[str] | None = Field(
         default_factory=list,
-        description="The dependencies of the effect. Use the .. syntax to traverse the tree of ports. For example, if you have a port with the key 'foo' and you want to reference a port with the key 'bar' that is a child of 'foo', you would use 'foo..bar'",
+        description="The form-field subscription list of the effect: the keys of the other ports whose values the call may reference. This list is authoritative: a value_path in the call may only reference these names (plus `value` for the port's own value). Use the .. syntax to traverse the tree of ports, e.g. 'foo..bar' for the child 'bar' of port 'foo'.",
     )
     message: str | None = Field(default=None, description="The message to display when the effect is applied (if it is a message effect)")
     kind: enums.EffectKind = Field(description="The kind of the effect. Can be either message, hide or custom")
     fade: bool = Field(default=True, description="Whether to fade out the port when the effect is applied (if it is a hide effect)")
-    hook: str | None = Field(default=None, description="The hook to run when the effect is applied (if it is a custom effect)")
-    ward: str | None = Field(default=None, description="The ward to run when the effect is applied (if it is a custom effect)")
+    @model_validator(mode="after")
+    def check_call_is_pure(self) -> Self:
+        """Reject impure calls and value_paths outside the declared dependencies."""
+        _check_pure_call(self.call, self.dependencies, f"Effect {self.kind.value} ({self.call.operation})")
+        return self
 
 
 class ChoiceInputModel(BaseModel):
@@ -40,66 +123,151 @@ class ChoiceInputModel(BaseModel):
 
 
 class ValidatorInputModel(BaseModel):
-    function: str = Field(description="The function to run when validating the port")
+    call: "UtilCallInputModel" = Field(
+        description="The pure blok UtilCall, evaluated client-side against the catalog, that validates the port value. It must return a boolean meaning 'valid'. Argument value_paths may only reference names listed in `dependencies`, plus `value` for the port's own value."
+    )
     dependencies: list[str] | None = Field(
         default_factory=list,
-        description="The dependencies of the function. Use the .. syntax to traverse the tree of ports. For example, if you have a port with the key 'foo' and you want to reference a port with the key 'bar' that is a child of 'foo', you would use 'foo..bar'",
+        description="The form-field subscription list of the validator: the keys of the other ports whose values the call may reference. This list is authoritative: a value_path in the call may only reference these names (plus `value` for the port's own value). Use the .. syntax to traverse the tree of ports, e.g. 'foo..bar' for the child 'bar' of port 'foo'.",
     )
     label: str | None = Field(default=None, description="An optional human-readable label for the validator.")
     error_message: str | None = Field(default=None, description="The error message to display when the validation fails")
 
+    @model_validator(mode="after")
+    def check_call_is_pure(self) -> Self:
+        """Reject impure calls and value_paths outside the declared dependencies."""
+        _check_pure_call(self.call, self.dependencies, f"Validator {self.label or self.call.operation}")
+        return self
+
 
 class StateAccessorInputModel(BaseModel):
     option_key: enums.OptionKey = Field(description="The part of the state accessor to use as the value for the assign widget (e.g. the key, the description, the logo, etc.)")
-    sub_path: str | None = Field(
-        default=None,
-        description="The sub path to access a specific part of the state value. Always traverse from top to bottom level. i.e state.x for state.x and state.x.y for state.x.y. You can also use an arrow function to specify a dynamic path based on the other arguments, e.g. (args) => state[args.foo]",
-    )
+    path: str | None = Field(default=None, description="Static JSON pointer into the state value ('/x/y'). Omit for the whole value. Mutually exclusive with `call`.")
+    call: Optional["UtilCallInputModel"] = Field(default=None, description="Pure UtilCall returning the pointer string dynamically. May reference `state`, `value` and the widget's `dependencies`. Mutually exclusive with `path`.")
+
+    @model_validator(mode="after")
+    def check_one_of(self) -> Self:
+        """A pointer is either static or computed, not both."""
+        if self.path is not None and self.call is not None:
+            raise ValueError("StateAccessor: set either path or call, not both")
+        return self
+
+
+def _is_set(value: Any) -> bool:
+    """None and empty lists count as unset (strawberry inputs default list fields to [])."""
+    return value is not None and value != []
+
+
+def _check_widget_props(props: Optional[List["ComponentPropInputModel"]], dependencies: list[str] | None, owner: str) -> None:
+    """Custom widget props: no agent calls; value_paths only reference `value` and `dependencies`."""
+    allowed = set(dependencies or []) | {"value"}
+    for prop in props or []:
+        prop_owner = f"{owner} prop {prop.key!r}"
+        if prop.agent_call is not None:
+            raise ValueError(f"{prop_owner} must be pure: agent calls are not allowed in widgets")
+        if prop.dynamic_value is not None and prop.dynamic_value.path is not None:
+            root = _value_path_root(prop.dynamic_value.path)
+            if root not in allowed:
+                raise ValueError(f"{prop_owner} references '{root}' via dynamic_value.path but it is not in dependencies")
+        if prop.util_call is not None:
+            _check_pure_call(prop.util_call, dependencies, prop_owner)
+
+
+# Per kind: (required fields, optional fields). `kind` and `follow_value` are always allowed;
+# everything else is forbidden for that kind.
+_ASSIGN_WIDGET_FIELDS: dict[enums.AssignWidgetKind, tuple[set[str], set[str]]] = {
+    enums.AssignWidgetKind.SEARCH: ({"query", "ward"}, {"filters", "dependencies", "placeholder"}),
+    enums.AssignWidgetKind.CHOICE: ({"choices"}, {"placeholder"}),
+    enums.AssignWidgetKind.SLIDER: (set(), {"min", "max", "step"}),
+    enums.AssignWidgetKind.STRING: (set(), {"placeholder", "as_paragraph"}),
+    enums.AssignWidgetKind.CUSTOM: ({"component"}, {"props", "dependencies", "fallback"}),
+    enums.AssignWidgetKind.STATE_CHOICE: (set(), {"state_path", "state_call", "dependency", "state_accessors", "dependencies"}),
+    enums.AssignWidgetKind.PROXY: ({"target_port", "target_action"}, {"target_dependency"}),
+}
+_ASSIGN_WIDGET_ALWAYS = {"kind", "follow_value"}
 
 
 class AssignWidgetInputModel(BaseModel):
-    kind: enums.AssignWidgetKind = Field(description="The kind of the assign widget. Can be either dropdown, text, slider, checkbox, radio or custom")
-    query: str | None = Field(default=None, description="The query to run when searching for choices. This is used for dropdowns and text inputs")
-    choices: list[ChoiceInputModel] | None = Field(default=None, description="The choices to display in the dropdown. This is used for dropdowns and text inputs")
-    state_choices: str | None = Field(default=None, description="The key of a state whose value provides the choices for this widget (state-driven choices).")
+    kind: enums.AssignWidgetKind = Field(description="The kind of the assign widget. Decides which of the other fields are required, optional or forbidden.")
+    query: str | None = Field(default=None, description="SEARCH: the GraphQL query the ward executes to populate the choices.")
+    choices: list[ChoiceInputModel] | None = Field(default=None, description="CHOICE: the choices to display.")
     follow_value: str | None = Field(default=None, description="The key of another port whose value this widget should follow and mirror.")
-    min: float | None = Field(default=None, description="The minimum value of the slider (if a slider). This is used for sliders and text inputs")
-    max: float | None = Field(default=None, description="The maximum value of the slider (if a slider). This is used for sliders and text inputs")
-    step: float | None = Field(default=None, description="The step value of the slider (if a slider). This is used for sliders and text inputs")
-    placeholder: str | None = Field(default=None, description="The placeholder of the input. This is used for text inputs and dropdowns")
-    as_paragraph: bool | None = Field(default=None, description="Whether to display the input as a paragraph or not. This is used for text inputs and dropdowns")
-    hook: str | None = Field(default=None, description="The hook to run when the input is changed. This is used for custom assign widgets")
-    ward: str | None = Field(default=None, description="The ward that is responsible for handling querying the choices")
-    fallback: Optional["AssignWidgetInputModel"] = Field(default=None, description="The fallback assign widget to use if the current one fails. This is used for custom assign widgets")
-    filters: list["ArgPortInputModel"] | None = Field(default=None, description="The filters to apply to a search widget. This is used for custom assign widgets")
+    min: float | None = Field(default=None, description="SLIDER: the minimum value.")
+    max: float | None = Field(default=None, description="SLIDER: the maximum value.")
+    step: float | None = Field(default=None, description="SLIDER: the step.")
+    placeholder: str | None = Field(default=None, description="SEARCH, CHOICE, STRING: the placeholder text.")
+    as_paragraph: bool | None = Field(default=None, description="STRING: render as a paragraph.")
+    ward: str | None = Field(default=None, description="SEARCH: the ward (service) that executes the query.")
+    component: str | None = Field(default=None, description="CUSTOM: the catalog component to render. The port value is in scope as the reserved root `value`.")
+    props: Optional[List["ComponentPropInputModel"]] = Field(default=None, description="CUSTOM: props of the component. value_paths may only reference `value` and `dependencies`; agent calls are not allowed.")
+    fallback: Optional["AssignWidgetInputModel"] = Field(default=None, description="CUSTOM: widget to render when the UI has no such component in its catalog.")
+    filters: list["ArgPortInputModel"] | None = Field(default=None, description="SEARCH: filter ports whose values are passed to the query.")
     dependencies: list[str] | None = Field(
         default_factory=list,
-        description="The dependencies of the assign widget, which will be passed to the search or the hook widget. Use the .. syntax to traverse the tree of ports. For example, if you have a port with the key 'foo' and you want to reference a port with the key 'bar' that is a child of 'foo', you would use 'foo..bar'",
+        description="SEARCH, CUSTOM, STATE_CHOICE: the other ports (port paths, `..` traverses children) whose values the query, props or calls may reference.",
     )
-    dependency: str | None = Field(default=None, description="The dependency that we are going to use to fullfill the state choices. If none is provided its the own state that will be queried")
-    target_dependency: str | None = Field(default=None, description="The dependency that we are going to target with a proxy widget. This is used for proxy widgets")
-    target_action: str | None = Field(default=None, description="The action that we are going to target with a proxy widget. This is used for proxy widgets")
-    target_port: str | None = Field(default=None, description="The port that we are going to target with a proxy widget. This is used for proxy widgets")
-    state_path: str | None = Field(
-        default=None,
-        description="The path to the state value that we are going to use to fullfill the state choices. Always traverse from top to bottom level. i.e state.x for state.x and state.x.y for state.x.y. You can also use an arrow function to specify a dynamic path based on the other arguments, e.g. (args) => state[args.foo]",
-    )
+    dependency: str | None = Field(default=None, description="STATE_CHOICE: the agent dependency whose state provides the choices; omitted: the own state.")
+    target_dependency: str | None = Field(default=None, description="PROXY: the dependency to target.")
+    target_action: str | None = Field(default=None, description="PROXY: the action to target.")
+    target_port: str | None = Field(default=None, description="PROXY: the port to target.")
+    state_path: str | None = Field(default=None, description="STATE_CHOICE: static JSON pointer into the state value that provides the choices. Mutually exclusive with `state_call`.")
+    state_call: Optional["UtilCallInputModel"] = Field(default=None, description="STATE_CHOICE: pure UtilCall returning that pointer dynamically; may reference `state`, `value` and `dependencies`. Mutually exclusive with `state_path`.")
     state_accessors: list[StateAccessorInputModel] | None = Field(
         default=None,
-        description="State accessors are used to specify how to access the state values that we are going to use to fullfill the state choices. This is used when the state value that we want to use is not the same as the one of the port, e.g. when we want to use a specific key of a state object, or when we want to use a dynamic key based on the other arguments. The option_key field is used to specify which part of the state accessor we want to use as the value for the assign widget (e.g. the key, the description, the logo, etc.)",
+        description="STATE_CHOICE: how to read label/description/logo/value out of each state entry; each accessor is a static pointer or a pure call.",
     )
+
+    @model_validator(mode="after")
+    def check_kind_fields(self) -> Self:
+        """Only the fields of this kind are set, required ones are present, and calls are pure."""
+        required, optional = _ASSIGN_WIDGET_FIELDS[self.kind]
+        present = {name for name in type(self).model_fields if name not in _ASSIGN_WIDGET_ALWAYS and _is_set(getattr(self, name))}
+        missing = sorted(required - present)
+        if missing:
+            raise ValueError(f"{self.kind.value} widget requires {missing}")
+        extra = sorted(present - required - optional)
+        if extra:
+            raise ValueError(f"{self.kind.value} widget must not set {extra}")
+
+        if self.kind == enums.AssignWidgetKind.CUSTOM:
+            _check_widget_props(self.props, self.dependencies, "CustomAssignWidget")
+        if self.kind == enums.AssignWidgetKind.STATE_CHOICE:
+            if (self.state_path is None) == (self.state_call is None):
+                raise ValueError("STATE_CHOICE widget needs exactly one of state_path or state_call")
+            if self.state_call is not None:
+                _check_pure_call(self.state_call, self.dependencies, "StateChoice state_call", extra_roots=("state",))
+            for index, accessor in enumerate(self.state_accessors or []):
+                if accessor.call is not None:
+                    _check_pure_call(accessor.call, self.dependencies, f"StateAccessor {index}", extra_roots=("state",))
+        return self
+
+
+_RETURN_WIDGET_FIELDS: dict[enums.ReturnWidgetKind, tuple[set[str], set[str]]] = {
+    enums.ReturnWidgetKind.CHOICE: ({"choices"}, set()),
+    enums.ReturnWidgetKind.CUSTOM: ({"component"}, {"props"}),
+}
 
 
 class ReturnWidgetInputModel(BaseModel):
-    kind: enums.ReturnWidgetKind = Field(description="The kind of the return widget. Can be either dropdown, text, slider, checkbox, radio or custom")
-    query: str | None = Field(default=None, description="The query to run when searching for choices. This is used for dropdowns and text inputs")
-    choices: list[ChoiceInputModel] | None = Field(default=None, description="The choices to display in the dropdown. This is used for dropdowns and text inputs")
-    min: int | None = Field(default=None, description="The minimum value to display (if a slider).")
-    max: int | None = Field(default=None, description="The maximum value to display (if a slider).")
-    step: int | None = Field(default=None, description="The step value to display (if a slider).")
-    placeholder: str | None = Field(default=None, description="The placeholder text of the return widget.")
-    hook: str | None = Field(default=None, description="The hook to run (if it is a custom return widget).")
-    ward: str | None = Field(default=None, description="The ward responsible for handling the return widget.")
+    kind: enums.ReturnWidgetKind = Field(description="The kind of the return widget. Decides which of the other fields are required, optional or forbidden.")
+    choices: list[ChoiceInputModel] | None = Field(default=None, description="CHOICE: the choices to display.")
+    component: str | None = Field(default=None, description="CUSTOM: the catalog component to render. The returned value is in scope as the reserved root `value`.")
+    props: Optional[List["ComponentPropInputModel"]] = Field(default=None, description="CUSTOM: props of the component; value_paths may only reference `value`, agent calls are not allowed.")
+
+    @model_validator(mode="after")
+    def check_kind_fields(self) -> Self:
+        """Only the fields of this kind are set, required ones are present, and calls are pure."""
+        required, optional = _RETURN_WIDGET_FIELDS[self.kind]
+        present = {name for name in type(self).model_fields if name != "kind" and _is_set(getattr(self, name))}
+        missing = sorted(required - present)
+        if missing:
+            raise ValueError(f"{self.kind.value} return widget requires {missing}")
+        extra = sorted(present - required - optional)
+        if extra:
+            raise ValueError(f"{self.kind.value} return widget must not set {extra}")
+        if self.kind == enums.ReturnWidgetKind.CUSTOM:
+            _check_widget_props(self.props, None, "CustomReturnWidget")
+        return self
 
 
 class RequiresInputModel(BaseModel):
@@ -116,10 +284,18 @@ class ProvidesInputModel(BaseModel):
 
 class OptimisticInputModel(BaseModel):
     state: str = Field(description="The state to optimistically set when the action is assigned")
-    path: str = Field(
-        description="The path to the state.value to optimistically set the value, always traverse from top to bottom level. i.e state.x for state.x and state.x.y for state.x.y. You can also use an arrow function to specify a dynamic path based on the other arguments, e.g. (args) => state[args.foo]"
-    )
-    accessor: str | None = Field(default=None, description="The accessor to get the value to optimistically set. This is used when the value to optimistically set is not the same as the value of the port")
+    path: str | None = Field(default=None, description="Static JSON pointer into the state value to set. Mutually exclusive with `path_call`.")
+    path_call: Optional["UtilCallInputModel"] = Field(default=None, description="Pure UtilCall returning the pointer dynamically; may reference `args` (the assignment arguments). Mutually exclusive with `path`.")
+    accessor: str | None = Field(default=None, description="Static JSON pointer into the assignment args for the value to set; omitted: the whole args.")
+
+    @model_validator(mode="after")
+    def check_one_of(self) -> Self:
+        """The pointer is either static or computed, and a computed one only sees the args."""
+        if (self.path is None) == (self.path_call is None):
+            raise ValueError("Optimistic needs exactly one of path or path_call")
+        if self.path_call is not None:
+            _check_pure_call(self.path_call, [], f"Optimistic {self.state}", extra_roots=("args",))
+        return self
 
 
 class PortInputModel(BaseModel):
@@ -133,9 +309,11 @@ class PortInputModel(BaseModel):
     effects: list[EffectInputModel] | None = Field(default=None, description="The effects of the port")
     default: Any | None = Field(default=None, description="The default value for the port.")
     choices: list[ChoiceInputModel] | None = Field(default=None, description="The options for the port. This is used for dropdowns and text inputs")
-    reference_unit: str | None = Field(default=None, description="For QUANTITY ports: the canonical/reference unit of the physical quantity, e.g. \"volt\" or \"farad\". It is the default selection and the key used to resolve the concrete quantity type; other units of the same dimension are still allowed.")
-    proposed_units: list[str] | None = Field(default=None, description="For QUANTITY ports: units offered as a dropdown in the UI, e.g. [\"pF\", \"nF\", \"uF\"]. Proposals only — any unit of the same dimension remains valid input.")
-    dimension: str | None = Field(default=None, description="For QUANTITY ports: the pint dimensionality string, e.g. \"[mass] * [length] ** 2 / [time] ** 3 / [current]\". This is the wiring-compatibility key between quantity ports.")
+    reference_unit: str | None = Field(
+        default=None, description='For QUANTITY ports: the canonical/reference unit of the physical quantity, e.g. "volt" or "farad". It is the default selection and the key used to resolve the concrete quantity type; other units of the same dimension are still allowed.'
+    )
+    proposed_units: list[str] | None = Field(default=None, description='For QUANTITY ports: units offered as a dropdown in the UI, e.g. ["pF", "nF", "uF"]. Proposals only — any unit of the same dimension remains valid input.')
+    dimension: str | None = Field(default=None, description='For QUANTITY ports: the pint dimensionality string, e.g. "[mass] * [length] ** 2 / [time] ** 3 / [current]". This is the wiring-compatibility key between quantity ports.')
     children: Optional[list["PortInputModel"]] = Field(default=None, description="The child ports (used for list, dict, union and model ports).")
 
     @model_validator(mode="after")
@@ -324,24 +502,37 @@ class DefinitionInputModel(BaseModel):
     is_test_for: list[TestTargetInputModel] = Field(default_factory=list, description="The actions this definition is a test for, each identified by hash or by (app, key, version).")
     is_dev: bool = Field(default=False, description="Whether the definition is a dev definition or not. If the definition is a dev definition, it can be used to create a dev action. If the definition is not a dev definition, it cannot be used to create a dev action")
 
+    catalog: str | None = Field(
+        default=None,
+        description="Name of the UI catalog (in the registering agent's organization) whose operations the effect and validator calls of this definition are checked against at registration. Unknown or unregistered catalog: no check.",
+    )
+
     @model_validator(mode="after")
     def check_dependencies(self) -> Self:
-        """Ensure that all dependencies in ports are valid."""
-        all_arg_keys = [port.key for port in self.args]
-        all_return_keys = [port.key for port in self.returns]
+        """Every dependency of every validator/effect (args, returns, nested children, port groups) is a resolvable port path."""
+        roots: list[PortInputModel] = [*self.args, *self.returns]
 
-        for arg in self.args:
-            for validator in arg.validators or []:
-                if validator.dependencies:
-                    for dep in validator.dependencies:
-                        if dep not in all_arg_keys and dep not in all_return_keys:
-                            raise ValueError(f"Validator {validator.label} in port {arg.key} has invalid dependency: {dep}")
+        def check(dependencies: list[str] | None, owner: str) -> None:
+            for dep in dependencies or []:
+                if not _resolve_port_path(dep, roots):
+                    raise ValueError(f"{owner} has invalid dependency: {dep}")
 
-            for effect in arg.effects or []:
-                if effect.dependencies:
-                    for dep in effect.dependencies:
-                        if dep not in all_arg_keys and dep not in all_return_keys:
-                            raise ValueError(f"Effect {effect.function} in port {arg.key} has invalid dependency: {dep}")
+        def walk(ports: list[PortInputModel], prefix: str = "") -> None:
+            for port in ports:
+                path = f"{prefix}{port.key}"
+                if port.key == "value":
+                    raise ValueError("'value' is a reserved port key (it names the port's own value in calls)")
+                for validator in port.validators or []:
+                    check(validator.dependencies, f"Validator {validator.label or validator.call.operation} in port {path}")
+                for effect in port.effects or []:
+                    check(effect.dependencies, f"Effect {effect.kind.value} ({effect.call.operation}) in port {path}")
+                walk(port.children or [], f"{path}{PORT_PATH_SEPARATOR}")
+
+        walk(self.args)
+        walk(self.returns)
+        for group in self.port_groups or []:
+            for effect in group.effects or []:
+                check(effect.dependencies, f"Effect {effect.kind.value} ({effect.call.operation}) in port group {group.key}")
 
         return self
 
@@ -378,7 +569,7 @@ class DependencyInputModel(BaseModel):
 
 
 class WindowInputModel(BaseModel):
-    window_function: str = Field(description="The window function to apply over the tracked value.")
+    window_function: enums.WindowFunction = Field(description="The aggregation to compute over the tracked value within the window.")
     label: str | None = Field(default=None, description="An optional human-readable label for the window.")
 
 
@@ -430,9 +621,9 @@ class LockImplementationInputModel(BaseModel):
     definition: LockDefinitionInputModel = Field(description="The lock definition this implementation fulfills.")
 
 
-class BlokImplementationInputModel(BaseModel):
-    key: str = Field(description="The key of the blok implementation.")
-    definition: LockDefinitionInputModel = Field(description="The definition this blok implementation fulfills.")
+# A two-field `BlokImplementationInputModel` stub used to sit here. The real one is
+# declared further down and shadowed it at import time, so the stub was never reachable
+# -- and its `definition: LockDefinitionInputModel` named a lock, not a blok.
 
 
 class DynamicValueInputModel(BaseModel):
@@ -442,26 +633,39 @@ class DynamicValueInputModel(BaseModel):
         literal: An optional static fallback literal value, passed as a serialized string or JSON primitive.
     """
 
+    literal: str | None = Field(default=None, description="A static fallback literal value (serialized string or JSON primitive) used when `path` does not resolve.")
     path: str | None = Field(default=None, description="JSON Pointer to a variable inside the Blok's isolated data model (e.g., '/microscope/exposure').")
 
 
 class AgentProbeInputModel(BaseModel):
-    """Base model for defining a callback that routes user interactions directly to an Arkitekt Agent via Rekuest.
+    """A callback that routes user interactions directly to an Arkitekt Agent via Rekuest.
 
     Attributes:
-        target_dependency_key: The abstract agent dependency key declared in the Blok manifest (e.g., 'stage_dep').
-        operation_name: The target function name registered on that specific agent's worker thread loop.
+        dependency: The abstract agent dependency key declared in the Blok manifest (e.g., 'stage_dep').
+        operation: The target function name registered on that specific agent's worker thread loop.
         arguments: An optional list of key-value arguments compiled for the target agent call.
     """
 
-    dependency: str = Field(description="The abstract agent dependency key declared in the Blok manifest (e.g., 'stage_dep').")
-    operation: str = Field(description="The target function name registered on that specific agent's worker thread loop.")
+    dependency: str = Field(min_length=1, description="The abstract agent dependency key declared in the Blok manifest (e.g., 'stage_dep').")
+    operation: str = Field(min_length=1, description="The target function name registered on that specific agent's worker thread loop.")
     arguments: Optional[List["ActionArgumentInputModel"]] = Field(default=None, description="Key-value arguments map compiled for the target agent call.")
 
+    @model_validator(mode="after")
+    def check_argument_keys(self) -> Self:
+        """Call arguments are a map: every entry needs a unique key."""
+        _check_keyed(self.arguments, f"arguments of agent call {self.operation}")
+        return self
 
-class UtilProbeInputModel(BaseModel):
-    operation: str = Field(description="The utility function name to invoke.")
+
+class UtilCallInputModel(BaseModel):
+    operation: str = Field(min_length=1, description="The utility function name to invoke.")
     arguments: Optional[List["ActionArgumentInputModel"]] = Field(default=None, description="Key-value arguments map compiled for the target utility call.")
+
+    @model_validator(mode="after")
+    def check_argument_keys(self) -> Self:
+        """Call arguments are a map: every entry needs a unique key."""
+        _check_keyed(self.arguments, f"arguments of {self.operation}")
+        return self
 
 
 class ActionArgumentInputModel(BaseModel):
@@ -479,10 +683,24 @@ class ActionArgumentInputModel(BaseModel):
 
     # Separated nested calls
     agent_call: Optional["AgentProbeInputModel"] = Field(default=None, description="Defines a nested agent call if this argument should trigger an agent interaction.")
-    util_call: Optional["UtilProbeInputModel"] = Field(default=None, description="Defines a nested utility call if this argument should trigger a system utility interaction.")
+    util_call: Optional["UtilCallInputModel"] = Field(default=None, description="Defines a nested utility call if this argument should trigger a system utility interaction.")
 
     value_list: Optional[List["ActionArgumentInputModel"]] = Field(default=None, description="Defines a list of values if this argument should be an array.")
     value_dict: Optional[List["ActionArgumentInputModel"]] = Field(default=None, description="Defines a list of key-value pairs if this argument should be a dictionary.")
+
+    BINDINGS: ClassVar[tuple[str, ...]] = ("value_literal", "value_path", "agent_call", "util_call", "value_list", "value_dict")
+
+    @model_validator(mode="after")
+    def check_exactly_one_binding(self) -> Self:
+        """An argument is bound in exactly one way; list entries are unkeyed, dict entries uniquely keyed."""
+        bound = [name for name in self.BINDINGS if getattr(self, name) is not None]
+        if len(bound) != 1:
+            raise ValueError(f"ActionArgument {self.key!r} must set exactly one of {', '.join(self.BINDINGS)} (got {bound or 'none'})")
+        _check_keyed(self.value_dict, f"value_dict of argument {self.key!r}")
+        for entry in self.value_list or []:
+            if entry.key is not None:
+                raise ValueError(f"value_list entries of argument {self.key!r} must not carry a key")
+        return self
 
 
 # ============================================================================
@@ -505,7 +723,19 @@ class ComponentPropInputModel(BaseModel):
 
     # Separated top-level callbacks
     agent_call: Optional["AgentProbeInputModel"] = Field(default=None, description="Defines an imperative interactive network action callback loop if this prop should trigger an agent interaction.")
-    util_call: Optional["UtilProbeInputModel"] = Field(default=None, description="Defines an imperative interactive network action callback loop if this prop should trigger a system utility interaction.")
+    util_call: Optional["UtilCallInputModel"] = Field(default=None, description="Defines an imperative interactive network action callback loop if this prop should trigger a system utility interaction.")
+
+    BINDINGS: ClassVar[tuple[str, ...]] = ("static_value", "dynamic_value", "agent_call", "util_call")
+
+    @model_validator(mode="after")
+    def check_at_most_one_binding(self) -> Self:
+        """A prop is bound at most one way; an unbound prop must at least declare a value."""
+        bound = [name for name in self.BINDINGS if getattr(self, name) is not None]
+        if len(bound) > 1:
+            raise ValueError(f"ComponentProp {self.key!r} must set at most one of {', '.join(self.BINDINGS)} (got {bound})")
+        if not bound and not self.declares_value:
+            raise ValueError(f"ComponentProp {self.key!r} is neither bound nor declares a value")
+        return self
 
 
 # 3. The Unified Abstract Component Node Input
@@ -526,6 +756,62 @@ class ComponentNodeInputModel(BaseModel):
     children: list["ComponentNodeInputModel"] | None = Field(default=None, description="Flat adjacency pointer list mapping out IDs nested inside this specific component layer.")
 
 
+def check_blok_manifest(components: Optional[List[ComponentNodeInputModel]], dependency_keys: set[str], state_keys: Optional[set[str]]) -> None:
+    """Coherence of a blok component tree.
+
+    * component ids are unique across the whole tree
+    * ``declares_value`` names are unique
+    * every ``agent_call.dependency`` names a declared blok dependency
+    * every ``value_path`` / ``dynamic_value.path`` root resolves to a demo-state key, a declared
+      value or a dependency key -- skipped when ``state_keys`` is ``None`` (no demo state given)
+    """
+    ids: set[str] = set()
+    declared: set[str] = set()
+    for node in iter_component_nodes(components):
+        if node.id in ids:
+            raise ValueError(f"Blok manifest: duplicate component id {node.id!r}")
+        ids.add(node.id)
+        for prop in node.props or []:
+            if prop.declares_value:
+                if prop.declares_value in declared:
+                    raise ValueError(f"Blok manifest: value {prop.declares_value!r} declared twice")
+                declared.add(prop.declares_value)
+
+    roots = None if state_keys is None else (state_keys | declared | dependency_keys)
+
+    def check_root(path: Optional[str], owner: str) -> None:
+        if path is None or roots is None:
+            return
+        root = _value_path_root(path)
+        if root not in roots:
+            raise ValueError(f"{owner} references {root!r} but it is neither a demo_state key, a declared value nor a dependency key")
+
+    def check_agent_call(agent_call, owner: str) -> None:
+        if agent_call.dependency not in dependency_keys:
+            raise ValueError(f"{owner}: agent_call targets undeclared dependency {agent_call.dependency!r}")
+        walk_arguments(agent_call.arguments, owner)
+
+    def walk_arguments(arguments: Optional[List[ActionArgumentInputModel]], owner: str) -> None:
+        for argument in arguments or []:
+            check_root(argument.value_path, owner)
+            if argument.agent_call is not None:
+                check_agent_call(argument.agent_call, owner)
+            if argument.util_call is not None:
+                walk_arguments(argument.util_call.arguments, owner)
+            walk_arguments(argument.value_list, owner)
+            walk_arguments(argument.value_dict, owner)
+
+    for node in iter_component_nodes(components):
+        for prop in node.props or []:
+            owner = f"prop {prop.key!r} of component {node.id!r}"
+            if prop.dynamic_value is not None:
+                check_root(prop.dynamic_value.path, owner)
+            if prop.agent_call is not None:
+                check_agent_call(prop.agent_call, owner)
+            if prop.util_call is not None:
+                walk_arguments(prop.util_call.arguments, owner)
+
+
 class BlokImplementationInputModel(BaseModel):
     "Base model for a Blok implementation manifest, which compiles all necessary information to materialize a Blok instance in the Arkitekt ecosystem."
 
@@ -536,5 +822,66 @@ class BlokImplementationInputModel(BaseModel):
     description: Optional[str] = Field(default=None, description="A human-readable description about this Blok's purpose and functionality.")
     demo_state: Optional[dict] = Field(default=None, description="An optional JSON-serializable object providing demo state values for this Blok's internal reactive data model, useful for testing and development purposes.")
 
+    @model_validator(mode="after")
+    def check_manifest(self) -> Self:
+        """The component tree is coherent with the declared dependencies and demo state."""
+        check_blok_manifest(self.components, {dep.key for dep in self.dependencies}, None if self.demo_state is None else set(self.demo_state))
+        return self
+
 
 AssignWidgetInputModel.model_rebuild()
+ReturnWidgetInputModel.model_rebuild()
+StateAccessorInputModel.model_rebuild()
+OptimisticInputModel.model_rebuild()
+
+
+# ============================================================================
+# UI catalog registry: what a UI app can render (components) and evaluate (operations)
+# ============================================================================
+def _check_unique(items: list, attr: str, owner: str) -> None:
+    seen: set[str] = set()
+    for item in items:
+        value = getattr(item, attr)
+        if value in seen:
+            raise ValueError(f"{owner}: duplicate {attr} {value!r}")
+        seen.add(value)
+
+
+class CatalogPropInputModel(BaseModel):
+    key: str = Field(min_length=1, description="The prop key a ComponentProp.key must match.")
+    kind: enums.CatalogValueKind = Field(description="The value kind this prop accepts. CALLBACK props must be bound via agent_call or util_call.")
+    required: bool = Field(default=False, description="Whether every component instance must set this prop.")
+    description: str | None = Field(default=None, description="Human-readable description of the prop.")
+
+
+class CatalogComponentInputModel(BaseModel):
+    name: str = Field(min_length=1, description="The component name a ComponentNode.component (or a custom widget's component) must match.")
+    description: str | None = Field(default=None, description="Human-readable description of the component.")
+    props: list[CatalogPropInputModel] = Field(default_factory=list, description="The props this component accepts.")
+    accepts_children: bool = Field(default=True, description="Whether ComponentNode.children may be nested under this component.")
+
+    @model_validator(mode="after")
+    def check_unique_props(self) -> Self:
+        """Prop keys are unique per component."""
+        _check_unique(self.props, "key", f"catalog component {self.name}")
+        return self
+
+
+class CatalogArgumentInputModel(BaseModel):
+    key: str = Field(min_length=1, description="The argument key a UtilCall argument must use.")
+    kind: enums.CatalogValueKind = Field(description="The value kind of the argument.")
+    required: bool = Field(default=True, description="Whether every call must pass this argument.")
+    description: str | None = Field(default=None, description="Human-readable description of the argument.")
+
+
+class CatalogOperationInputModel(BaseModel):
+    name: str = Field(min_length=1, description="The operation name a UtilCall.operation must match.")
+    description: str | None = Field(default=None, description="Human-readable description of the operation.")
+    arguments: list[CatalogArgumentInputModel] = Field(default_factory=list, description="The arguments the operation accepts.")
+    returns: enums.CatalogValueKind = Field(description="The kind of value the operation returns (BOOL for effect and validator calls).")
+
+    @model_validator(mode="after")
+    def check_unique_arguments(self) -> Self:
+        """Argument keys are unique per operation."""
+        _check_unique(self.arguments, "key", f"catalog operation {self.name}")
+        return self

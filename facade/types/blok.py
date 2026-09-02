@@ -28,15 +28,11 @@ class Blok:
         description="Dependencies that need to be resolved for this blok.",
     )
 
-    @strawberry_django.field(description="List of action demands specified in this blok.")
+    @strawberry_django.field(description="The typed component tree of this blok.")
     def components(self) -> list[rtypes.ComponentNode]:
         return [rmodels.ComponentNodeModel(**i) for i in self.components]
 
-    @strawberry_django.field(description="List of action demands specified in this blok.")
-    def ui_components(self) -> scalars.Props:
-        return self.components
-
-    @strawberry_django.field(description="List of action demands specified in this blok.")
+    @strawberry_django.field(description="Demo state used to render a preview of this blok without agents.")
     def demo_state(self) -> scalars.Props:
         return self.demo_state
 
@@ -45,10 +41,10 @@ class Blok:
         return build_prescoped_queryset(info, queryset, field="organization")
 
 
-@strawberry_django.type(models.BlokDependency, filters=filters.BlokDependencyFilter, pagination=True, description="Represents a dependency between implementations and actions.")
+@strawberry_django.type(models.BlokDependency, filters=filters.BlokDependencyFilter, pagination=True, description="An agent dependency declared by a blok.")
 class BlokDependency:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the dependency.")
-    implementation: "Implementation" = strawberry_django.field(description="The implementation this dependency belongs to.")
+    blok: Blok = strawberry_django.field(description="The blok that declares this dependency.")
     key: str = strawberry_django.field(description="Optional string identifier or tag for reference.")
     optional: bool = strawberry_django.field(description="Indicates if the dependency is optional.")
     description: str | None = strawberry_django.field(description="Optional description of the dependency.")

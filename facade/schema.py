@@ -57,6 +57,7 @@ class Query:
     bloks: list[types.Blok] = field(description="List of UI Blok.")
     resolutions: list[types.Resolution] = field(description="All resolutions.")
     materialized_bloks: list[types.MaterializedBlok] = field(description="List of UI Blok.")
+    ui_catalogs: list[types.UICatalog] = field(description="UI catalogs registered in the caller's organization: the components and operations UI apps can render and evaluate.")
     state_definitions: list[types.StateDefinition] = field(description="Available state schemas.")
     memory_shelves: list[types.MemoryShelve] = field(description="All memory shelves.")
     memory_drawers: list[types.MemoryDrawer] = field(description="All memory drawers.")
@@ -118,6 +119,10 @@ class Query:
     @field(description="Get a materialized blok by ID.")
     def materialized_blok(self, info: Info, id: strawberry.ID) -> types.MaterializedBlok:
         return cast(types.MaterializedBlok, scoped_get(models.MaterializedBlok, info, id, field="blok__organization"))
+
+    @field(description="Get a UI catalog by ID.")
+    def ui_catalog(self, info: Info, id: strawberry.ID) -> types.UICatalog:
+        return cast(types.UICatalog, scoped_get(models.UICatalog, info, id, field="organization"))
 
     @field(description="Retrieve a state definition by ID.")
     def state_definition(self, info: Info, id: strawberry.ID) -> types.StateDefinition:
@@ -227,6 +232,7 @@ class Mutation:
     update_blok = mutation(resolver=mutations.update_blok, description="Update properties of a blok such as its name, description, components, demo state, catalog, or dependencies.")
     delete_materialized_blok = mutation(resolver=mutations.delete_materialized_blok, description="Delete a materialized blok by ID.")
     update_materialized_blok = mutation(resolver=mutations.update_materialized_blok, description="Update properties of a materialized blok such as its agent mappings.")
+    register_ui_catalog = mutation(resolver=mutations.register_ui_catalog, description="Register the components and operations a UI app can render and evaluate (upsert by name in the caller's organization). Bloks and definitions that name the catalog are validated against it.")
     # Implement Agent
     implement_agent = mutation(resolver=mutations.implement_agent, description="Implement an agent with given states and implementations. This is used to set up an agent with its initial configuration and capabilities.")
 

@@ -13,22 +13,58 @@ executable statement of the finding.
 """
 
 import pytest
-from asgiref.sync import sync_to_async
-from authentikate.models import Membership
+from asgiref.sync import async_to_sync, sync_to_async
+from authentikate.expand import aexpand_client_from_token, aexpand_organization_from_token, aexpand_user_from_token
+from authentikate.models import Client, Membership, Organization, User
+from authentikate.utils import authenticate_token_or_none
 from kante.context import HttpContext, UniversalRequest
 from strawberry.http.temporal_response import TemporalResponse
 
+from facade.models import Caller
 from facade.schema import schema
 from tests.factories import (
+    TEST_TOKEN,
     _build_state_for_agent,
     create_action_for_organization,
     create_agent_for_registry,
-    create_registry_bundle,
 )
+
+OTHER_TOKEN = "test-other"
+
+
+def tenant_context(token: str = TEST_TOKEN) -> tuple[HttpContext, User, Client, Organization]:
+    """An HttpContext authenticated by ``token`` plus the identity it resolves to.
+
+    ``AuthentikateExtension`` overwrites the request's user/client/organization from the bearer
+    token on every execution and rejects requests without one, so a tenant can only be expressed
+    as a token: ``TEST_TOKEN`` lives in ``static_org``, ``OTHER_TOKEN`` in ``other_org`` (see
+    ``rekuest/settings_test.py``). Contexts that pre-set a different organization and still sent
+    ``Bearer test`` silently collapsed into the same tenant, which made every cross-tenant
+    assertion vacuous.
+    """
+    decoded = async_to_sync(authenticate_token_or_none)(token)
+    user = async_to_sync(aexpand_user_from_token)(decoded)
+    client = async_to_sync(aexpand_client_from_token)(decoded)
+    org = async_to_sync(aexpand_organization_from_token)(decoded)
+    membership, _ = Membership.objects.get_or_create(user=user, organization=org)
+    request = UniversalRequest(
+        _extensions={"token": token},
+        _client=client,  # type: ignore[arg-type]
+        _user=user,  # type: ignore[arg-type]
+        _organization=org,  # type: ignore[arg-type]
+    )
+    request.set_membership(membership)  # type: ignore[attr-defined]
+    return HttpContext(request=request, response=TemporalResponse(), headers={"Authorization": f"Bearer {token}"}, type="http"), user, client, org
 
 
 def _context_for(user, client, org):
-    """An HttpContext authenticated as ``user`` acting in ``org`` (mirrors conftest)."""
+    """A context acting as ``user`` in ``org`` for **direct resolver calls only**.
+
+    Valid when a test invokes a resolver function with ``SimpleNamespace(context=...)``: no
+    extension runs, so the preset organization is honoured. It must not be passed to
+    ``schema.execute`` -- there the extension re-derives the identity from the token (see
+    ``tenant_context``).
+    """
     membership, _ = Membership.objects.get_or_create(user=user, organization=org)
     request = UniversalRequest(
         _extensions={"token": "test"},
@@ -37,20 +73,21 @@ def _context_for(user, client, org):
         _organization=org,  # type: ignore[arg-type]
     )
     request.set_membership(membership)  # type: ignore[attr-defined]
-    return HttpContext(request=request, response=TemporalResponse(), headers={"Authorization": "Bearer test"}, type="http")
+    return HttpContext(request=request, response=TemporalResponse(), headers={}, type="http")
 
 
 @sync_to_async
 def _seed_two_tenants(prefix):
     """Two complete, independent tenants, each with an agent, a state and an action."""
     tenants = {}
-    for side in ("a", "b"):
-        user, client, org, caller = create_registry_bundle(f"{prefix}-{side}")
+    for side, token in (("a", TEST_TOKEN), ("b", OTHER_TOKEN)):
+        context, user, client, org = tenant_context(token)
+        caller, _ = Caller.objects.get_or_create(client=client, user=user, organization=org)
         agent = create_agent_for_registry(caller, user, org, f"{prefix}-{side}")
         state = _build_state_for_agent(agent.pk, f"{prefix}-{side}-iface", f"{prefix}-{side}")
         action = create_action_for_organization(org, f"{prefix}-{side}-act")
         tenants[side] = {
-            "context": _context_for(user, client, org),
+            "context": context,
             "org": org,
             "agent": agent,
             "state": state,

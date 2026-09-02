@@ -41,7 +41,6 @@ class AssignWidgetKind(str, Enum):
 class ReturnWidgetKind(str, Enum):
     CHOICE = "CHOICE"
     CUSTOM = "CUSTOM"
-    PROXY = "PROXY"
 
 
 @strawberry.enum(description="The kind of effect.")
@@ -106,3 +105,27 @@ class OptionKey(str, Enum):
     DESCRIPTION = "DESCRIPTION"
     LOGO = "LOGO"
     VALUE = "VALUE"
+
+
+@strawberry.enum(description="The kind of value a catalog component prop accepts or a catalog operation argument/return carries.")
+class CatalogValueKind(str, Enum):
+    STRING = "STRING"
+    INT = "INT"
+    FLOAT = "FLOAT"
+    BOOL = "BOOL"
+    DICT = "DICT"
+    LIST = "LIST"
+    ANY = "ANY"
+    CALLBACK = "CALLBACK"
+
+
+@strawberry.enum(description="Aggregation computed over a tracked value within a window.")
+class WindowFunction(str, Enum):
+    MEAN = "MEAN"
+    MIN = "MIN"
+    MAX = "MAX"
+    SUM = "SUM"
+    COUNT = "COUNT"
+    LAST = "LAST"
+    FIRST = "FIRST"
+    STD = "STD"
