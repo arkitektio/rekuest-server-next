@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v3.0.0-rc.2 (2026-09-02)
+
+### Features
+
+- New ui catalog
+  ([`5375ac7`](https://github.com/arkitektio/rekuest-server-next/commit/5375ac767d9f1716bd345e755df7c79ecb698f1b))
+
+
 ## v3.0.0-rc.1 (2026-09-02)
 
 ### Features
