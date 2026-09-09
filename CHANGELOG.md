@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
+## v3.0.0-rc.3 (2026-09-09)
+
+
 ## v3.0.0-rc.2 (2026-09-02)
+
+### Bug Fixes
+
+- Better catalog validation
+  ([`a7b1efb`](https://github.com/arkitektio/rekuest-server-next/commit/a7b1efb8706210d7bd412108fc97bedc7fbddb94))
 
 ### Features
 
