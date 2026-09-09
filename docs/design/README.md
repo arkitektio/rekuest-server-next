@@ -89,7 +89,9 @@ Start at the top and follow the flow of a request:
    everything else references it.
 2. **[domain-model.md](domain-model.md)** — the full data model with an ER diagram and the
    uniqueness/cardinality rules that encode the business logic.
-3. **[action-matching.md](action-matching.md)** — how an Action's `provides`/`requires`
+3. **[ports.md](ports.md)** — what each `PortKind` means, which of children, identifier and
+   choices it carries, how defaults and assignment values are checked, and which widgets fit.
+4. **[action-matching.md](action-matching.md)** — how an Action's `provides`/`requires`
    descriptors compile to JSONPath and how the relational port engine finds matching actions.
 4. **[task-lifecycle.md](task-lifecycle.md)** — `assign` / `reserve`, the
    Task event state machine, and how results flow back to the caller.

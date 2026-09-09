@@ -80,7 +80,7 @@ def test_search_query_is_parsed_and_must_declare_its_variables() -> None:
         _widget("SEARCH", query="mutation M($search: String, $values: [ID!]) { x }", ward="mikro")
     with pytest.raises(ValidationError, match=r"missing \['\$stage'\]"):
         _widget("SEARCH", query=SEARCH_QUERY, ward="mikro", filters=[{"key": "stage", "kind": "STRING", "nullable": False}])
-    with pytest.raises(ValidationError, match="reserved key 'value'"):
+    with pytest.raises(ValidationError, match="'value' is a reserved port key"):
         _widget("SEARCH", query="query S($search: String, $values: [ID!], $value: ID) { x }", ward="mikro", filters=[{"key": "value", "kind": "STRING", "nullable": False}])
     widget = _widget("SEARCH", query="query S($search: String, $values: [ID!], $stage: ID) { x }", ward="mikro", filters=[{"key": "stage", "kind": "STRING", "nullable": False}])
     assert widget.filters[0].key == "stage"

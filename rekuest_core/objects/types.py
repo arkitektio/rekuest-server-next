@@ -21,9 +21,9 @@ class ChoiceModel(BaseModel):
 @pydantic.type(models.ChoiceModel)
 class Choice:
     label: str
-    value: str
-    image: str | None
-    description: str | None
+    value: scalars.AnyDefault = strawberry.field(description="The value the choice stands for (any JSON value fitting the port's kind).")
+    image: str | None = None
+    description: str | None = None
 
 
 @pydantic.interface(models.AssignWidgetModel)
@@ -196,15 +196,15 @@ class Validator:
 @pydantic.type(models.RequiresModel)
 class Requires:
     key: str = strawberry.field(description="The key of the descriptor. This is used to uniquely identify the descriptor")
-    value: scalars.Arg = strawberry.field(description="The value of the descriptor. This can be any JSON serializable value")
-    operator: enums.RequiresOperator = strawberry.field(description="The operator to use for matching the descriptor. This is used when searching for actions based on their descriptors. The operator can be EQUALS, NOT_EQUALS, EXISTS, NOT_EXISTS, GREATER_THAN, LESS_THAN, INCLUDES, NOT_INCLUDES")
+    value: scalars.Arg | None = strawberry.field(default=None, description="The value the constraint compares against (none for EXISTS).")
+    operator: enums.DescriptorOperator = strawberry.field(description="How the constraint compares the object's value at `key` with `value`.")
 
 
 @pydantic.type(models.ProvidesModel)
 class Provides:
     key: str = strawberry.field(description="The key of the descriptor. This is used to uniquely identify the descriptor")
-    value: scalars.Arg = strawberry.field(description="The value of the descriptor. This can be any JSON serializable value")
-    operator: enums.ProvidesOperator = strawberry.field(description="The operator to use for matching the descriptor. This is used when searching for actions based on their descriptors. The operator can be EQUALS, NOT_EQUALS, EXISTS, NOT_EXISTS, GREATER_THAN, LESS_THAN, INCLUDES, NOT_INCLUDES")
+    value: scalars.Arg | None = strawberry.field(default=None, description="The value the constraint compares against (none for EXISTS).")
+    operator: enums.DescriptorOperator = strawberry.field(description="How the constraint compares the object's value at `key` with `value`.")
 
 
 @pydantic.type(models.WindowModel, description="""A window that is calculated""")
@@ -261,7 +261,6 @@ class ReturnPort:
         default=None,
         description="The identifier of the port. Identifier are used to give meaning to structure ports",
     )
-    default: scalars.AnyDefault | None
     kind: enums.PortKind
     key: str
     nullable: bool

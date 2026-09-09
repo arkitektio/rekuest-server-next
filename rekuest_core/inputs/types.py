@@ -213,36 +213,25 @@ class OptimisticInput:
 @pydantic.input(models.RequiresInputModel)
 class RequiresInput:
     key: str
-    operator: enums.RequiresOperator
-    value: scalars.Arg
+    operator: enums.DescriptorOperator
+    value: scalars.Arg | None = None
 
 
 @pydantic.input(models.ProvidesInputModel)
 class ProvidesInput:
     key: str
-    operator: enums.ProvidesOperator
-    value: scalars.Arg
+    operator: enums.DescriptorOperator
+    value: scalars.Arg | None = None
 
 
 @pydantic.input(
     models.ArgPortInputModel,
-    description="""Port
+    description="""A Port is a single input or output of an action, identified by its `key` and typed by its `kind`.
 
-    A Port is a single input or output of a action. It is composed of a key and a kind
-    which are used to uniquely identify the port.
-
-    If the Port is a structure, we need to define a identifier and scope,
-    Identifiers uniquely identify a specific type of model for the scopes (e.g
-    all the ports that have the identifier "@mikro/image" are of the same type, and
-    are hence compatible with each other). Scopes are used to define in which context
-    the identifier is valid (e.g. a port with the identifier "@mikro/image" and the
-    scope "local", can only be wired to other ports that have the same identifier and
-    are running in the same app). Global ports are ports that have the scope "global",
-    and can be wired to any other port that has the same identifier, as there exists a
-    mechanism to resolve and retrieve the object for each app. Please check the rekuest
-    documentation for more information on how this works.
-
-
+    STRUCTURE, MEMORY_STRUCTURE and INTERFACE ports carry an `identifier` of the form `@package/key`
+    (e.g. `@mikro/image`); ports with the same identifier are compatible. LIST and DICT ports have one
+    child (the item type), UNION ports two or more (the variants), MODEL ports one per field. ENUM ports
+    declare `choices`. See docs/design/ports.md for the full table.
     """,
 )
 class ArgPortInput:
@@ -266,27 +255,15 @@ class ArgPortInput:
 
 @pydantic.input(
     models.ReturnPortInputModel,
-    description="""Port
+    description="""A Port is a single input or output of an action, identified by its `key` and typed by its `kind`.
 
-    A Port is a single input or output of a action. It is composed of a key and a kind
-    which are used to uniquely identify the port.
-
-    If the Port is a structure, we need to define a identifier and scope,
-    Identifiers uniquely identify a specific type of model for the scopes (e.g
-    all the ports that have the identifier "@mikro/image" are of the same type, and
-    are hence compatible with each other). Scopes are used to define in which context
-    the identifier is valid (e.g. a port with the identifier "@mikro/image" and the
-    scope "local", can only be wired to other ports that have the same identifier and
-    are running in the same app). Global ports are ports that have the scope "global",
-    and can be wired to any other port that has the same identifier, as there exists a
-    mechanism to resolve and retrieve the object for each app. Please check the rekuest
-    documentation for more information on how this works.
-
-
+    STRUCTURE, MEMORY_STRUCTURE and INTERFACE ports carry an `identifier` of the form `@package/key`
+    (e.g. `@mikro/image`); ports with the same identifier are compatible. LIST and DICT ports have one
+    child (the item type), UNION ports two or more (the variants), MODEL ports one per field. ENUM ports
+    declare `choices`. See docs/design/ports.md for the full table.
     """,
 )
 class ReturnPortInput:
-    validators: list[ValidatorInput] | None = strawberry.field(default_factory=list)
     key: str
     label: str | None = None
     kind: enums.PortKind
@@ -295,7 +272,6 @@ class ReturnPortInput:
     nullable: bool = False
     effects: list[EffectInput] | None = strawberry.field(default_factory=list)
     choices: list[ChoiceInput] | None = strawberry.field(default_factory=list)
-    default: scalars.AnyDefault | None = None
     children: list[Annotated["ReturnPortInput", strawberry.lazy(__name__)]] | None = strawberry.field(default_factory=list)
     widget: Optional[ReturnWidgetInput] = None
     provides: list[ProvidesInput] | None = strawberry.field(default_factory=list)
@@ -309,10 +285,10 @@ class ReturnPortInput:
 )
 class PortGroupInput:
     key: str = strawberry.field(description="The key of the port group. This is used to uniquely identify the port group")
-    title: str | None
-    description: str | None
-    effects: list[EffectInput] | None = strawberry.field(default_factory=list)
-    ports: list[str] | None = strawberry.field(default_factory=list)
+    title: str | None = strawberry.field(default=None, description="The title of the port group, displayed in the UI")
+    description: str | None = strawberry.field(default=None, description="The description of the port group, displayed in the UI")
+    effects: list[EffectInput] | None = strawberry.field(default_factory=list, description="The effects applied to the port group as a whole")
+    ports: list[str] = strawberry.field(default_factory=list, description="The keys of the root arg ports in this group; a port belongs to at most one group")
 
 
 @pydantic.input(

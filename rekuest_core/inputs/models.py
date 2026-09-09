@@ -1,7 +1,9 @@
 import hashlib
 import json
+import re
 from typing import Annotated, Any, ClassVar, Iterator, List, Literal, Optional, Union
 from rekuest_core import enums, units
+from rekuest_core.values import value_mismatch
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing_extensions import Self
 
@@ -25,6 +27,30 @@ class BindsInputModel(BaseModel):
 #   server-side.
 # * ``value`` is reserved for the port's own value; a port may not be keyed ``value``.
 PORT_PATH_SEPARATOR = ".."
+
+#: The conventional key of a LIST or DICT item port; the only key that may contain the separator.
+ITEM_KEY = "..."
+_KEY_RESERVED = {"value"}
+
+
+def _check_port_key(key: str, owner: str) -> None:
+    """A key is non-empty, not reserved, and free of the port-path separator (except the item key)."""
+    if not key:
+        raise ValueError(f"{owner}: port key must not be empty")
+    if key in _KEY_RESERVED:
+        raise ValueError(f"{owner}: {key!r} is a reserved port key (it names the port's own value in calls)")
+    if PORT_PATH_SEPARATOR in key and key != ITEM_KEY:
+        raise ValueError(f"{owner}: port key {key!r} may not contain {PORT_PATH_SEPARATOR!r}")
+
+
+def _check_unique(items: list, attr: str, owner: str) -> None:
+    seen: set = set()
+    for item in items:
+        value = getattr(item, attr)
+        if value in seen:
+            raise ValueError(f"{owner}: duplicate {attr} {value!r}")
+        seen.add(value)
+
 
 
 def _value_path_root(value_path: str) -> str:
@@ -110,18 +136,31 @@ class EffectInputModel(BaseModel):
     fade: bool = Field(default=True, description="Whether to fade out the port when the effect is applied (if it is a hide effect)")
     source: str | None = Field(default=None, description="The authoring expression the call was compiled from (informational; never parsed or validated by the server).")
 
+    model_config = ConfigDict(extra="forbid")
+
     @model_validator(mode="after")
     def check_call_is_pure(self) -> Self:
         """Reject impure calls and value_paths outside the declared dependencies."""
         _check_pure_call(self.call, self.dependencies, f"Effect {self.kind.value} ({self.call.operation})")
         return self
 
+    @model_validator(mode="after")
+    def check_kind_fields(self) -> Self:
+        """A MESSAGE effect needs its message; `fade` only means something on HIDE."""
+        if self.kind == enums.EffectKind.MESSAGE and not self.message:
+            raise ValueError("MESSAGE effect requires a message")
+        if self.kind != enums.EffectKind.HIDE and "fade" in self.model_fields_set:
+            raise ValueError(f"{self.kind.value} effect must not set fade (HIDE only)")
+        return self
+
 
 class ChoiceInputModel(BaseModel):
-    value: str = Field(description="The value of the choice. This is the value that is returned when the choice is selected")
+    value: Any = Field(description="The value of the choice (any JSON value); must fit the port's kind. This is the value that is returned when the choice is selected")
     label: str = Field(description="The label of the choice. This is the text that is displayed in the UI")
     image: str | None = Field(default=None, description="The image of the choice. This is the image that is displayed in the UI (must be a URL)")
     description: str | None = Field(default=None, description="The description of the choice. This is the text that is displayed in the UI when the user hovers over the choice")
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class ValidatorInputModel(BaseModel):
@@ -135,6 +174,8 @@ class ValidatorInputModel(BaseModel):
     label: str | None = Field(default=None, description="An optional human-readable label for the validator.")
     error_message: str | None = Field(default=None, description="The error message to display when the validation fails")
     source: str | None = Field(default=None, description="The authoring expression the call was compiled from (informational; never parsed or validated by the server).")
+
+    model_config = ConfigDict(extra="forbid")
 
     @model_validator(mode="after")
     def check_call_is_pure(self) -> Self:
@@ -397,30 +438,59 @@ def _check_widget_fits_port(widget: Any, port: "PortInputModel") -> None:
             raise ValueError(f"Port {port.key!r}: a SEARCH widget on a LIST port needs a STRUCTURE child")
     if widget.kind == "CHOICE" and not port.choices:
         raise ValueError(f"Port {port.key!r}: a CHOICE widget needs the port to declare `choices`")
-    if widget.kind == "SLIDER" and isinstance(port.default, (int, float)) and not isinstance(port.default, bool):
-        below = widget.min is not None and port.default < widget.min
-        above = widget.max is not None and port.default > widget.max
+    default = getattr(port, "default", None)
+    if widget.kind == "SLIDER" and isinstance(default, (int, float)) and not isinstance(default, bool):
+        below = widget.min is not None and default < widget.min
+        above = widget.max is not None and default > widget.max
         if below or above:
-            raise ValueError(f"Port {port.key!r}: default {port.default} lies outside the SLIDER range [{widget.min}, {widget.max}]")
+            raise ValueError(f"Port {port.key!r}: default {default} lies outside the SLIDER range [{widget.min}, {widget.max}]")
 
 
 def _check_default_in_choices(port: "PortInputModel") -> None:
-    if port.choices and port.default is not None:
-        values = {choice.value for choice in port.choices}
-        if port.default not in values and str(port.default) not in values:
-            raise ValueError(f"Port {port.key!r}: default {port.default!r} is not one of its choices {sorted(values)}")
+    default = getattr(port, "default", None)
+    if port.choices and default is not None:
+        values = [choice.value for choice in port.choices]
+        if default not in values:
+            raise ValueError(f"Port {port.key!r}: default {default!r} is not one of its choices {values}")
+
+
+def _check_descriptor(descriptor: "RequiresInputModel | ProvidesInputModel", owner: str) -> None:
+    """The operator and the value agree: IN/NOT_IN take a list, LTE/GTE a number, EXISTS no value."""
+    operator, value = descriptor.operator, descriptor.value
+    if operator in (enums.DescriptorOperator.IN, enums.DescriptorOperator.NOT_IN) and not isinstance(value, list):
+        raise ValueError(f"{owner} {descriptor.key!r}: {operator.value} needs a list value")
+    if operator in (enums.DescriptorOperator.LTE, enums.DescriptorOperator.GTE) and (isinstance(value, bool) or not isinstance(value, (int, float))):
+        raise ValueError(f"{owner} {descriptor.key!r}: {operator.value} needs a numeric value")
+    if operator == enums.DescriptorOperator.EXISTS and value not in (None, True):
+        raise ValueError(f"{owner} {descriptor.key!r}: EXISTS takes no value")
 
 
 class RequiresInputModel(BaseModel):
-    key: str = Field(description="The key of the requirement. This is used to uniquely identify the requirement")
-    operator: enums.RequiresOperator = Field(description="The operator for the requirement")
-    value: Any = Field(description="The value of the requirement. This can be any JSON serializable value")
+    key: str = Field(min_length=1, description="The key of the requirement: the path into the object the constraint reads")
+    operator: enums.DescriptorOperator = Field(description="The operator for the requirement")
+    value: Any = Field(default=None, description="The value of the requirement. This can be any JSON serializable value; IN/NOT_IN take a list, LTE/GTE a number, EXISTS none")
+
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def check_operator_value(self) -> Self:
+        """Operator and value agree."""
+        _check_descriptor(self, "requires")
+        return self
 
 
 class ProvidesInputModel(BaseModel):
-    key: str = Field(description="The key of the provision. This is used to uniquely identify the provision")
-    operator: enums.ProvidesOperator = Field(description="The operator for the provision")
-    value: Any = Field(description="The value of the provision. This can be any JSON serializable value")
+    key: str = Field(min_length=1, description="The key of the provision: the path into the object the constraint reads")
+    operator: enums.DescriptorOperator = Field(description="The operator for the provision")
+    value: Any = Field(default=None, description="The value of the provision. This can be any JSON serializable value; IN/NOT_IN take a list, LTE/GTE a number, EXISTS none")
+
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def check_operator_value(self) -> Self:
+        """Operator and value agree."""
+        _check_descriptor(self, "provides")
+        return self
 
 
 class OptimisticInputModel(BaseModel):
@@ -439,28 +509,78 @@ class OptimisticInputModel(BaseModel):
         return self
 
 
+IDENTIFIER_PATTERN = re.compile(r"^@[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+"""A structure identifier: ``@package/key``, e.g. ``@mikro/image``."""
+
+_IDENTIFIED_KINDS = {enums.PortKind.STRUCTURE, enums.PortKind.MEMORY_STRUCTURE, enums.PortKind.INTERFACE}
+_CHILD_COUNT: dict[enums.PortKind, tuple[int, int | None]] = {
+    enums.PortKind.LIST: (1, 1),
+    enums.PortKind.DICT: (1, None),
+    enums.PortKind.UNION: (2, None),
+    enums.PortKind.MODEL: (1, None),
+}
+_CHOICE_KINDS = {enums.PortKind.ENUM, enums.PortKind.INT, enums.PortKind.FLOAT, enums.PortKind.STRING}
+
+
+def _check_port_shape(port: "PortInputModel") -> None:
+    """The per-kind structure table: children, identifier and choices."""
+    owner = f"Port {port.key!r} of kind {port.kind.value}"
+    children = port.children or []
+
+    bounds = _CHILD_COUNT.get(port.kind)
+    if bounds is None:
+        if children:
+            raise ValueError(f"{owner} must not have children")
+    else:
+        low, high = bounds
+        if len(children) < low or (high is not None and len(children) > high):
+            expected = "exactly one child" if (low, high) == (1, 1) else f"at least {low} children"
+            raise ValueError(f"{owner} must have {expected}, got {len(children)}")
+        _check_unique(children, "key", f"{owner} children")
+        if port.kind == enums.PortKind.DICT and len(children) > 1 and any(child.key == ITEM_KEY for child in children):
+            raise ValueError(f"{owner}: a DICT is either homogeneous (one child keyed {ITEM_KEY!r}) or has named children, not both")
+
+    if port.kind in _IDENTIFIED_KINDS:
+        if not port.identifier:
+            raise ValueError(f"{owner} must declare an identifier (@package/key)")
+        if not IDENTIFIER_PATTERN.match(port.identifier):
+            raise ValueError(f"{owner}: identifier {port.identifier!r} is not of the form @package/key")
+    elif port.identifier is not None and port.kind != enums.PortKind.MODEL:
+        raise ValueError(f"{owner} must not declare an identifier")
+    elif port.identifier is not None and not IDENTIFIER_PATTERN.match(port.identifier):
+        raise ValueError(f"{owner}: identifier {port.identifier!r} is not of the form @package/key")
+
+    if port.kind == enums.PortKind.ENUM and not port.choices:
+        raise ValueError(f"{owner} must declare choices")
+    if port.choices and port.kind not in _CHOICE_KINDS:
+        raise ValueError(f"{owner} must not declare choices (only {sorted(kind.value for kind in _CHOICE_KINDS)} may)")
+    if port.choices:
+        _check_unique(port.choices, "value", f"{owner} choices")
+
+
 class PortInputModel(BaseModel):
-    validators: list[ValidatorInputModel] | None = Field(default=None, description="The validators for the port")
-    key: str = Field(description="The key of the port")
+    key: str = Field(description="The key of the port: unique among its siblings, free of '..', not 'value'. LIST/DICT item ports are conventionally keyed '...'.")
     label: str | None = Field(default=None, description="The label of the port. This is the text that is displayed in the UI")
     kind: enums.PortKind = Field(description="The kind of the port. This is the type of the port. Can be either int, string, structure, list, bool, dict, float, date, union or model")
     description: str | None = Field(default=None, description="The description of the port. This is the text that is displayed in the UI when the user hovers over the port")
     identifier: str | None = Field(default=None, description="The identifier of a structure port. This is used to uniquely identify a specific type of structure.")
     nullable: bool = Field(default=False, description="Whether the port is nullable or not. If the port is nullable, it can be set to null. If the port is not nullable, it cannot be set to null")
     effects: list[EffectInputModel] | None = Field(default=None, description="The effects of the port")
-    default: Any | None = Field(default=None, description="The default value for the port.")
-    choices: list[ChoiceInputModel] | None = Field(default=None, description="The options for the port. This is used for dropdowns and text inputs")
+    choices: list[ChoiceInputModel] | None = Field(default=None, description="The values the port accepts (required for ENUM; optional for INT, FLOAT, STRING). Rendered by CHOICE widgets.")
     reference_unit: str | None = Field(
         default=None, description='For QUANTITY ports: the canonical/reference unit of the physical quantity, e.g. "volt" or "farad". It is the default selection and the key used to resolve the concrete quantity type; other units of the same dimension are still allowed.'
     )
     proposed_units: list[str] | None = Field(default=None, description='For QUANTITY ports: units offered as a dropdown in the UI, e.g. ["pF", "nF", "uF"]. Proposals only — any unit of the same dimension remains valid input.')
     dimension: str | None = Field(default=None, description='For QUANTITY ports: the pint dimensionality string, e.g. "[mass] * [length] ** 2 / [time] ** 3 / [current]". This is the wiring-compatibility key between quantity ports.')
-    children: Optional[list["PortInputModel"]] = Field(default=None, description="The child ports (used for list, dict, union and model ports).")
+    children: Optional[list["PortInputModel"]] = Field(default=None, description="The child ports: the item type of a LIST or DICT, the variants of a UNION, the fields of a MODEL.")
+
+    model_config = ConfigDict(extra="forbid")
 
     @model_validator(mode="after")
     def check_kind_specific_fields(self) -> Self:
-        if self.kind == enums.PortKind.LIST and (self.children is None or len(self.children) != 1):
-            raise ValueError("Port of kind LIST must have exactly one child")
+        """Key, per-kind structure (children, identifier, choices) and the QUANTITY unit rules."""
+        _check_port_key(self.key, "Port")
+        _check_port_shape(self)
 
         if self.kind == enums.PortKind.QUANTITY:
             if not self.reference_unit:
@@ -481,7 +601,8 @@ class PortInputModel(BaseModel):
 
 
 class ArgPortInputModel(PortInputModel):
-    default: Any | None = Field(default=None, description="The default value for the port.")
+    validators: list[ValidatorInputModel] | None = Field(default=None, description="The validators for the port")
+    default: Any | None = Field(default=None, description="The default value for the port; must fit the port's kind.")
     widget: Optional["AssignWidgetInputModel"] = Field(default=None, description="The assign widget to use for this port, discriminated by `kind`.")
     requires: list[RequiresInputModel] | None = Field(default=None, description="The descriptors for the port. Descriptors are key-value pairs that can be used to add additional metadata to a port. When using rekuest's action search, you can filter actions based on their port descriptors")
     children: Optional[list["ArgPortInputModel"]] = Field(default=None, description="The child ports (used for list, dict, union and model ports).")
@@ -492,8 +613,12 @@ class ArgPortInputModel(PortInputModel):
         return _as_plain(value)
 
     @model_validator(mode="after")
-    def check_widget_and_choices(self) -> Self:
-        """The widget (and its fallbacks) fit the port's kind; a default is one of the choices."""
+    def check_widget_and_default(self) -> Self:
+        """The widget (and its fallbacks) fit the port's kind; a default fits the kind and the choices."""
+        if self.default is not None:
+            mismatch = value_mismatch(self, self.default)
+            if mismatch:
+                raise ValueError(f"Port default {mismatch}")
         _check_default_in_choices(self)
         for widget in iter_widget_chain(self.widget):
             _check_widget_fits_port(widget, self)
@@ -513,18 +638,19 @@ class ReturnPortInputModel(PortInputModel):
     @model_validator(mode="after")
     def check_widget_and_choices(self) -> Self:
         """A CHOICE return widget displays the port's choices, so the port must declare them."""
-        _check_default_in_choices(self)
         if self.widget is not None and self.widget.kind == "CHOICE" and not self.choices:
             raise ValueError(f"Port {self.key!r}: a CHOICE return widget needs the port to declare `choices`")
         return self
 
 
 class PortGroupInputModel(BaseModel):
-    key: str = Field(description="The key of the port group. This is used to uniquely identify the port group")
-    title: str | None = Field(description="The title of the port group. This is the text that is displayed in the UI")
-    description: str | None = Field(description="The description of the port group. This is the text that is displayed in the UI")
-    effects: list[EffectInputModel] | None = Field(description="The effects applied to the port group as a whole.")
-    ports: list[str] = Field(description="The keys of the ports that belong to this group.")
+    key: str = Field(min_length=1, description="The key of the port group. This is used to uniquely identify the port group")
+    title: str | None = Field(default=None, description="The title of the port group. This is the text that is displayed in the UI")
+    description: str | None = Field(default=None, description="The description of the port group. This is the text that is displayed in the UI")
+    effects: list[EffectInputModel] | None = Field(default=None, description="The effects applied to the port group as a whole.")
+    ports: list[str] = Field(default_factory=list, description="The keys of the root arg ports that belong to this group; a port belongs to at most one group.")
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class DescriptorInputModel(BaseModel):
@@ -674,6 +800,33 @@ class DefinitionInputModel(BaseModel):
         description="Names of the UI catalogs (in the registering agent's organization) that extend the base catalog for this definition's effect and validator calls. The base catalog (`base@1`) is always applied and may be named explicitly; naming another base version or a catalog that does not exist yields an unknown_catalog warning. Two catalogs defining the same operation differently is a registration error. An operation no catalog provides is stored as a warning on the implementation.",
     )
 
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def check_keys(self) -> Self:
+        """Root arg keys and root return keys are unique, and the two sets do not overlap."""
+        _check_unique(self.args, "key", f"Definition {self.key} args")
+        _check_unique(self.returns, "key", f"Definition {self.key} returns")
+        shared = sorted({port.key for port in self.args} & {port.key for port in self.returns})
+        if shared:
+            raise ValueError(f"Definition {self.key}: args and returns share the keys {shared}; dependency paths could not tell them apart")
+        return self
+
+    @model_validator(mode="after")
+    def check_port_groups(self) -> Self:
+        """Group keys are unique, every member is a root arg, and no port sits in two groups."""
+        _check_unique(self.port_groups, "key", f"Definition {self.key} port_groups")
+        arg_keys = {port.key for port in self.args}
+        seen: dict[str, str] = {}
+        for group in self.port_groups:
+            for key in group.ports or []:
+                if key not in arg_keys:
+                    raise ValueError(f"Definition {self.key}: port group {group.key!r} lists unknown arg {key!r}")
+                if key in seen:
+                    raise ValueError(f"Definition {self.key}: arg {key!r} is in both port groups {seen[key]!r} and {group.key!r}")
+                seen[key] = group.key
+        return self
+
     @model_validator(mode="after")
     def check_dependencies(self) -> Self:
         """Every dependency of every validator, effect and widget (args, returns, nested children, port groups) is a resolvable port path."""
@@ -687,7 +840,7 @@ class DefinitionInputModel(BaseModel):
         def walk(ports: list[PortInputModel], prefix: str = "") -> None:
             for port in ports:
                 path = f"{prefix}{port.key}"
-                for validator in port.validators or []:
+                for validator in getattr(port, "validators", None) or []:
                     check(validator.dependencies, f"Validator {validator.label or validator.call.operation} in port {path}")
                 for effect in port.effects or []:
                     check(effect.dependencies, f"Effect {effect.kind.value} ({effect.call.operation}) in port {path}")
@@ -722,9 +875,10 @@ class DefinitionInputModel(BaseModel):
                 "stateful",
                 "is_test_for",
                 "collections",
-                "dependencies",
                 "key",
                 "version",
+                "kind",
+                "port_groups",
             ]
         }
         return hashlib.sha256(json.dumps(hashable_definition, sort_keys=True).encode()).hexdigest()
@@ -1064,15 +1218,6 @@ OptimisticInputModel.model_rebuild()
 # ============================================================================
 # UI catalog registry: what a UI app can render (components) and evaluate (operations)
 # ============================================================================
-def _check_unique(items: list, attr: str, owner: str) -> None:
-    seen: set[str] = set()
-    for item in items:
-        value = getattr(item, attr)
-        if value in seen:
-            raise ValueError(f"{owner}: duplicate {attr} {value!r}")
-        seen.add(value)
-
-
 class CatalogPropInputModel(BaseModel):
     key: str = Field(min_length=1, description="The prop key a ComponentProp.key must match.")
     kind: enums.CatalogValueKind = Field(description="The value kind this prop accepts. CALLBACK props must be bound via agent_call or util_call.")

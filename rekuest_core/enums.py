@@ -8,7 +8,7 @@ class ActionKind(str, Enum):
     GENERATOR = "GENERATOR"
 
 
-@strawberry.enum(description="The kind of port.")
+@strawberry.enum(description="The kind of a port: its structural type. Decides which of children, identifier and choices the port must, may or must not carry (see docs/design/ports.md).")
 class PortKind(str, Enum):
     INT = "INT"
     STRING = "STRING"
@@ -24,6 +24,29 @@ class PortKind(str, Enum):
     MEMORY_STRUCTURE = "MEMORY_STRUCTURE"
     INTERFACE = "INTERFACE"
     QUANTITY = "QUANTITY"
+
+
+# Per-member SDL descriptions. Set on the strawberry definition rather than via
+# ``strawberry.enum_value`` so the Python-side values stay plain strings (pydantic and the
+# relational matcher compare ``kind.value``).
+_PORT_KIND_DESCRIPTIONS = {
+    "INT": "An integer. No children; choices optional.",
+    "STRING": "A string. No children; choices optional.",
+    "STRUCTURE": "A reference to an object held by a service, typed by `identifier` (@package/key, required). Values are ids. No children.",
+    "LIST": "A list; exactly one child describes the item type (conventionally keyed '...').",
+    "BOOL": "A boolean. No children.",
+    "DICT": "A string-keyed map. One child keyed '...' describes a homogeneous value type; several named children describe the known keys.",
+    "FLOAT": "A floating point number. No children; choices optional.",
+    "DATE": "An ISO-8601 date or datetime string. No children.",
+    "UNION": "One of several variants; at least two children, each a variant.",
+    "ENUM": "One of a fixed set of values; `choices` required.",
+    "MODEL": "An object with named fields; at least one child per field, `identifier` optional.",
+    "MEMORY_STRUCTURE": "A reference to an object that lives in the agent's memory, typed by `identifier` (required). Makes the action LOCAL-scoped. No children.",
+    "INTERFACE": "A reference to any object implementing an interface, typed by `identifier` (required). No children.",
+    "QUANTITY": "A physical quantity with a unit; `reference_unit` required, `dimension` derived. No children.",
+}
+for _port_kind_value in PortKind.__strawberry_definition__.values:
+    _port_kind_value.description = _PORT_KIND_DESCRIPTIONS[_port_kind_value.name]
 
 
 @strawberry.enum(description="The kind of assign widget.")
@@ -64,8 +87,8 @@ class ActionScope(str, Enum):
     BRIDGE_LOCAL_TO_GLOBAL = "BRIDGE_LOCAL_TO_GLOBAL"
 
 
-@strawberry.enum(description="The operator for matching descriptors.")
-class RequiresOperator(str, Enum):
+@strawberry.enum(description="The operator of a requires/provides descriptor: how a port's constraint compares the object's value at `key` with `value`.")
+class DescriptorOperator(str, Enum):
     MATCHES = "MATCHES"
     EXISTS = "EXISTS"
     LTE = "LTE"
@@ -77,17 +100,9 @@ class RequiresOperator(str, Enum):
     NOT_IN = "NOT_IN"
 
 
-@strawberry.enum(description="The operator for matching descriptors.")
-class ProvidesOperator(str, Enum):
-    MATCHES = "MATCHES"
-    EXISTS = "EXISTS"
-    LTE = "LTE"
-    GTE = "GTE"
-    EQUALS = "EQUALS"
-    CONTAINS = "CONTAINS"
-    NOT_EQUALS = "NOT_EQUALS"
-    IN = "IN"
-    NOT_IN = "NOT_IN"
+# Requires and provides descriptors share one operator vocabulary; the old names stay as aliases.
+RequiresOperator = DescriptorOperator
+ProvidesOperator = DescriptorOperator
 
 
 @strawberry.enum

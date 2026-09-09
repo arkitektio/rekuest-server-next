@@ -244,7 +244,7 @@ def iter_definition_calls(definition: rimodels.DefinitionInputModel, optimistics
 
     def walk(ports: list[rimodels.PortInputModel]) -> Iterator[rimodels.UtilCallInputModel]:
         for port in ports:
-            for validator in port.validators or []:
+            for validator in getattr(port, "validators", None) or []:
                 yield validator.call
             for effect in port.effects or []:
                 yield effect.call

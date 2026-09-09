@@ -12,6 +12,8 @@ from facade.provenance import mint_token_for_task
 from facade.provenance.canonical import args_hash
 from kante.types import Info
 import logging
+from rekuest_core.objects.models import ArgPortModel
+from rekuest_core.values import validate_assignment_args
 
 
 def agent_available_q(prefix: str = "agent") -> Q:
@@ -341,6 +343,13 @@ class RedisControllBackend:
 
         if not action:
             raise ValueError("Could not determine action for this task")
+
+        # The args must fit the action's ports: no unknown keys, every required port present,
+        # every value of the port's kind. Checked before the higher-order branch so wrapper args
+        # are held to the wrapper's ports. An action that declares no ports at all has nothing
+        # to check against and keeps accepting whatever it is given.
+        if action.args:
+            validate_assignment_args([ArgPortModel(**port) for port in action.args], input.args or {})
 
         # Root propagation: a child's root is its parent's root (or the parent itself when
         # the parent IS the root). Interrupt's descendant propagation, the root-scoped

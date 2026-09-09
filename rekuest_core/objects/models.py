@@ -9,9 +9,9 @@ from typing import Any
 
 class ChoiceModel(BaseModel):
     label: str
-    value: str
-    image: str | None
-    description: str | None
+    value: Any
+    image: str | None = None
+    description: str | None = None
 
 
 class AssignWidgetModel(BaseModel):
@@ -160,20 +160,20 @@ class PortMatchModel(BaseModel):
     kind: str | None = None
     identifier: str | None = None
     children: list["PortMatchModel"] | None = None
-    nullable: bool | None = False
+    nullable: bool | None = None
     dimension: str | None = None
 
 
 class RequiresModel(BaseModel):
     key: str
-    operator: enums.RequiresOperator
-    value: Any
+    operator: enums.DescriptorOperator
+    value: Any = None
 
 
 class ProvidesModel(BaseModel):
     key: str
-    operator: enums.ProvidesOperator
-    value: Any
+    operator: enums.DescriptorOperator
+    value: Any = None
 
 
 class OptimisticModel(BaseModel):
@@ -186,13 +186,12 @@ class OptimisticModel(BaseModel):
 class PortModel(BaseModel):
     key: str
     label: str | None = None
-    kind: str
+    kind: enums.PortKind
     description: str | None = None
     identifier: str | None = None
-    nullable: bool
-    effects: list[EffectModelUnion] | None
-    default: Any | None = None
-    children: list["PortModel"] | None
+    nullable: bool = False
+    effects: list[EffectModelUnion] | None = None
+    children: list["PortModel"] | None = None
     choices: list[ChoiceModel] | None = None
     reference_unit: str | None = None
     proposed_units: list[str] | None = None
@@ -200,7 +199,8 @@ class PortModel(BaseModel):
 
 
 class ArgPortModel(PortModel):
-    validators: list[ValidatorModel] | None
+    validators: list[ValidatorModel] | None = None
+    default: Any | None = None
     children: list["ArgPortModel"] | None = None
     widget: Optional[AssignWidgetModelUnion] = None
     requires: list[RequiresModel] | None = None
