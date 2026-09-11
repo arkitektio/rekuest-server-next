@@ -9,14 +9,14 @@ services:
       labels:
          - fakts.service=live.arkitekt.postgres
       ports:
-        - 5555:5432
+        - "${REKUEST_TEST_DB_PORT:-5555}:5432"
    redis:
       environment:
          REDIS_HOST: redis
          REDIS_PORT: 6379
       image: redis
       ports:
-         - 6666:6379
+         - "${REKUEST_TEST_REDIS_PORT:-6666}:6379"
 
 volumes:
    chroma_data:

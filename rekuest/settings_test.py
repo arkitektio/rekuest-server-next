@@ -1,6 +1,7 @@
 from .settings import *  # noqa
 from .settings import DATABASES, AUTHENTIKATE, DATALAYER
 import logging
+import os
 
 
 # There is no STS to assume a role against under unit tests, and a grant that cannot be scoped
@@ -8,7 +9,7 @@ import logging
 # grant care about its *shape*, not its credentials, so let them have the unscoped one.
 DATALAYER = {**DATALAYER, "allow_unscoped_fallback": True}
 
-DATABASES["default"] = {**DATABASES["default"], "NAME": "testdb", "PORT": 5555, "HOST": "localhost", "USER": "test", "PASSWORD": "test"}
+DATABASES["default"] = {**DATABASES["default"], "NAME": "testdb", "PORT": int(os.environ.get("REKUEST_TEST_DB_PORT", 5555)), "HOST": "localhost", "USER": "test", "PASSWORD": "test"}
 # Django forces DEBUG=False under the test runner, and authentikate 3.0 refuses static
 # tokens when DEBUG is False. These are deliberate test fixtures, so opt in explicitly.
 AUTHENTIKATE = {
@@ -46,7 +47,7 @@ REKUEST_GRACE = {"DEFAULT": 0, "PHYSICAL": 0}
 # Point the agent queue at the published dokker redis port (see
 # tests/integration/docker-compose.yaml). Replaces the old redis-factory monkeypatch.
 AGENT_REDIS_HOST = "localhost"
-AGENT_REDIS_PORT = 6666
+AGENT_REDIS_PORT = int(os.environ.get("REKUEST_TEST_REDIS_PORT", 6666))
 
 # Probes: short TTLs so expiry behavior is testable without waiting.
 TASK_RETENTION_SECONDS = 0

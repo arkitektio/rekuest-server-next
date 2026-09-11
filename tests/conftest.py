@@ -69,7 +69,7 @@ def backend_stack():
                     user="test",
                     password="test",
                     host="localhost",
-                    port=5555,
+                    port=int(os.environ.get("REKUEST_TEST_DB_PORT", 5555)),
                     connect_timeout=1,
                 ) as connection:
                     with connection.cursor() as cursor:
@@ -85,7 +85,21 @@ def backend_stack():
 
 @pytest.fixture(scope="session")
 def django_db_modify_db_settings(backend_stack):
-    """Start the backend services before pytest-django configures the test DB."""
+    """Start the backend services before pytest-django configures the test DB.
+
+    The published host ports are reserved per run (see the root ``conftest.py``),
+    but Django settings are imported by pytest-django before that module ever
+    executes, so ``settings_test`` will still be holding the defaults. This is
+    the hook pytest-django provides for exactly that ordering: point the
+    connection at the ports the stack actually came up on, before the test
+    database is created.
+    """
+    settings.DATABASES["default"]["PORT"] = int(
+        os.environ.get("REKUEST_TEST_DB_PORT", settings.DATABASES["default"]["PORT"])
+    )
+    settings.AGENT_REDIS_PORT = int(
+        os.environ.get("REKUEST_TEST_REDIS_PORT", settings.AGENT_REDIS_PORT)
+    )
     yield
 
 
