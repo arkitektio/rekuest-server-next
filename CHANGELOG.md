@@ -1,6 +1,29 @@
 # CHANGELOG
 
 
+## v3.0.1 (2026-09-11)
+
+### Bug Fixes
+
+- Accept the structure reference envelope in assignment args
+  ([`ecbbdea`](https://github.com/arkitektio/rekuest-server-next/commit/ecbbdeaa7a2af152e0f132f9c40239c862ec1cc2))
+
+Clients send a structure reference as `{"__identifier", "object"}` -- the identifier rides along so
+  the receiver can check the reference belongs to the port it landed on. validate_assignment_args
+  instead required a bare str/int id, so every assign carrying a STRUCTURE, MEMORY_STRUCTURE or
+  INTERFACE argument was rejected with "expected a MEMORY_STRUCTURE id (string or int), got dict".
+  MODEL had the same bug one kind over: the `__identifier` marker the client attaches to model
+  params was reported as an unknown field.
+
+value_mismatch is shared with the definition-time default check, and a port default is declared in
+  the definition rather than sent by a client, so it is still a bare id -- their own test pins
+  default="42". The envelope form is therefore opt-in via `reference_envelope`, threaded through the
+  recursive calls and passed only by validate_assignment_args.
+
+Both halves are now pinned by tests, including the envelope's failure modes (missing key, identifier
+  mismatch, non-scalar object).
+
+
 ## v3.0.0 (2026-09-11)
 
 
