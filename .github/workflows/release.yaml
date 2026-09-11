@@ -3,6 +3,11 @@ name: Release
 on:
   push:
     branches: [main, next, "*.x"] # main: stable, next: prereleases, N.x: maintenance
+  # The image is only built when semantic-release actually cuts a version, so a
+  # branch whose commits are all released already has no way to (re)publish its
+  # image -- previously that meant inventing a commit purely to force a build.
+  # Running this by hand re-evaluates the branch and rebuilds on its terms.
+  workflow_dispatch:
 
 # Needed so semantic-release can push the version-bump commit + tag and create
 # the GitHub Release.
