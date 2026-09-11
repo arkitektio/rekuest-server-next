@@ -233,14 +233,37 @@ def _ports(*ports: dict) -> list[omodels.ArgPortModel]:
 def test_assignment_args_are_validated_against_the_ports() -> None:
     """Assignment args are validated against the ports."""
     ports = _ports(_port("n", "INT"), _port("opt", "STRING", nullable=True), _port("d", "FLOAT", default=1.0), STRUCTURE)
-    validate_assignment_args(ports, {"n": 1, "img": "7"})
-    validate_assignment_args(ports, {"n": 1, "opt": None, "d": 2, "img": 7})
+    ref = {"__identifier": "@mikro/image", "object": "7"}
+    validate_assignment_args(ports, {"n": 1, "img": ref})
+    validate_assignment_args(ports, {"n": 1, "opt": None, "d": 2, "img": {"__identifier": "@mikro/image", "object": 7}})
     with pytest.raises(ValueError, match=r"Unknown arguments \['zzz'\]"):
-        validate_assignment_args(ports, {"n": 1, "img": "7", "zzz": 1})
+        validate_assignment_args(ports, {"n": 1, "img": ref, "zzz": 1})
     with pytest.raises(ValueError, match="Argument 'n' is required and has no default"):
-        validate_assignment_args(ports, {"img": "7"})
+        validate_assignment_args(ports, {"img": ref})
     with pytest.raises(ValueError, match="Argument n: expected an INT, got str"):
-        validate_assignment_args(ports, {"n": "1", "img": "7"})
+        validate_assignment_args(ports, {"n": "1", "img": ref})
+
+
+def test_assignment_structure_args_must_carry_the_reference_envelope() -> None:
+    """A structure argument is an envelope, not a bare id, and it names its port's identifier."""
+    ports = _ports(_port("n", "INT"), STRUCTURE)
+    with pytest.raises(ValueError, match="expected a STRUCTURE reference"):
+        validate_assignment_args(ports, {"n": 1, "img": "7"})
+    with pytest.raises(ValueError, match="missing its `object` key"):
+        validate_assignment_args(ports, {"n": 1, "img": {"__identifier": "@mikro/image"}})
+    with pytest.raises(ValueError, match="missing its `__identifier` key"):
+        validate_assignment_args(ports, {"n": 1, "img": {"object": "7"}})
+    with pytest.raises(ValueError, match="identifier mismatch"):
+        validate_assignment_args(ports, {"n": 1, "img": {"__identifier": "@mikro/other", "object": "7"}})
+    with pytest.raises(ValueError, match="`object` must be a str or int id"):
+        validate_assignment_args(ports, {"n": 1, "img": {"__identifier": "@mikro/image", "object": {"a": 1}}})
+
+
+def test_structure_port_default_is_still_a_bare_id() -> None:
+    """A default is declared in the definition, not sent by a client, so it stays a bare id."""
+    (port,) = _ports(STRUCTURE)
+    assert value_mismatch(port, "7") is None
+    assert value_mismatch(port, {"__identifier": "@mikro/image", "object": "7"}) is not None
 
 
 def test_value_mismatch_recurses_into_containers() -> None:
