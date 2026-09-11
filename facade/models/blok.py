@@ -6,11 +6,23 @@ from facade import enums
 
 
 class Dashboard(models.Model):
+    organization = models.ForeignKey(
+        "authentikate.Organization",
+        on_delete=models.CASCADE,
+        related_name="dashboards",
+        help_text="The organization this Dashboard belongs to. Access is scoped to it.",
+    )
     name = models.CharField(max_length=2000)
     ui_tree = models.JSONField(null=True, blank=True)
 
 
 class Blok(models.Model):
+    organization = models.ForeignKey(
+        "authentikate.Organization",
+        on_delete=models.CASCADE,
+        related_name="bloks",
+        help_text="The organization this Blok belongs to. Access is scoped to it.",
+    )
     name = models.CharField(max_length=1000)
     description = models.TextField(null=True, blank=True)
     creator = models.ForeignKey(
@@ -24,11 +36,15 @@ class Blok(models.Model):
         on_delete=models.CASCADE,
         related_name="bloks",
         help_text="The catalog this Blok belongs to",
-        null=True,
     )
     components = models.JSONField(help_text="The UI schema for this Blok", default=list)
     uri = models.CharField(max_length=1000, help_text="The URI for this Blok (e.g. if it should be rendered as an iframe)", null=True, blank=True)
     demo_state = models.JSONField(help_text="The initial state for this Blok (to display in the ui a fake version)", default=dict)
+    diagnostics = models.JSONField(default=list, help_text="Non-fatal registration findings (rekuest_core Diagnostic), e.g. manifest util calls naming operations that neither the base catalog nor this blok's catalog provides. Replaced on every write.")
+
+    class Meta:
+        # Every write path upserts on (organization, name); the constraint makes that upsert safe.
+        constraints = [models.UniqueConstraint(fields=["organization", "name"], name="unique_blok_name_per_organization")]
 
 
 class BlokDependency(models.Model):
@@ -99,6 +115,9 @@ class BlokDependency(models.Model):
         default=enums.AssignPolicy.AUTOMATIC,
         help_text="The assign policy for this dependency",
     )
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["blok", "key"], name="unique_dependency_key_per_blok")]
 
     def get_action_dependencies(self):
         return [ActionDependencyInputModel(**demand) for demand in self.action_demands]

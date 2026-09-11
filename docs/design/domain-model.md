@@ -128,7 +128,7 @@ task run, tracking it from assignment to completion. The fields that matter most
 | `acted_on` (array) | Structures this task modified (provenance). |
 | `latest_event_kind` / `latest_instruct_kind` | Denormalized "current state" for fast reads. |
 | `is_done`, `finished_at` | Terminal markers. |
-| `ephemeral` | Delete after completion vs. keep for audit. |
+| `ephemeral` | Legacy column (excluded from replay offers). Zero-persistence work is an ephemeral *Probe* (`facade/probes/`), not a Task. |
 
 **`TaskEvent`** is the immutable per-transition log entry the agent (or server) appends:
 `kind` (see the lifecycle in [task-lifecycle.md](task-lifecycle.md)), optional

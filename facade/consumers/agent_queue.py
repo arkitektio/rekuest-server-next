@@ -12,7 +12,7 @@ monkeypatching the ``redis``/``redis.asyncio`` factories.
 
 import abc
 import asyncio
-from collections import defaultdict
+from collections import defaultdict, deque
 from typing import DefaultDict, Dict, Optional, Tuple
 
 import redis
@@ -47,11 +47,18 @@ class AgentQueue(abc.ABC):
     """A per-agent message queue: producers ``push``, the consumer ``pop``s."""
 
     @abc.abstractmethod
-    def push(self, agent_id: str, message_json: str) -> None:
+    def push(self, agent_id: str, message_json: str, *, priority: bool = False) -> None:
         """Enqueue a (already serialized) message for ``agent_id``.
 
         Synchronous: it is called from the backend / signal code (and from the
         classmethod ``AgentConsumer.broadcast``) which runs in a sync context.
+
+        ``priority=True`` (used by probe traffic) makes the message the NEXT one popped,
+        jumping the whole task backlog. Priority messages are LIFO among themselves — a
+        probe Cancel pushed while its Assign is still queued pops first. That is
+        acceptable by design: the server has already recorded the CANCELLING state, and
+        agents must ignore a Cancel for an id they don't know (cancel races completion
+        anyway); newest-first is the right order for hover-style traffic.
         """
 
     @abc.abstractmethod
@@ -88,10 +95,16 @@ class RedisAgentQueue(AgentQueue):
     def from_settings(cls) -> "RedisAgentQueue":
         return cls(host=settings.AGENT_REDIS_HOST, port=settings.AGENT_REDIS_PORT)
 
-    def push(self, agent_id: str, message_json: str) -> None:
+    def push(self, agent_id: str, message_json: str, *, priority: bool = False) -> None:
         # Pooled connection: returned to the pool on use, not torn down per call.
+        # The consumer BLMOVEs from the RIGHT (tail), so LPUSH = back of the FIFO line and
+        # RPUSH = popped next — priority jumps the backlog atomically, with the
+        # processing-list at-least-once semantics untouched.
         connection = redis.Redis(connection_pool=_sync_pool(self.host, self.port))
-        connection.lpush(f"{agent_id}{QUEUE_SUFFIX}", message_json)
+        if priority:
+            connection.rpush(f"{agent_id}{QUEUE_SUFFIX}", message_json)
+        else:
+            connection.lpush(f"{agent_id}{QUEUE_SUFFIX}", message_json)
 
     async def pop(self, agent_id: str) -> Optional[str]:
         if self._async_connection is None:
@@ -115,19 +128,30 @@ class RedisAgentQueue(AgentQueue):
 
 
 class InMemoryAgentQueue(AgentQueue):
-    """In-process queue for unit tests — no redis, no network."""
+    """In-process queue for unit tests — no redis, no network.
+
+    Mirrors the redis list semantics: a deque holds the messages (append-left = FIFO
+    tail, append-right = priority head, pop from the right) and a token queue provides
+    the blocking wait.
+    """
 
     def __init__(self) -> None:
-        self._queues: DefaultDict[str, "asyncio.Queue[str]"] = defaultdict(asyncio.Queue)
+        self._queues: DefaultDict[str, "deque[str]"] = defaultdict(deque)
+        self._tokens: DefaultDict[str, "asyncio.Queue[None]"] = defaultdict(asyncio.Queue)
 
-    def push(self, agent_id: str, message_json: str) -> None:
-        self._queues[agent_id].put_nowait(message_json)
+    def push(self, agent_id: str, message_json: str, *, priority: bool = False) -> None:
+        if priority:
+            self._queues[agent_id].append(message_json)
+        else:
+            self._queues[agent_id].appendleft(message_json)
+        self._tokens[agent_id].put_nowait(None)
 
     async def pop(self, agent_id: str) -> Optional[str]:
-        return await self._queues[agent_id].get()
+        await self._tokens[agent_id].get()
+        return self._queues[agent_id].pop()
 
     async def ack(self, agent_id: str, message: str) -> None:
-        # ``asyncio.Queue.get`` already removed the item; nothing to do.
+        # ``pop`` already removed the item; nothing to do.
         return None
 
     async def close(self) -> None:

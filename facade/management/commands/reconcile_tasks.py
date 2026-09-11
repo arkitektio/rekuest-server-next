@@ -20,10 +20,11 @@ from django.utils import timezone
 from facade import enums, models
 from facade.grace import grace_seconds
 from facade.persist_backend import persist_backend
+from facade.retention import sweep_terminal_tasks
 
 
 class Command(BaseCommand):
-    help = "Fail orphaned in-flight work of websocket executors that are disconnected past the grace window."
+    help = "Fail orphaned in-flight work of websocket executors that are disconnected past the grace window, then apply the task retention sweep."
 
     def handle(self, *args, **options) -> None:
         # Phase 0 — heal agents whose ``connected`` is stuck True past the stale window (crashed
@@ -48,4 +49,9 @@ class Command(BaseCommand):
         for agent_id in agent_ids:
             async_to_sync(persist_backend.reconcile_orphaned_executor_work)(agent_id)
 
-        self.stdout.write(self.style.SUCCESS(f"reconcile_tasks: healed {healed} stuck agent(s), reconciled {len(agent_ids)} orphaned executor(s)."))
+        # Retention: delete terminal task trees past the configured horizon (no-op at the
+        # default TASK_RETENTION_SECONDS=0). Runs after the reconcile so freshly-failed
+        # work gets its full retention window rather than being reaped mid-transition.
+        swept = sweep_terminal_tasks()
+
+        self.stdout.write(self.style.SUCCESS(f"reconcile_tasks: healed {healed} stuck agent(s), reconciled {len(agent_ids)} orphaned executor(s), swept {swept} expired task tree(s)."))

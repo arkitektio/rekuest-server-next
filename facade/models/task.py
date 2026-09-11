@@ -14,7 +14,7 @@ class Task(models.Model):
     acted_on = ArrayField(base_field=models.CharField(max_length=1000), help_text="Which structures were acted on in this task", default=list)
     implementation = models.ForeignKey(
         "Implementation",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         help_text="Which implementation is the task currently mapped (can be reassigned)?",
         related_name="tasks",
         blank=True,
@@ -58,6 +58,10 @@ class Task(models.Model):
     capture = models.BooleanField(
         default=False,
         help_text="Should we capture the logs and events of this Task (e.g. for debugging or auditing purposes)?",
+    )
+    is_higher_order_child = models.BooleanField(
+        default=False,
+        help_text="Whether this task is the lower child of a higher-order wrapper — its yields/terminals unfold onto the wrapper. Lets the event hot path skip the parent lookup for ordinary tasks.",
     )
     parent = models.ForeignKey(
         "self",
@@ -159,6 +163,13 @@ class Task(models.Model):
             models.Index(fields=["agent"], condition=models.Q(is_done=False), name="task_agent_open_idx"),
             # The assign dedupe — filter(caller=, reference=) — on the hottest write path.
             models.Index(fields=["caller", "reference"], name="task_caller_ref_idx"),
+            # The retention sweep: filter(is_done=True, root__isnull=True, finished_at__lt=cutoff).
+            # Partial on exactly those constants so it only ever holds terminal roots.
+            models.Index(
+                fields=["finished_at"],
+                condition=models.Q(is_done=True, root__isnull=True),
+                name="task_retention_idx",
+            ),
         ]
 
 
@@ -197,8 +208,8 @@ class TaskEvent(models.Model):
     )
     level = TextChoicesField(
         max_length=1000,
-        choices_enum=enums.TaskEventChoices,
-        help_text="The log level",
+        choices_enum=enums.LogLevelChoices,
+        help_text="The log level (LOG events)",
         null=True,
         blank=True,
     )

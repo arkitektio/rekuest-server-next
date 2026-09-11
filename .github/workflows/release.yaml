@@ -36,6 +36,14 @@ jobs:
       - name: Run tests
         run: uv run pytest
 
+      # semantic-release rewrites the version in pyproject.toml but not uv.lock, so without
+      # this the lockfile records the previous version after every release and `uv lock --check`
+      # fails on the freshly-released commit.
+      - name: Sync uv.lock to the pending version
+        run: |
+          uv lock
+          git diff --quiet uv.lock || echo "uv.lock updated; semantic-release will include it"
+
       - name: Python Semantic Release
         id: release
         uses: python-semantic-release/python-semantic-release@v9

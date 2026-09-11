@@ -34,6 +34,7 @@ def shelve_in_memory_drawer(info: Info, input: ShelveInMemoryDrawerInput) -> typ
         defaults=dict(
             name=f"{str(agent)} memory shelve",
             creator=info.context.request.user,
+            organization=agent.organization,
         ),
     )
 

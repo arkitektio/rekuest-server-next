@@ -25,7 +25,7 @@ sequenceDiagram
     alt higher-order implementation
         BE->>BE: _assign_higher_order (see higher-order.md)
     end
-    BE->>DB: create Task (caller, agent, args, deps,<br/>latest_event_kind = ASSIGN)
+    BE->>DB: create Task (caller, agent, args, deps,<br/>latest_event_kind = QUEUED)
     BE->>Q: AgentConsumer.broadcast(agent.pk, Assign{...})
     Q->>AG: deliver Assign
     AG-->>PB: ProgressEvent / YieldEvent / DoneEvent / ErrorEvent
@@ -74,9 +74,9 @@ stored on `Task.dependencies`, ready for the agent to fan out child tasks agains
 
 ## Step 4 — persist and broadcast
 
-`assign` creates the `Task` (with `latest_event_kind = ASSIGN`,
+`assign` creates the `Task` (with `latest_event_kind = QUEUED`,
 `latest_instruct_kind = ASSIGN`, `caller`, `agent`, `args`, `acted_on`, resolved `dependencies`,
-`ephemeral`/`capture` flags) and then broadcasts the work:
+`capture` flag) and then broadcasts the work:
 
 ```python
 AgentConsumer.broadcast(
@@ -192,8 +192,38 @@ When an agent drops, `on_agent_disconnected` (guarded by `active_connection_id`,
 FK** deliberately — a task may have a null/reassigned `implementation`, so filtering through
 `implementation__agent` would silently skip work the agent actually owns.
 
-## Ephemeral vs persistent
+## Roots, lineage and idempotency
 
-`Task.ephemeral` trades audit history for storage: ephemeral tasks are meant to be
-discarded after completion, persistent ones are kept as an audit trail. `capture` independently
-controls whether logs/events are retained for debugging.
+A GraphQL `assign` is a ROOT by definition — the schema no longer exposes
+`parent`/`dependency`/`method`; children are created only over the agent socket
+(`AssignRequest`, where `parent` is mandatory) and by server-internal paths (init
+hooks). Every child's `root` is set at creation (backfilled by migration 0015), so
+interrupt propagation, the root-scoped change feeds and `myTasks` see the true tree.
+`assign` is idempotent on `(caller, reference)`: re-sending a caller-supplied reference
+returns the prior task without re-broadcasting — the same contract the socket path
+always had.
+
+## Retention
+
+Terminal root task trees older than `TASK_RETENTION_SECONDS` are deleted by the
+retention sweep (`facade/retention.py`, driven by the reaper loop and the
+`reconcile_tasks` command); trees with any live member are skipped. Default 0 =
+disabled — deletion also removes runs from replay discovery, so it is an explicit
+operator opt-in. Control ops (cancel/interrupt/pause/resume) write a `TaskInstruct`
+audit row naming the requesting caller.
+
+## Ephemeral work is a Probe, not a Task
+
+Work that should leave no history is not a Task at all — it is an **ephemeral Probe**
+(`facade/probes/`): the `probe` GraphQL mutation dispatches the same `Assign` wire message
+under a `p-…` id, all server state lives in redis under a TTL, and no Task/TaskEvent rows
+are ever written. Probes trade every Task guarantee (crash recovery, replay, locks, DB
+provenance lineage) for latency and zero storage — built for hover-frequency interactive
+work. Two contracts keep the concepts honest: the action author must declare
+`allow_probe` on the definition (a non-identity-bearing qualifier like
+`pure`/`idempotent` — the `probe` mutation refuses undeclared actions), and the `Assign`
+wire message carries `probe: true` so the agent knows it is running a probe (no
+history, no sub-assignment, no locks) rather than a task. The legacy
+`AssignInput.ephemeral` flag has been removed; the `Task.ephemeral` column remains only
+to exclude old rows from replay offers. `capture` independently controls whether
+logs/events are retained for debugging.

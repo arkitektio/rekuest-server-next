@@ -9,9 +9,9 @@ from typing import Any
 
 class ChoiceModel(BaseModel):
     label: str
-    value: str
-    image: str | None
-    description: str | None
+    value: Any
+    image: str | None = None
+    description: str | None = None
 
 
 class AssignWidgetModel(BaseModel):
@@ -27,41 +27,46 @@ class SliderAssignWidgetModel(AssignWidgetModel):
 
 
 class ChoiceAssignWidgetModel(AssignWidgetModel):
+    """A dropdown over the port's own `choices`."""
+
     kind: Literal["CHOICE"]
-    choices: list[ChoiceModel] | None
+    placeholder: str | None = None
 
 
 class CustomAssignWidgetModel(AssignWidgetModel):
+    """A catalog component rendered as the port's widget. The port value is in scope as the reserved root `value`."""
+
     kind: Literal["CUSTOM"]
-    hook: str
-    ward: str
+    component: str
+    props: Optional[List["ComponentPropModel"]] = None
+    dependencies: list[str] | None = None
+    fallback: Optional["AssignWidgetModelUnion"] = None
 
 
 class SearchAssignWidgetModel(AssignWidgetModel):
     kind: Literal["SEARCH"]
     query: str  # TODO: Validators
     ward: str
-    filters: list["PortModel"] | None = None
+    filters: list["ArgPortModel"] | None = None
     dependencies: list[str] | None = None
+    placeholder: str | None = None
 
 
 class StateAccessorModel(BaseModel):
     option_key: enums.OptionKey
-    sub_path: str | None = None
+    path: str | None = None
+    call: Optional["UtilCallModel"] = None
 
 
+# `StateChoiceAssignWidgetModel` used to be declared twice here, byte for byte. The
+# second definition shadowed the first, so only one was ever reachable.
 class StateChoiceAssignWidgetModel(AssignWidgetModel):
     kind: Literal["STATE_CHOICE"]
-    state_path: str
+    state_path: str | None = None
+    state_call: Optional["UtilCallModel"] = None
     dependency: str | None = None
     state_accessors: list[StateAccessorModel] | None = None
-
-
-class StateChoiceAssignWidgetModel(AssignWidgetModel):
-    kind: Literal["STATE_CHOICE"]
-    state_path: str
-    dependency: str | None = None
-    state_accessors: list[StateAccessorModel] | None = None
+    dependencies: list[str] | None = None
 
 
 class ProxyWidgetModel(AssignWidgetModel):
@@ -93,13 +98,17 @@ class ReturnWidgetModel(BaseModel):
 
 
 class CustomReturnWidgetModel(ReturnWidgetModel):
-    hook: str
-    ward: str
+    """A catalog component rendered for a returned value. The value is in scope as the reserved root `value`."""
+
+    kind: Literal["CUSTOM"]
+    component: str
+    props: Optional[List["ComponentPropModel"]] = None
 
 
 class ChoiceReturnWidgetModel(ReturnWidgetModel):
+    """Displays the label of the port's own `choices` for a returned value."""
+
     kind: Literal["CHOICE"]
-    choices: list[ChoiceModel] | None
 
 
 ReturnWidgetModelUnion = Union[CustomReturnWidgetModel, ChoiceReturnWidgetModel]
@@ -107,8 +116,9 @@ ReturnWidgetModelUnion = Union[CustomReturnWidgetModel, ChoiceReturnWidgetModel]
 
 class EffectModel(BaseModel):
     kind: str
-    function: str
+    call: "UtilCallModel"
     dependencies: list[str]
+    source: str | None = None
 
 
 class MessageEffectModel(EffectModel):
@@ -123,8 +133,6 @@ class HideEffectModel(EffectModel):
 
 class CustomEffectModel(EffectModel):
     kind: Literal["CUSTOM"]
-    hook: str
-    ward: str
 
 
 EffectModelUnion = Union[MessageEffectModel, HideEffectModel, CustomEffectModel]
@@ -139,10 +147,11 @@ class PortGroupModel(BaseModel):
 
 
 class ValidatorModel(BaseModel):
-    function: str
+    call: "UtilCallModel"
     dependencies: list[str] | None = []
     label: str | None = None
     error_message: str | None = None
+    source: str | None = None
 
 
 class PortMatchModel(BaseModel):
@@ -151,38 +160,38 @@ class PortMatchModel(BaseModel):
     kind: str | None = None
     identifier: str | None = None
     children: list["PortMatchModel"] | None = None
-    nullable: bool | None = False
+    nullable: bool | None = None
     dimension: str | None = None
 
 
 class RequiresModel(BaseModel):
     key: str
-    operator: enums.RequiresOperator
-    value: Any
+    operator: enums.DescriptorOperator
+    value: Any = None
 
 
 class ProvidesModel(BaseModel):
     key: str
-    operator: enums.ProvidesOperator
-    value: Any
+    operator: enums.DescriptorOperator
+    value: Any = None
 
 
 class OptimisticModel(BaseModel):
     state: str
-    path: str
+    path: str | None = None
+    path_call: Optional["UtilCallModel"] = None
     accessor: str | None = None
 
 
 class PortModel(BaseModel):
     key: str
     label: str | None = None
-    kind: str
+    kind: enums.PortKind
     description: str | None = None
     identifier: str | None = None
-    nullable: bool
-    effects: list[EffectModelUnion] | None
-    default: Any | None = None
-    children: list["PortModel"] | None
+    nullable: bool = False
+    effects: list[EffectModelUnion] | None = None
+    children: list["PortModel"] | None = None
     choices: list[ChoiceModel] | None = None
     reference_unit: str | None = None
     proposed_units: list[str] | None = None
@@ -190,7 +199,8 @@ class PortModel(BaseModel):
 
 
 class ArgPortModel(PortModel):
-    validators: list[ValidatorModel] | None
+    validators: list[ValidatorModel] | None = None
+    default: Any | None = None
     children: list["ArgPortModel"] | None = None
     widget: Optional[AssignWidgetModelUnion] = None
     requires: list[RequiresModel] | None = None
@@ -203,7 +213,7 @@ class ReturnPortModel(PortModel):
 
 
 class WindowModel(BaseModel):
-    window_function: str
+    window_function: enums.WindowFunction
     label: str | None = None
 
 
@@ -316,4 +326,58 @@ class ComponentNodeModel(BaseModel):
     children: Optional[List["ComponentNodeModel"]] = None
 
 
+class WidgetDefaultModel(BaseModel):
+    """A catalog's default widget for ports matching a kind and/or structure identifier."""
+
+    kind: str | None = None
+    identifier: str | None = None
+    widget: Optional[AssignWidgetModelUnion] = None
+    return_widget: Optional[ReturnWidgetModelUnion] = None
+
+
 SearchAssignWidgetModel.model_rebuild()
+CustomAssignWidgetModel.model_rebuild()
+CustomReturnWidgetModel.model_rebuild()
+StateAccessorModel.model_rebuild()
+StateChoiceAssignWidgetModel.model_rebuild()
+OptimisticModel.model_rebuild()
+
+
+# ============================================================================
+# UI catalog registry
+# ============================================================================
+class CatalogPropModel(BaseModel):
+    key: str
+    kind: enums.CatalogValueKind
+    required: bool = False
+    description: str | None = None
+
+
+class CatalogComponentModel(BaseModel):
+    name: str
+    description: str | None = None
+    props: list[CatalogPropModel] = []
+    accepts_children: bool = True
+
+
+class CatalogArgumentModel(BaseModel):
+    key: str
+    kind: enums.CatalogValueKind
+    required: bool = True
+    description: str | None = None
+
+
+class CatalogOperationModel(BaseModel):
+    name: str
+    description: str | None = None
+    arguments: list[CatalogArgumentModel] = []
+    returns: enums.CatalogValueKind
+
+
+class DiagnosticModel(BaseModel):
+    """A non-fatal registration finding, stored on the registered row."""
+
+    level: enums.DiagnosticLevel = enums.DiagnosticLevel.WARNING
+    code: str
+    message: str
+    path: str | None = None

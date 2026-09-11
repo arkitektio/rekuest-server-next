@@ -428,7 +428,8 @@ def build_sql_for_item_recursive(item: MatchInput, index: int, at_value: int | N
         for idx, child in enumerate(item.children):
             build_child_recursively(
                 child,
-                f"item->'children'->{idx + 1}",
+                # jsonb `->` on an array is 0-based (unlike the 1-based WITH ORDINALITY idx above).
+                f"item->'children'->{idx}",
                 f"children_{index}_{idx}",
                 child_parts,
                 child_params,

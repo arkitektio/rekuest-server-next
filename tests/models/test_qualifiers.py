@@ -1,4 +1,4 @@
-"""Semantic qualifiers (pure / idempotent / is_dev) on actions.
+"""Semantic qualifiers (pure / idempotent / allow_probe / is_dev) on actions.
 
 Qualifiers are declared on the definition, persisted on the Action, and deliberately NOT
 identity-bearing: they're excluded from ``unique_hash`` so flipping them never forces fleet
@@ -16,7 +16,7 @@ from facade.mutations.implementation import _create_implementation
 from tests.factories import create_agent_for_registry, create_registry_bundle
 
 
-def _input(pure=False, idempotent=False, is_dev=False, stateful=False, effect="NONE", name="Quali"):
+def _input(pure=False, idempotent=False, is_dev=False, stateful=False, allow_probe=False, effect="NONE", name="Quali"):
     return ImplementationInputModel.model_validate(
         {
             "interface": "quali",
@@ -30,6 +30,7 @@ def _input(pure=False, idempotent=False, is_dev=False, stateful=False, effect="N
                 "pure": pure,
                 "idempotent": idempotent,
                 "is_dev": is_dev,
+                "allow_probe": allow_probe,
                 "args": [{"key": "n", "kind": "INT", "nullable": False}],
                 "returns": [],
             },
@@ -58,13 +59,15 @@ def test_qualifier_flip_syncs_without_hash_change():
     first = _create_implementation(_input(idempotent=False), agent).action
     original_hash = first.hash
     assert first.idempotent is False
+    assert first.allow_probe is False
 
-    # Same definition except the qualifier: identity hash must NOT change (no fleet
-    # re-registration), but the column must sync.
-    second = _create_implementation(_input(idempotent=True), agent).action
+    # Same definition except the qualifiers: identity hash must NOT change (no fleet
+    # re-registration), but the columns must sync.
+    second = _create_implementation(_input(idempotent=True, allow_probe=True), agent).action
     assert second.pk == first.pk
     assert second.hash == original_hash
     assert second.idempotent is True
+    assert second.allow_probe is True
 
 
 @pytest.mark.django_db

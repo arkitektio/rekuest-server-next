@@ -18,6 +18,16 @@ from .agent import (
     UpdateAgentInput,
     UpdateAgentInputModel,
 )
+from .probe import (
+    ProbeInput,
+    ProbeInputModel,
+    CancelProbeInput,
+    CancelProbeInputModel,
+    PauseProbeInput,
+    PauseProbeInputModel,
+    ResumeProbeInput,
+    ResumeProbeInputModel,
+)
 from .task import (
     AssignInput,
     AssignInputModel,
@@ -42,8 +52,10 @@ from .blok import (
     DeleteMaterializedBlokInput,
     MaterializeBlokInput,
     UpdateBlokInput,
+    UpdateBlokInputModel,
     UpdateMaterializedBlokInput,
 )
+from .catalog import RegisterUiCatalogInput, RegisterUiCatalogInputModel
 from .dashboard import (
     CreateDashboardInput,
     DeleteDashboardInput,
@@ -103,6 +115,15 @@ from .toolbox import (
 )
 
 __all__ = [
+    # probe
+    "ProbeInput",
+    "ProbeInputModel",
+    "CancelProbeInput",
+    "CancelProbeInputModel",
+    "PauseProbeInput",
+    "PauseProbeInputModel",
+    "ResumeProbeInput",
+    "ResumeProbeInputModel",
     # agent
     "BlockInput",
     "BlockInputModel",
@@ -139,7 +160,11 @@ __all__ = [
     "DeleteMaterializedBlokInput",
     "MaterializeBlokInput",
     "UpdateBlokInput",
+    "UpdateBlokInputModel",
     "UpdateMaterializedBlokInput",
+    # catalog
+    "RegisterUiCatalogInput",
+    "RegisterUiCatalogInputModel",
     # dashboard
     "CreateDashboardInput",
     "DeleteDashboardInput",

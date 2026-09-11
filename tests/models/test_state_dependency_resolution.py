@@ -71,6 +71,7 @@ def setup(db):
         _create_implementation(ImplementationInputModel.model_validate({"interface": "snap", "definition": SNAP_DEFINITION}), agent)
 
     counter_definition = models.StateDefinition.objects.create(
+        organization=org,
         name="Counter",
         hash="statedep-counter-hash",
         description="counter",

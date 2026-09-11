@@ -62,3 +62,69 @@ CREATE_DASHBOARD = """
         }
     }
 """
+
+UPDATE_BLOK = """
+    mutation UpdateBlok($input: UpdateBlokInput!) {
+        updateBlok(input: $input) {
+            id
+            name
+            description
+            demoState
+            catalog {
+                name
+            }
+            dependencies {
+                key
+                optional
+            }
+            components {
+                id
+                component
+            }
+        }
+    }
+"""
+
+DELETE_BLOK = """
+    mutation DeleteBlok($input: DeleteBlokInput!) {
+        deleteBlok(input: $input)
+    }
+"""
+
+MATERIALIZE_BLOK = """
+    mutation MaterializeBlok($input: MaterializeBlokInput!) {
+        materializeBlok(input: $input) {
+            id
+            name
+            agentMappings {
+                key
+                agent {
+                    id
+                }
+            }
+            dashboardPlacements {
+                id
+            }
+        }
+    }
+"""
+
+UPDATE_MATERIALIZED_BLOK = """
+    mutation UpdateMaterializedBlok($input: UpdateMaterializedBlokInput!) {
+        updateMaterializedBlok(input: $input) {
+            id
+            agentMappings {
+                key
+                agent {
+                    id
+                }
+            }
+        }
+    }
+"""
+
+DELETE_MATERIALIZED_BLOK = """
+    mutation DeleteMaterializedBlok($input: DeleteMaterializedBlokInput!) {
+        deleteMaterializedBlok(input: $input)
+    }
+"""

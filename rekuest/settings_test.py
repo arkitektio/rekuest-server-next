@@ -9,13 +9,20 @@ import logging
 DATALAYER = {**DATALAYER, "allow_unscoped_fallback": True}
 
 DATABASES["default"] = {**DATABASES["default"], "NAME": "testdb", "PORT": 5555, "HOST": "localhost", "USER": "test", "PASSWORD": "test"}
+# Django forces DEBUG=False under the test runner, and authentikate 3.0 refuses static
+# tokens when DEBUG is False. These are deliberate test fixtures, so opt in explicitly.
 AUTHENTIKATE = {
     **AUTHENTIKATE,
+    "allow_static_tokens_in_production": True,
     "static_tokens": {
         "test": {"sub": "1", "client_id": "oinsoins", "app": "test-app"},
         # A second distinct identity (same default ``static_org``) for cross-agent tests —
         # agent 1 (token "test") assigns to agent 2 (token "test2").
         "test2": {"sub": "2", "client_id": "oinsoins2", "app": "test-app"},
+        # A third identity in a *different* organization for cross-tenant tests. The auth
+        # extension always derives the request's organization from the bearer token, so a
+        # second tenant can only be expressed as a second token.
+        "test-other": {"sub": "3", "client_id": "oinsoins3", "app": "test-app", "org": "other_org"},
     },
 }
 
@@ -40,3 +47,9 @@ REKUEST_GRACE = {"DEFAULT": 0, "PHYSICAL": 0}
 # tests/integration/docker-compose.yaml). Replaces the old redis-factory monkeypatch.
 AGENT_REDIS_HOST = "localhost"
 AGENT_REDIS_PORT = 6666
+
+# Probes: short TTLs so expiry behavior is testable without waiting.
+TASK_RETENTION_SECONDS = 0
+PROBE_TTL_SECONDS = 60
+PROBE_LINGER_SECONDS = 30
+PROBE_MAX_INFLIGHT_PER_CALLER = 8

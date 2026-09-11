@@ -48,6 +48,10 @@ class Implementation:
     def tracks(self) -> list[rtypes.Track]:
         return [rmodels.TrackModel(**i) for i in self.tracks]
 
+    @strawberry_django.field(description="Non-fatal registration findings, e.g. validator/effect calls naming operations that neither the base catalog nor the definition's catalog provides.")
+    def diagnostics(self) -> list[rtypes.Diagnostic]:
+        return [rmodels.DiagnosticModel(**i) for i in self.diagnostics]
+
     @strawberry_django.field(description="Get the latest completed task created by the current user.")
     def my_latest_task(self, info: Info) -> Optional["Task"]:
         user = info.context.request.user

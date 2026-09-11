@@ -1,3 +1,4 @@
+from rekuest_core.inputs.types import widget_input_types
 from rekuest_core.objects import types
 
 
@@ -15,3 +16,6 @@ interface_types = [
     types.ProxyWidget,
     types.HideEffect,
 ]
+
+# Widget input union members: referenced by no field, so schemas must list them explicitly.
+input_union_types = list(widget_input_types)

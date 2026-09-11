@@ -116,22 +116,18 @@ async def watch_state(
     ]
 
     async for message in patch_channel.listen(info.context, topics):
-        # TODO: optimize by NOT using a model here but sending the raw patch data in the channel message (from the agent to this receiver)
-        try:
-            patch = await models.Patch.objects.aget(id=message.create)
-            yield StatePatchEvent(
-                state_id=strawberry.ID(str(patch.state_id)),
-                agent_id=strawberry.ID(str(patch.agent_id)) if patch.agent_id else strawberry.ID(""),
-                op=patch.op,
-                path=patch.path,
-                value=patch.value,
-                global_revision=patch.global_rev,
-                session_id=patch.session_id,
-                timestamp=patch.timestamp,
-                interface=patch.interface,
-            )
-        except models.Patch.DoesNotExist:
-            continue
+        # Payload-carrying: the PatchEvent brings the whole patch — no per-subscriber fetch.
+        yield StatePatchEvent(
+            state_id=strawberry.ID(str(message.state)),
+            agent_id=strawberry.ID(str(message.agent)) if message.agent else strawberry.ID(""),
+            op=message.op,
+            path=message.path,
+            value=message.value,
+            global_revision=message.global_rev,
+            session_id=message.session,
+            timestamp=message.timestamp,
+            interface=message.interface,
+        )
 
 
 @strawberry.type(description="A plain snapshot of a state's current value.")
@@ -166,22 +162,18 @@ async def watch_agent(
     )
 
     async for message in patch_channel.listen(info.context, topics):
-        try:
-            patch = await models.Patch.objects.aget(id=message.create)
-
-            if not patch.agent_id or str(patch.agent_id) != str(agent.id):
-                continue
-
-            yield StatePatchEvent(
-                state_id=strawberry.ID(str(patch.state_id)),
-                agent_id=strawberry.ID(str(patch.agent_id)),
-                op=patch.op,
-                path=patch.path,
-                value=patch.value,
-                global_revision=patch.global_rev,
-                session_id=patch.session_id,
-                timestamp=patch.timestamp,
-                interface=patch.interface,
-            )
-        except models.Patch.DoesNotExist:
+        # Payload-carrying: no per-subscriber fetch; the topic already scopes to the agent.
+        if not message.agent or str(message.agent) != str(agent.id):
             continue
+
+        yield StatePatchEvent(
+            state_id=strawberry.ID(str(message.state)),
+            agent_id=strawberry.ID(str(message.agent)),
+            op=message.op,
+            path=message.path,
+            value=message.value,
+            global_revision=message.global_rev,
+            session_id=message.session,
+            timestamp=message.timestamp,
+            interface=message.interface,
+        )

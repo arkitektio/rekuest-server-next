@@ -11,6 +11,7 @@ from rekuest_core.objects import types as rtypes
 
 from facade import filters, models, scalars
 from facade.types.demand import ActionDependencyModel, StateDependencyModel
+from facade.types.base import build_prescoped_queryset
 
 
 @strawberry_django.type(models.Blok)
@@ -27,23 +28,27 @@ class Blok:
         description="Dependencies that need to be resolved for this blok.",
     )
 
-    @strawberry_django.field(description="List of action demands specified in this blok.")
+    @strawberry_django.field(description="The typed component tree of this blok.")
     def components(self) -> list[rtypes.ComponentNode]:
         return [rmodels.ComponentNodeModel(**i) for i in self.components]
 
-    @strawberry_django.field(description="List of action demands specified in this blok.")
-    def ui_components(self) -> scalars.Props:
-        return self.components
-
-    @strawberry_django.field(description="List of action demands specified in this blok.")
+    @strawberry_django.field(description="Demo state used to render a preview of this blok without agents.")
     def demo_state(self) -> scalars.Props:
         return self.demo_state
 
+    @strawberry_django.field(description="Non-fatal registration findings, e.g. manifest util calls naming operations that neither the base catalog nor this blok's catalog provides.")
+    def diagnostics(self) -> list[rtypes.Diagnostic]:
+        return [rmodels.DiagnosticModel(**i) for i in self.diagnostics]
 
-@strawberry_django.type(models.BlokDependency, filters=filters.BlokDependencyFilter, pagination=True, description="Represents a dependency between implementations and actions.")
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="organization")
+
+
+@strawberry_django.type(models.BlokDependency, filters=filters.BlokDependencyFilter, pagination=True, description="An agent dependency declared by a blok.")
 class BlokDependency:
     id: strawberry.ID = strawberry_django.field(description="Unique ID of the dependency.")
-    implementation: "Implementation" = strawberry_django.field(description="The implementation this dependency belongs to.")
+    blok: Blok = strawberry_django.field(description="The blok that declares this dependency.")
     key: str = strawberry_django.field(description="Optional string identifier or tag for reference.")
     optional: bool = strawberry_django.field(description="Indicates if the dependency is optional.")
     description: str | None = strawberry_django.field(description="Optional description of the dependency.")
@@ -100,6 +105,10 @@ class MaterializedBlok:
     placements: list["Placement"] = strawberry_django.field(
         description="Placements of this materialized blok.",
     )
+
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="blok__organization")
 
 
 @strawberry_django.type(models.BlokAgentMapping)

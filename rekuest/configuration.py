@@ -73,6 +73,10 @@ class RekuestBlock(BaseModel):
     grace_default: int = Field(default=30, description="Default reclaim grace window (seconds) after a disconnect.")
     grace_physical: int = Field(default=5, description="Grace window (seconds) for effect:physical work.")
     progress_lease: int = Field(default=0, description="Progress lease (seconds); 0 disables the wedged-task lease.")
+    task_retention: int = Field(default=0, description="Seconds to keep terminal root task trees; 0 disables deletion. Deleting past runs also removes them from replay (reusable_task_for). Suggested production value: 2592000 (30 days).")
+    probe_ttl: int = Field(default=3600, description="Lifetime (seconds) of a probe's redis state while live.")
+    probe_linger: int = Field(default=300, description="How long (seconds) a terminal call's state lingers for late subscribers.")
+    probe_max_inflight: int = Field(default=32, description="Maximum concurrent probes per caller.")
 
 
 class ProvenanceBlock(BaseModel):

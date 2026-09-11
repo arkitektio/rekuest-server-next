@@ -8,6 +8,7 @@ import strawberry
 import strawberry_django
 
 from facade import filters, models
+from facade.types.base import build_prescoped_queryset
 
 
 @strawberry_django.type(models.MemoryShelve, filters=filters.MemoryShelveFilter, ordering=filters.MemoryShelveOrder, pagination=True, description="A shelve for storing memory-based resources on an agent.")
@@ -17,6 +18,10 @@ class MemoryShelve:
     name: str = strawberry_django.field(description="Name of the shelve.")
     description: str | None = strawberry_django.field(description="Optional description of the shelve.")
     drawers: list["MemoryDrawer"] = strawberry_django.field(description="List of memory drawers within the shelve.")
+
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="organization")
 
 
 @strawberry_django.type(models.MemoryDrawer, filters=filters.MemoryDrawerFilter, pagination=True)
@@ -31,3 +36,9 @@ class MemoryDrawer:
     @strawberry_django.field(description="Get the latest value stored in this drawer.")
     def label(self) -> str:
         return self.label or self.identifier + "@" + self.resource_id
+
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="shelve__organization")
+
+

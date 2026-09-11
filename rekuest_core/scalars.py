@@ -8,13 +8,12 @@ Arg = NewType("Arg", object)
 SearchQuery = NewType("SearchQuery", str)
 InstanceID = NewType("InstanceID", str)
 ActionHash = NewType("ActionHash", str)
-ValidatorFunction = NewType("ValidatorFunction", object)
 
 
 scalar_map = {
     Identifier: strawberry.scalar(
         name="Identifier",
-        description="The `ArrayLike` scalar type represents a reference to a store previously created by the user n a datalayer",
+        description="The `Identifier` scalar is a structure identifier of the form `@package/key` (e.g. `@mikro/image`) that types STRUCTURE, MEMORY_STRUCTURE and INTERFACE ports",
         serialize=lambda v: v,
         parse_value=lambda v: v,
     ),
@@ -26,7 +25,7 @@ scalar_map = {
     ),
     AnyDefault: strawberry.scalar(
         name="AnyDefault",
-        description="The `ArrayLike` scalar type represents a reference to a store previously created by the user n a datalayer",
+        description="The `AnyDefault` scalar is any JSON value used as a port default or a choice value; the server checks it against the port's kind",
         serialize=lambda v: v,
         parse_value=lambda v: v,
     ),
@@ -38,28 +37,19 @@ scalar_map = {
     ),
     SearchQuery: strawberry.scalar(
         name="SearchQuery",
-        description="The `ArrayLike` scalar type represents a reference to a store previously created by the user n a datalayer",
+        description="The `SearchQuery` scalar is a GraphQL query string a search widget executes against its ward to populate its choices",
         serialize=lambda v: v,
         parse_value=lambda v: v,
     ),
     InstanceID: strawberry.scalar(
         name="InstanceId",
-        description="The `ArrayLike` scalar type represents a reference to a store previously created by the user n a datalayer",
+        description="The `InstanceId` scalar identifies one running instance of an agent",
         serialize=lambda v: v,
         parse_value=lambda v: v,
     ),
     ActionHash: strawberry.scalar(
         name="ActionHash",
-        description="The `ArrayLike` scalar type represents a reference to a store previously created by the user n a datalayer",
-        serialize=lambda v: v,
-        parse_value=lambda v: v,
-    ),
-    ValidatorFunction: strawberry.scalar(
-        name="ValidatorFunction",
-        description="""
-    The `Validator` scalar represents a javascript function that should execute on the client side (inside a shadow realm)
-      to validate a value (or a set of values) before it is sent to the server.  The function has two parameters (value, otherValues) and should return a string if the value is invalid and undefined if the value is valid.
-        The otherValues parameter is an object with the other values in the form {fieldName: value}.""",
+        description="The `ActionHash` scalar is the sha256 identity hash of an action definition (key, version, ports, ...)",
         serialize=lambda v: v,
         parse_value=lambda v: v,
     ),

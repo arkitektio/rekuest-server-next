@@ -508,11 +508,20 @@ class Datalayer:
         except Exception as exc:
             return self._unscoped_fallback(f"a general read grant on {bucket_key} for organization {organization_id}", exc)
 
-    def generate_media_upload_grant(self, input: base_models.RequestMediaUploadInput) -> base_models.MediaUploadGrant:
+    def generate_media_upload_grant(
+        self,
+        input: base_models.RequestMediaUploadInput,
+        *,
+        organization_id: int | None = None,
+        creator_id: int | None = None,
+    ) -> base_models.MediaUploadGrant:
         """Create a media store and a presigned PUT URL for upload.
 
         The presigned URL is generated against the internal S3 endpoint, then
         the base URL is rewritten to match the client-provided addressing.
+
+        ``organization_id``/``creator_id`` stamp ownership on the new store; read access is
+        scoped to the owning organization, so callers should always supply them.
         """
         from datalayer import models
 
@@ -524,6 +533,8 @@ class Datalayer:
             bucket="media",
             original_file_name=input.original_file_name,
             content_type=input.content_type,
+            organization_id=organization_id,
+            creator_id=creator_id,
         )
 
         ttl = self._session_duration()

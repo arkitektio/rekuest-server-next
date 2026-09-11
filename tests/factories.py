@@ -119,12 +119,16 @@ async def seed_agent(instance_id, token=TEST_TOKEN, blocked=False):
 # --------------------------------------------------------------------------- #
 # Object-graph builders (run synchronously, wrapped via sync_to_async)
 # --------------------------------------------------------------------------- #
-def _build_task(prefix, *, effect="NONE", idempotent=False, pure=False, parent=None):
+def _build_task(prefix, *, effect="NONE", idempotent=False, pure=False, parent=None, agent_pk=None):
     """Create a standalone Action -> Implementation -> Task graph.
 
-    The persist backend looks tasks up by id (not by the registered agent),
-    so this graph is independent of the agent that streams the events. ``effect`` sets the
-    implementation's effect class; ``parent`` wires the tree shape.
+    ``effect`` sets the implementation's effect class; ``parent`` wires the tree shape.
+
+    ``agent_pk`` binds the task to an existing agent instead of minting a fresh one. Pass it
+    whenever the test streams events over an agent socket: the persist backend now resolves
+    reported tasks with an ``agent_id`` predicate, so an agent may only report on its *own*
+    work. Omitting it yields a task owned by a throwaway agent, which is right for tests that
+    never report over a socket.
     """
     user = User.objects.create(username=f"{prefix}-user", password="x", sub=f"{prefix}-sub")
     device = Device.objects.create(device_id=f"{prefix}-device")
@@ -134,13 +138,17 @@ def _build_task(prefix, *, effect="NONE", idempotent=False, pure=False, parent=N
 
     app = App.objects.create(identifier=f"{prefix}-app")
     release = Release.objects.create(app=app, version="1.0.0")
-    agent = Agent.objects.create(
-        app=app,
-        hash=f"{prefix}-hash",
-        release=release,
-        user=user,
-        client=client,
-        organization=org,
+    agent = (
+        Agent.objects.get(pk=agent_pk)
+        if agent_pk is not None
+        else Agent.objects.create(
+            app=app,
+            hash=f"{prefix}-hash",
+            release=release,
+            user=user,
+            client=client,
+            organization=org,
+        )
     )
 
     action = Action.objects.create(
@@ -266,8 +274,12 @@ def _build_task_event(task_pk, kind=enums.TaskEventChoices.COMPLETED, message=No
     )
 
 
-def _build_implementation_for_agent(agent_pk, prefix, needs_token=True):
-    """An Action + Implementation owned by ``agent`` (connectable assign target)."""
+def _build_implementation_for_agent(agent_pk, prefix, needs_token=True, allow_probe=True):
+    """An Action + Implementation owned by ``agent`` (connectable assign target).
+
+    ``allow_probe`` defaults True so the call tests can target it; the flag only
+    gates the ``call`` mutation and is invisible to the task paths.
+    """
     agent = Agent.objects.select_related("app", "release", "organization").get(pk=agent_pk)
     action = Action.objects.create(
         app=agent.app,
@@ -277,6 +289,7 @@ def _build_implementation_for_agent(agent_pk, prefix, needs_token=True):
         description=f"{prefix} description",
         hash=f"{prefix}-action-hash",
         organization=agent.organization,
+        allow_probe=allow_probe,
     )
     return Implementation.objects.create(
         release=agent.release,
@@ -289,11 +302,13 @@ def _build_implementation_for_agent(agent_pk, prefix, needs_token=True):
 
 def _build_state_for_agent(agent_pk, interface, prefix):
     """Create a State (and its definition) attached to an existing agent."""
+    agent = Agent.objects.get(pk=agent_pk)
     definition = StateDefinition.objects.create(
         name=f"{prefix} state",
         hash=f"{prefix}-state-hash",
         ports=[],
         description=f"{prefix} state def",
+        organization=agent.organization,
     )
     return State.objects.create(definition=definition, interface=interface, agent_id=agent_pk, value={})
 

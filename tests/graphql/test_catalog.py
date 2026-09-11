@@ -56,6 +56,7 @@ class TestGraphQLCatalog:
     async def test_state_schemas_query(self, authenticated_context: HttpContext):
         """Test fetching all state definitions via GraphQL query."""
         await sync_to_async(StateDefinition.objects.create)(
+            organization=authenticated_context.request.organization,
             name="Query State Definition",
             hash="query-state-definition-hash",
             description="State definition for query testing",
@@ -88,6 +89,7 @@ class TestGraphQLCatalog:
     async def test_state_definitions_with_ports(self, authenticated_context: HttpContext):
         """Test that a seeded state definition with ports is exposed via GraphQL."""
         await sync_to_async(StateDefinition.objects.create)(
+            organization=authenticated_context.request.organization,
             name="Test State Schema",
             hash="state-hash-graphql",
             description="A test state schema",

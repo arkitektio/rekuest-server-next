@@ -145,7 +145,7 @@ class TestHookIntake:
 
     async def test_done_event_over_http_acks_and_persists(self, post_recorder):
         agent = await build_webhook_agent("hook-in-done", secret="sek")
-        ass = await build_task("hook-in-done-ass")
+        ass = await build_task("hook-in-done-ass", agent_pk=agent.pk)
 
         msg = messages.Completed(task=str(ass.pk), seq=3)
         response = await hook_intake(_signed_request(agent, msg), str(agent.pk))

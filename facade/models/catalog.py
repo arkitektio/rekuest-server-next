@@ -2,6 +2,8 @@ from authentikate.models import Client, Organization
 from django.contrib.auth import get_user_model
 from django.db import models
 
+from rekuest_core.inputs.models import CatalogComponentInputModel, CatalogOperationInputModel, WidgetDefaultInputModel
+
 
 class Collection(models.Model):
     """A collection is a group of actions that are related to each other.
@@ -52,6 +54,12 @@ class Protocol(models.Model):
 
     """
 
+    organization = models.ForeignKey(
+        "authentikate.Organization",
+        on_delete=models.CASCADE,
+        related_name="protocols",
+        help_text="The organization this Protocol belongs to. Access is scoped to it.",
+    )
     name = models.CharField(max_length=1000, unique=True, help_text="The name of this Protocol")
     description = models.TextField(help_text="A description for the Protocol")
 
@@ -66,12 +74,51 @@ class UICatalog(models.Model):
 
     """
 
+    organization = models.ForeignKey(
+        "authentikate.Organization",
+        on_delete=models.CASCADE,
+        related_name="ui_catalogs",
+        help_text="The organization this UICatalog belongs to. Access is scoped to it.",
+    )
     name = models.CharField(max_length=1000)
-    schema = models.JSONField(default=dict)
+    description = models.TextField(null=True, blank=True, help_text="A description of this catalog")
+    components = models.JSONField(
+        default=list,
+        help_text="Registered component specs (rekuest_core CatalogComponent): the names a ComponentNode.component may use and the props each accepts.",
+    )
+    operations = models.JSONField(
+        default=list,
+        help_text="Registered operation specs (rekuest_core CatalogOperation): the names a UtilCall.operation may use, their arguments and return kind.",
+    )
+    widget_defaults = models.JSONField(
+        default=list,
+        help_text="Default widgets per port kind and/or structure identifier (rekuest_core WidgetDefault), applied by the UI to ports that declare no widget.",
+    )
+    registered_by = models.ForeignKey(
+        Client,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="registered_ui_catalogs",
+        help_text="The client (UI app) that last registered this catalog's components and operations.",
+    )
 
-    def validate_surface(self, surface: str) -> bool:
-        """Validate if this catalog can be used for a given surface (e.g. 'web', 'mobile', 'desktop')"""
-        return True
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["organization", "name"], name="unique_ui_catalog_name_per_organization")]
+
+    @property
+    def is_registered(self) -> bool:
+        """A catalog only created by ``get_or_create`` (no components, no operations) validates nothing."""
+        return bool(self.components) or bool(self.operations)
+
+    def get_components(self) -> list[CatalogComponentInputModel]:
+        return [CatalogComponentInputModel(**component) for component in self.components]
+
+    def get_operations(self) -> list[CatalogOperationInputModel]:
+        return [CatalogOperationInputModel(**operation) for operation in self.operations]
+
+    def get_widget_defaults(self) -> list[WidgetDefaultInputModel]:
+        return [WidgetDefaultInputModel(**default) for default in self.widget_defaults]
 
 
 class Toolbox(models.Model):

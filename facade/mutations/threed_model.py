@@ -6,11 +6,16 @@ from datalayer.models import MediaStore
 
 
 def create_threed_model(info: Info, input: inputs.CreateThreeDModelInput) -> types.ThreeDModel:
-    file = MediaStore.objects.get(id=input.media)
+    organization = info.context.request.organization
+    try:
+        file = MediaStore.objects.get(id=input.media, organization=organization)
+    except MediaStore.DoesNotExist:
+        raise PermissionError(f"No media store {input.media} in your organization.")
     x = models.ThreeDModel.objects.create(
         name=input.name,
         description=input.description,
         file=file,
+        organization=organization,
     )
     return x
 

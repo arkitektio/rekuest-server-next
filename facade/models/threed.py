@@ -5,6 +5,12 @@ from datalayer.models import MediaStore
 
 
 class ThreeDModel(models.Model):
+    organization = models.ForeignKey(
+        "authentikate.Organization",
+        on_delete=models.CASCADE,
+        related_name="threed_models",
+        help_text="The organization this 3D model belongs to. Access is scoped to it.",
+    )
     name = models.CharField(max_length=1000)
     description = models.TextField(null=True, blank=True)
     file = models.ForeignKey(

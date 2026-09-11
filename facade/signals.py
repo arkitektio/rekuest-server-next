@@ -2,7 +2,6 @@ from django.db import transaction
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from facade import models, channels, channel_events, transport
-from authentikate.models import Organization
 
 import logging
 
@@ -26,12 +25,6 @@ def _broadcast_on_commit(channel, event, topics=_UNSET):
         transaction.on_commit(lambda: channel.broadcast(event))
     else:
         transaction.on_commit(lambda: channel.broadcast(event, topics))
-
-
-@receiver
-def organization_post_save(sender, instance: Organization = None, created=None, **kwargs):
-    if created:
-        print("Creating all the agents for organization:", instance.name)
 
 
 @receiver(post_save, sender=models.State)
@@ -75,7 +68,7 @@ def task_post_save(sender, instance: models.Task = None, created=None, **kwargs)
     if created and instance.root_id is None and instance.caller_id:
         _broadcast_on_commit(
             channels.task_event_channel,
-            channel_events.TaskEventCreatedEvent(create=str(instance.id)),
+            channel_events.TaskEventCreatedEvent(create=channel_events.TaskChangePayload.from_task(instance)),
             [
                 f"root_tasks_caller_{instance.caller_id}",
                 f"root_tasks_org_{instance.caller.organization_id}",
@@ -86,7 +79,8 @@ def task_post_save(sender, instance: models.Task = None, created=None, **kwargs)
     # detail-page feed, so the agent's "latest tasks" list updates live on create and on
     # every status/is_done transition (which re-saves the Task row → arrives here as update).
     if instance.agent_id:
-        event = channel_events.ChildTaskEvent(create=str(instance.id)) if created else channel_events.ChildTaskEvent(update=str(instance.id))
+        payload = channel_events.TaskChangePayload.from_task(instance)
+        event = channel_events.ChildTaskEvent(create=payload) if created else channel_events.ChildTaskEvent(update=payload)
         _broadcast_on_commit(channels.agent_task_channel, event, [f"agent_tasks_{instance.agent_id}"])
 
     # Detail feed: notify the direct parent AND the root, so a subscription on the root task
@@ -95,7 +89,8 @@ def task_post_save(sender, instance: models.Task = None, created=None, **kwargs)
         topics = {f"child_tasks_{instance.parent_id}"}
         if instance.root_id:
             topics.add(f"child_tasks_{instance.root_id}")
-        event = channel_events.ChildTaskEvent(create=str(instance.id)) if created else channel_events.ChildTaskEvent(update=str(instance.id))
+        payload = channel_events.TaskChangePayload.from_task(instance)
+        event = channel_events.ChildTaskEvent(create=payload) if created else channel_events.ChildTaskEvent(update=payload)
         _broadcast_on_commit(channels.child_task_channel, event, list(topics))
 
 
@@ -109,26 +104,28 @@ def task_event_post_save(sender, instance: models.TaskEvent = None, created=None
 
 @receiver(post_save, sender=models.Implementation)
 def implementation_post_save(sender, instance: models.Implementation = None, created=None, **kwargs):
-    if created:
-        _broadcast_on_commit(channels.new_implementation_channel, channel_events.ImplementationEvent(create=instance.id))
-    else:
-        _broadcast_on_commit(channels.new_implementation_channel, channel_events.ImplementationEvent(update=instance.id), [f"implementation_{instance.id}"])
+    # Two audiences: the per-implementation detail feed (implementation_change) and the
+    # per-agent list feed (implementations) — every event reaches both.
+    topics = [f"implementation_{instance.id}", f"implementations_agent_{instance.agent_id}"]
+    event = channel_events.ImplementationEvent(create=instance.id) if created else channel_events.ImplementationEvent(update=instance.id)
+    _broadcast_on_commit(channels.new_implementation_channel, event, topics)
 
 
 @receiver(post_delete, sender=models.Implementation)
 def implementation_post_del(sender, instance: models.Implementation = None, **kwargs):
     if instance:
-        _broadcast_on_commit(channels.new_implementation_channel, channel_events.ImplementationEvent(delete=instance.id), [f"implementation_{instance.id}"])
+        _broadcast_on_commit(
+            channels.new_implementation_channel,
+            channel_events.ImplementationEvent(delete=instance.id),
+            [f"implementation_{instance.id}", f"implementations_agent_{instance.agent_id}"],
+        )
 
 
 @receiver(post_save, sender=models.Patch)
 def patch_post_save(sender, instance: models.Patch = None, created=None, **kwargs):
-    print("Patch post save signal received for patch:", instance)
     if created:
-        topics = [f"patches_state_{instance.state.id}"]
-        if instance.agent:
-            topics.append(f"patches_agent_{instance.agent.id}")
+        topics = [f"patches_state_{instance.state_id}"]
+        if instance.agent_id:
+            topics.append(f"patches_agent_{instance.agent_id}")
 
-        print("Broadcasting patch event to topics:", topics)
-
-        _broadcast_on_commit(channels.patch_channel, channel_events.PatchEvent(create=instance.id, state=instance.state.id, agent=instance.agent.id if instance.agent else None), topics)
+        _broadcast_on_commit(channels.patch_channel, channel_events.PatchEvent.from_patch(instance), topics)

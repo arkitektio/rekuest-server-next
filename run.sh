@@ -1,12 +1,10 @@
 #!/bin/bash
+set -euo pipefail
 echo "=> Waiting for DB to be online"
 python manage.py wait_for_database -s 6
 
 echo "=> Performing database migrations..."
 python manage.py migrate
-
-echo "=> Ensuring Superusers..."
-python manage.py ensureadmin
 
 echo "=> Reconciling stale agents / orphaned work from before restart..."
 python manage.py reconcile_tasks

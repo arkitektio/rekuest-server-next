@@ -73,6 +73,9 @@ class TaskEventKind(str, Enum):
     STARTED = "STARTED"
     PROGRESS = "PROGRESS"
     DELEGATE = "DELEGATE"
+    # Mirrors TaskEventChoices.UNASSIGN. Without it, coercing a persisted UNASSIGN row in the
+    # task subscriptions raises ValueError.
+    UNASSIGN = "UNASSIGN"
 
     DISCONNECTED = "DISCONNECTED"
 

@@ -3,13 +3,14 @@
 from typing import Any
 
 import strawberry
-from pydantic import BaseModel, Field
-from rekuest_core.inputs import models as rimodels
-from rekuest_core.inputs import types as ritypes
+from pydantic import BaseModel, Field, model_validator
 from strawberry.experimental import pydantic
+from typing_extensions import Self
 
 from facade import scalars
 from facade.inputs.dependency import MappedAgentInput
+from rekuest_core.inputs import models as rimodels
+from rekuest_core.inputs import types as ritypes
 
 
 @strawberry.input(description="Input for updating a dashboard. This is used to update the properties of a dashboard, such as its name, associated bloks, or organization.")
@@ -60,6 +61,12 @@ class CreateBlokInputModel(BaseModel):
         description="The initial state of the blok. This is used to set the initial state of the blok when it is materialized.",
     )
 
+    @model_validator(mode="after")
+    def check_manifest(self) -> Self:
+        """The component tree is coherent with the declared dependencies and demo state."""
+        rimodels.check_blok_manifest(self.components, {dep.key for dep in self.dependencies or []}, None if self.demo_state is None else set(self.demo_state))
+        return self
+
 
 @pydantic.input(CreateBlokInputModel, description="The input for creating a blok.")
 class CreateBlokInput:
@@ -71,21 +78,39 @@ class CreateBlokInput:
     demo_state: scalars.Args | None = None
 
 
-@strawberry.input(description="The input for updating a blok.")
+class UpdateBlokInputModel(BaseModel):
+    """Partial update of a Blok. ``None`` leaves a field unchanged; list fields replace wholesale."""
+
+    id: str = Field(description="The ID of the blok to update.")
+    name: str | None = Field(default=None, description="The name of the blok, used for identification in the system.")
+    description: str | None = Field(default=None, description="The description of the blok and its purpose.")
+    components: list[rimodels.ComponentNodeInputModel] | None = Field(
+        default=None,
+        description="The full component tree of the blok. Replaces the existing tree when provided.",
+    )
+    demo_state: dict[str, Any] | None = Field(
+        default=None,
+        description="The demo state used to preview this blok. Replaces the existing demo state when provided.",
+    )
+    catalog: str | None = Field(
+        default=None,
+        description="Name of the UI catalog (in the caller's organization) this blok renders against. Created if missing.",
+    )
+    dependencies: list[rimodels.AgentDependencyInputModel] | None = Field(
+        default=None,
+        description="The full list of agent dependencies. When provided it replaces the existing set: keys not listed are deleted and their agent mappings on materialized bloks lose their dependency reference.",
+    )
+
+
+@pydantic.input(UpdateBlokInputModel, description="The input for updating a blok. Omitted (null) fields are left unchanged; list fields replace wholesale.")
 class UpdateBlokInput:
     id: strawberry.ID
-    name: str | None = strawberry.field(
-        default=None,
-        description="The name of the blok, used for identification in the system.",
-    )
-    description: str | None = strawberry.field(
-        default=None,
-        description="The description of the blok and its purpose.",
-    )
-    components: list[ritypes.ComponentNodeInput] | None = strawberry.field(
-        default=None,
-        description="The components of the blok. This is used to update the blok in the system.",
-    )
+    name: str | None = None
+    description: str | None = None
+    components: list[ritypes.ComponentNodeInput] | None = None
+    demo_state: scalars.Args | None = None
+    catalog: str | None = None
+    dependencies: list[ritypes.AgentDependencyInput] | None = None
 
 
 @strawberry.input(description="The input for updating a blok.")
@@ -110,3 +135,5 @@ class MaterializeBlokInput:
         default=None,
         description="The agent mappings for the blok. This is used to map the blok dependencies to agents in the system.",
     )
+    name: str | None = strawberry.field(default=None, description="Display name of this materialization. Defaults to the blok's name.")
+    description: str | None = strawberry.field(default=None, description="Description of this materialization. Defaults to the blok's description.")

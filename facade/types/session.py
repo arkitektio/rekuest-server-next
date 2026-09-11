@@ -8,6 +8,7 @@ import kante
 import strawberry
 
 from facade import filters, models
+from facade.types.base import build_prescoped_queryset
 
 
 @strawberry.type
@@ -42,3 +43,9 @@ class Session:
     ended_at: datetime.datetime | None
     snapshots: list[Snapshot]
     patches: list[Patch]
+
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="agent__organization")
+
+

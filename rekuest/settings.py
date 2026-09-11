@@ -25,9 +25,12 @@ conf = Settings()
 SECRET_KEY = conf.django.secret_key  # TODO: Change this in production
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Config-driven and defaulting to False. This is load-bearing beyond leaking tracebacks:
+# authentikate only refuses static tokens when DEBUG is False (see its settings.py), so a
+# hardcoded DEBUG=True silently disables that guard.
+DEBUG = conf.django.debug
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = conf.django.hosts
 
 AGENT_HEARTBEAT_INTERVAL = 10
 AGENT_HEARTBEAT_RESPONSE_TIMEOUT = 5
@@ -58,6 +61,17 @@ REKUEST_GRACE = {
     # failed as terminal. 0 disables the lease (default).
     "PROGRESS_LEASE": conf.rekuest.progress_lease,
 }
+
+# Task retention: terminal root task trees older than this are deleted by the retention
+# sweep (reaper loop + reconcile_tasks command). 0 disables — history then grows forever.
+TASK_RETENTION_SECONDS = conf.rekuest.task_retention
+
+# Probes (facade.probes): redis-held, zero-DB-row invocations. TTL is the garbage
+# collector — a live probe's state expires after PROBE_TTL_SECONDS without a write, and a
+# terminal probe lingers PROBE_LINGER_SECONDS for late subscribers.
+PROBE_TTL_SECONDS = conf.rekuest.probe_ttl
+PROBE_LINGER_SECONDS = conf.rekuest.probe_linger
+PROBE_MAX_INFLIGHT_PER_CALLER = conf.rekuest.probe_max_inflight
 
 # Application definition
 USE_X_FORWARDED_HOST = conf.django.use_x_forwarded_host
@@ -137,6 +151,9 @@ STRAWBERRY_DJANGO = {
 
 
 CSRF_TRUSTED_ORIGINS = conf.django.csrf_trusted_origins
+# Consumed by kante's ``dynamicpath``/``re_dynamicpath`` (see rekuest/urls.py), which prefixes
+# each URL pattern itself. Deliberately NOT Django's FORCE_SCRIPT_NAME — setting both would
+# prefix twice.
 MY_SCRIPT_NAME = conf.django.force_script_name
 
 

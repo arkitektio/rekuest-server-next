@@ -11,6 +11,8 @@ import logging
 from facade import types, models, inputs, unique
 from pydantic import BaseModel, Field
 import kante
+from facade.catalog_validation import dump_diagnostics, validate_manifest_against_catalog
+from facade.mutations.blok import _sync_dependencies
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +47,7 @@ def _register_state(agent: models.Agent, inputstate: StateImplementationInputMod
     to the interface, ``app_identifier`` to the agent's app identifier."""
     state_definition, _ = models.StateDefinition.objects.update_or_create(
         hash=unique.hash_state_definition(inputstate.definition),
+        organization=agent.organization,
         defaults=dict(
             name=inputstate.definition.name,
             ports=[i.model_dump() for i in inputstate.definition.ports],
@@ -83,6 +86,7 @@ def ensure_agent(info: Info, input: AgentInput) -> types.Agent:
         defaults=dict(
             name=f"{str(agent)} memory shelve",
             creator=info.context.request.user,
+            organization=agent.organization,
         ),
     )
 
@@ -202,49 +206,49 @@ def implement_agent(info: Info, input: ImplementAgentInput) -> types.Agent:
 
     # Reap everything the agent no longer declares. Queryset delete still emits per-instance
     # signals (the subscription fan-out in facade.signals), without the per-row get() loops.
+    #
+    # Implementations carrying non-terminal tasks are kept: an agent that re-registers without an
+    # implementation it is still executing must not have that work deleted out from under it.
+    # ``Task.implementation`` is SET_NULL, so reaping an idle implementation preserves its history.
     models.State.objects.filter(agent=agent).exclude(id__in=created_states_id).delete()
-    models.Implementation.objects.filter(agent=agent).exclude(id__in=created_implementations_id).delete()
+
+    stale_implementations = models.Implementation.objects.filter(agent=agent).exclude(id__in=created_implementations_id)
+    live = stale_implementations.filter(tasks__is_done=False).distinct()
+    live_ids = list(live.values_list("id", flat=True))
+    if live_ids:
+        logger.warning(f"Keeping {len(live_ids)} undeclared implementation(s) for agent {agent.id}: still running tasks.")
+    stale_implementations.exclude(id__in=live_ids).delete()
 
     for blok in input.bloks or []:
-        catalog = models.UICatalog.objects.get_or_create(name=blok.catalog)[0] if blok.catalog else models.UICatalog.objects.get_or_create(name="default")[0]
+        catalog = models.UICatalog.objects.get_or_create(name=blok.catalog or "default", organization=agent.organization)[0]
+        blok_diagnostics = validate_manifest_against_catalog(catalog, blok.components)
 
         x, _ = models.Blok.objects.update_or_create(
             name=blok.key,
+            organization=agent.organization,
             defaults=dict(
                 components=[x.model_dump() for x in blok.components] if blok.components else [],
                 description=blok.description,
                 creator=info.context.request.user,
                 catalog=catalog,
-                demo_state=blok.demo_state,
+                demo_state=blok.demo_state or {},
+                diagnostics=dump_diagnostics(blok_diagnostics),
             ),
         )
 
-        new_deps = []
-
+        # One auto-materialization per agent-declared blok, every dependency bound to the
+        # declaring agent itself.
         mblok, _ = models.MaterializedBlok.objects.update_or_create(
             blok=x,
+            defaults=dict(name=x.name, description=x.description or ""),
         )
 
-        if blok.dependencies:
-            for i in blok.dependencies:
-                dep, _ = models.BlokDependency.objects.update_or_create(
-                    blok=x,
-                    key=i.key,
-                    defaults=dict(
-                        action_demands=[x.model_dump() for x in i.action_dependencies] if i.action_dependencies else [],
-                        state_demands=[x.model_dump() for x in i.state_dependencies] if i.state_dependencies else [],
-                        app_filter=i.app,
-                        version_filter=i.version,
-                    ),
-                )
-                new_deps.append(dep)
-
-                models.BlokAgentMapping.objects.update_or_create(
-                    materialized_blok=mblok,
-                    key=i.key,
-                    dependency=dep,
-                    defaults=dict(agent=agent),
-                )
+        for dep in _sync_dependencies(x, blok.dependencies, replace=True):
+            models.BlokAgentMapping.objects.update_or_create(
+                materialized_blok=mblok,
+                key=dep.key,
+                defaults=dict(dependency=dep, agent=agent),
+            )
 
     return agent
 

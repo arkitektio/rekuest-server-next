@@ -30,6 +30,10 @@ class Action(models.Model):
         default=False,
         help_text="Is this function idempotent. e.g can we run it multiple times without changing the data again ?",
     )
+    allow_probe = models.BooleanField(
+        default=False,
+        help_text="May this action be invoked as a probe (zero persistence, no history/replay/recovery)? Declared by the action author; the probe mutation refuses actions without it.",
+    )
     stateful = models.BooleanField(
         default=False,
         help_text="Is this function stateful. e.g does it inherently depend on or change state (think physical devices)?",

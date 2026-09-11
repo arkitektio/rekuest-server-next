@@ -30,6 +30,7 @@ def _seed_agents(context):
     org = request.organization
 
     counter_definition = models.StateDefinition.objects.create(
+        organization=org,
         name="Counter",
         hash="agents-sd-counter",
         description="counter",

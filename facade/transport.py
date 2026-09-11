@@ -15,25 +15,62 @@ from the DB — the real-time layer never has to be reliable, only prompt.
 from __future__ import annotations
 
 import logging
+import time
 
 from facade import caller_events, channel_events, channels, enums, hooks, messages, models
 from facade.consumers.agent_queue import RedisAgentQueue
 
 logger = logging.getLogger(__name__)
 
+# Delivery-routing fields (kind, hook_url, hook_url_secret) change ~never, so a short
+# process-local TTL cache is safe: worst case a redirected webhook or kind flip is
+# picked up one TTL late, while the per-message Agent SELECT disappears.
+_DELIVERY_CACHE_TTL = 60.0
+_DELIVERY_CACHE_MAX = 4096
+_agent_delivery_cache: dict[int, tuple[float, models.Agent]] = {}
+_caller_webhook_cache: dict[int, tuple[float, models.Agent | None]] = {}
 
-def deliver_to_agent(agent: models.Agent, message: messages.ToAgentMessage) -> None:
-    """Send one ToAgent message to ``agent`` over its transport (queue or webhook)."""
+
+def _cache_put(cache: dict, key: int, value) -> None:
+    if len(cache) >= _DELIVERY_CACHE_MAX:
+        cache.clear()
+    cache[key] = (time.monotonic() + _DELIVERY_CACHE_TTL, value)
+
+
+def get_agent_for_delivery(agent_id: int) -> models.Agent:
+    """The slim Agent row needed to route a delivery, behind the process-local TTL cache."""
+    hit = _agent_delivery_cache.get(agent_id)
+    if hit is not None and hit[0] > time.monotonic():
+        return hit[1]
+    agent = models.Agent.objects.only("id", "kind", "hook_url", "hook_url_secret").get(id=agent_id)
+    _cache_put(_agent_delivery_cache, agent_id, agent)
+    return agent
+
+
+def deliver_to_agent(agent: models.Agent, message: messages.ToAgentMessage, *, priority: bool = False) -> None:
+    """Send one ToAgent message to ``agent`` over its transport (queue or webhook).
+
+    ``priority`` (probe traffic) jumps the agent's queued backlog; the webhook transport
+    has no queue to jump, so it is ignored there.
+    """
     body = message.model_dump_json()
     if agent.kind == enums.AgentKind.WEBHOOK.value:
         hooks.deliver_to_hook(agent, body)
     else:
-        RedisAgentQueue.from_settings().push(str(agent.pk), body)
+        RedisAgentQueue.from_settings().push(str(agent.pk), body, priority=priority)
 
 
 def publish_task_event(event: models.TaskEvent) -> None:
-    """Fan a persisted task event out to its caller (channel layer + webhook)."""
-    task = event.task
+    """Fan a persisted task event out to its caller (channel layer + webhook).
+
+    Handlers that already hold the Task row acreate with ``task=x`` so the FK cache is
+    warm here (zero SELECTs); the fire-and-forget events (Yield/Log/Progress) acreate by
+    id, so this loads ONE slim row. The caller's organization comes from a TTL cache.
+    """
+    if models.TaskEvent.task.is_cached(event):
+        task = event.task
+    else:
+        task = models.Task.objects.only("id", "caller_id", "root_id").get(pk=event.task_id)
     caller_id = task.caller_id
     if not caller_id:
         return
@@ -44,20 +81,34 @@ def publish_task_event(event: models.TaskEvent) -> None:
     if task.root_id is None:
         topics += [
             f"root_tasks_caller_{caller_id}",
-            f"root_tasks_org_{task.caller.organization_id}",
+            f"root_tasks_org_{_get_org_for_caller(caller_id)}",
         ]
     channels.task_event_channel.broadcast(
-        channel_events.TaskEventCreatedEvent(event=event.id),  # pyright: ignore[reportCallIssue]  # pydantic Field(None) default
+        channel_events.TaskEventCreatedEvent(event=channel_events.TaskEventPayload.from_event(event)),  # pyright: ignore[reportCallIssue]  # pydantic Field(None) default
         topics,
     )
-    _deliver_caller_event_to_webhook(event, task)
+    _deliver_caller_event_to_webhook(event, caller_id)
 
 
-def _deliver_caller_event_to_webhook(event: models.TaskEvent, task: models.Task) -> None:
-    """If the task's caller is a HookAgent, POST the …Event mirror to its hook_url."""
-    caller = task.caller
-    if caller is None:
-        return
+_caller_org_cache: dict[int, tuple[float, int]] = {}
+
+
+def _get_org_for_caller(caller_id: int) -> int:
+    """The caller's organization id, behind the TTL cache — a caller never changes org."""
+    hit = _caller_org_cache.get(caller_id)
+    if hit is not None and hit[0] > time.monotonic():
+        return hit[1]
+    organization_id = models.Caller.objects.values_list("organization_id", flat=True).get(pk=caller_id)
+    _cache_put(_caller_org_cache, caller_id, organization_id)
+    return organization_id
+
+
+def _get_webhook_agent_for_caller(caller_id: int) -> models.Agent | None:
+    """The caller's HookAgent, if any, behind the TTL cache — almost every caller has none."""
+    hit = _caller_webhook_cache.get(caller_id)
+    if hit is not None and hit[0] > time.monotonic():
+        return hit[1]
+    caller = models.Caller.objects.only("id", "client_id", "user_id", "organization_id").get(pk=caller_id)
     agent = (
         models.Agent.objects.filter(
             client_id=caller.client_id,
@@ -69,6 +120,13 @@ def _deliver_caller_event_to_webhook(event: models.TaskEvent, task: models.Task)
         .exclude(hook_url="")
         .first()
     )
+    _cache_put(_caller_webhook_cache, caller_id, agent)
+    return agent
+
+
+def _deliver_caller_event_to_webhook(event: models.TaskEvent, caller_id: int) -> None:
+    """If the task's caller is a HookAgent, POST the …Event mirror to its hook_url."""
+    agent = _get_webhook_agent_for_caller(caller_id)
     if agent is None:
         return
     # A Django model satisfies EventLike at runtime, but pyright can't see through the

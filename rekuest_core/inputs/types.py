@@ -4,6 +4,7 @@ from strawberry import LazyType
 from rekuest_core.inputs import models
 import strawberry
 from rekuest_core import enums, scalars
+from kante.unions import merged_input, union_member, union_member_types
 
 # NOTE: For ``@strawberry.experimental.pydantic`` types, GraphQL field descriptions are
 # sourced from the *pydantic* model (``Field(description=...)`` in ``models.py``), not from
@@ -17,23 +18,23 @@ from rekuest_core import enums, scalars
 @pydantic.input(
     models.EffectInputModel,
     description="""
-                 An effect is a way to modify a port based on a condition. For example,
-    you could have an effect that sets a port to null if another port is null.
+    An effect is a way to modify a port based on a condition. For example,
+    you could have an effect that hides the port if another port meets a condition,
+    e.g. when the user selects a certain option in a dropdown, another port is hidden.
 
-    Or, you could have an effect that hides the port if another port meets a condition.
-    E.g when the user selects a certain option in a dropdown, another port is hidden.
-
-
+    The condition is a pure blok UtilCall (`call`) evaluated client-side against the
+    catalog; it must return a boolean deciding whether the effect applies. `dependencies`
+    is the authoritative list of other ports the call may reference (plus `value` for the
+    port's own value).
     """,
 )
 class EffectInput:
     kind: enums.EffectKind
     dependencies: list[str] | None = strawberry.field(default_factory=list)
-    function: scalars.ValidatorFunction
+    call: Annotated["UtilCallInput", strawberry.lazy(__name__)]
     message: str | None = None
-    hook: str | None = None
-    ward: str | None = None
     fade: bool | None = True
+    source: str | None = None
 
 
 @pydantic.input(
@@ -58,89 +59,142 @@ class ChoiceInput:
 @pydantic.input(models.StateAccessorInputModel)
 class StateAccessorInput:
     option_key: enums.OptionKey
-    sub_path: str | None = None
+    path: str | None = None
+    call: Optional[Annotated["UtilCallInput", strawberry.lazy(__name__)]] = None
 
 
-@pydantic.input(models.AssignWidgetInputModel)
-class AssignWidgetInput:
-    """An Assign Widget is a UI element that is used to assign a value to a port.
-
-    It gets displayed if we intend to assign to a action, and represents the Widget
-    that gets displayed in the UI. For example, a dropdown, a text input, a slider,
-    etc.
-
-    This input type composes elements of all the different kinds of assign widgets.
-    Please refere to each subtype for more information.
-
-
-
-    """
-
+# ----------------------------------------------------------------------------
+# Widgets arrive as kante discriminated input unions: one strict member input per kind, plus a
+# merged wire type (`AssignWidgetInput` / `ReturnWidgetInput`) whose `to_pydantic` dispatches on
+# `kind`. The members are published with `@unionElementOf` so generated clients rebuild the union.
+# ----------------------------------------------------------------------------
+@union_member("AssignWidgetInput", key="SLIDER")
+@pydantic.input(models.SliderAssignWidgetInputModel, description="A numeric slider for INT, FLOAT and QUANTITY ports.")
+class SliderAssignWidgetInput:
     kind: enums.AssignWidgetKind
-    query: scalars.SearchQuery | None = None
-    choices: list[ChoiceInput] | None = None
-    state_choices: str | None = None
     follow_value: str | None = None
     min: float | None = None
     max: float | None = None
     step: float | None = None
+
+
+@union_member("AssignWidgetInput", key="CHOICE")
+@pydantic.input(models.ChoiceAssignWidgetInputModel, description="A dropdown over the port's `choices`.")
+class ChoiceAssignWidgetInput:
+    kind: enums.AssignWidgetKind
+    follow_value: str | None = None
+    placeholder: str | None = None
+
+
+@union_member("AssignWidgetInput", key="STRING")
+@pydantic.input(models.StringAssignWidgetInputModel, description="A text input for STRING ports.")
+class StringAssignWidgetInput:
+    kind: enums.AssignWidgetKind
+    follow_value: str | None = None
     placeholder: str | None = None
     as_paragraph: bool | None = None
-    hook: str | None = None
-    ward: str | None = None
-    fallback: Optional[Annotated["AssignWidgetInput", strawberry.lazy(__name__)]] = None
-    filters: Optional[List[Annotated["ArgPortInput", strawberry.lazy(__name__)]]] = strawberry.field(default_factory=list)
+
+
+@union_member("AssignWidgetInput", key="SEARCH")
+@pydantic.input(models.SearchAssignWidgetInputModel, description="A search over a ward for STRUCTURE ports (or lists of them).")
+class SearchAssignWidgetInput:
+    kind: enums.AssignWidgetKind
+    follow_value: str | None = None
+    query: scalars.SearchQuery
+    ward: str
+    filters: Optional[List[Annotated["ArgPortInput", strawberry.lazy(__name__)]]] = None
     dependencies: list[str] | None = strawberry.field(default_factory=list)
+    placeholder: str | None = None
+
+
+@union_member("AssignWidgetInput", key="CUSTOM")
+@pydantic.input(models.CustomAssignWidgetInputModel, description="A catalog component rendered as the port's widget.")
+class CustomAssignWidgetInput:
+    kind: enums.AssignWidgetKind
+    follow_value: str | None = None
+    component: str
+    props: Optional[List[Annotated["ComponentPropInput", strawberry.lazy(__name__)]]] = None
+    dependencies: list[str] | None = strawberry.field(default_factory=list)
+    fallback: Optional[Annotated["AssignWidgetInput", strawberry.lazy(__name__)]] = None
+
+
+@union_member("AssignWidgetInput", key="STATE_CHOICE")
+@pydantic.input(models.StateChoiceAssignWidgetInputModel, description="A choice over entries of an agent's state.")
+class StateChoiceAssignWidgetInput:
+    kind: enums.AssignWidgetKind
+    follow_value: str | None = None
     dependency: str | None = None
     state_path: str | None = None
-    target_dependency: str | None = None
-    target_action: str | None = None
-    target_port: str | None = None
+    state_call: Optional[Annotated["UtilCallInput", strawberry.lazy(__name__)]] = None
     state_accessors: Optional[List[Annotated["StateAccessorInput", strawberry.lazy(__name__)]]] = None
+    dependencies: list[str] | None = strawberry.field(default_factory=list)
 
 
-@pydantic.input(
-    models.ReturnWidgetInputModel,
-    description="""A Return Widget is a UI element that is used to display the value of a port.
+@union_member("AssignWidgetInput", key="PROXY")
+@pydantic.input(models.ProxyAssignWidgetInputModel, description="Delegates the port to a port of another action.")
+class ProxyAssignWidgetInput:
+    kind: enums.AssignWidgetKind
+    follow_value: str | None = None
+    target_port: str
+    target_action: str
+    target_dependency: str | None = None
 
-    Return Widgets get displayed both if we show the return values of an assignment,
-    but also when we inspect the given arguments of a previous run task. Their primary
-    usecase is to adequately display the value of a port, in a user readable way.
 
-    Return Widgets are often overwriten by the underlying UI framework (e.g. Orkestrator)
-    to provide a better user experience. For example, a return widget that displays a
-    date could be overwriten to display a calendar widget.
+@merged_input(
+    members=[SliderAssignWidgetInput, ChoiceAssignWidgetInput, StringAssignWidgetInput, SearchAssignWidgetInput, CustomAssignWidgetInput, StateChoiceAssignWidgetInput, ProxyAssignWidgetInput],
+    noun="assign widget",
+    description="An assign widget: the UI element used to assign a value to a port, as a discriminated union over `kind`. Only the fields of the chosen kind may be set; see the `*AssignWidgetInput` members.",
+    descriptions={"kind": "Which kind of assign widget this is; decides which other fields are read."},
+    spec=models.AssignWidgetInputModel,
+)
+class AssignWidgetInput:
+    """An assign widget, discriminated by ``kind``."""
 
-    Return Widgets provide more a way to customize this overwriten behavior.
 
-    """,
+@union_member("ReturnWidgetInput", key="CHOICE")
+@pydantic.input(models.ChoiceReturnWidgetInputModel, description="Displays the port's `choices` label for a returned value.")
+class ChoiceReturnWidgetInput:
+    kind: enums.ReturnWidgetKind
+
+
+@union_member("ReturnWidgetInput", key="CUSTOM")
+@pydantic.input(models.CustomReturnWidgetInputModel, description="A catalog component rendered for a returned value.")
+class CustomReturnWidgetInput:
+    kind: enums.ReturnWidgetKind
+    component: str
+    props: Optional[List[Annotated["ComponentPropInput", strawberry.lazy(__name__)]]] = None
+
+
+@merged_input(
+    members=[ChoiceReturnWidgetInput, CustomReturnWidgetInput],
+    noun="return widget",
+    description="A return widget: the UI element used to display a port's value, as a discriminated union over `kind`. Only the fields of the chosen kind may be set; see the `*ReturnWidgetInput` members.",
+    descriptions={"kind": "Which kind of return widget this is; decides which other fields are read."},
+    spec=models.ReturnWidgetInputModel,
 )
 class ReturnWidgetInput:
-    kind: enums.ReturnWidgetKind
-    query: scalars.SearchQuery | None = None
-    choices: list[ChoiceInput] | None = None
-    min: int | None = None
-    max: int | None = None
-    step: int | None = None
-    placeholder: str | None = None
-    hook: str | None = None
-    ward: str | None = None
+    """A return widget, discriminated by ``kind``."""
+
+
+widget_input_types = [*union_member_types(AssignWidgetInput), *union_member_types(ReturnWidgetInput)]
+"""The member input types; nothing references them, so every schema must list them in ``types=``."""
 
 
 @pydantic.input(
     models.ValidatorInputModel,
     description="""
-A validating function for a port. Can specify a function that will run when validating values of the port.
-If outside dependencies are needed they need to be specified in the dependencies field. With the .. syntax
-when transversing the tree of ports.
-
+A validator for a port. `call` is a pure blok UtilCall evaluated client-side against the
+catalog; it must return a boolean meaning 'valid'. Other ports the call references must be
+listed in `dependencies` (the authoritative subscription list); `value` refers to the port's
+own value. Use the .. syntax when traversing the tree of ports.
 """,
 )
 class ValidatorInput:
-    function: scalars.ValidatorFunction
+    call: Annotated["UtilCallInput", strawberry.lazy(__name__)]
     dependencies: list[str] | None = strawberry.field(default_factory=list)
     label: str | None = None
     error_message: str | None = None
+    source: str | None = None
 
 
 @pydantic.input(
@@ -151,43 +205,33 @@ class ValidatorInput:
 )
 class OptimisticInput:
     state: str
-    path: str
+    path: str | None = None
+    path_call: Optional[Annotated["UtilCallInput", strawberry.lazy(__name__)]] = None
     accessor: str | None = None
 
 
 @pydantic.input(models.RequiresInputModel)
 class RequiresInput:
     key: str
-    operator: enums.RequiresOperator
-    value: scalars.Arg
+    operator: enums.DescriptorOperator
+    value: scalars.Arg | None = None
 
 
 @pydantic.input(models.ProvidesInputModel)
 class ProvidesInput:
     key: str
-    operator: enums.ProvidesOperator
-    value: scalars.Arg
+    operator: enums.DescriptorOperator
+    value: scalars.Arg | None = None
 
 
 @pydantic.input(
     models.ArgPortInputModel,
-    description="""Port
+    description="""A Port is a single input or output of an action, identified by its `key` and typed by its `kind`.
 
-    A Port is a single input or output of a action. It is composed of a key and a kind
-    which are used to uniquely identify the port.
-
-    If the Port is a structure, we need to define a identifier and scope,
-    Identifiers uniquely identify a specific type of model for the scopes (e.g
-    all the ports that have the identifier "@mikro/image" are of the same type, and
-    are hence compatible with each other). Scopes are used to define in which context
-    the identifier is valid (e.g. a port with the identifier "@mikro/image" and the
-    scope "local", can only be wired to other ports that have the same identifier and
-    are running in the same app). Global ports are ports that have the scope "global",
-    and can be wired to any other port that has the same identifier, as there exists a
-    mechanism to resolve and retrieve the object for each app. Please check the rekuest
-    documentation for more information on how this works.
-
-
+    STRUCTURE, MEMORY_STRUCTURE and INTERFACE ports carry an `identifier` of the form `@package/key`
+    (e.g. `@mikro/image`); ports with the same identifier are compatible. LIST and DICT ports have one
+    child (the item type), UNION ports two or more (the variants), MODEL ports one per field. ENUM ports
+    declare `choices`. See docs/design/ports.md for the full table.
     """,
 )
 class ArgPortInput:
@@ -202,7 +246,7 @@ class ArgPortInput:
     choices: list[ChoiceInput] | None = strawberry.field(default_factory=list)
     default: scalars.AnyDefault | None = None
     children: list[Annotated["ArgPortInput", strawberry.lazy(__name__)]] | None = strawberry.field(default_factory=list)
-    widget: Optional["AssignWidgetInput"] = None
+    widget: Optional[AssignWidgetInput] = None
     requires: list[RequiresInput] | None = strawberry.field(default_factory=list)
     reference_unit: str | None = None
     proposed_units: list[str] | None = None
@@ -211,27 +255,15 @@ class ArgPortInput:
 
 @pydantic.input(
     models.ReturnPortInputModel,
-    description="""Port
+    description="""A Port is a single input or output of an action, identified by its `key` and typed by its `kind`.
 
-    A Port is a single input or output of a action. It is composed of a key and a kind
-    which are used to uniquely identify the port.
-
-    If the Port is a structure, we need to define a identifier and scope,
-    Identifiers uniquely identify a specific type of model for the scopes (e.g
-    all the ports that have the identifier "@mikro/image" are of the same type, and
-    are hence compatible with each other). Scopes are used to define in which context
-    the identifier is valid (e.g. a port with the identifier "@mikro/image" and the
-    scope "local", can only be wired to other ports that have the same identifier and
-    are running in the same app). Global ports are ports that have the scope "global",
-    and can be wired to any other port that has the same identifier, as there exists a
-    mechanism to resolve and retrieve the object for each app. Please check the rekuest
-    documentation for more information on how this works.
-
-
+    STRUCTURE, MEMORY_STRUCTURE and INTERFACE ports carry an `identifier` of the form `@package/key`
+    (e.g. `@mikro/image`); ports with the same identifier are compatible. LIST and DICT ports have one
+    child (the item type), UNION ports two or more (the variants), MODEL ports one per field. ENUM ports
+    declare `choices`. See docs/design/ports.md for the full table.
     """,
 )
 class ReturnPortInput:
-    validators: list[ValidatorInput] | None = strawberry.field(default_factory=list)
     key: str
     label: str | None = None
     kind: enums.PortKind
@@ -240,9 +272,8 @@ class ReturnPortInput:
     nullable: bool = False
     effects: list[EffectInput] | None = strawberry.field(default_factory=list)
     choices: list[ChoiceInput] | None = strawberry.field(default_factory=list)
-    default: scalars.AnyDefault | None = None
     children: list[Annotated["ReturnPortInput", strawberry.lazy(__name__)]] | None = strawberry.field(default_factory=list)
-    widget: Optional["ReturnWidgetInput"] = None
+    widget: Optional[ReturnWidgetInput] = None
     provides: list[ProvidesInput] | None = strawberry.field(default_factory=list)
     reference_unit: str | None = None
     proposed_units: list[str] | None = None
@@ -254,10 +285,10 @@ class ReturnPortInput:
 )
 class PortGroupInput:
     key: str = strawberry.field(description="The key of the port group. This is used to uniquely identify the port group")
-    title: str | None
-    description: str | None
-    effects: list[EffectInput] | None = strawberry.field(default_factory=list)
-    ports: list[str] | None = strawberry.field(default_factory=list)
+    title: str | None = strawberry.field(default=None, description="The title of the port group, displayed in the UI")
+    description: str | None = strawberry.field(default=None, description="The description of the port group, displayed in the UI")
+    effects: list[EffectInput] | None = strawberry.field(default_factory=list, description="The effects applied to the port group as a whole")
+    ports: list[str] = strawberry.field(default_factory=list, description="The keys of the root arg ports in this group; a port belongs to at most one group")
 
 
 @pydantic.input(
@@ -419,6 +450,14 @@ class DefinitionInput:
         default=False,
         description="Whether the action is idempotent: safe to run multiple times with the same args without changing the outcome — on ambiguous executor loss it may be freely re-dispatched.",
     )
+    allow_probe: bool = strawberry.field(
+        default=False,
+        description="Whether the action may be invoked as a probe: zero persistence, redis-held state, no history/replay/recovery. Only actions declaring this are callable via the call mutation.",
+    )
+    catalogs: list[str] | None = strawberry.field(
+        default_factory=list,
+        description="Names of the UI catalogs that extend the base catalog (`base@1`, always applied) for this definition's effect and validator calls. Unknown names yield an unknown_catalog warning; conflicting operation definitions across catalogs are a registration error.",
+    )
     port_groups: list[PortGroupInput] = strawberry.field(
         default_factory=list,
         description="The port groups of the definition. This is used to group ports together in the UI",
@@ -444,7 +483,7 @@ class DefinitionInput:
 
 @pydantic.input(models.WindowInputModel, description="""A window that is calculated""")
 class WindowInput:
-    window_function: str
+    window_function: enums.WindowFunction
     label: str | None = None
 
 
@@ -517,11 +556,12 @@ class LockImplementationInput:
 
 @pydantic.input(models.DynamicValueInputModel, description="A bound state pointer referencing a variable inside a Blok state instance.")
 class DynamicValueInput:
+    literal: Optional[str] = None
     path: Optional[str] = None
 
 
-@pydantic.input(models.AgentCallInputModel, description="Defines a callback that routes user interactions directly to an Arkitekt Agent via Rekuest.")
-class AgentCallInput:
+@pydantic.input(models.AgentProbeInputModel, description="Defines a callback that routes user interactions directly to an Arkitekt Agent via Rekuest.")
+class AgentProbeInput:
     dependency: str
     operation: str
     arguments: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = None
@@ -539,7 +579,7 @@ class ActionArgumentInput:
     value_literal: Optional[scalars.JSONSerializable] = None
     value_path: Optional[str] = None
 
-    agent_call: Optional[AgentCallInput] = None
+    agent_call: Optional[AgentProbeInput] = None
     util_call: Optional[UtilCallInput] = None
     value_list: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = None
     value_dict: Optional[List[Annotated["ActionArgumentInput", strawberry.lazy(__name__)]]] = None
@@ -552,7 +592,7 @@ class ComponentPropInput:
     # Primitives mapping to standard properties, state paths, or actions
     static_value: Optional[scalars.JSONSerializable] = None
     dynamic_value: Optional[DynamicValueInput] = None
-    agent_call: Optional[AgentCallInput] = None
+    agent_call: Optional[AgentProbeInput] = None
     util_call: Optional[UtilCallInput] = None
     declares_value: Optional[str] = None
 
@@ -576,3 +616,43 @@ class BlokImplementationInput:
     catalog: Optional[str] = None
     demo_state: Optional[scalars.JSONSerializable] = None
     description: Optional[str] = None
+
+
+@pydantic.input(models.CatalogPropInputModel, description="A prop a catalog component accepts.")
+class CatalogPropInput:
+    key: str
+    kind: enums.CatalogValueKind
+    required: bool = False
+    description: Optional[str] = None
+
+
+@pydantic.input(models.CatalogComponentInputModel, description="A component a UI catalog can render.")
+class CatalogComponentInput:
+    name: str
+    description: Optional[str] = None
+    props: List[CatalogPropInput] = strawberry.field(default_factory=list)
+    accepts_children: bool = True
+
+
+@pydantic.input(models.CatalogArgumentInputModel, description="An argument a catalog operation accepts.")
+class CatalogArgumentInput:
+    key: str
+    kind: enums.CatalogValueKind
+    required: bool = True
+    description: Optional[str] = None
+
+
+@pydantic.input(models.CatalogOperationInputModel, description="A pure operation a UI catalog can evaluate for UtilCalls.")
+class CatalogOperationInput:
+    name: str
+    description: Optional[str] = None
+    arguments: List[CatalogArgumentInput] = strawberry.field(default_factory=list)
+    returns: enums.CatalogValueKind
+
+
+@pydantic.input(models.WidgetDefaultInputModel, description="A catalog's default widget for ports matching a kind and/or structure identifier. A UI applies it when a port has no explicit widget; an identifier match beats a kind match.")
+class WidgetDefaultInput:
+    kind: Optional[enums.PortKind] = None
+    identifier: Optional[str] = None
+    widget: Optional[AssignWidgetInput] = None
+    return_widget: Optional[ReturnWidgetInput] = None

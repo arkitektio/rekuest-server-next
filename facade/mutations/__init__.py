@@ -1,5 +1,6 @@
 from .implementation import create_implementation, delete_implementation, pin_implementation, set_higher_order
 from .postman import assign, pause, resume, ack, cancel, interrupt, collect, bounce, kick, block, unblock
+from .probe import probe, cancel_probe, pause_probe, resume_probe
 from .test import create_test_case, create_test_result
 from .memory_shelve import shelve_in_memory_drawer, unshelve_memory_drawer
 from .agent import ensure_agent, pin_agent, delete_agent
@@ -7,8 +8,8 @@ from .dashboard import create_dashboard, delete_dashboard, update_dashboard
 from .shortcut import create_shortcut, delete_shortcut
 from .toolbox import create_toolbox, delete_toolbox
 from .blok import create_blok, delete_blok, update_blok
+from .catalog import register_ui_catalog
 from .materialized_blok import materialize_blok, delete_materialized_blok, update_materialized_blok
-from .lifeline import reinit
 from .action import cleanup_actions
 from .resolution import auto_resolve, create_resolution, update_resolution, delete_resolution
 from .space import create_space, create_placement, update_space, delete_space, update_placement, delete_placement
@@ -36,12 +37,12 @@ __all__ = [
     "update_resolution",
     "delete_resolution",
     "cleanup_actions",
-    "reinit",
     "materialize_blok",
     "unblock",
     "delete_implementation",
     "create_dashboard",
     "create_blok",
+    "register_ui_catalog",
     "create_space",
     "create_placement",
     "update_space",
@@ -56,6 +57,10 @@ __all__ = [
     "create_shortcut",
     "delete_shortcut",
     "assign",
+    "probe",
+    "cancel_probe",
+    "pause_probe",
+    "resume_probe",
     "pause",
     "resume",
     "ack",
