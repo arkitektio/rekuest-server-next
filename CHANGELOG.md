@@ -1,4 +1,26 @@
+<!-- Frozen. Releases are tag-only since the move to tag-only semantic-release,
+so this file is no longer generated; entries below stop at the last release that
+predates the switch. Current release notes live on the GitHub Releases page. -->
+
 # CHANGELOG
+
+
+## v3.0.2-rc.1 (2026-09-11)
+
+### Bug Fixes
+
+- Allow the release workflow to be run by hand
+  ([`45b8d4f`](https://github.com/arkitektio/rekuest-server-next/commit/45b8d4f7b4cda4494cbc035c65de7f9934acc567))
+
+The image is built only when semantic-release cuts a version, and the docker job is gated on
+  `needs.release.outputs.released == 'true'`. A branch whose commits are all released therefore had
+  no way to (re)publish its image -- the `next` line carried the structure-reference envelope fix
+  but its `:next` tag still pointed at a build from before it, and the only way to move it was to
+  invent a commit to force a release. `workflow_dispatch` gives that a proper handle.
+
+Typed `fix:` deliberately rather than `ci:`: this push is also what finally publishes a `:next`
+  image containing the envelope fix, and only a releasing type reaches the docker job. That is the
+  last time this trick should be needed -- the manual trigger added here replaces it.
 
 
 ## v3.0.1 (2026-09-11)
