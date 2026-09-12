@@ -1,7 +1,7 @@
 
 services:
    db:
-      image: jhnnsrs/daten:dev
+      image: jhnnsrs/daten:next
       environment:
          POSTGRES_MULTIPLE_DATABASES: testdb
          POSTGRES_PASSWORD: test
